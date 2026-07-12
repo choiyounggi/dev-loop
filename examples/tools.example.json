@@ -1,0 +1,39 @@
+{
+  "intake": {
+    "kind": "mcp",
+    "ref": "atlassian",
+    "how": "getJiraIssue(parent) + searchJiraIssuesUsingJql('parent=<KEY>'); extract key from URL last segment",
+    "when": "user names a parent issue key/URL — its children become the candidate tasks (else: free-text goal)"
+  },
+  "knowledge": {
+    "kind": "mcp",
+    "ref": "wiki-rag",
+    "how": "wiki_search -> wiki_get_document -> wiki_query_context",
+    "when": "domain terms, business policy, code/status values — verify before assuming"
+  },
+  "tacit": {
+    "kind": "mcp",
+    "ref": "rtb-lore",
+    "how": "lore_query, lore_list_danger_zones, lore_get_incident",
+    "when": "edge cases, past incidents, coupling/danger zones for the area being changed"
+  },
+  "_note_plan": "There is no 'plan' role in dev-loop — step 2 is fixed to the bundled wiki-plan skill (grounded in wiki/). Do not add a plan role here; it is ignored.",
+  "verify": {
+    "kind": "cli",
+    "ref": "pnpm test",
+    "how": "run the project's test/build/QA command; report failures verbatim",
+    "when": "step 5 — running tests. Execution only; do NOT use a tool that runs its own fix loop"
+  },
+  "explore": {
+    "kind": "cli",
+    "ref": "rtb-sourcecode",
+    "how": "find-references / read-definition for external repos and symbols",
+    "when": "step 1 — locating code, symbols, call sites (read-only)"
+  },
+  "design": {
+    "kind": "mcp",
+    "ref": "rtb-figma",
+    "how": "get_spec_links -> inspect_node / get_dev_ready / get_design_tokens",
+    "when": "issue has a Figma link AND the change touches UI; skip for backend-only tasks"
+  }
+}

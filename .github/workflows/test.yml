@@ -1,0 +1,41 @@
+# Run the bats suite on every push to main and every PR, across macOS and Linux
+# (the plugin's shell scripts must be portable — design §12). Guards against
+# regressions before a release tag is cut.
+
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install bats + jq + tmux
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install bats-core jq tmux
+          else
+            sudo apt-get update
+            sudo apt-get install -y bats jq tmux
+          fi
+
+      - name: Run bats suite
+        run: bats tests/

@@ -1,0 +1,42 @@
+# Create a GitHub Release (with auto-generated notes) when a version tag is
+# pushed. This plugin is installed via the Claude Code marketplace (a git repo),
+# not npm, so there is NO npm publish step — the Release is the versioning
+# artifact for marketplace users.
+#
+# Usage: bump .claude-plugin/plugin.json "version", commit, then:
+#   git tag vX.Y.Z && git push origin vX.Y.Z
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # needed to create the Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Refuse if the tag and plugin.json version disagree (fail-fast).
+      - name: Verify tag matches plugin.json version
+        run: |
+          PKG_VERSION=$(jq -r .version .claude-plugin/plugin.json)
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "plugin.json: $PKG_VERSION"
+          echo "release tag: $TAG_VERSION"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag '$TAG_VERSION' does not match plugin.json '$PKG_VERSION'. Bump plugin.json or retag."
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
