@@ -13,12 +13,13 @@ description: For a CAPABLE model (Claude Sonnet/Opus, GPT-4-class, Codex) — an
 > described in step 5.
 >
 > **How this plugs into the loop.** `loop-implement` calls this skill as its
-> **step 2 (Plan)** — mandatory. For a single loop-implement task, produce the
-> wiki-grounded `## Decisions` table and a concrete plan; loop-implement then
-> executes it through its own steps 3–7 (Red → Green → run → audit). The
-> full task-decomposition + small-model handoff below (`tasks/NN-*.md` +
-> `wiki-implement`) is what `orchestrate` uses to split a goal across sessions.
-> Either way, **every decision must cite a `wiki/` page or be marked `[no-wiki]`**.
+> **step 2 (Plan)** — mandatory. Produce the wiki-grounded `## Decisions` table,
+> the ordered `## Task order`, and one `tasks/NN-*.md` per task naming the exact
+> wiki pages it needs. **`loop-implement` is the single implementer** — it then
+> executes those tasks *in order*, loading each task's named pages and running the
+> verification loop (Red → Green → run → audit) per task. (`orchestrate` uses the
+> same output to fan tasks across sessions, each session running `loop-implement`.)
+> Every decision must cite a `wiki/` page or be marked `[no-wiki]`.
 
 You are the planner. The implementer will be a small model with no memory of this
 planning session. Its entire world per task = one task file + the wiki pages that
@@ -113,8 +114,13 @@ decision now, and write the decision into the task.
 
 ## Execution handoff
 
-Tasks are executed one at a time, in order, each by a fresh small-model session
-running `skills/wiki-implement/SKILL.md` with the task file path as its assignment.
-If an implementer reports BLOCKED, the fix belongs here: repair the task file
-(or the plan), then re-dispatch — that a small model got blocked means the plan
-was under-specified, not that the model failed.
+Tasks are executed one at a time, in `## Task order`, by **`loop-implement`** —
+the single implementation loop. It loads each task's named wiki pages, applies
+their directives (task D-number decisions win), and runs the verification loop
+(tests → audit → judge) before moving to the next task. (In `orchestrate`, each
+task is dispatched to its own session, which runs `loop-implement`.)
+
+If execution reports BLOCKED, the fix belongs here: the task was under-specified.
+Repair the task file (or a decision in `plan.md`), then re-dispatch — a BLOCKED
+report means the plan left a decision to the implementer, not that execution
+failed.

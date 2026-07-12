@@ -132,12 +132,14 @@ Run these via the skill files, which contain the full step-by-step workflows:
 Two further skills use the wiki to run development work (rather than maintain the wiki):
 
 - **Plan** (`skills/wiki-plan/SKILL.md`) — for a capable model: make every design decision
-  (wiki-grounded), then decompose the work into ordered task files sized for a small
-  model (≤3 files, ≤4 wiki pages, verifiable, self-contained), each mapping the exact
+  (wiki-grounded), then decompose the work into ordered task files sized for execution
+  (≤3 files, ≤4 wiki pages, verifiable, self-contained), each mapping the exact
   wiki pages that govern it.
-- **Implement** (`skills/wiki-implement/SKILL.md`) — for the small model executing one task:
-  read only the task file + its named wiki pages + named inputs, no improvisation
-  (missing decisions are reported BLOCKED, never guessed), verify, report in a fixed format.
+- **Implement** (`skills/loop-implement/SKILL.md`) — the single implementation loop:
+  execute the plan's tasks in order, loading each task's named wiki pages, applying their
+  directives (no improvisation — missing decisions go back to the plan, never guessed),
+  writing tests first and judging each task against done. The wiki-executor discipline
+  is folded in here; there is no separate implement skill.
 
 ## Naming
 

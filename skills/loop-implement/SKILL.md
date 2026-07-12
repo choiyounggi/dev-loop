@@ -1,18 +1,34 @@
 ---
 name: loop-implement
-description: Close a single implementation task with a methodology-grounded verification loop — define done, analyze, plan, write tests first (Red), implement (Green), run, self-review, get an independent test-quality audit, then judge against done; on failure reflect and retry (bounded). Use for one non-trivial task (feature, fix, behavior-changing refactor). Skip for typos, config values, simple renames.
+description: The single implementation loop. Plans via wiki-plan (step 2, required) into an ordered, wiki-navigated task list, then executes those tasks IN ORDER — each loading only its named wiki pages, applying their directives with no improvisation, writing tests first (Red), implementing (Green), running, self-reviewing, getting an independent test-quality audit, and judging against done (reporting the wiki references applied); on failure reflect and retry (bounded). Consumes an existing plan if handed one. Use for a non-trivial task or feature. Skip for typos, config values, simple renames.
 ---
 
-# loop-implement — verification loop for a single task
+# loop-implement — the single implementation loop, driven by a wiki-plan
 
-Take one task and drive it to "done" through a closed loop whose steps are
-grounded in established methodology (sources at the bottom). This is the worker
-half of loop-orchestrator: an orchestrator session hands you one task; you
-complete it here. It also works standalone for a single task.
+Drive work to "done" through a closed, methodology-grounded loop (sources at the
+bottom). **This is dev-loop's one and only implementation skill** — it both plans
+(via `wiki-plan`, step 2) and executes, so there is no separate executor. The
+plan `wiki-plan` produces is not a loose sketch: it fixes an ordered task list
+and, for each task, *navigates to the exact wiki pages that ground it* (the
+decision→page map). This loop **consumes that plan directly** — executing the
+tasks in the plan's order, loading exactly the wiki pages each task names, and
+citing them — so every change traces back to a verified wiki page.
+
+It works the same whether it runs standalone (you produce the plan here in step 2)
+or as an orchestrated worker (the orchestrator hands you a task brief and you plan
++ implement it here). Either path, one loop.
 
 ## When to use
 - Use: logic changes, new features, bug fixes, behavior-changing refactors.
 - Skip: typos, config values, simple rename/import cleanup, one-line edits.
+
+## Two entry modes (both run the SAME loop)
+- **A plan already exists** (a `plans/<feature>/` from a prior `wiki-plan` run, or
+  handed to you by the orchestrator): skip producing one — execute its tasks in
+  the `## Task order` sequence, one at a time, each through steps 0 and 3–7 below,
+  loading that task's named wiki pages.
+- **No plan yet** (a fresh standalone task): step 2 runs `wiki-plan` first to
+  produce the ordered, wiki-navigated plan, then you execute it the same way.
 
 ## The plan step is fixed (not pluggable)
 Step 2 (Plan) is **hardwired to the bundled `wiki-plan` skill** and is
@@ -47,42 +63,92 @@ is no `implement` role — step 4 below is the single owner of the implement cyc
 
 ## The loop
 
+Step 2 produces the plan once (or you were handed one). Steps 0 and 3–7 then run
+**per task, in the plan's `## Task order`** — finish and judge one task before
+starting the next, so a downstream task always builds on a verified upstream one.
+
 ```
-0. Define done       — write the acceptance criteria + done checklist FIRST,
-                        so the loop has an explicit pass/fail target.        [DoD/XP]
-1. Analyze           — understand the change; list the test scenarios it needs.
-                        Consult `knowledge` + `tacit` if configured; use `explore`
-                        to locate code/symbols. For a UI-facing task, read the
-                        visual spec — the brief's `<design_spec>` if present, else
-                        consult `design` (e.g. a Figma link) — and implement to it. [TDD step 1 / PDCA Plan]
-2. Plan (wiki-plan)  — REQUIRED. Invoke the bundled `wiki-plan` skill to make
-                        every design decision, each grounded in a `wiki/` page
-                        (record the decision->page map), and to write the plan
-                        as concrete values/code — never "as appropriate". This
-                        step is not skippable for a non-trivial task and never
-                        defers a decision to the implementing pass.              [PDCA Plan / wiki-plan]
-3. Write tests (Red) — write the failing test(s) BEFORE the code. The test is
-                        the spec and the verification oracle. If test-first is
-                        impractical (e.g. exploratory UI), fix the acceptance
-                        criteria / verification command before implementing.    [TDD test-first]
-4. Implement (Green) — minimal code to make the tests pass.                     [TDD Green / PDCA Do]
-5. Run tests (Check) — run new + existing tests; preserve failure output. Use the
-                        `verify` role's command if configured (run only).        [PDCA Check / self-testing code]
-6. Self-review + refactor — clean up; check bugs, edge cases, resource leaks,
-                        input validation, unused code. Re-check against the
-                        `tacit` role's danger zones if configured.               [TDD Refactor / self-review / Self-Refine]
+2. Plan (wiki-plan)  — REQUIRED, once. If no plan exists, invoke `wiki-plan` to
+                        make every design decision (each grounded in a `wiki/`
+                        page — the decision->page map) and emit the ordered task
+                        list, each task naming the exact wiki pages it needs. If a
+                        plan exists, adopt it. Never defer a decision to execution. [PDCA Plan / wiki-plan]
+
+   ── for each task, in Task order: ──
+0. Define done       — from the task's Objective + Verify + the plan's Deliverables:
+                        write this task's pass/fail checklist FIRST.            [DoD/XP]
+1. Analyze + load refs— read THIS task's "Wiki pages (read these first, only
+                        these)" — the pages `wiki-plan` navigated to — and load
+                        exactly those from `${CLAUDE_PLUGIN_ROOT}/wiki/`, plus the
+                        task's Inputs (confirm each exists; a missing Input is a
+                        plan defect -> 7b, not a stand-in). List the test
+                        scenarios. Consult `knowledge`/`tacit`/`explore` if
+                        configured; for a UI task read the `<design_spec>`/`design`. [TDD step 1 / PDCA Plan]
+3. Write tests (Red) — failing test(s) BEFORE code, from the task's Verify/Objective.
+                        If test-first is impractical (exploratory UI), fix the
+                        acceptance criteria / verify command first.             [TDD test-first]
+4. Implement (Green) — minimal code to pass, executing the task under the
+                        Execution contract below: apply the named pages' directive
+                        rows as written, task D-number decisions win, stay inside
+                        Deliverables, and do NOT improvise — a gap is a plan defect. [TDD Green / PDCA Do]
+5. Run tests (Check) — run new + existing tests + the task's Verify command;
+                        preserve failure output. Use the `verify` role if set.    [PDCA Check / self-testing code]
+6. Self-review + refactor — bugs, edge cases, resource leaks, input validation,
+                        unused code; re-check against the named pages' edge-case
+                        rows and the `tacit` danger zones if configured.          [TDD Refactor / self-review]
 6.5 Independent audit — REQUIRED: call the test-quality-auditor subagent with the
-                        task brief, the diff, and the test paths. Do NOT grade
-                        your own tests. (self-grading guard)
-7. Judge against done — pass only if the done checklist is met AND the auditor
-                        returns VERDICT: PASS.                                  [DoD / evaluator]
-   - PASS  -> done.
+                        task brief, the diff, and the test paths. (self-grading guard)
+7. Judge against done — PASS only if the checklist is met AND the auditor returns
+                        VERDICT: PASS. Emit the task report (format below, with the
+                        WIKI: references you applied).                          [DoD / evaluator]
+   - PASS  -> next task in Task order (back to step 0), until all tasks done.
    - FAIL  -> 7b.
-7b. Reflect + retry  — state in words why it failed (what the auditor/tests
-                        showed), then retry from step 3 with that reflection.
-                        Bounded: at most 3 attempts. On the 3rd failure, STOP
-                        and escalate with the last failure reason.              [Reflexion / bounded retry]
+7b. Reflect + retry  — say why it failed. If it is a PLAN defect (a decision/name/
+                        input the task+pages+inputs never gave), repair the plan/
+                        task via step 2, don't guess; else retry from step 3.
+                        Bounded: ≤3 attempts per task; 3rd failure STOPs + escalates. [Reflexion / bounded retry]
 ```
+
+## Execution contract (step 4 — absorbed from the wiki executor)
+
+The plan already decided the design; your discipline is what makes the output
+correct. While implementing a task:
+
+1. **Read exactly what the task names, nothing else.** The task file (all
+   sections), then every page under its "Wiki pages" — those are your
+   best-practice instructions for this task — then every "Inputs" file. Where a
+   task step and a wiki page both speak, the task's explicit **D-number decisions
+   win**; the wiki fills in the *how*.
+2. **Stay inside the box.** Touch only files named in Deliverables (creating
+   parent dirs is fine). "Out of scope" is the next task's work — stop at the
+   boundary even when finishing it looks easy. Use the exact names/paths/types/
+   signatures the task spells out; they are seams other tasks depend on.
+3. **No improvisation.** If a step needs something the task, its wiki pages, and
+   its inputs do not give — a name, a type, a library choice, a behavior for an
+   unlisted case — do NOT pick one. That is a planning defect: go to 7b and repair
+   the plan/task via `wiki-plan`. A wrong guess costs more than a re-plan.
+4. **Apply wiki directives as written.** A listed page's decision table → do your
+   case's row. A listed edge case → the edge-case row overrides the general rule.
+   No matching row → that's rule 3 (plan defect), not a guess.
+5. **Cite what you applied.** The task report's `WIKI:` line names each page id
+   and the row/directive you followed — this is the explicit reference back to the
+   plan's decision→page map, so every change is traceable.
+
+## Task report (step 7 output, per task)
+
+```
+STATUS: PASS | BLOCKED
+TASK:   <NN-slug>
+CHANGED: <each file created/modified, one per line>
+TESTS:  <n cases; the Red->Green transition; auditor VERDICT>
+VERIFY: <the task's Verify command → actual result>
+WIKI:   <page id applied → the row/directive followed, one line each>
+NOTES:  <deviations (should be none); for BLOCKED: the exact missing decision/
+         input, as a one-line question wiki-plan can answer>
+```
+
+A BLOCKED task is a plan defect: repair the task file / decisions via `wiki-plan`
+(step 2) and re-run it. Never mark PASS with a failing or skipped Verify.
 
 ## Depth that keeps the loop to one pass
 

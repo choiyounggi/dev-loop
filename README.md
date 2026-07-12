@@ -38,13 +38,20 @@ instruction, and the harvest hook are active in any repository you open.
 
 Run it two ways:
 
-- **One task** → the `loop-implement` skill. Its loop:
-  `0 define done → 1 analyze → 2 PLAN (wiki-plan, required) → 3 write tests (Red)
-  → 4 implement (Green) → 5 run → 6 self-review → 6.5 independent test-quality
-  audit → 7 judge → 7b reflect + retry (bounded)`.
+- **One task or one feature** → the `loop-implement` skill — the **single
+  implementer**. Step 2 runs `wiki-plan` once to produce an ordered task list where
+  each task names the exact wiki pages that ground it; the loop then executes those
+  tasks **in the plan's order**, and per task runs:
+  `0 define done → 1 analyze + load the task's named wiki pages → 3 tests (Red)
+  → 4 implement (apply the pages' directives, no improvisation) → 5 run → 6
+  self-review → 6.5 independent test-quality audit → 7 judge (report the WIKI
+  references applied) → 7b reflect + retry (bounded)`. There is no separate
+  executor — the wiki-executor discipline (load only named pages, decisions win,
+  BLOCKED-on-gap) is folded into this loop.
 - **A whole goal, split across parallel tmux sessions** → the `orchestrate`
   skill: intake → decompose (approval gate) → per-wave plan (wiki-plan) →
-  implement + review → integration test → pre-merge gate → merge.
+  implement + review (each session runs `loop-implement`) → integration test →
+  pre-merge gate → merge.
 
 ### Step 2 is fixed to `wiki-plan`
 
@@ -99,10 +106,9 @@ it never interferes with ordinary `gh pr create` in any repo.
 
 | Skill | Role |
 |-------|------|
-| `loop-implement` | Drive one task to done through the verification loop (plan step = wiki-plan). |
+| `loop-implement` | **The single implementer** — consumes the wiki-plan and executes its tasks in order (loading each task's named wiki pages) through the verification loop. Plan step = wiki-plan. |
 | `orchestrate` | Split one goal into parallel sessions, each running loop-implement. |
-| `wiki-plan` | **The fixed plan methodology** — route each decision to a wiki page, decompose. |
-| `wiki-implement` | Small-model per-task executor for the orchestrate/wiki-plan split. |
+| `wiki-plan` | **The fixed plan methodology** — route each decision to a wiki page, decompose into ordered, page-navigated tasks. |
 | `wiki-ingest` | Add verified knowledge to the right semantic layer (used by knowledge-flush). |
 | `wiki-query` | Answer a question from the wiki with citations. |
 | `wiki-lint` | Health-check the wiki. |
@@ -115,7 +121,7 @@ dev-loop/
 ├── .claude-plugin/{plugin,marketplace}.json
 ├── AGENTS.md INDEX.md templates/     # wiki schema + routing entry + page template
 ├── wiki/                             # 10-domain semantic-layer knowledge base
-├── skills/                           # the 8 skills above
+├── skills/                           # the 7 skills above
 ├── agents/test-quality-auditor.md    # bundled independent test auditor (loop step 6.5)
 ├── hooks/
 │   ├── hooks.json
