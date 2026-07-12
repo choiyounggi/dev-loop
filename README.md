@@ -65,6 +65,31 @@ an ingest candidate. This is not a configurable role and cannot be turned off.
 The wiki lives at the plugin root (`wiki/`, `INDEX.md`, `AGENTS.md`,
 `templates/`); the wiki skills resolve their paths against `${CLAUDE_PLUGIN_ROOT}`.
 
+### Configuring your tools (optional)
+
+Like loop-orchestrator, dev-loop runs fully generic with **no** config, but you
+can map its **capability roles** to your real tools so the loop uses them:
+
+| Role | Map to |
+|------|--------|
+| `verify` | your project's **test / build / QA** command (the loop's run step) |
+| `knowledge` | your domain/team **wiki** or knowledge MCP (external facts) |
+| `explore` | code/symbol search (LSP, ripgrep, a source-search CLI) |
+| `tacit` | past incidents / danger-zone lore |
+| `design` | Figma / visual-spec MCP (UI work) |
+| `intake` | issue tracker (orchestrate's work-list) |
+
+(`plan` is **not** a role — the plan step is fixed to `wiki-plan`. And the bundled
+best-practice `wiki/` needs no config; `knowledge` is a *separate* external wiki.)
+
+Set it up with **`/dev-loop:configure`**, which writes `~/.claude/dev-loop/tools.json`
+(global) or `<repo>/.dev-loop/tools.json` (per-repo, team-shared). Precedence is
+git-config style: `defaults < ~/.claude/dev-loop/tools.json < <repo>/.dev-loop/tools.json`.
+A SessionStart hook nudges you (at most weekly, then never) if you haven't
+configured anything — silence it with `DEV_LOOP_CONFIG_NUDGE=0`. Legacy
+`loop-orchestrator` config paths are still read as a fallback. See
+`references/tool-profile.md` and `examples/tools.example.json`.
+
 ---
 
 ## The knowledge-capture loop
@@ -126,6 +151,7 @@ it never interferes with ordinary `gh pr create` in any repo.
 | `wiki-query` | Answer a question from the wiki with citations. |
 | `wiki-lint` | Health-check the wiki. |
 | `knowledge-flush` | Research + verify + route queued insights → one reviewed wiki PR. |
+| `configure` | Set up the capability-role tool profile (map your wiki, test command, etc.). |
 
 ## Structure
 
@@ -134,12 +160,13 @@ dev-loop/
 ├── .claude-plugin/{plugin,marketplace}.json
 ├── AGENTS.md INDEX.md templates/     # wiki schema + routing entry + page template
 ├── wiki/                             # 10-domain semantic-layer knowledge base
-├── skills/                           # the 7 skills above
+├── skills/                           # the 8 skills above
 ├── agents/test-quality-auditor.md    # bundled independent test auditor (loop step 6.5)
 ├── hooks/
 │   ├── hooks.json
 │   ├── preflight.sh                  # SessionStart: git/tmux/jq advisory
 │   ├── insight-instruction.sh        # SessionStart: inject ★ Insight capture instruction (global)
+│   ├── config-nudge.sh               # SessionStart: nudge to /dev-loop:configure if unconfigured (weekly)
 │   ├── loop-gate.sh                  # Stop: verification-loop integrity gate
 │   ├── harvest-insights.sh + harvest.js  # Stop: harvest insights → queue
 │   ├── auto-flush.sh                 # Stop: auto-run knowledge-flush (guarded) → PR

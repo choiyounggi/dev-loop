@@ -88,12 +88,17 @@ and tends to drag in an environment-specific tool's own assumptions.
 Layered like `git config`, lowest to highest:
 
 ```
-built-in defaults  <  ~/.claude/loop-orchestrator/tools.json  <  <repo>/.loop-orchestrator/tools.json
+built-in defaults  <  ~/.claude/dev-loop/tools.json  <  <repo>/.dev-loop/tools.json
 ```
 
-- **per-user** (`~/.claude/loop-orchestrator/tools.json`) — your machine's tools,
-  applied across every project you run the orchestrator in.
-- **per-repo** (`<repo>/.loop-orchestrator/tools.json`) — commit it to share a
+Run **`/dev-loop:configure`** to set these up interactively (it maps your wiki,
+test command, etc. and writes the file). The legacy `loop-orchestrator` paths
+(`~/.claude/loop-orchestrator/tools.json`, `<repo>/.loop-orchestrator/tools.json`)
+are still read as a fallback.
+
+- **per-user** (`~/.claude/dev-loop/tools.json`) — your machine's tools,
+  applied across every project.
+- **per-repo** (`<repo>/.dev-loop/tools.json`) — commit it to share a
   team-standard mapping; overrides your per-user file.
 - Merge is **per role and per field**: a per-repo file can override one role — or
   one field of a role — and inherit the rest. To drop an inherited value, set that

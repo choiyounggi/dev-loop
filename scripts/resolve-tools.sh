@@ -1,8 +1,12 @@
 #!/bin/sh
-# resolve-tools.sh — resolve the loop-orchestrator tool profile by layering
+# resolve-tools.sh — resolve the dev-loop tool profile by layering
 # config files over built-in defaults (git-config style precedence):
 #
-#   built-in defaults  <  ~/.claude/loop-orchestrator/tools.json  <  <repo>/.loop-orchestrator/tools.json
+#   built-in defaults  <  ~/.claude/dev-loop/tools.json  <  <repo>/.dev-loop/tools.json
+#
+# (The old loop-orchestrator paths — ~/.claude/loop-orchestrator/tools.json and
+#  <repo>/.loop-orchestrator/tools.json — are still read as a fallback so existing
+#  configs keep working after the rename.)
 #
 # Each capability role (intake / knowledge / tacit / verify / explore /
 # design, plus any custom role) is merged independently and field-wise, so a project file can
@@ -19,10 +23,11 @@
 #   resolve-tools.sh --role verify # print just the resolved object for one role
 #
 # env overrides (mainly for tests / non-standard layouts):
-#   LOOP_ORCH_CONFIG_HOME     per-user config path
-#                             (default: ~/.claude/loop-orchestrator/tools.json)
-#   LOOP_ORCH_CONFIG_PROJECT  per-repo config path
-#                             (default: <git-root-or-PWD>/.loop-orchestrator/tools.json)
+#   DEV_LOOP_CONFIG_HOME      per-user config path
+#                             (default: ~/.claude/dev-loop/tools.json)
+#   DEV_LOOP_CONFIG_PROJECT   per-repo config path
+#                             (default: <git-root-or-PWD>/.dev-loop/tools.json)
+#   LOOP_ORCH_CONFIG_HOME / LOOP_ORCH_CONFIG_PROJECT — legacy fallbacks (still honored)
 set -eu
 
 JQ=$(command -v jq) || { echo "resolve-tools: jq not found" >&2; exit 127; }
@@ -38,12 +43,34 @@ DEFAULTS='{
   "design":    {"kind":"default","when":"visual/UI spec for FE/UI tasks, e.g. a Figma link in the issue — read the referenced design before implementing (orchestrate Phase 0/2; loop-implement step 1)"}
 }'
 
-home_cfg="${LOOP_ORCH_CONFIG_HOME:-$HOME/.claude/loop-orchestrator/tools.json}"
-if [ -n "${LOOP_ORCH_CONFIG_PROJECT:-}" ]; then
+# Per-user config: explicit env wins; else the dev-loop path; else the legacy
+# loop-orchestrator path if it exists; else the canonical dev-loop path.
+if [ -n "${DEV_LOOP_CONFIG_HOME:-}" ]; then
+  home_cfg="$DEV_LOOP_CONFIG_HOME"
+elif [ -n "${LOOP_ORCH_CONFIG_HOME:-}" ]; then
+  home_cfg="$LOOP_ORCH_CONFIG_HOME"
+elif [ -f "$HOME/.claude/dev-loop/tools.json" ]; then
+  home_cfg="$HOME/.claude/dev-loop/tools.json"
+elif [ -f "$HOME/.claude/loop-orchestrator/tools.json" ]; then
+  home_cfg="$HOME/.claude/loop-orchestrator/tools.json"
+else
+  home_cfg="$HOME/.claude/dev-loop/tools.json"
+fi
+
+# Per-repo config: same precedence, resolved against the repo root.
+if [ -n "${DEV_LOOP_CONFIG_PROJECT:-}" ]; then
+  proj_cfg="$DEV_LOOP_CONFIG_PROJECT"
+elif [ -n "${LOOP_ORCH_CONFIG_PROJECT:-}" ]; then
   proj_cfg="$LOOP_ORCH_CONFIG_PROJECT"
 else
   root=$(git rev-parse --show-toplevel 2>/dev/null || pwd -P)
-  proj_cfg="$root/.loop-orchestrator/tools.json"
+  if [ -f "$root/.dev-loop/tools.json" ]; then
+    proj_cfg="$root/.dev-loop/tools.json"
+  elif [ -f "$root/.loop-orchestrator/tools.json" ]; then
+    proj_cfg="$root/.loop-orchestrator/tools.json"
+  else
+    proj_cfg="$root/.dev-loop/tools.json"
+  fi
 fi
 
 # Load a layer as compact JSON; warn + skip if missing/invalid (fail-open to {}).
