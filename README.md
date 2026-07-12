@@ -160,8 +160,7 @@ dev-loop/
 ├── .claude-plugin/{plugin,marketplace}.json
 ├── AGENTS.md INDEX.md templates/     # wiki schema + routing entry + page template
 ├── wiki/                             # 10-domain semantic-layer knowledge base
-├── commands/                         # slash-command wrappers (so /dev-loop:* shows in the / menu)
-├── skills/                           # the 8 skills above
+├── skills/                           # the 8 skills above (user-invocable; appear in the / menu by skill name)
 ├── agents/test-quality-auditor.md    # bundled independent test auditor (loop step 6.5)
 ├── hooks/
 │   ├── hooks.json
