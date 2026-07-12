@@ -1,5 +1,7 @@
 ---
 name: wiki-query
+effort: medium
+argument-hint: "[your question]"
 description: Answer a development question from the wiki with citations, loading only the pages whose triggers match. If the answer required synthesis across multiple pages and the question is likely to recur, file the synthesis back as a new page so knowledge compounds.
 ---
 

@@ -1,5 +1,7 @@
 ---
 name: wiki-ingest
+effort: medium
+argument-hint: "[the lesson or edge case]"
 description: Add one verified lesson or edge case to the bundled wiki. Route it to the right domain and category, merge into an existing page before creating a new one, and enforce sourcing and positive-guidance rules. Use when capturing a documented best practice or a production edge case.
 ---
 

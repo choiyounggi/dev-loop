@@ -1,5 +1,7 @@
 ---
 name: orchestrate
+effort: high
+argument-hint: "[goal or parent issue]"
 description: Orchestrate one natural-language goal into parallel tmux Claude Code sessions. It decomposes the goal (with your approval), plans each task with wiki-plan, implements and reviews, runs an integration test, and merges after your confirmation. Use to build a goal across multiple sessions. For a single task, use loop-implement instead.
 ---
 

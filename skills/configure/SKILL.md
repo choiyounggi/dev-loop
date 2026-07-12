@@ -1,5 +1,7 @@
 ---
 name: configure
+effort: medium
+argument-hint: "[global | repo]"
 description: Set up dev-loop's capability-role tool profile — map `knowledge` (your domain wiki / MCP), `verify` (your project's test/build/QA command), `explore` (code search), `tacit` (past incidents), and `design` (Figma/visual spec) to the actual tools this environment has, then write ~/.claude/dev-loop/tools.json (global) or <repo>/.dev-loop/tools.json (per-repo). Use when asked to "configure dev-loop", "set up tools", "map my wiki/test command", or "/dev-loop:configure".
 ---
 

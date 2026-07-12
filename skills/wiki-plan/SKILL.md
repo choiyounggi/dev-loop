@@ -1,5 +1,7 @@
 ---
 name: wiki-plan
+effort: high
+argument-hint: "[what to build]"
 description: The fixed planning methodology for a capable model. Make every design decision grounded in a bundled wiki page (recording a decision-to-page map), then decompose the work into ordered, self-contained tasks, each naming the exact wiki pages that govern it. Runs as loop-implement step 2.
 ---
 

@@ -1,5 +1,7 @@
 ---
 name: wiki-lint
+effort: medium
+argument-hint: "[optional: changed pages]"
 description: Health-check the bundled wiki. Detect unsourced claims, bare prohibitions, broken links, index and page trigger mismatches, vague qualifiers, oversized pages, and stale dates, then fix them. Use to keep the wiki healthy before drift compounds.
 ---
 

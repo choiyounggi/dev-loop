@@ -1,5 +1,7 @@
 ---
 name: knowledge-flush
+effort: high
+argument-hint: "[optional: filters]"
 description: Drain queued ★ Insight candidates (harvested from your sessions) into the wiki as a reviewed PR. For each candidate it researches and verifies the best-practice against real sources, checks existing wiki layers for duplicates and links, decides the target layer/category (or justifies a new one), runs wiki-ingest, then opens ONE PR per flush for you to review and merge/reject. Never auto-merges. Use when asked to "flush knowledge", "process the insight queue", "ingest what I learned", or "/dev-loop:knowledge-flush".
 ---
 

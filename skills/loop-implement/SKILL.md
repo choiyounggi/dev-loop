@@ -1,5 +1,7 @@
 ---
 name: loop-implement
+effort: high
+argument-hint: "[task or feature to build]"
 description: The single implementation loop. It plans via wiki-plan (step 2, required) into an ordered, wiki-navigated task list, then executes those tasks in order, each loading only its named wiki pages, writing tests first, getting an independent test-quality audit, and judging against done; on failure it reflects and retries (bounded). Use for a non-trivial task or feature. Skip typos, config values, and simple renames.
 ---
 
