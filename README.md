@@ -80,8 +80,8 @@ The wiki is meant to grow from what you actually learn. Three moving parts:
    session transcript into a local queue (`~/.dev-loop/queue/`). It never edits
    the wiki and never opens a PR — harvesting is cheap and non-blocking.
 
-3. **Flush (on-demand, you trigger it).** `/dev-loop:knowledge-flush` drains the
-   queue. For **each** candidate it must, before any PR:
+3. **Flush → verified PR (automatic, or on-demand).** The queue is drained by the
+   `knowledge-flush` pipeline. For **each** candidate it must, before any PR:
    - **research & verify** the best-practice against real sources (official docs,
      primary references) and assign a confidence (verified / field-tested /
      unverified — never a fabricated citation),
@@ -89,8 +89,21 @@ The wiki is meant to grow from what you actually learn. Three moving parts:
    - **decide the target layer/category** (or justify a new category),
    - then run `wiki-ingest` and write an `INGEST_REPORT.md`.
 
-   It opens **one PR per flush** and **never auto-merges**. You review the open
-   `dev-loop:knowledge` PRs and merge or reject each one.
+   It opens **one PR per flush** and **never auto-merges**. Each contributor's PR
+   is committed and opened under **their own git/gh identity** (never a hardcoded
+   account, never an assistant); the repo owner reviews the open
+   `dev-loop:knowledge` PRs and merges or rejects each one.
+
+   Two ways it runs:
+   - **Automatic** — the `hooks/auto-flush.sh` Stop hook fires the pipeline in a
+     detached, headless `claude` run when the queue crosses a threshold and the
+     rate-limit window has elapsed, so PRs appear without you doing anything.
+     Guarded: kill switch `DEV_LOOP_AUTOFLUSH=0`, once per
+     `DEV_LOOP_AUTOFLUSH_INTERVAL` (default 3600s), only at
+     `DEV_LOOP_AUTOFLUSH_MIN` (default 3) pending items, single-flight lock, and
+     recursion-safe. Needs `claude` + `gh` on PATH and gh authenticated; if either
+     is missing it silently no-ops and you fall back to manual.
+   - **Manual** — invoke `/dev-loop:knowledge-flush` any time to drain the queue now.
 
 ### This ordering is enforced by a hook
 
@@ -129,6 +142,7 @@ dev-loop/
 │   ├── insight-instruction.sh        # SessionStart: inject ★ Insight capture instruction (global)
 │   ├── loop-gate.sh                  # Stop: verification-loop integrity gate
 │   ├── harvest-insights.sh + harvest.js  # Stop: harvest insights → queue
+│   ├── auto-flush.sh                 # Stop: auto-run knowledge-flush (guarded) → PR
 │   └── pre-flush-pr-gate.sh          # PreToolUse: enforce the flush pre-PR pipeline
 ├── scripts/resolve-tools.sh          # capability-role profile resolver (no `plan` role)
 ├── references/tool-profile.md
@@ -139,8 +153,10 @@ dev-loop/
 
 ## Attribution
 
-Contributions (including auto-opened knowledge PRs) are committed as the repo
-owner (`choiyounggi`), not as an assistant, and carry no `Co-Authored-By` trailer.
+Knowledge PRs (manual or auto-opened) are committed under **each contributor's own
+git/gh identity** — never a hardcoded account and never an assistant, with no
+`Co-Authored-By` trailer. Every contributor opens a PR from their own account; the
+repo owner reviews and merges/rejects.
 
 ## Lineage & license
 

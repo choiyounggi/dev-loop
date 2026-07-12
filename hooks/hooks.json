@@ -1,5 +1,5 @@
 {
-  "description": "dev-loop hooks — dependency preflight (advisory), verification-loop integrity gate, knowledge capture (SessionStart insight instruction + Stop harvest), and the knowledge-flush pre-PR gate.",
+  "description": "dev-loop hooks — dependency preflight (advisory), verification-loop integrity gate, knowledge capture (SessionStart insight instruction + Stop harvest), automatic queue flush (Stop, guarded), and the knowledge-flush pre-PR gate.",
   "hooks": {
     "SessionStart": [
       {
@@ -37,6 +37,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/harvest-insights.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/auto-flush.sh"
           }
         ]
       }

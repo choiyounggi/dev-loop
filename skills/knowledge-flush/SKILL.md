@@ -27,14 +27,24 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
      mkdir -p "$HOME/.dev-loop"
      git clone https://github.com/choiyounggi/dev-loop.git "$REPO"
    fi
-   # Commit as the repo owner — never as an assistant, never add a Co-Authored-By.
-   git -C "$REPO" config user.name  "choiyounggi"
-   git -C "$REPO" config user.email "74581798+choiyounggi@users.noreply.github.com"
-   BR="knowledge/$(date +%Y%m%d-%H%M%S)"
+   # Commit under THIS user's own identity — each contributor's PR carries their
+   # own account; the owner reviews and approves/rejects. Do NOT hardcode an
+   # identity, and NEVER commit as an assistant or add a Co-Authored-By trailer.
+   # Inherit the user's global git identity (fall back to their gh login only if
+   # git has none configured):
+   if [ -z "$(git -C "$REPO" config user.email)" ]; then
+     GH_USER="$(gh api user -q .login 2>/dev/null)"
+     [ -n "$GH_USER" ] && git -C "$REPO" config user.name "$GH_USER" \
+       && git -C "$REPO" config user.email "${GH_USER}@users.noreply.github.com"
+   fi
+   # Branch names carry the contributor so PRs are attributable at a glance:
+   WHO="$(git -C "$REPO" config user.name | tr ' ' '-' | tr -cd 'A-Za-z0-9-')"
+   BR="knowledge/${WHO:-anon}-$(date +%Y%m%d-%H%M%S)"
    git -C "$REPO" checkout -b "$BR"
    ```
    Read/write the wiki inside `$REPO` (its `INDEX.md`, `wiki/`, `templates/`,
-   `AGENTS.md`), NOT `${CLAUDE_PLUGIN_ROOT}`.
+   `AGENTS.md`), NOT `${CLAUDE_PLUGIN_ROOT}`. The push + PR use the ambient `gh`
+   auth, so the PR is opened by whichever account this user is logged in as.
 
 2. **For each queued candidate, run the pre-PR pipeline** (this is the whole point
    — a raw harvested block is a *candidate*, not vetted knowledge):
@@ -103,8 +113,17 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
 
 ## Guardrails
 - PR-only. Never auto-merge, never push to `main`, never force-push `main`.
-- Commit identity is `choiyounggi` — never an assistant; never add a
-  `Co-Authored-By` trailer.
+- Commit under the **user's own ambient git/gh identity** — never hardcode an
+  account, never commit as an assistant, never add a `Co-Authored-By` trailer.
 - A candidate you cannot verify does not get quietly upgraded to `verified`.
 - If the queue is empty, say so and stop — do not open an empty PR.
 - One PR per flush (batched), so review stays a single pass.
+
+## Triggering — manual and automatic
+- **Manual:** invoke this skill (`/dev-loop:knowledge-flush`) any time; it drains
+  the shared queue (`~/.dev-loop/queue/`, keyed off `$HOME` so it spans sessions).
+- **Automatic:** the Stop hook `hooks/auto-flush.sh` fires this same pipeline in a
+  detached headless `claude` run when the queue crosses a threshold and the
+  rate-limit window has elapsed — so PRs appear without you running anything. It
+  is guarded (rate-limited, batched, recursion-safe) and opens the same reviewed,
+  gated PR. Disable with `DEV_LOOP_AUTOFLUSH=0`. See that hook for the knobs.
