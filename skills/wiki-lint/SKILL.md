@@ -1,6 +1,6 @@
 ---
 name: wiki-lint
-description: Wiki health check — finds drift before it compounds. Detects unsourced claims, prohibitions without replacements, vague qualifiers, orphan pages, broken links, oversized pages, stale verification dates, and unresolved contradictions. Run periodically or after a batch of ingests.
+description: Health-check the bundled wiki. Detect unsourced claims, bare prohibitions, broken links, index and page trigger mismatches, vague qualifiers, oversized pages, and stale dates, then fix them. Use to keep the wiki healthy before drift compounds.
 ---
 
 # Lint

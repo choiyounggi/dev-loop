@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: Orchestrate one natural-language goal into parallel tmux Claude Code sessions — clarify requirements, branch by environment, decompose into tasks (with approval), launch a session per task running loop-implement, review and integration-test, then merge after your confirmation. Use when asked to build/implement a goal "with the orchestrator" or to split work across multiple sessions. For a single task, use loop-implement instead.
+description: Orchestrate one natural-language goal into parallel tmux Claude Code sessions. It decomposes the goal (with your approval), plans each task with wiki-plan, implements and reviews, runs an integration test, and merges after your confirmation. Use to build a goal across multiple sessions. For a single task, use loop-implement instead.
 ---
 
 # orchestrate — multi-session orchestrator

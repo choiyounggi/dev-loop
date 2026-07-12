@@ -1,6 +1,6 @@
 ---
 name: loop-implement
-description: The single implementation loop. Plans via wiki-plan (step 2, required) into an ordered, wiki-navigated task list, then executes those tasks IN ORDER — each loading only its named wiki pages, applying their directives with no improvisation, writing tests first (Red), implementing (Green), running, self-reviewing, getting an independent test-quality audit, and judging against done (reporting the wiki references applied); on failure reflect and retry (bounded). Consumes an existing plan if handed one. Use for a non-trivial task or feature. Skip for typos, config values, simple renames.
+description: The single implementation loop. It plans via wiki-plan (step 2, required) into an ordered, wiki-navigated task list, then executes those tasks in order, each loading only its named wiki pages, writing tests first, getting an independent test-quality audit, and judging against done; on failure it reflects and retries (bounded). Use for a non-trivial task or feature. Skip typos, config values, and simple renames.
 ---
 
 # loop-implement — the single implementation loop, driven by a wiki-plan

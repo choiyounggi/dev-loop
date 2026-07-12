@@ -1,6 +1,6 @@
 ---
 name: wiki-plan
-description: For a CAPABLE model (Claude Sonnet/Opus, GPT-4-class, Codex) — analyze a feature/change request, make every design decision, and decompose it into ordered, self-contained task specs that a SMALL model (Haiku, Qwen-class) can each execute correctly using only the task spec plus mapped wiki pages. Produces plan.md + tasks/NN-<slug>.md.
+description: The fixed planning methodology for a capable model. Make every design decision grounded in a bundled wiki page (recording a decision-to-page map), then decompose the work into ordered, self-contained tasks, each naming the exact wiki pages that govern it. Runs as loop-implement step 2.
 ---
 
 # Plan — decompose work into small-model-executable tasks

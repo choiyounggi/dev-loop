@@ -1,6 +1,6 @@
 ---
 name: wiki-ingest
-description: Add new knowledge to the wiki — a lesson learned, an edge case hit in production, a documented best practice, or a source document. Routes it to the right domain/category, merges into existing pages before creating new ones, and enforces sourcing and positive-guidance rules.
+description: Add one verified lesson or edge case to the bundled wiki. Route it to the right domain and category, merge into an existing page before creating a new one, and enforce sourcing and positive-guidance rules. Use when capturing a documented best practice or a production edge case.
 ---
 
 # Ingest
