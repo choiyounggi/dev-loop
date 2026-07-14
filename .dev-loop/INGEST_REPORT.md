@@ -1,5 +1,15 @@
 # Knowledge flush — 2 insight(s)
 
+## Decision Log
+
+- **의도**: dev-loop 큐의 pending 인사이트 2건(OrbStack kubelet 메트릭 소스 전환, host→pod 메모리 리밋 산정)을 1차 소스로 재검증해 위키에 반영. 이슈처럼 큰 변경이 아니라 지식 ingest — 페이지 1 신규 + 1 병합.
+- **배제한 대안**:
+  - insight 1을 `observability/logs-metrics-signals.md`에 병합 → 배제: 그 페이지는 "내 서비스 계측"이 트리거고, 이 건은 "클러스터 메트릭 수집 소스 선택"이라 트리거가 다름(one case per page 규칙).
+  - insight 2를 신규 페이지로 생성 → 배제: `resource-limits-and-probes.md`가 이미 "OOMKilled + 측정 기반 리밋" 트리거를 소유 — 엣지케이스/Instead-of 행 병합이 중복 없는 형태.
+  - PR #1의 `streaming-large-result-sets` 페이지로의 `related:` 링크 → 보류: PR #1 미머지 상태라 main에 없는 페이지로의 링크는 깨질 수 있음(본문 Existing-layer check에 플래그).
+- **리뷰어가 볼 곳**: 신규 페이지의 4개 소스가 각 주장과 대응하는지(values.yaml 기본값, resource_metrics.go 라벨셋, mixin `image!=""`+cadvisorSelector, orbstack#1561), OrbStack 주장이 field-tested로 정직하게 표기됐는지, `resource-limits-and-probes.md` 추가 2행이 기존 규칙 4("measure, don't copy")와 중복이 아닌 보강인지.
+- [추정] 없음 — 모든 메커니즘 주장은 이번 flush에서 라이브로 가져온 1차 소스로 검증됨(본문 Verified best-practice 참조).
+
 Cross-Check: every mechanism claim was independently re-verified against primary
 sources (chart values.yaml, kubernetes source, kubernetes-mixin source, psycopg2
 docs) fetched live during this flush — not taken from the harvesting session.
