@@ -46,3 +46,4 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [logs-metrics-signals](observability/logs-metrics-signals.md) | Instrumenting a new or existing service (logs, metrics, correlation ids); an incident revealed you couldn't see what happened; choosing between a log line and a metric; a metric label would carry unbounded values (user ids/UUIDs) |
 | [alerting](observability/alerting.md) | Creating or reviewing alerts; the team ignores a noisy pager; deciding whether a condition pages, tickets, or stays on a dashboard |
+| [container-metrics-when-cadvisor-is-empty](observability/container-metrics-when-cadvisor-is-empty.md) | Prometheus/kube-prometheus-stack on an embedded/local Kubernetes (OrbStack or similar) shows no `container_*` series while kubelet targets are up; deciding between cAdvisor and the kubelet `/metrics/resource` endpoint |
