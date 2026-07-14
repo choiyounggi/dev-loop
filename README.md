@@ -1,5 +1,7 @@
 # dev-loop
 
+**English** | [한국어](README.ko.md)
+
 A Claude Code plugin that merges two things into one self-contained tool:
 
 - **[loop-orchestrator]** — a methodology-grounded verification loop (TDD / PDCA /
