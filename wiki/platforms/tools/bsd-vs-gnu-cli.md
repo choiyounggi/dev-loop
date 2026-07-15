@@ -9,7 +9,9 @@ sources:
   - https://man.freebsd.org/cgi/man.cgi?date(1)
   - https://man.freebsd.org/cgi/man.cgi?sed(1)
   - https://man.freebsd.org/cgi/man.cgi?seq(1)
-last_verified: 2026-07-10
+  - https://www.gnu.org/software/coreutils/manual/html_node/Options-for-date.html
+  - https://pubs.opengroup.org/onlinepubs/9699919799/functions/strftime.html
+last_verified: 2026-07-15
 related: [platforms-shells-portable-shell-scripts]
 ---
 
@@ -28,6 +30,7 @@ flags do not. Apply the portable fix per command:
 | Command | GNU (Linux) | BSD (macOS) | Portable fix |
 |---------|-------------|-------------|--------------|
 | Relative date | `date -d '5 minutes ago'` | `date -v-5M` | Feature-detect with a fallback chain: `date -d '5 minutes ago' 2>/dev/null \|\| date -v-5M`; or compute epoch math: `$(( $(date +%s) - 300 ))` then format |
+| Millisecond timestamp | `date +%3N` (first 3 digits of `%N`) | `%N` is supported (nanoseconds; macOS 14.1+ and GNU) but the `%3N` **width** form is not — an unrecognized spec surfaces literally (field-observed as `3N`), giving broken output like `…08.3NZ` | Feature-detect by the OUTPUT, not by `%N`: `[[ "$(date +%3N)" == [0-9][0-9][0-9] ]]` before using `%3N`; else fall back to `gdate +%3N`, or drop the sub-second field |
 | In-place sed | `sed -i 's/a/b/' f` (bare `-i`) | `-i` takes a backup-extension argument (`sed -i '' 's/a/b/' f`) | `sed -i.bak 's/a/b/' f && rm f.bak` (no space before `.bak` — parses on both), or `perl -pi -e 's/a/b/' f` |
 | `timeout` | In coreutils | Absent on stock macOS — exits 127 | Install coreutils and call `gtimeout`, or background the command and `kill` it from a sleep watchdog |
 | `seq -s,` | Separator between numbers only | Separator also emitted after the last number, before the terminator | Join after generating (`seq 1 3 \| paste -sd, -`) and count items by lines, never by separators |
@@ -59,6 +62,7 @@ General strategy by situation:
 | Hardcode GNU flags because the script passed in CI | Feature-detect the flavor or install coreutils on macOS | The same script runs on developers' BSD-userland Macs |
 | Count list items by counting separators plus one | Count items directly (`wc -l` on newline-separated output) | BSD `seq`/`paste` trailing-separator behavior makes separator counts off-by-one |
 | Port a failing command by trial-and-error flag swaps | Look the command up in the table above, or read both man pages | The differences are systematic, not random — the fix is per-command and known |
+| Detect GNU vs BSD `date` by testing whether `%N` prints | Test whether `date +%3N` prints three digits (`[0-9][0-9][0-9]`) | Modern macOS `date` supports `%N` (nanoseconds), so `%N` no longer discriminates; only the `%3N` width form fails there |
 
 ## Sources
 
@@ -66,3 +70,5 @@ General strategy by situation:
 - https://man.freebsd.org/cgi/man.cgi?date(1) — BSD `date -v` adjustment flag
 - https://man.freebsd.org/cgi/man.cgi?sed(1) — BSD `sed -i` backup-extension argument
 - https://man.freebsd.org/cgi/man.cgi?seq(1) — BSD `seq -s` separator emitted after the last number (see man-page example)
+- https://www.gnu.org/software/coreutils/manual/html_node/Options-for-date.html — GNU `date` `%N` nanoseconds and the numeric field-width form (`%3N` = first 3 digits)
+- https://pubs.opengroup.org/onlinepubs/9699919799/functions/strftime.html — an unrecognized strftime conversion specification is undefined; BSD passes `%3N` through literally (field-observed as `3N`)

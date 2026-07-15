@@ -27,6 +27,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [image-builds](containers/image-builds.md) | Writing or reviewing a Dockerfile; images rebuild everything on small changes, build slowly, or are too large; choosing an image tagging scheme |
 | [resource-limits-and-probes](containers/resource-limits-and-probes.md) | Writing or reviewing Kubernetes-style deployment manifests; pods OOMKilled, evicted, or CPU-throttled; a dependency outage triggered a restart storm; traffic hitting pods that are not ready |
+| [pid1-entrypoint-log-flush](containers/pid1-entrypoint-log-flush.md) | A container entrypoint bash script pipes stdout via `exec > >(tee …)` and loses log lines on exit (short jobs lose all, long jobs lose the tail); making PID 1 flush piped logs and run its EXIT trap on container stop (SIGTERM) |
 
 ## data
 
@@ -46,3 +47,4 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [logs-metrics-signals](observability/logs-metrics-signals.md) | Instrumenting a new or existing service (logs, metrics, correlation ids); an incident revealed you couldn't see what happened; choosing between a log line and a metric; a metric label would carry unbounded values (user ids/UUIDs) |
 | [alerting](observability/alerting.md) | Creating or reviewing alerts; the team ignores a noisy pager; deciding whether a condition pages, tickets, or stays on a dashboard |
+| [kubelet-resource-metrics](observability/kubelet-resource-metrics.md) | Pod CPU/memory (`container_*`) series are empty though kubelet scrape targets are UP; wiring pod-resource dashboards on a lightweight kubelet (OrbStack/kind/k3s); a kube-prometheus-stack resource-metrics target 404s |
