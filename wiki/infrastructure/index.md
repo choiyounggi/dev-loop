@@ -27,6 +27,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [image-builds](containers/image-builds.md) | Writing or reviewing a Dockerfile; images rebuild everything on small changes, build slowly, or are too large; choosing an image tagging scheme |
 | [resource-limits-and-probes](containers/resource-limits-and-probes.md) | Writing or reviewing Kubernetes-style deployment manifests; pods OOMKilled, evicted, or CPU-throttled; a dependency outage triggered a restart storm; traffic hitting pods that are not ready |
+| [entrypoint-log-capture](containers/entrypoint-log-capture.md) | A container entrypoint bash script tees its output to a log file and lines are missing (short jobs capture nothing, long jobs lose the tail); wiring stdout duplication or signal traps into a PID-1 shell script |
 
 ## data
 
@@ -46,3 +47,4 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [logs-metrics-signals](observability/logs-metrics-signals.md) | Instrumenting a new or existing service (logs, metrics, correlation ids); an incident revealed you couldn't see what happened; choosing between a log line and a metric; a metric label would carry unbounded values (user ids/UUIDs) |
 | [alerting](observability/alerting.md) | Creating or reviewing alerts; the team ignores a noisy pager; deciding whether a condition pages, tickets, or stays on a dashboard |
+| [kubelet-container-metrics](observability/kubelet-container-metrics.md) | Prometheus kubelet targets are `up` but `container_*` CPU/memory queries return nothing (common on OrbStack/k3s/kind); configuring kube-prometheus-stack kubelet scraping; built-in Compute Resources dashboards blank while PromQL returns data |

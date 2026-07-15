@@ -9,7 +9,7 @@ sources:
   - https://man.freebsd.org/cgi/man.cgi?date(1)
   - https://man.freebsd.org/cgi/man.cgi?sed(1)
   - https://man.freebsd.org/cgi/man.cgi?seq(1)
-last_verified: 2026-07-10
+last_verified: 2026-07-15
 related: [platforms-shells-portable-shell-scripts]
 ---
 
@@ -32,6 +32,7 @@ flags do not. Apply the portable fix per command:
 | `timeout` | In coreutils | Absent on stock macOS — exits 127 | Install coreutils and call `gtimeout`, or background the command and `kill` it from a sleep watchdog |
 | `seq -s,` | Separator between numbers only | Separator also emitted after the last number, before the terminator | Join after generating (`seq 1 3 \| paste -sd, -`) and count items by lines, never by separators |
 | PCRE grep | `grep -P` | Not supported | `grep -E` with ERE, or `perl -ne 'print if /…/'` |
+| Sub-second timestamp | `date +%3N` → milliseconds (`%N` and the field width are both GNU extensions) | Recent macOS prints digits for `%N` but emits `%3N` literally as `3N` (timestamps become `…08.3NZ`) | Feature-detect on the actual `%3N` output, not on `%N`: `case "$(date +%3N)" in [0-9][0-9][0-9]) …GNU path… ;; *) …fallback… ;; esac`; or `gdate +%3N`, or settle for epoch seconds |
 | Resolve path | `readlink -f` | Absent before macOS 13 | `cd "$(dirname "$f")" && pwd -P` for directories, `python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))'`, or coreutils `greadlink -f` |
 | File metadata | `stat -c '%s'` | `stat -f '%z'` | Detect once: `stat -c %s "$f" 2>/dev/null \|\| stat -f %z "$f"` |
 
@@ -49,6 +50,7 @@ General strategy by situation:
 | Case | Then |
 |------|------|
 | `command -v timeout` succeeds on macOS | Someone installed coreutils unprefixed — confirm `timeout --version` reports GNU coreutils before relying on GNU exit-code semantics (124 on timeout) |
+| `date +%N` prints digits on macOS | Do not infer GNU userland from one specifier working — width-modified forms (`%3N`) still fail on BSD `date`; feature-detect the exact format string you will use, by its output shape |
 | Any flags passed to `echo` (`-e`, `-n`) | `echo` flag handling differs across shells and userlands — use `printf` for anything beyond a bare literal string |
 | Script needs bash 4+ features on macOS | Stock `/bin/bash` on macOS is 3.2 — use `#!/usr/bin/env bash` so a brew-installed bash is picked up, and state the required bash version in the script header |
 
@@ -63,6 +65,9 @@ General strategy by situation:
 ## Sources
 
 - https://www.gnu.org/software/coreutils/manual/html_node/index.html — GNU date/timeout/seq/stat behavior
+- https://www.gnu.org/software/coreutils/manual/html_node/Time-conversion-specifiers.html — `%N` (nanoseconds) is a GNU extension
+- https://www.gnu.org/software/coreutils/manual/html_node/Padding-and-other-flags.html — field width between `%` and the specifier is a GNU extension
+- Field reproduction (macOS 14.8.3 and 26.5.1, 2026-07-15): `date +%N` → digits, `date +%3N` → literal `3N` on both
 - https://man.freebsd.org/cgi/man.cgi?date(1) — BSD `date -v` adjustment flag
 - https://man.freebsd.org/cgi/man.cgi?sed(1) — BSD `sed -i` backup-extension argument
 - https://man.freebsd.org/cgi/man.cgi?seq(1) — BSD `seq -s` separator emitted after the last number (see man-page example)

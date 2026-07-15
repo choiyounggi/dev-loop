@@ -8,7 +8,7 @@ sources:
   - https://docs.docker.com/build/building/best-practices/
   - https://docs.docker.com/build/building/secrets/
 last_verified: 2026-07-10
-related: [infrastructure-ci-cd-pipeline-structure, infrastructure-ci-cd-secrets-handling]
+related: [infrastructure-ci-cd-pipeline-structure, infrastructure-ci-cd-secrets-handling, infrastructure-containers-entrypoint-log-capture]
 ---
 
 # Structuring Container Image Builds
