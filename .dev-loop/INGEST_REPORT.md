@@ -4,6 +4,13 @@ Drained 3 queued `★ Insight` candidates. Each was independently researched and
 verified against primary sources before ingest. Two new pages created, one
 existing page extended. No auto-merge — this PR is for review.
 
+Cross-Check: each of the 3 candidates was verified by an independent research
+subagent against primary sources (chart values.yaml / k8s docs / kubernetes-mixin;
+Greg's Wiki + pipe(7) + Docker/bash manuals; GNU + FreeBSD date + POSIX strftime).
+All three mechanisms VERIFIED; corrections folded in (mixin also pins
+`job=cadvisor` not just `image!=""`; process-sub `$!` is bash 4.4+ not 5.1) and
+field-observed specifics (OrbStack root cause, literal `3N`) labeled as such.
+
 ## Verified best-practice
 
 ### 1. Empty cAdvisor `container_*` metrics on a lightweight kubelet → scrape `/metrics/resource`
