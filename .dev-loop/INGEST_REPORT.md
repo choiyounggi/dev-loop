@@ -46,3 +46,13 @@ Conflicts flagged: none.
 | 3 — date `%3N` detection | `platforms/tools/bsd-vs-gnu-cli.md` (merge) | No — exact existing page for BSD-vs-GNU flag differences |
 
 Nothing left `unverified`. Queue rows retired to `~/.dev-loop/queue/.processed.jsonl` after PR creation.
+
+## Decision Log
+
+- **의도**: dev-loop 세션에서 수확된 ★ Insight 후보 3건을 검증·중복점검·라우팅을 거쳐 위키에 반영 (knowledge-flush 파이프라인, 사용자가 flush 실행 및 PR 1건 생성을 명시 지시).
+- **배제한 대안**:
+  - 인사이트 1·2를 기존 페이지(logs-metrics-signals / portable-shell-scripts)에 병합 — 트리거가 다름(스크레이프 소스 설정 vs 계측 원칙, PID-1 컨테이너 시맨틱 vs 셸 이식성)이라 "one case per page" 원칙에 따라 신규 페이지로 분리.
+  - 신규 카테고리 생성 — observability/containers/tools 기존 카테고리가 정확히 커버해 불필요.
+  - 큐 원문 directive 그대로 반영 — 인사이트 2의 `trap 'exit 143' TERM` 단독 처방은 적대검증 실험에서 반박되어(foreground 자식 뒤 trap 지연→SIGKILL) 교정 후 반영.
+- **리뷰어가 볼 곳**: `entrypoint-log-capture.md`의 step 2(background-child+wait 패턴 — 교차검증으로 재작성된 부분), `kubelet-container-metrics.md`의 대시보드 제외 원인 서술(metrics_path 핀 + image 필터 복합), `bsd-vs-gnu-cli.md` 추가 행의 case 패턴 분기.
+- [추정] RTB 팀 표준 리뷰어 3인은 이 개인 레포의 collaborator가 아닐 수 있어 리뷰어 지정이 GitHub에서 거부될 수 있음 — 그 경우 레포 소유자 리뷰(스킬 기본 모델)로 진행.
