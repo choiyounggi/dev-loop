@@ -47,4 +47,3 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [logs-metrics-signals](observability/logs-metrics-signals.md) | Instrumenting a new or existing service (logs, metrics, correlation ids); an incident revealed you couldn't see what happened; choosing between a log line and a metric; a metric label would carry unbounded values (user ids/UUIDs) |
 | [alerting](observability/alerting.md) | Creating or reviewing alerts; the team ignores a noisy pager; deciding whether a condition pages, tickets, or stays on a dashboard |
-| [kubelet-container-metrics](observability/kubelet-container-metrics.md) | Prometheus kubelet targets are `up` but `container_*` CPU/memory queries return nothing (common on OrbStack/k3s/kind); configuring kube-prometheus-stack kubelet scraping; built-in Compute Resources dashboards blank while PromQL returns data |
