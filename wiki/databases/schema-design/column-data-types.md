@@ -9,7 +9,7 @@ sources:
   - https://wiki.postgresql.org/wiki/Don%27t_Do_This
   - https://dev.mysql.com/doc/refman/8.0/en/data-types.html
 last_verified: 2026-07-10
-related: [databases-schema-design-primary-key-choice, databases-schema-design-nullability-and-defaults, databases-schema-design-requirements-to-tables]
+related: [databases-schema-design-primary-key-choice, databases-schema-design-nullability-and-defaults, databases-schema-design-requirements-to-tables, databases-schema-design-online-schema-changes]
 ---
 
 # Choosing Column Data Types

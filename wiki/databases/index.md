@@ -36,6 +36,13 @@ Match your situation to a "load when" line; load only matching pages.
 | [column-data-types](schema-design/column-data-types.md) | Picking column types: money, time, text, enums, JSON, binary; changing a type on a live table |
 | [nullability-and-defaults](schema-design/nullability-and-defaults.md) | Declaring column nullability/defaults; queries dropping rows around NULLs |
 | [soft-delete](schema-design/soft-delete.md) | Deleted records themselves must be restorable or kept (deleted_at schemas); deciding what a parent's deletion does to children that must survive (for who-changed-what history → requirements-to-tables) |
+| [online-schema-changes](schema-design/online-schema-changes.md) | Running ALTER TABLE / CREATE INDEX on a large table under live traffic; a migration blocks reads/writes (ACCESS EXCLUSIVE); adding a column/constraint/NOT NULL/index/type change safely; expand-and-contract to decouple DB migration from app deploy |
+
+## operations
+
+| Page | Load when |
+|------|-----------|
+| [autovacuum-and-wraparound](operations/autovacuum-and-wraparound.md) | A write-heavy table bloats or slows over time; tuning autovacuum for a hot table; monitoring/preventing transaction-ID wraparound (age(datfrozenxid)); the database starts refusing writes to avoid wraparound; deciding VACUUM vs VACUUM FULL vs pg_repack |
 
 ## sqlite
 
