@@ -8,7 +8,7 @@ sources:
   - https://www.postgresql.org/docs/current/indexes.html
   - https://use-the-index-luke.com/
 last_verified: 2026-07-10
-related: [databases-indexing-index-selection, databases-indexing-covering-indexes]
+related: [databases-indexing-index-selection, databases-indexing-covering-indexes, databases-schema-design-online-schema-changes, databases-operations-autovacuum-and-wraparound]
 ---
 
 # Budgeting Index Maintenance Cost
