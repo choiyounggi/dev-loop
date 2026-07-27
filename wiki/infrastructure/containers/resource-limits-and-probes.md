@@ -68,6 +68,7 @@ storm; traffic reaches pods that are not ready to serve.
 | Runtime OOMKilled while its configured heap is below the limit | Non-heap memory (metaspace, thread stacks, direct buffers) pushed the total over: [backend-java-runtime-threads-and-memory] |
 | Pod evicted rather than OOMKilled | Node memory pressure evicting by QoS order — set memory request = limit to move the workload to Guaranteed |
 | App has no HTTP server to probe | Use an exec or TCP probe against the process itself; the process-only rule for liveness is unchanged |
+| Process moved from a host/VM into a pod is OOMKilled at a limit that "should be plenty" | "Ran fine on the host" is not evidence — the host enforced no limit. Measure the real workload's peak (`kubectl top`, `container_memory_working_set_bytes`) before sizing. If memory scales with input size (e.g. a default client-side DB cursor buffers the whole result set on execute), bound the working set (server-side/streaming cursor, chunked `fetchmany`) or size the limit to the measured peak of the largest real input |
 
 ## Instead of
 
@@ -77,9 +78,11 @@ storm; traffic reaches pods that are not ready to serve.
 | Copy resource limits from a blog post or another service | Measure this service's usage; set requests from p99 + headroom | Limits sized for someone else's workload produce OOMKills or throttling for yours |
 | Leave requests unset "for flexibility" | Set requests on every container | Unset requests = BestEffort: first evicted, and the scheduler overcommits the node |
 | Stretch liveness timeouts so the app survives boot | Add a startup probe sized for worst-case boot; keep liveness at steady-state timing | Boot-sized liveness leaves real steady-state hangs undetected for the whole boot window |
+| Size a migrated workload's memory limit from "it ran fine on the host" | Measure the workload's actual peak in-container on real data, then set limit = peak + headroom | The host never enforced a limit, so its success carries no information about the peak; data-proportional consumers (whole-result-set DB cursors, in-memory file builds) only reveal their peak under the real input |
 
 ## Sources
 
 - https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/ — probe purposes, failureThreshold/periodSeconds, startup probes protecting slow boots, readiness removes from endpoints without restart
 - https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ — requests drive scheduling, limits enforced at runtime; memory over limit = OOM kill, CPU over limit = throttling
 - https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/ — Guaranteed/Burstable/BestEffort assignment and eviction order
+- https://www.psycopg.org/docs/usage.html#server-side-cursors — a default (client-side) cursor loads the whole result set client-side; server-side cursors transfer data in controlled amounts
