@@ -8,7 +8,7 @@ sources:
   - https://use-the-index-luke.com/no-offset
   - https://www.postgresql.org/docs/current/queries-limit.html
 last_verified: 2026-07-10
-related: [databases-indexing-composite-index-column-order]
+related: [databases-indexing-composite-index-column-order, databases-query-optimization-streaming-large-result-sets]
 ---
 
 # Paginating Large Result Sets
