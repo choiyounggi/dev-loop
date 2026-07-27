@@ -21,6 +21,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [reading-execution-plans](query-optimization/reading-execution-plans.md) | A single query/statement is slow; verifying an index/query change with EXPLAIN before shipping (endpoint slow because it runs *many* fast queries → n-plus-one-queries) |
 | [keyset-pagination](query-optimization/keyset-pagination.md) | Implementing pagination, infinite scroll, or batch table walks |
+| [streaming-large-result-sets](query-optimization/streaming-large-result-sets.md) | Exporting/reading a very large single-query result into the app; process memory peaks on `fetchall` or building a big file; server-side cursor blocked by autocommit or a read-only proxy |
 | [large-in-lists](query-optimization/large-in-lists.md) | Building `IN (...)` queries whose list size can grow (batch lookups, fetch-by-ids) |
 | [n-plus-one-queries](query-optimization/n-plus-one-queries.md) | Loading a list plus per-row associations via an ORM; query count scales with result size |
 | [existence-and-count-checks](query-optimization/existence-and-count-checks.md) | Writing "is there any…", counts, badges, or gating logic on row presence |
