@@ -1,5 +1,7 @@
 # Knowledge flush — 4 insight(s)
 
+Cross-Check: 인사이트 4건 각각을 독립 general-purpose 서브에이전트 4개가 1차 소스(공식 문서·소스코드·이슈트래커) 대조로 교차검증 — 2건의 실질 교정 반영(cgroupns는 mount-time 시맨틱으로 메커니즘 수정, kps resourcePath v1alpha1은 현재도 기본값), 캐비앗 2건 추가(vLLM 필드 개명, DeepSeek 별도 CoT 예산).
+
 ## Verified best-practice
 
 **1. Container metrics empty while kubelet targets report up (OrbStack embedded k8s)**
