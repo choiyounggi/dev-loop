@@ -2,6 +2,13 @@
 
 Cross-Check: 인사이트 4건 각각을 독립 general-purpose 서브에이전트 4개가 1차 소스(공식 문서·소스코드·이슈트래커) 대조로 교차검증 — 2건의 실질 교정 반영(cgroupns는 mount-time 시맨틱으로 메커니즘 수정, kps resourcePath v1alpha1은 현재도 기본값), 캐비앗 2건 추가(vLLM 필드 개명, DeepSeek 별도 CoT 예산).
 
+## Decision Log
+
+- **의도**: `~/.dev-loop/queue`에 쌓인 ★ Insight 후보 4건을 knowledge-flush 파이프라인(리서치 검증 → 기존 레이어 중복확인 → 라우팅 → wiki-ingest)으로 정제해 위키에 반영. 사용자가 명시 지시한 단일 배치 PR.
+- **배제한 대안**: ① 기존 페이지에 병합 — 4건 모두 기존 페이지의 트리거와 불일치(아래 Existing-layer check)라 신규 페이지로. ② insight 2·3을 `reliability` 카테고리에 편입 — reliability는 전송 계층 실패(타임아웃/재시도) 소유라 시맨틱 응답 검증과 안 맞아 신규 카테고리 `backend/common/llm`으로(라우팅 근거는 Routing decision). ③ 수확된 원문 그대로 반영 — 리서치에서 메커니즘 교정 2건이 나와 교정본으로 반영.
+- **리뷰어가 볼 곳**: 신규 4페이지의 `confidence`/`sources`가 실제 근거와 맞는지, `backend/common/llm` 신규 카테고리 판단, 그리고 기존 5개 페이지의 frontmatter `related:` 한 줄 수정이 과하지 않은지.
+- [추정] 이 레포의 PR 리뷰는 dev-loop 규약상 레포 오너(choiyounggi) 단독 리뷰로 충분하다고 판단 — 팀 표준 리뷰어 3인은 개인 레포 collaborator가 아닐 수 있어 gh가 거부하면 미지정으로 진행.
+
 ## Verified best-practice
 
 **1. Container metrics empty while kubelet targets report up (OrbStack embedded k8s)**
