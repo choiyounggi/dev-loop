@@ -9,7 +9,7 @@ sources:
   - https://12factor.net/build-release-run
   - https://12factor.net/dev-prod-parity
 last_verified: 2026-07-10
-related: [infrastructure-deploy-rollout-and-rollback, infrastructure-ci-cd-secrets-handling, backend-node-boundaries-runtime-validation, backend-python-boundaries-runtime-validation]
+related: [infrastructure-deploy-rollout-and-rollback, infrastructure-ci-cd-secrets-handling, backend-node-boundaries-runtime-validation, backend-python-boundaries-runtime-validation, backend-common-llm-gateway-model-alias-defaults]
 ---
 
 # Configuration That Differs Per Environment

@@ -5,7 +5,7 @@ three stack subtrees — route by concern first, stack second:
 
 | Subtree | Route there when |
 |---------|------------------|
-| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure |
+| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, LLM/gateway completion handling |
 | [java](java/index.md) | You are writing/reviewing JVM backend code (Java/Kotlin, Spring, JPA/Hibernate) and the concern is stack-specific: entity mapping, persistence context, proxy pitfalls, JVM threads/memory |
 | [node](node/index.md) | You are writing/reviewing Node.js/TypeScript backend code: event-loop blocking, promise error handling, runtime validation at boundaries, graceful shutdown |
 | [python](python/index.md) | You are writing/reviewing Python backend code: GIL/concurrency model, pydantic validation, WSGI/ASGI workers, language traps |
@@ -51,6 +51,13 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [exception-handling](common/errors/exception-handling.md) | Writing a catch block or deciding where errors are handled/logged/translated in a service — catch placement, log-once, wrapping with cause preserved, typed results for expected outcomes; one fault producing duplicate alerts |
 | [async-failure-handling](common/errors/async-failure-handling.md) | Handing work to in-process async (@Async, unawaited futures/promises) — deciding fire-and-forget vs consumed future vs durable job; side effects silently never happening with no error logs; unobserved futures; async work enqueued inside a transaction |
+
+### llm
+
+| Page | Load when |
+|------|-----------|
+| [completion-response-validation](common/llm/completion-response-validation.md) | Consuming OpenAI-compatible `/chat/completions` output as a final artifact (summary, document, notification); LLM responses coming back empty or truncated while HTTP status is 200; a reasoning-family model may be routed onto the alias you call |
+| [gateway-model-alias-defaults](common/llm/gateway-model-alias-defaults.md) | A code default names a model alias or route resolved by an external serving catalog (LLM gateway, registry); reviewing/merging a PR that claims end-to-end verification of such a default; a previously-verified default starts failing with 400/404 |
 
 ### auth
 

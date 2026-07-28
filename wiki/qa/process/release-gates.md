@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://sre.google/sre-book/release-engineering/
 last_verified: 2026-07-10
-related: [qa-process-regression-scope, qa-exploratory-exploratory-sessions]
+related: [qa-process-regression-scope, qa-exploratory-exploratory-sessions, backend-common-llm-gateway-model-alias-defaults]
 ---
 
 # Deciding Whether a Build Is Ready to Ship

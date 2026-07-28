@@ -9,7 +9,7 @@ sources:
   - https://prometheus.io/docs/practices/naming/
   - https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
 last_verified: 2026-07-10
-related: [infrastructure-observability-alerting]
+related: [infrastructure-observability-alerting, infrastructure-observability-missing-container-metrics]
 ---
 
 # Instrumenting a Service with Logs and Metrics
