@@ -11,7 +11,7 @@ sources:
   - https://martinfowler.com/bliki/TestCoverage.html
   - https://testing.googleblog.com/2013/05/testing-on-toilet-dont-overuse-mocks.html
 last_verified: 2026-07-10
-related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing]
+related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-checks-that-cannot-pass]
 ---
 
 # Proving a Test Can Fail
