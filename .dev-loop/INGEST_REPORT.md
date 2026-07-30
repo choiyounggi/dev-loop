@@ -182,6 +182,32 @@ against this PR's own two pages. One candidate claim was downgraded on review
 see the scope correction above). No separate adversarial reviewer ran; the
 owner's PR review is the remaining gate.
 
+## Decision Log (AI 생성)
+
+### 의도 — 무엇을 / 왜
+
+- 큐에 쌓인 5개 후보를 각각 원본 1차 소스로 재검증한 뒤 wiki 2페이지로 적재했다. 후보 텍스트를 그대로 믿지 않고 ESLint/Semgrep/GFM/JSON Schema/AWS 문서와 `managed_upload.js` 소스를 직접 열어 대조했다 — 수확된 블록은 후보이지 검증된 지식이 아니기 때문.
+- 5후보 → 2페이지로 접었다. AGENTS.md "one case per page"는 후보 수가 아니라 **상황** 단위로 자르므로, 1·2·4·5는 모두 "문서를 대상으로 하는 체커를 작성하는 상황" 하나라 한 페이지로 병합했다.
+- 새 카테고리 2개(`testing/docs-as-spec`, `backend/common/storage`)를 만들었다. 기존 카테고리는 각각 "코드 테스트"와 "8개 common 관심사"로 짜여 있어 문서 검증·오브젝트 스토리지를 담을 자리가 없었다.
+
+### 배제한 대안 — 무엇을 안 했나 / 왜
+
+- `testing/quality/tests-that-cannot-fail.md`에 append하지 않았다. 그 페이지는 *테스트 코드*의 mutation 규칙을 소유하고 "load when" 라인이 충돌해 AGENTS.md invariant 1의 drift 조건에 걸린다. 대신 양방향 링크로 연결.
+- 후보 2·5가 `domain: qa` 태그였지만 qa로 라우팅하지 않았다. qa는 릴리즈 *프로세스* 스코프이고, 여기서 만드는 산출물은 자동 체커라 testing이 소유한다.
+- 후보 3을 `backend/node`가 아닌 `backend/common`에 뒀다. v2·v3 양쪽에서 재현되고 원리가 언어 무관이라, "common이 원리·stack이 메커닉"이라는 AGENTS.md 규칙에 따랐다.
+- 후보 3의 "space → `+`"를 문서화된 계약으로 단정하지 않았다. 공개 소스로 확인되는 건 `/` → `%2F`뿐이라 컬럼명을 "Observed form"으로 두고 스코프를 좁혔다.
+- 포매터(PostToolUse prettier)가 index 3개 파일의 표 전체를 패딩해 무관한 행까지 diff에 올렸다 — 되돌리고 스크립트로 대상 라인만 재적용했다(INDEX.md 2줄, backend +8/-1, testing +12/-3).
+
+### 리뷰어가 볼 곳 — 신뢰성 판단 포인트
+
+- `.dev-loop/INGEST_REPORT.md` "Verified best-practice" — 인용 URL이 실제로 그 주장을 지지하는지. 특히 "One scope correction" 문단(후보보다 약하게 적은 부분).
+- `wiki/testing/docs-as-spec/document-conformance-checks.md:39-42` — positive/negative control 표. ESLint valid/invalid + Semgrep ok/ruleid 두 출처가 실제로 이 형태를 강제하는지.
+- `wiki/backend/common/storage/object-key-persistence.md:40-43` — 단일/멀티파트 인코딩 표. "Observed form" 열이 문서화된 계약처럼 읽히지 않는지.
+- `wiki/testing/index.md`, `wiki/backend/index.md` — 새 "load when" 라인이 인접 페이지 트리거와 겹치지 않는지(AGENTS.md invariant 1).
+- 새 카테고리 2개 신설이 과한지 — 기존 카테고리로 접는 게 낫다고 보면 이 PR에서 되돌리기 쉬운 부분.
+
+> [추정] 표시 항목은 세션에 명시 근거가 없어 사후 재구성한 의도임 — 검증 필요
+
 ## Invariants checked
 
 - Body length: 73 and 60 lines (limit 120).
