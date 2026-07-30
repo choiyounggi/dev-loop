@@ -168,6 +168,20 @@ All five ids verified to resolve to existing files; no duplicate ids in `wiki/`.
   before `reliability`), plus "object-storage references" added to the `common`
   subtree route line and to the backend row of the root `INDEX.md`.
 
+## Cross-Check
+
+Cross-Check: source-level, not adversarial-reviewer. Every claim in this PR was
+re-derived in-session from the primary source rather than from the harvested
+candidate text — five docs/issues fetched for the S3 page (including reading
+`managed_upload.js` on `raw.githubusercontent.com` instead of trusting the
+candidate's line numbers) and four for the doc-gate page, with two independent
+tools (ESLint `RuleTester`, Semgrep rule tests) converging on the
+positive+negative control requirement. The pipe-splitting rule was reproduced
+against this PR's own two pages. One candidate claim was downgraded on review
+(the `space → +` multipart form is field evidence, not a documented contract —
+see the scope correction above). No separate adversarial reviewer ran; the
+owner's PR review is the remaining gate.
+
 ## Invariants checked
 
 - Body length: 73 and 60 lines (limit 120).
