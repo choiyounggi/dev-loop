@@ -15,6 +15,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [portable-shell-scripts](shells/portable-shell-scripts.md) | Writing a shell script that must run on more than one machine/OS/shell or in CI; a script that works locally fails elsewhere; choosing a shebang (bash vs sh); a bash script misbehaves in zsh or vice versa (unquoted vars, `=word`, array indexing); deciding how `set -euo pipefail` protects (and doesn't); building argument lists safely |
+| [command-text-inspected-before-execution](shells/command-text-inspected-before-execution.md) | A hook, policy gate, allow-list, or audit rule blocked a command that is correct as written; composing a command that must satisfy such a gate first try; deciding whether to write a path literally or as `"$VAR"` in an inspected argument; a gate reports an argument missing or a file nonexistent though both are right; a gate must read a file your command creates; prose containing a dangerous-looking command (release notes, docs, fixtures) trips a text scanner |
 
 ## tools
 
@@ -41,6 +42,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [background-services](processes/background-services.md) | Something must run persistently or on a schedule on a dev machine or server (daemon, watcher, cron-style job); a "started" process dies when the terminal/SSH/agent session ends; choosing nohup vs LaunchAgent vs systemd unit vs cron/timer; a job works in the terminal but fails under cron/launchd (minimal environment); wiring service logs and restart policy |
+| [non-interactive-cli-invocation](processes/non-interactive-cli-invocation.md) | Calling a tool that can prompt (agent CLI, ssh, git, package manager) from a script, CI step, hook, or agent session; such a call produced no output and never returned; deciding whether a hang belongs to the client, the network, or the far-side service; choosing the stdin/timeout/fail-fast switches for an unattended call; a TTY-detecting tool changes its output format under automation |
 
 ## toolchains
 
