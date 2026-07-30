@@ -14,10 +14,10 @@ follow the cross-pointers in their index or take the next matching seeded domain
 | [frontend](wiki/frontend/index.md) | **seeded** | Web UI code: state placement, rendering performance, in-UI data fetching (races, infinite scroll), auth token handling, forms, XSS-safe output, accessibility |
 | [infrastructure](wiki/infrastructure/index.md) | **seeded** | CI/CD pipelines, secrets in build/deploy, container image builds, rollout/rollback strategy, observability (logs/metrics/alerting) |
 | [testing](wiki/testing/index.md) | **seeded** | Writing or structuring automated tests: level choice, cases/assertions, test data, mock decisions, flaky tests (release-process quality → qa) |
-| [qa](wiki/qa/index.md) | **seeded** | Release-quality process: release gates, regression scoping, bug reports, severity/priority triage, exploratory testing (writing automated test code → testing) |
+| [qa](wiki/qa/index.md) | **seeded** | Release-quality process: release gates, regression scoping, bug reports, severity/priority triage, exploratory testing, automated verification of document deliverables (spec/RFC gates) (writing automated test code → testing) |
 | [debugging](wiki/debugging/index.md) | **seeded** | Diagnosing a failure — finding what is wrong and why: reproducing, bisection, hypothesis testing, traces/logs, intermittent failures (fixing the diagnosed fault → its owning domain) |
 | [security](wiki/security/index.md) | **seeded** | Trust-boundary decisions: input validation, session-vs-token auth choice, per-resource authorization (IDOR), secrets hygiene, dependency trust, PII handling (XSS rendering → frontend; CI secrets → infrastructure; JWT implementation → backend/frontend auth) |
-| [platforms](wiki/platforms/index.md) | **seeded** | OS-level differences breaking code across macOS/Linux/Windows: shell portability, BSD-vs-GNU CLI, filesystem case/line endings, background services/cron, toolchain version pinning |
+| [platforms](wiki/platforms/index.md) | **seeded** | OS-level differences breaking code across macOS/Linux/Windows: shell portability, BSD-vs-GNU CLI, filesystem case/line endings, Unicode normalization in text/file-name matching, background services/cron, toolchain version pinning |
 | [mobile](wiki/mobile/index.md) | **seeded** | App-side iOS/Android/cross-platform: process death/state survival, offline-first sync, mobile-network calls, store rollout/hotfix strategy, startup time |
 
 All ten domains are seeded. New categories grow via `skills/wiki-ingest/SKILL.md`.
