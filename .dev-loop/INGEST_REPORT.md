@@ -161,3 +161,45 @@ Body lines 83 / 82 / 93 (limit 120) · all four required sections present on eac
 every `related:` id and inline `[page-id]` resolves (13 checks, 0 misses) · each new page
 listed in its domain index with a multi-use-case "load when" · every index relative link
 resolves · no banned vague qualifiers · `log.md` entry appended.
+
+## Decision Log
+
+**의도**
+- 큐에 쌓인 4건을 3페이지로 인그레스트한다. qa 2건(자기참조 grep · 어휘 게이트/앵커)은
+  "게이트가 걸린 문서를 편집하는 쪽"이라는 **한 케이스**라서 1페이지로 합쳤다
+  (`AGENTS.md` "one case per page" + 지시문이 서로를 필요로 함).
+- 후보의 *why*를 그대로 받지 않고 실측으로 교정했다: `--body-file` 차단 원인은
+  "따옴표 때문"이 아니라 **따옴표=추출 실패 / 미확장 변수=경로 부재**의 두 모드이고
+  따옴표 친 리터럴 경로도 실패한다(본문 표에 5변형 실측).
+- 열린 PR(#6~#10)까지 중복 검사 대상에 포함했다. `main`만 보면 커버리지를 과소평가해
+  #10과 같은 페이지를 또 만들 위험이 있었다.
+- `INDEX.md`는 **의도적으로 건드리지 않았다** — #10이 이미 qa 라우트 라인을 갱신하므로
+  충돌면을 `wiki/qa/index.md` 한 훅으로 줄였다.
+
+**배제한 대안**
+- *insight 1을 `background-services`에 병합* → 기각. 그 페이지의 케이스는 *지속성*이고,
+  블로킹 stdin을 넣으면 "load when"이 흐려진다(양방향 링크로 대체).
+- *insight 2를 `portable-shell-scripts`에 병합* → 기각. 그 페이지 규칙은 "모든 확장을
+  따옴표로 감싸라"인데 이 건은 한 인자를 리터럴로 쓰라는 것 — 트리거도 다르고 규칙이
+  충돌해 보인다. 새 페이지에 "이 페이지는 인자 하나만 좁히며 다른 곳의 무따옴표 확장을
+  허용하지 않는다"를 명시.
+- *insight 2용 새 카테고리(`policy-gates`)* → 기각. 두 번째 멤버가 안 보이는 1페이지
+  카테고리. 메커니즘이 확장 타이밍이라 `shells`가 맞다.
+- *insight 1을 `debugging`으로* → 기각. 바꾸는 산출물이 호출 명령이므로 소유 도메인 우선
+  규칙에 따라 platforms(진단 절반은 `debugging-methodology-reproduce-first`로 링크).
+- *qa 2건을 #10 머지까지 보류* → 기각. 범위 축소는 소유자 판단이므로, 대신 충돌 위치와
+  해소법(헤딩 1개 + 행 2개)을 위에 명시했다.
+- *#10 브랜치를 base로 스택 PR* → 기각. 스킬이 `--base main`을 요구하고, 리뷰 diff에
+  #10 변경이 섞인다.
+
+**리뷰어가 볼 곳**
+1. `wiki/qa/index.md` — #10과 충돌 예정 지점. **헤딩 1개 유지 + 행 2개**로 해소.
+2. `wiki/qa/document-verification/editing-a-gated-document.md` — #10의 페이지와
+   중복이 아닌지(저자 측 vs 게이트 저자 측 분담)가 이 PR의 핵심 판단.
+3. `command-text-inspected-before-execution.md`의 Field context 5변형 표 —
+   `hooks/pre-flush-pr-gate.sh:56` 패턴으로 재현 가능.
+4. confidence 등급: 1·2는 `verified`(공식 문서+재현), 3+4는 `field-tested`
+   (위험은 문서화되어 있으나 지시문은 현장 유래). 1번 페이지의 클라이언트/서버 분리
+   단계는 문서 근거가 아니라 현장 유래라서 Field context로 분리해 표기했다.
+5. **[추정]** `platforms/shells`에 2페이지(이식성 + 확장 타이밍)가 앞으로도 응집적으로
+   남을 것이라는 판단은 추정이다 — 유사 사례가 더 쌓이면 별도 카테고리가 나을 수 있다.
