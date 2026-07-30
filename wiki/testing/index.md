@@ -3,9 +3,9 @@
 Route here for: writing or structuring automated tests — choosing the test
 level, selecting cases and assertions, test data and isolation, mock/fake
 decisions, fixing flaky tests, verifying tests can actually fail, testing
-async code (promises/timers/events), and browser E2E selector/wait/setup
-strategy. Release-process quality (gates, manual testing, bug triage) →
-wiki/qa/.
+async code (promises/timers/events), browser E2E selector/wait/setup
+strategy, and checks whose subject is a document rather than code.
+Release-process quality (gates, manual testing, bug triage) → wiki/qa/.
 
 Match your situation to a "load when" line; load only matching pages.
 
@@ -22,6 +22,12 @@ Match your situation to a "load when" line; load only matching pages.
 | [minimum-case-set](quality/minimum-case-set.md) | Writing tests for a function/endpoint/change and choosing which cases to cover; reviewing whether coverage suffices; picking boundary values by input type; adding a regression test for a bug fix |
 | [behavior-not-implementation](quality/behavior-not-implementation.md) | Deciding what a test should assert; a behavior-preserving refactor broke tests; tempted to expose privates for testing; deciding whether a snapshot test is appropriate |
 | [tests-that-cannot-fail](quality/tests-that-cannot-fail.md) | Reviewing tests that always pass; a bug shipped through an area the suite reported as covered; auditing a suspiciously green suite; judging whether an assertion, error-path test, or mock-based test can actually detect a defect |
+
+## docs-as-spec
+
+| Page | Load when |
+|------|-----------|
+| [document-conformance-checks](docs-as-spec/document-conformance-checks.md) | Writing or reviewing an automated check whose subject is a document (RFC, API spec, schema doc, mapping table, ADR) — grep gates, parse scripts, CI doc gates; authoring the check before the document exists; deciding what to mutate to prove the check can fail; a doc gate passed on a document that lost a requirement; parsing Markdown tables (cell counts, per-column extraction) programmatically |
 
 ## data
 
