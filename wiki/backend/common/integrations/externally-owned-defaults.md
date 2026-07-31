@@ -31,9 +31,11 @@ default path in an environment nobody changed.
    does not own.
 2. **Paste the dated check into the PR** (endpoint queried, result, date), so the
    next reviewer reads the age of the evidence instead of trusting its existence.
-3. **Resolve the configured name at startup and crash when it is absent**, with the
-   resolved name in the message — a retired alias then fails the deploy instead of
-   the user's request. Startup-validation mechanics:
+3. **Resolve the configured name at startup, in the client wrapper that owns the
+   call, and crash when it is absent** — the process that will use the name is the
+   one that must prove it exists, so a retired alias fails the deploy instead of the
+   user's request. Put the resolution in the same module that builds the request, so
+   a new call site cannot bypass it. Config-shape and startup-validation mechanics:
    [infrastructure-config-environment-config].
 4. **Make the runtime failure name the resource**: log the requested name and the
    provider's error verbatim, so "400 from the gateway" reads as "alias X no longer
@@ -44,7 +46,7 @@ default path in an environment nobody changed.
 | The named resource is required for the feature | Validate at startup, crash on failure, and gate the deploy on that check |
 | Several names are tried in order (primary + fallbacks) | Resolve all of them at startup, log which ones exist, and alert when the primary is unresolvable while a fallback is serving |
 | The provider has announced a shutdown date | Record the date next to the default (comment + tracking issue) — preview-tier names can retire on as little as two weeks' notice |
-| The default only exists in one environment's catalog | Make it a required per-environment config value with no default ([infrastructure-config-environment-config]) |
+| The name exists in one environment's catalog but not another's | Make it a required per-environment value with no default, and run the resolution check in every environment at boot — one shared default silently points staging at a name only production owns ([infrastructure-config-environment-config] owns the config shape) |
 
 ## Edge cases
 

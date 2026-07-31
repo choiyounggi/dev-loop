@@ -7,6 +7,7 @@ confidence: verified
 sources:
   - https://www.gnu.org/software/coreutils/manual/html_node/nohup-invocation.html
   - https://man.openbsd.org/ssh
+  - https://man.openbsd.org/ssh_config
   - https://git-scm.com/docs/git
 last_verified: 2026-07-31
 related: [platforms-processes-background-services, platforms-tools-bsd-vs-gnu-cli, debugging-methodology-hypothesis-testing]
@@ -24,14 +25,18 @@ remote service is at fault.
 
 ## Do this
 
-1. **Detach fd 0 at the call site**: `cmd </dev/null`, or `nohup cmd >"$LOG" 2>&1 &`
-   (GNU `nohup` redirects a terminal stdin to a deliberately unreadable descriptor,
-   so a stray read reports an error instead of blocking). A non-interactive flag
-   controls the tool's output and prompt *policy*; it does not guarantee the tool
-   never reads standard input.
-2. **Also close the tool's documented prompt channel** when it has one:
-   `ssh -n` ("prevents reading from stdin … must be used when ssh is run in the
-   background"), `GIT_TERMINAL_PROMPT=0` for git's own credential prompts.
+1. **Detach fd 0 at the call site**: `cmd </dev/null` — the redirect is the
+   unconditional guarantee, and the tool's own stdin-detach flag where it has one
+   (`ssh -n` "prevents reading from stdin … must be used when ssh is run in the
+   background"). GNU `nohup` adds this **only when fd 0 is already a terminal**, so
+   in a CI step or hook where fd 0 is a pipe, write the redirect explicitly. A
+   non-interactive flag controls the tool's output and prompt *policy*; it does not
+   guarantee the tool never reads standard input.
+2. **Close the tool's prompt channel separately** — detaching stdin makes a prompt
+   fail rather than answer it: `ssh -o BatchMode=yes` ("user interaction such as
+   password prompts and host key confirmation requests will be disabled", plus
+   `-o StrictHostKeyChecking=accept-new` for a first-contact host key),
+   `GIT_TERMINAL_PROMPT=0` for git's credential prompts.
 3. **Bound every such call with a timeout** (`timeout` / `gtimeout` —
    [platforms-tools-bsd-vs-gnu-cli] owns the macOS gap) so a blocked read fails the
    step instead of hanging the pipeline.
@@ -42,7 +47,7 @@ remote service is at fault.
 
 | Observation | Conclusion |
 |-------------|------------|
-| No request logged on the server for that window | The call never left the client — a local block (fd 0, auth prompt, lock). Fix the invocation |
+| No request logged on the server for that window | The request never reached the server's logged surface: either a local block (fd 0, auth prompt, lock) or a pre-log rejection (DNS, TLS handshake, an intermediate proxy). Separate the two by retrying the same endpoint with a minimal client (`curl -v`) from the same host |
 | Request logged, response slow or 5xx | Server side — take it to the service's latency/error path |
 | Request logged and answered fast, client still produced nothing | The client blocked *after* the response — inspect the client's own output handling |
 
@@ -61,11 +66,12 @@ remote service is at fault.
 | If you are about to | Do this instead | Why |
 |---------------------|-----------------|-----|
 | Raise the client timeout because the call "is just slow" | Re-run with `</dev/null` under `timeout`, then check the server log for arrival | A blocked read on fd 0 never emits a request; more waiting cannot produce one |
-| Conclude the model/gateway/network is broken from a client-side hang | Confirm the request appears in the server's log first | Absence of the request in the server log localizes the fault to your invocation, and saves restarting healthy remote services |
+| Conclude the model/gateway/network is broken from a client-side hang | Confirm the request appears in the server's log first, then re-test the same endpoint with `curl -v` | Absence in the log narrows the fault to your side of the logged surface (invocation, DNS, TLS, proxy) and saves restarting healthy remote services |
 | Rely on `--print` / `-p` / `--yes` alone to make a call non-interactive | Pass the flag AND redirect stdin from `/dev/null` | The flag is the tool's intent; the redirect is the guarantee |
 
 ## Sources
 
-- https://www.gnu.org/software/coreutils/manual/html_node/nohup-invocation.html — when stdin is a terminal, nohup redirects it and makes the substitute descriptor unreadable so a mistaken read reports an error; GNU extension, portable form `0>/dev/null`
-- https://man.openbsd.org/ssh — `-n` "Redirects stdin from /dev/null (actually, prevents reading from stdin). This must be used when ssh is run in the background."
-- https://git-scm.com/docs/git — `GIT_TERMINAL_PROMPT`: when false, git will not prompt on the terminal (default is to prompt)
+- https://www.gnu.org/software/coreutils/manual/html_node/nohup-invocation.html — "If standard input is a terminal, redirect it … Make the substitute file descriptor unreadable, so that commands that mistakenly attempt to read from standard input can report an error"; GNU extension, portable form `0>/dev/null`. The terminal precondition is why the explicit redirect is the guarantee
+- https://man.openbsd.org/ssh — `-n` "Redirects stdin from /dev/null (actually, prevents reading from stdin). This must be used when ssh is run in the background"; the same entry notes it "does not work if ssh needs to ask for a password or passphrase" — a stdin detach, not a prompt suppressor
+- https://man.openbsd.org/ssh_config — `BatchMode=yes`: "user interaction such as password prompts and host key confirmation requests will be disabled"; `StrictHostKeyChecking=accept-new` adds new host keys without permitting changed ones
+- https://git-scm.com/docs/git — `GIT_TERMINAL_PROMPT`: "If this Boolean environment variable is set to false, git will not prompt on the terminal (e.g., when asking for HTTP authentication)"

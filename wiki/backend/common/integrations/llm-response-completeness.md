@@ -31,10 +31,10 @@ Treat HTTP 200 as "transport succeeded" only, and gate the artifact on the body:
 | Case | Do |
 |------|----|
 | `finish_reason == "stop"` and `content` non-blank | Accept the text |
-| `finish_reason == "length"` | Fail the call — the text stopped at your token cap mid-generation. Retry with a higher cap or a smaller input; never persist or post the partial text |
+| `finish_reason == "length"` | Fail the call — the text stopped at your token cap mid-generation. Retry with a higher cap or a smaller input, and keep the partial text out of the artifact |
 | `content` blank (empty or whitespace) | Fail the call with a diagnostic carrying `finish_reason`, `usage` (prompt/completion/reasoning tokens), the requested alias, and the returned `model` |
-| `content` blank AND a reasoning field non-blank | Report "the reasoning model spent the output budget": raise the token cap (OpenAI advises reserving ≥25,000 tokens for reasoning + output while calibrating) or route to a non-reasoning alias. Never substitute the reasoning text for the answer — it is scratch work, not the deliverable |
-| `finish_reason == "tool_calls"` | Blank `content` is correct here — consume the tool call; do not run the blank-content failure path |
+| `content` blank AND a reasoning field non-blank | Report "the reasoning model spent the output budget": raise the token cap (OpenAI advises reserving ≥25,000 tokens for reasoning + output while calibrating) or route to a non-reasoning alias. Source the answer from `content` alone — the reasoning field is scratch work, not the deliverable |
+| `finish_reason == "tool_calls"`, or the deprecated `function_call` | Blank `content` is correct here — consume the tool call and skip the blank-content row above |
 
 Then log the `model` value the response carries next to the alias you requested, so
 a gateway reroute (alias → different model) is visible in the record afterwards.
@@ -47,7 +47,7 @@ a gateway reroute (alias → different model) is visible in the record afterward
 | Streaming responses | Accumulate, then apply the same gate using the final chunk's `finish_reason` — validate before the text leaves your process |
 | Caller uses the Responses API, not chat completions | The equivalent signal is `status == "incomplete"` with reason `max_output_tokens`; treat it exactly as `finish_reason == "length"` |
 | Retrying a `length` failure | This is a fresh request, not a retry of the same bytes — raise the cap or shrink the input first, otherwise it truncates identically ([backend-common-reliability-timeouts-and-retries] owns retry policy) |
-| Reasoning tokens are billed but invisible | Cost is incurred even when `content` is blank, so alert on the blank-content failure rather than silently retrying in a loop |
+| Reasoning tokens are billed but invisible | Cost is incurred even when `content` is blank — send the blank-content failure to an alert with the token counts attached, and cap automatic retries at one |
 
 ## Instead of
 
@@ -61,6 +61,6 @@ a gateway reroute (alias → different model) is visible in the record afterward
 ## Sources
 
 - https://developers.openai.com/api/docs/guides/reasoning — reasoning tokens occupy the output budget and are billed as output tokens; a response can be cut off "before any visible output tokens are produced"; detect via `status == incomplete` / `max_output_tokens`; reserve ≥25,000 tokens while calibrating
-- https://developers.openai.com/api/docs/api-reference/chat/object — `finish_reason` values: `stop`, `length` ("the maximum number of tokens specified in the request was reached"), `tool_calls`, `content_filter`
+- https://developers.openai.com/api/docs/api-reference/chat/object — five documented `finish_reason` values: `stop`, `length` ("the maximum number of tokens specified in the request was reached"), `tool_calls`, `content_filter`, and the deprecated `function_call` — the two tool-calling values are why blank `content` is carved out
 - https://docs.vllm.ai/en/latest/features/reasoning_outputs.html — OpenAI-compatible servers put reasoning in `reasoning` (formerly `reasoning_content`) and the final answer in `content`
 - https://docs.litellm.ai/docs/reasoning_content — LiteLLM normalizes provider thinking into `message.reasoning_content` (plus `thinking_blocks` for Anthropic)

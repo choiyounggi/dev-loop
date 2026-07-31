@@ -24,8 +24,16 @@ Sources checked (all fetched live, 2026-07-31):
   background." Primary evidence that mature CLIs ship an explicit stdin-detach flag
   *because* background invocation otherwise blocks.
 - [`git` docs, `GIT_TERMINAL_PROMPT`](https://git-scm.com/docs/git) — "If this Boolean
-  environment variable is set to false, git will not prompt on the terminal", i.e.
-  prompting on the terminal is the default. Second independent instance of the pattern.
+  environment variable is set to false, git will not prompt on the terminal (e.g., when
+  asking for HTTP authentication)." Second independent instance of a CLI shipping an
+  explicit opt-out for terminal prompting. (The doc does **not** state the default; an
+  earlier draft asserted "default is to prompt" as sourced — removed by cross-check.)
+- [OpenBSD `ssh_config`](https://man.openbsd.org/ssh_config) — `BatchMode=yes`: "user
+  interaction such as password prompts and host key confirmation requests will be
+  disabled"; `StrictHostKeyChecking=accept-new` adds new host keys without permitting
+  changed ones. Added by cross-check: `ssh -n` detaches stdin but the same man page notes
+  it "does not work if ssh needs to ask for a password or passphrase", so the prompt
+  channel needs its own directive.
 
 Reproduction from the session: `pi 0.79.1 --tools` in the foreground hung twice
 (300s, 150s; 0 bytes written), while the LiteLLM gateway log showed **zero requests from
@@ -50,8 +58,10 @@ Sources checked (all fetched live, 2026-07-31):
   ≥25,000 tokens while calibrating. This is exactly the failure mode the candidate claimed.
 - [OpenAI chat-completion object](https://developers.openai.com/api/docs/api-reference/chat/object)
   — `finish_reason: "length"` = "the maximum number of tokens specified in the request
-  was reached"; `tool_calls` and `content_filter` are the other non-`stop` values (the
-  `tool_calls` case is why the page carves out legitimately-blank content).
+  was reached"; the full set is five values — `stop`, `length`, `tool_calls`,
+  `content_filter`, and the deprecated `function_call`. Both tool-calling values return
+  blank `content` by design, which is why the page carves them out of the
+  blank-content failure path (the `function_call` half was added by cross-check).
 - [vLLM reasoning outputs](https://docs.vllm.ai/en/latest/features/reasoning_outputs.html)
   — reasoning goes in `reasoning` (renamed from `reasoning_content`), final answer in
   `content`.
@@ -115,7 +125,8 @@ Pages read in full before writing anything:
 
 **Conflicts found: none.** Nothing in the wiki contradicts these three directives.
 
-Self-lint before commit: all 3 new pages are 66–71 lines (limit 120); zero banned vague
+Self-lint before commit (re-run after the cross-check fixes): all 3 new pages are 66–77
+lines (limit 120); zero banned vague
 qualifiers (`usually|generally|consider|might want|as appropriate|typically|probably|ideally`);
 all 11 `related:`/inline page ids resolve to exactly one existing page each.
 
@@ -127,11 +138,56 @@ all 11 `related:`/inline page ids resolve to exactly one existing page each.
 | 2 — LLM response completeness | `backend` / **NEW category** `common/integrations` / `llm-response-completeness.md` | New category justified: the existing eight common categories cover the API you *publish* (api-design), transport to a dependency (reliability), and internal concerns (caching, jobs, errors, auth, orm, concurrency). None covers *depending on an externally owned service's response contract and its catalog of names*. Placed in `common/` (not `node/`/`python/`) because the decision is language-agnostic; `applies_to: [openai-compatible]` scopes it |
 | 3 — externally-owned defaults | `backend` / `common/integrations` / `externally-owned-defaults.md` | Same new category — it is the second face of one concern (insight 2 = the response you get back; insight 3 = the name you asked for). Kept as its own page under AGENTS.md's one-case-per-page rule rather than folded into insight 2, because its trigger (reviewing/merging a diff, plus startup validation) is distinct and it generalizes past LLMs to any repo-external name (bucket, queue, index). Cross-linked to `infrastructure-config-environment-config` and `qa-process-release-gates` |
 
-Plumbing updated: `wiki/backend/index.md` (new `### integrations` section, 2 rows),
+## Cross-check
+
+Cross-Check: independent headless `claude -p --permission-mode plan` adversarial review of
+all three pages + this report returned **VERDICT: FAIL with 12 findings**; 8 were confirmed
+against the primary sources and applied, 2 were already clean, 2 were declined with reasons.
+Applied:
+
+1. **`ssh -n` was miscategorised** as a prompt-channel control. ssh(1) itself says `-n`
+   "does not work if ssh needs to ask for a password or passphrase" — it is a stdin detach.
+   Moved to directive 1; directive 2 now uses `-o BatchMode=yes` (+
+   `StrictHostKeyChecking=accept-new`), verified against ssh_config and cited.
+2. **GNU nohup's stdin redirect is conditional** ("If standard input is a terminal…"). In
+   this page's own CI/hook triggers fd 0 is often a pipe, so nohup redirects nothing. The
+   page now states that `</dev/null` is the unconditional guarantee.
+3. **"No request in the server log ⇒ never left the client" was too strong** — DNS, TLS, and
+   proxy failures also produce no access-log entry. Row and `Instead of` row widened to
+   "pre-log rejection", with `curl -v` as the discriminator.
+4. **Deprecated `function_call` also returns blank `content`** by design and would have hit
+   the fail path. Added to the carve-out.
+5. **The `finish_reason` enumeration was incomplete** (4 of 5) in both the page's Sources
+   bullet and this report. Corrected in both.
+6. **`GIT_TERMINAL_PROMPT` "default is to prompt" was inference presented as sourced** — the
+   doc states only the false case. Removed.
+7. **`wiki/backend/index.md`'s concern-first subtree row was not updated** — routing protocol
+   step 2 reads that row before the category tables, so an agent would have landed on
+   `reliability` instead of the new `integrations` category. Row extended (the real routing
+   defect in this batch).
+8. **`environment-config`'s `last_verified` bump was unearned** — a one-row edge-case addition
+   does not re-verify its three 12factor sources. Reverted to 2026-07-10 so lint's staleness
+   clock is not reset.
+
+Also applied for format: four anti-patterns phrased as negations inside `Do this`/`Edge cases`
+tables were restated positively (AGENTS.md keeps negations in `Instead of`), and
+`externally-owned-defaults`' pure-pointer row and startup directive were given app-side
+substance.
+
+Declined, with reasons: (a) **splitting `externally-owned-defaults` by trigger** — the
+corpus norm (`environment-config`, `release-gates`) is several related triggers plus a
+numbered list *and* a case table on one page, and the three triggers here are one case seen
+at review time, boot time, and failure time; (b) **relocating it to `infrastructure/config`**
+— its primary trigger is reviewing application-code defaults and its resolution rule lives
+in the client wrapper, so `backend` owns it; the config-shape half is delegated by link and
+`environment-config` carries the reciprocal row.
+
+Plumbing updated: `wiki/backend/index.md` (new `### integrations` section, 2 rows, plus the
+concern-first subtree row),
 `wiki/platforms/index.md` (1 row under `processes`), `INDEX.md` (both domains' "route
 here when" lines extended so the new cases are reachable from the root map), `log.md`
-(2 `ingest` + 1 `revise` entries), and `background-services` / `environment-config`
-`related:` back-links.
+(2 `ingest` + 2 `revise` entries, the second recording the cross-check), and
+`background-services` / `environment-config` `related:` back-links.
 
 Queue rows for these 3 candidates are retired to `~/.dev-loop/queue/.processed.jsonl`
 once this PR is opened.

@@ -8,7 +8,7 @@ sources:
   - https://12factor.net/config
   - https://12factor.net/build-release-run
   - https://12factor.net/dev-prod-parity
-last_verified: 2026-07-31
+last_verified: 2026-07-10
 related: [infrastructure-deploy-rollout-and-rollback, infrastructure-ci-cd-secrets-handling, backend-node-boundaries-runtime-validation, backend-python-boundaries-runtime-validation, backend-common-integrations-externally-owned-defaults]
 ---
 
