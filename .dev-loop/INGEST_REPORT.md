@@ -191,3 +191,30 @@ here when" lines extended so the new cases are reachable from the root map), `lo
 
 Queue rows for these 3 candidates are retired to `~/.dev-loop/queue/.processed.jsonl`
 once this PR is opened.
+
+## Decision Log (AI 생성)
+
+### 의도 — 무엇을 / 왜
+- 큐에 쌓인 ★ Insight 3건을 **검증 후** 위키로 승격. 원문(GNU nohup·OpenBSD ssh/ssh_config·git·OpenAI reasoning/chat-object/deprecations/models·vLLM·LiteLLM)을 직접 열어 세 directive 모두 `confidence: verified`로 확정했고, 후보에 없던 사실(게이트웨이별 `reasoning` vs `reasoning_content` 필드명 차이, 게이트웨이 자체 카탈로그를 조회해야 함)은 검증 과정에서 발견해 반영.
+- 라우팅은 **merge-before-create**: 인사이트 3은 `infrastructure/config/environment-config`의 "필수 키엔 default 없음" 규칙과 형제 케이스라 그 페이지에 edge case 1행 + 양방향 `related`로 연결하고, 본체는 리뷰시점 체크라는 별개 트리거이므로 별 페이지로 분리.
+- `backend/common/integrations`를 **새 카테고리로 신설** — 기존 8개 공통 카테고리는 "내가 발행하는 API"(api-design)와 "전송"(reliability)만 다루고, *외부 소유 서비스의 응답 스펙·이름 카탈로그에 의존하는 것*을 담을 자리가 없었다.
+- PR 본문 = INGEST_REPORT (게이트가 요구하는 3개 섹션 + 검증 근거를 리뷰어가 한 화면에서 보게).
+
+### 배제한 대안 — 무엇을 안 했나 / 왜
+- **인사이트 1을 `debugging`에 두기** — 클라이언트/서버 가르기가 진단이라 후보였지만, 바뀌는 산출물이 *호출 방식*이고 "터미널 fd 0은 읽기를 막는다"는 OS 사실이라 `platforms`. 진단 단계는 `debugging-methodology-hypothesis-testing` 링크로 처리(중복 금지).
+- **인사이트 3을 `qa/process/release-gates`에 병합** — release-gates는 의도적으로 *릴리즈마다 동일한 고정 체크리스트*인데 이건 특정 diff 유형에 걸리는 per-PR 체크라 게이트를 희석시킴. 링크만.
+- **인사이트 3을 `infrastructure/config`로 이전**(적대검증 제안) — 거절. 1차 트리거가 애플리케이션 코드 default 리뷰이고 해소 지점이 호출을 만드는 client wrapper라 `backend` 소유가 맞음. config 형태는 링크로 위임.
+- **인사이트 2·3을 한 페이지로 합치기** — AGENTS.md의 one-case-per-page 위반(트리거가 각각 응답 수신 / 리뷰·부팅 시점).
+- **`last_verified` 일괄 bump** — 12factor 출처를 재검증하지 않았으므로 `environment-config`는 2026-07-10 유지(적대검증 지적 반영).
+
+### 리뷰어가 볼 곳 — 신뢰성 판단 포인트
+- `wiki/platforms/processes/non-interactive-cli-invocation.md:26-38` — `ssh -n`(stdin 분리)과 `BatchMode=yes`(프롬프트 차단)를 분리한 부분. 1차 초안은 `-n`을 프롬프트 차단으로 잘못 분류했고 적대검증이 man page 인용으로 잡음.
+- 같은 파일 `:45`, `:64` — "서버 로그에 요청 없음"의 결론 범위. DNS/TLS/프록시 선차단을 포함하도록 약화했는데, 이 정도가 적정한지 판단 필요.
+- `wiki/backend/common/integrations/llm-response-completeness.md:31-38` — 수용/실패 판정 테이블. 특히 `tool_calls`/deprecated `function_call`에서 blank content가 정상인 carve-out.
+- `wiki/backend/index.md:8` — concern-first subtree 행. 라우팅 프로토콜 2단계가 카테고리 테이블보다 **먼저** 읽는 줄이라, 여기 누락되면 새 카테고리에 도달하지 못한다(적대검증이 잡은 유일한 실제 라우팅 결함).
+- `wiki/backend/common/integrations/externally-owned-defaults.md` 도메인 선택 — 위 "배제한 대안"의 판단이 맞는지가 이 PR에서 가장 논쟁적인 지점.
+- `log.md` 마지막 2줄 — 적대검증 결과와 거절 항목을 기록으로 남긴 부분.
+
+> [추정] 표시 항목 없음 — 모든 의도는 이 세션의 검증·적대검증 기록에 근거가 있다.
+>
+> 컨펌 예외: 이 PR은 auto-flush(headless) 실행으로 생성되어 푸시 전 대면 컨펌을 받지 못했다. 대신 ① 푸시 대상은 본인 fork(`dch0202-rsquare/dev-loop`)이고 ② 머지는 하지 않으며 ③ 리뷰·머지 판단 전체를 레포 오너에게 남긴다.
