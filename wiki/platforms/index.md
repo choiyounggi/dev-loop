@@ -40,6 +40,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [non-interactive-cli-invocation](processes/non-interactive-cli-invocation.md) | Calling a CLI that can prompt (agent CLI, ssh, git, package manager) from a script/CI/hook/agent harness, including with its own `-p`/`--print`/`--yes` flag; such a call hangs with no output and no error; deciding whether a hang is client-side or the remote service; feeding input to a tool without letting it read the terminal |
 | [background-services](processes/background-services.md) | Something must run persistently or on a schedule on a dev machine or server (daemon, watcher, cron-style job); a "started" process dies when the terminal/SSH/agent session ends; choosing nohup vs LaunchAgent vs systemd unit vs cron/timer; a job works in the terminal but fails under cron/launchd (minimal environment); wiring service logs and restart policy |
 
 ## toolchains

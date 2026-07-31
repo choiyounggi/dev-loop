@@ -32,6 +32,13 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [timeouts-and-retries](common/reliability/timeouts-and-retries.md) | Your service calls another service/external API/DB over the network — setting timeouts and deadlines, deciding what to retry per failure type, backoff/jitter, capping concurrency against a slow dependency; debugging pool exhaustion or retry storms |
 
+### integrations
+
+| Page | Load when |
+|------|-----------|
+| [llm-response-completeness](common/integrations/llm-response-completeness.md) | Your code consumes an OpenAI-compatible `/chat/completions` response (provider or gateway) and uses the text as an artifact — deciding what counts as a complete answer, handling `finish_reason == "length"`, blank `content`, or `reasoning_content`/`reasoning` from a reasoning model; blank or mid-sentence output reaching users while the call logs HTTP 200 |
+| [externally-owned-defaults](common/integrations/externally-owned-defaults.md) | A code/config default names a resource the repo does not own (model alias, endpoint, bucket, queue, index) — reviewing or merging a PR that claims that default works, adding a startup check that the name still resolves, or diagnosing a default path that broke with no code change |
+
 ### caching
 
 | Page | Load when |
