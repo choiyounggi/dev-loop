@@ -11,7 +11,7 @@ sources:
   - https://martinfowler.com/bliki/TestCoverage.html
   - https://testing.googleblog.com/2013/05/testing-on-toilet-dont-overuse-mocks.html
 last_verified: 2026-07-10
-related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing]
+related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-harness-reverse-controls]
 ---
 
 # Proving a Test Can Fail
@@ -50,6 +50,7 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 |------|------|
 | Mutating the code under test is impractical right now (slow build, shared branch) | Invert the expected value in the assertion instead and require red — this proves the assertion executes and compares, though not which code defects it catches |
 | Auditing a whole suite, not one test | Run an automated mutation-testing tool (PIT, Stryker) and treat surviving mutants in changed code as missing or defective tests |
+| The mutation run is your own script rather than PIT/Stryker | Prove the harness discriminates before citing its score — a semantics-preserving no-op must survive ([testing-quality-harness-reverse-controls]) |
 | A test intentionally has no outcome assertion (smoke test: module loads, page renders) | Keep it only when the regression it guards manifests as a throw; name it as a smoke test so reviewers do not count it as behavior coverage |
 | The always-green test is a snapshot approved without reading | Snapshot rules → [testing-quality-behavior-not-implementation] |
 

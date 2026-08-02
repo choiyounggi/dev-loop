@@ -70,3 +70,9 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [shared-state-and-pools](common/concurrency/shared-state-and-pools.md) | Request handlers share in-process mutable state — concurrency-safe structures/confinement vs shared store in multi-instance deployments; sizing thread/connection pools; same-pool nested-acquisition deadlock; bounding queues; debugging deadlock or starvation under load |
 | [distributed-locks](common/concurrency/distributed-locks.md) | Only one instance may perform an action at a time — Redis-style lock with owner token and TTL/watchdog, safe release, when a DB constraint/advisory lock suffices instead; debugging locks released by the wrong holder or work done twice despite a lock |
+
+### llm
+
+| Page | Load when |
+|------|-----------|
+| [context-window-budget](common/llm/context-window-budget.md) | Repointing an LLM client or agent CLI at a different model, a self-hosted server (vLLM/Ollama), or a gateway (LiteLLM); setting `max_tokens` for a client whose default was sized for a larger model; the first request after such a switch returns 400 with a context-window error; deciding where to set the cap (request body vs client env var vs gateway config) and how to point the base URL at a proxy; handling truncation that arrives as a normal 200 |
