@@ -45,18 +45,21 @@ error while the same client worked against the original endpoint.
 |--------|------|
 | Direct SDK/HTTP call | `max_tokens` in the request body |
 | Claude Code | `CLAUDE_CODE_MAX_OUTPUT_TOKENS` (output reservation) and `CLAUDE_CODE_MAX_CONTEXT_TOKENS` (input budget) — both present in the shipped v2.1.220 binary; the CLI's own message names the first as the fix for "exceeded the … output token maximum" |
-| Gateway in front of many clients | The gateway's per-model `max_output_tokens` config, so a client that omits the cap still gets a valid one |
+| Gateway in front of many clients | The gateway's own per-model output-cap setting (key name varies by gateway — read its model-config reference), so a client that omits the cap still gets a valid one |
 
-4. **Point the base URL at the endpoint root, not `/v1`.** The client appends its
-   own path (`/v1/messages`), so a base URL that already ends in `/v1` produces
-   `/v1/v1/messages`. Claude Code's `ANTHROPIC_BASE_URL` "override[s] the API
-   endpoint to route requests through a proxy or gateway"; vLLM's own integration
-   sets it to `http://localhost:8000`.
+4. **Point the base URL at the endpoint root, not `/v1`.** Claude Code's
+   `ANTHROPIC_BASE_URL` "override[s] the API endpoint to route requests through a
+   proxy or gateway", and vLLM's own integration sets it to `http://localhost:8000` —
+   the root, no `/v1`. The client appends `/v1/messages` itself, so a base URL already
+   ending in `/v1` yields `/v1/v1/messages` and 404s while looking like an auth or
+   routing fault (observed in the reproduction below; the doc gives the root form as
+   the example, not the append rule).
 5. **Read a 400 on the first request as a budget error before touching the
    network.** LiteLLM raises `ContextWindowExceededError` (400) as a "special error
-   type for context window exceeded error messages"; the message states the
-   arithmetic (input + requested output vs the window). Recompute step 2 from those
-   three numbers.
+   type for context window exceeded error messages". In the reproduction below the
+   message carried the arithmetic itself (input + requested output vs the window);
+   when it does, recompute step 2 from those three numbers rather than measuring
+   anything.
 
 ## Edge cases
 

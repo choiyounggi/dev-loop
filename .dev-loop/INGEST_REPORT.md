@@ -146,6 +146,25 @@ replacement; branches as tables.
    already processed into PRs #11/#12; they came back because the dead flush never ran
    step 5. Retiring them is handled below.
 
+## Cross-check
+
+Cross-Check: independent headless `claude` run (`--permission-mode plan`) re-fetched all
+11 cited URLs and audited every quoted string to refute it — **PASS on both pages**, with
+5 sourcing defects found and all 5 fixed in the follow-up commit.
+
+| Finding | Status |
+|---------|--------|
+| **MISQUOTED** — `"all mutants survive unexpectedly"` is not Stryker's wording | **Fixed.** I re-fetched the page and confirmed: the real headings are "All mutants survive - Jest runner" and "All mutants survive - module-alias", and both causes are sandbox mechanics (hidden temp dir; `module-alias/register` unsupported), not the "configuration fault" gloss. Quotes removed, causes attributed to the two sections. This was a fabricated quotation and the single most important catch |
+| **OVERREACH** — "Both mutation frameworks build this in" (baseline run) | **Fixed.** Only Stryker is sourced for it; now attributed to Stryker's "Initial test run fails" section and `dryRunOnly` alone |
+| **OVERREACH** — "coverage/timing analysis derived from that run" | **Fixed.** The config page supports timing (`netTimeMs`/`overheadMs`) only; coverage claim dropped |
+| Minor — "No tests were executed…" generalized to framework policy | **Fixed.** Now labelled as the Vitest runner's message, which is how the doc presents it |
+| **UNSUPPORTED ×3** in the LLM page — the 400 message stating the arithmetic; a gateway `max_output_tokens` key; the `/v1` path-append rule | **Fixed.** All three are field-derived and were sitting adjacent to doc citations as if doc-backed; each is now explicitly attributed to the reproduction, and the gateway row no longer invents a config key |
+
+One citation could not be checked: the Google Testing Blog URL renders its body
+client-side, so a fetch returns only page chrome. The claim attributed to it is generic
+("inserting faults and requiring failure measures detection") and is independently
+carried by the PIT and Stryker citations, but flagging it rather than calling it verified.
+
 ## Reviewer notes
 
 - **PRs #11 and #12 add the same page path** (`non-interactive-cli-invocation.md`) and
