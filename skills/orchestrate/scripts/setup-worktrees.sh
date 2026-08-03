@@ -43,6 +43,20 @@ for br in "$@"; do
     "$GIT" worktree add -b "$br" "$path" "$integ"
     echo "ok: worktree $path ($br)"
   fi
+  # Scope guardrails inside this worktree: an isolated sandbox loosens harmless
+  # rules (rm_rf, git_discard, tmp writes) and keeps genuinely dangerous ones as
+  # `ask` — which the escalation env (launch-session) turns into a coordinator
+  # escalation rather than a hard block. Unknown rule ids are ignored by older
+  # guardrails, so worktree_escape is forward-compatible.
+  mkdir -p "$path/.groundwork"
+  cat > "$path/.groundwork/guardrails.json" <<'GRJSON'
+{"rules":{"rm_rf":{"mode":"off"},"git_discard":{"mode":"off"},"system_tmp_write":{"mode":"off"},"cloud_delete":{"mode":"ask"},"sql_drop":{"mode":"ask"},"git_force_push":{"mode":"ask"},"secret_export":{"mode":"ask"},"curl_pipe_shell":{"mode":"ask"},"worktree_escape":{"mode":"ask"}}}
+GRJSON
+  # keep the sandbox config out of commits (worktree-local git exclude)
+  excl=$("$GIT" -C "$path" rev-parse --git-path info/exclude 2>/dev/null || echo "")
+  if [ -n "$excl" ] && [ -f "$excl" ]; then
+    grep -qxF '.groundwork/' "$excl" 2>/dev/null || printf '.groundwork/\n' >> "$excl"
+  fi
   # optional env copy if the project provides one (e.g. monorepos)
   if [ -f "$root/scripts/worktree-copy-env.sh" ]; then
     sh "$root/scripts/worktree-copy-env.sh" "$path" >/dev/null 2>&1 \
