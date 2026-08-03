@@ -27,7 +27,9 @@ elapsed=0
 escdir="$(dirname "$dir")/escalations"
 while [ "$elapsed" -lt "$timeout" ]; do
   # A worker's guardrails `ask`, recorded as an escalation, wakes the coordinator
-  # immediately rather than waiting out the timeout.
+  # immediately rather than waiting out the timeout. The coordinator MUST resolve
+  # (approve/deny) and clear these records before relaunching watch; exit 5 recurs
+  # by design so an unhandled escalation is never silently dropped.
   if [ -d "$escdir" ]; then
     esc_pending=""
     for e in "$escdir"/*.json; do

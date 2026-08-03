@@ -52,10 +52,16 @@ for br in "$@"; do
   cat > "$path/.groundwork/guardrails.json" <<'GRJSON'
 {"rules":{"rm_rf":{"mode":"off"},"git_discard":{"mode":"off"},"system_tmp_write":{"mode":"off"},"cloud_delete":{"mode":"ask"},"sql_drop":{"mode":"ask"},"git_force_push":{"mode":"ask"},"secret_export":{"mode":"ask"},"curl_pipe_shell":{"mode":"ask"},"worktree_escape":{"mode":"ask"}}}
 GRJSON
-  # keep the sandbox config out of commits (worktree-local git exclude)
+  # keep the sandbox config out of commits (worktree-local git exclude). Create
+  # the exclude file if it does not exist, and never let an append failure abort
+  # the whole run (set -e) — warn instead.
   excl=$("$GIT" -C "$path" rev-parse --git-path info/exclude 2>/dev/null || echo "")
-  if [ -n "$excl" ] && [ -f "$excl" ]; then
-    grep -qxF '.groundwork/' "$excl" 2>/dev/null || printf '.groundwork/\n' >> "$excl"
+  if [ -n "$excl" ]; then
+    mkdir -p "$(dirname "$excl")" 2>/dev/null || true
+    if ! grep -qxF '.groundwork/' "$excl" 2>/dev/null; then
+      printf '.groundwork/\n' >> "$excl" 2>/dev/null \
+        || echo "setup-worktrees: warn — could not exclude .groundwork/ in $path" >&2
+    fi
   fi
   # optional env copy if the project provides one (e.g. monorepos)
   if [ -f "$root/scripts/worktree-copy-env.sh" ]; then
