@@ -11,7 +11,7 @@ sources:
   - https://man7.org/linux/man-pages/man1/nohup.1.html
   - https://man7.org/linux/man-pages/man1/loginctl.1.html
 last_verified: 2026-07-10
-related: [platforms-toolchains-version-management, platforms-shells-portable-shell-scripts]
+related: [platforms-toolchains-version-management, platforms-shells-portable-shell-scripts, platforms-processes-non-interactive-cli-invocation]
 ---
 
 # Keeping a Process Running Beyond the Terminal Session
