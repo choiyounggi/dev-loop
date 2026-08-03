@@ -20,19 +20,24 @@ file="$dir/$task.json"
 
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)   # cross-platform (GNU/BSD) iso-8601 UTC
 wt=$(pwd -P)                          # physical path so loop-gate can match it
-tmp="$file.tmp.$$"
-trap 'rm -f "$tmp"' EXIT
-# phase + timestamp + worktree in one atomic write
-"$JQ" --arg p "$phase" --arg t "$now" --arg w "$wt" \
-  '.phase=$p | .updatedAt=$t | .worktree=$w' "$file" > "$tmp" && mv "$tmp" "$file"
 
+# Collect the extra key=value pairs into one JSON object first (in memory — no
+# file writes), so the whole record lands in a single atomic write below.
+extra='{}'
 for kv in "$@"; do
   case "$kv" in
     *=*) : ;;
     *) echo "status-update: ignoring malformed extra '$kv' (expected key=value)" >&2; continue ;;
   esac
   k=${kv%%=*}; v=${kv#*=}
-  "$JQ" --arg k "$k" --arg v "$v" '.[$k]=$v' "$file" > "$tmp" && mv "$tmp" "$file"
+  extra=$(printf '%s' "$extra" | "$JQ" --arg k "$k" --arg v "$v" '.[$k]=$v')
 done
+
+# One atomic write: phase + timestamp + worktree + all extras (extras win on key
+# collisions, e.g. an explicit worktree= overrides the cwd default).
+tmp="$file.tmp.$$"
+trap 'rm -f "$tmp"' EXIT
+"$JQ" --arg p "$phase" --arg t "$now" --arg w "$wt" --argjson e "$extra" \
+  '.phase=$p | .updatedAt=$t | .worktree=$w | . + $e' "$file" > "$tmp" && mv "$tmp" "$file"
 
 echo "status[$task] = $phase"
