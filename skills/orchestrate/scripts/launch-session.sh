@@ -45,7 +45,9 @@ fi
 esc=$(sh "$(dirname "$0")/escalation-dir.sh" "$wt" 2>/dev/null || echo "")
 launchcmd="export PATH=\"$claudedir:\$PATH\""
 if [ -n "$esc" ]; then
-  launchcmd="$launchcmd && export GROUNDWORK_ESCALATION_DIR=\"$esc\" && export GROUNDWORK_TASK_ID=\"$session\""
+  # single-quote the values in the pane-side command so a path/name with shell
+  # metacharacters can't break or inject into the launched command
+  launchcmd="$launchcmd && export GROUNDWORK_ESCALATION_DIR='$esc' && export GROUNDWORK_TASK_ID='$session'"
 fi
 launchcmd="$launchcmd && \"$CLAUDE\" --permission-mode $perm"
 "$TMUX" send-keys -t "$session" "$launchcmd" Enter

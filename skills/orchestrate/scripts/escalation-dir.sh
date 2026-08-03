@@ -18,5 +18,8 @@ common=$("$GIT" -C "$wt" rev-parse --git-common-dir 2>/dev/null) || exit 0
 # path may be relative to $wt, so resolve from there.
 mainroot=$(cd "$wt" 2>/dev/null && cd "$(dirname "$common")" 2>/dev/null && pwd -P) || exit 0
 [ -n "$mainroot" ] || exit 0
+# Sanity-check the derived root actually holds a git dir/file (guards a stale or
+# corrupt --git-common-dir). -e (not -d) also accepts a separate-git-dir setup.
+[ -e "$mainroot/.git" ] || exit 0
 
 printf '%s/.orchestration/escalations\n' "$mainroot"
