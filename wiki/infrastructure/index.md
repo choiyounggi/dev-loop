@@ -25,6 +25,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [host-cgroup-visibility](containers/host-cgroup-visibility.md) | A container must read the host's full cgroup v2 hierarchy (other pods' CPU/memory stats) via a hostPath/`-v` mount of `/sys/fs/cgroup`; the mounted directory is missing the `kubepods` subtree with no error |
 | [image-builds](containers/image-builds.md) | Writing or reviewing a Dockerfile; images rebuild everything on small changes, build slowly, or are too large; choosing an image tagging scheme |
 | [resource-limits-and-probes](containers/resource-limits-and-probes.md) | Writing or reviewing Kubernetes-style deployment manifests; pods OOMKilled, evicted, or CPU-throttled; a dependency outage triggered a restart storm; traffic hitting pods that are not ready |
 
@@ -45,4 +46,5 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [logs-metrics-signals](observability/logs-metrics-signals.md) | Instrumenting a new or existing service (logs, metrics, correlation ids); an incident revealed you couldn't see what happened; choosing between a log line and a metric; a metric label would carry unbounded values (user ids/UUIDs) |
+| [missing-container-metrics](observability/missing-container-metrics.md) | Prometheus `container_*` CPU/memory series are empty or pod dashboards blank while kubelet scrape targets all report up (common on embedded/VM Kubernetes like OrbStack); deciding between cAdvisor and kubelet `/metrics/resource` scraping |
 | [alerting](observability/alerting.md) | Creating or reviewing alerts; the team ignores a noisy pager; deciding whether a condition pages, tickets, or stays on a dashboard |

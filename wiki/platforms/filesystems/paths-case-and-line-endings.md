@@ -9,7 +9,7 @@ sources:
   - https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
   - https://git-scm.com/docs/gitattributes
 last_verified: 2026-07-10
-related: [platforms-shells-portable-shell-scripts]
+related: [platforms-shells-portable-shell-scripts, platforms-environment-unicode-text-matching]
 ---
 
 # Files That Break When a Repo Moves Between macOS, Windows, and Linux
