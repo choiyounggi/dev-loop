@@ -5,7 +5,7 @@ three stack subtrees — route by concern first, stack second:
 
 | Subtree | Route there when |
 |---------|------------------|
-| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure |
+| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, LLM completion validation & context budgeting, consuming external-API responses, externally-owned defaults, object-storage references |
 | [java](java/index.md) | You are writing/reviewing JVM backend code (Java/Kotlin, Spring, JPA/Hibernate) and the concern is stack-specific: entity mapping, persistence context, proxy pitfalls, JVM threads/memory |
 | [node](node/index.md) | You are writing/reviewing Node.js/TypeScript backend code: event-loop blocking, promise error handling, runtime validation at boundaries, graceful shutdown |
 | [python](python/index.md) | You are writing/reviewing Python backend code: GIL/concurrency model, pydantic validation, WSGI/ASGI workers, language traps |
@@ -70,3 +70,22 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [shared-state-and-pools](common/concurrency/shared-state-and-pools.md) | Request handlers share in-process mutable state — concurrency-safe structures/confinement vs shared store in multi-instance deployments; sizing thread/connection pools; same-pool nested-acquisition deadlock; bounding queues; debugging deadlock or starvation under load |
 | [distributed-locks](common/concurrency/distributed-locks.md) | Only one instance may perform an action at a time — Redis-style lock with owner token and TTL/watchdog, safe release, when a DB constraint/advisory lock suffices instead; debugging locks released by the wrong holder or work done twice despite a lock |
+
+### llm
+
+| Page | Load when |
+|------|-----------|
+| [completion-response-validation](common/llm/completion-response-validation.md) | Consuming OpenAI-compatible `/chat/completions` output as a final artifact (summary, document, notification); LLM responses coming back empty or truncated while HTTP status is 200; a reasoning-family model may be routed onto the alias you call |
+| [context-window-budget](common/llm/context-window-budget.md) | Repointing an LLM client or agent CLI at a different model, a self-hosted server (vLLM/Ollama), or a gateway (LiteLLM); setting `max_tokens` for a client whose default was sized for a larger model; the first request after such a switch returns 400 with a context-window error; deciding where to set the cap (request body vs client env var vs gateway config) and how to point the base URL at a proxy; handling truncation that arrives as a normal 200 |
+
+### integrations
+
+| Page | Load when |
+|------|-----------|
+| [externally-owned-defaults](common/integrations/externally-owned-defaults.md) | A code/config default names a resource the repo does not own (model alias, endpoint, bucket, queue, index) — reviewing or merging a PR that claims that default works, adding a startup check that the name still resolves, or diagnosing a default path that broke with no code change |
+
+### storage
+
+| Page | Load when |
+|------|-----------|
+| [object-key-persistence](common/storage/object-key-persistence.md) | Persisting the result of an object-storage upload (`s3.upload()`, `lib-storage` `Upload`, a transfer manager) — choosing which response field goes in the DB column; building the read/signing path from a stored reference; migrating a column that holds URLs to keys; only large uploads 404 on read |

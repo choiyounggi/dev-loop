@@ -9,7 +9,7 @@ sources:
   - https://sre.google/sre-book/addressing-cascading-failures/
   - https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
 last_verified: 2026-07-10
-related: [backend-common-api-design-idempotency]
+related: [backend-common-api-design-idempotency, backend-common-llm-completion-response-validation]
 ---
 
 # Calling Another Service over the Network: Timeouts, Retries, Backoff

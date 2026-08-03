@@ -1,35 +1,57 @@
-# Knowledge flush — 1 insight
+# Consolidated review — knowledge PRs #6–#13
 
-Source: RNR-3440 (사내 잠재매물 주간 추출 스크립트 메모리 피크 저감). Candidate:
-"QueryPie 프록시 경유로 대용량 결과를 스트리밍할 때 server-side named cursor 대신
-일반 커서 + `fetchmany` + openpyxl `write_only`."
+Eight fork PRs (`dch0202-rsquare`, 2026-07-28 → 2026-08-02) were reviewed together
+against `AGENTS.md`. Each PR was audited by an independent reviewer (format rules,
+sources, vague-qualifier ban, ≤120 body lines, index/log invariants) and then
+cross-compared to catch duplication the per-PR flushes could not see (they branched
+independently and rewrote the same shared files).
 
-## Verified best-practice
+## Landed (12 pages)
 
-**Claim 1 — psycopg2 server-side (named) cursor requires a transaction; fails under autocommit.**
-- Source: psycopg2 usage docs — `https://github.com/psycopg/psycopg2/blob/master/doc/src/usage.rst` (via Context7). Quote: "Named cursors are typically created 'WITHOUT HOLD', meaning they exist only within the current transaction. Attempting to fetch from them after a commit or in autocommit mode raises an exception."
-- Matches my live repro (`can't use a named cursor outside of transactions`). → **verified**
+| Page | From | Note |
+|------|------|------|
+| infrastructure/containers/host-cgroup-visibility | #6 | as-is |
+| infrastructure/observability/missing-container-metrics | #6 | as-is |
+| testing/quality/checks-that-cannot-pass | #7 | as-is |
+| testing/quality/spec-artifact-checks | #8 | as-is; canonical for spec/doc conformance-checks |
+| backend/common/storage/object-key-persistence | #9 | as-is |
+| platforms/environment/unicode-text-matching | #10 | as-is |
+| qa/document-verification/spec-document-gates | #10 | as-is |
+| platforms/shells/command-text-inspected-before-execution | #11 | as-is |
+| qa/document-verification/editing-a-gated-document | #11 | as-is |
+| backend/common/llm/context-window-budget | #13 | as-is |
+| testing/quality/harness-reverse-controls | #13 | as-is |
+| backend/common/llm/completion-response-validation | #6+#12 | reconciled |
+| backend/common/integrations/externally-owned-defaults | #6+#12 | reconciled |
+| platforms/processes/non-interactive-cli-invocation | #11+#12 | reconciled |
 
-**Claim 2 — a client-side (default) cursor pulls the whole result set to the client on execute; `fetchmany` only caps the Python-list explosion.**
-- Source: psycopg2 cursor/usage docs + FAQ (named-cursor advantage = "data is fetched in chunks … minimal client memory"). By contrast the default cursor buffers the full result in libpq. → **verified**
+## Reconciled (best-of-two, folded)
 
-**Claim 3 — openpyxl `write_only` gives near-constant memory (<10 MB); one save only; lxml is for serialization speed, not the memory saving.**
-- Source: openpyxl Optimised Modes — `https://openpyxl.readthedocs.io/en/stable/optimized.html` (via WebSearch). "keeping memory usage under 10Mb"; "A write-only workbook can only be saved once"; "make sure you have lxml installed" for large dumps (speed).
-- This **corrects** the raw candidate's "lxml unnecessary" → precise form: unnecessary *for the memory win*, recommended *for large-dump speed*. Confirmed by my server test (write-only worked with lxml absent). → **verified**
+- **completion-response-validation** — #12's body (all five `finish_reason` values,
+  `tool_calls`/`function_call` carve-out, streaming, Responses API, "reasoning is
+  scratch") kept in `llm/` (coherent with #6/#13); folded in #6's DeepSeek
+  first-party edge and the 8,173-char reasoning_content field incident.
+- **externally-owned-defaults** — #12's generalized body (any repo-external
+  resource) kept in `integrations/`; folded in #6's field incident and the
+  gateway-config-vs-live-upstream nuance.
+- **non-interactive-cli-invocation** — #12's body (GNU-nohup extension precision,
+  ssh -n vs BatchMode, pre-log DNS/TLS/proxy + curl -v) kept; folded in #11's
+  DEBIAN_FRONTEND, pager/color TTY case, wrapper-CLI case, and no-request-logged
+  field incident.
 
-**Claim 4 — QueryPie blocks `BEGIN`, so server-side cursor is impossible there.**
-- Environment-specific, no external source. Live repro in gui context: `autocommit=False` + named cursor → `[ENGINE] No permission to execute BEGIN statement`. → **field-tested**. Generalized in the page to "a read-only access-control proxy that blocks transaction control", with QueryPie as the concrete example (not a product-specific page).
-- Memory figure 838 MB → 38 MB (300k synthetic rows) is my RNR-3440 measurement (`ru_maxrss`, separate processes).
+## Dropped (duplicate / superseded)
 
-## Existing-layer check
+- **document-conformance-checks** (#9) — same case as spec-artifact-checks (#8);
+  #8 kept as canonical, `testing/docs-as-spec` category not created.
+- **gateway-model-alias-defaults** (#6) — subsumed by the generalized
+  externally-owned-defaults; the model-alias case is one instance.
+- **llm-response-completeness** (#12) — folded into llm/completion-response-validation.
 
-- Pages read: `databases/index.md`, `databases/query-optimization/keyset-pagination.md`, `backend/python/index.md`.
-- Overlap: keyset-pagination is the nearest neighbor (both handle large result sets) but a **distinct** topic — pagination splits the read into many bounded queries; this page streams a *single* query's result in chunks. Not a duplicate → new page + **bidirectional `related` link** added to both.
-- backend/python has no DB-cursor page; the psycopg2/openpyxl specifics live as concrete examples inside the databases page rather than a separate python page (no duplication).
-- Conflicts: none found.
+## Collisions resolved
 
-## Routing decision
+- `non-interactive-cli-invocation.md` was created by both #11 and #12 → single
+  reconciled page.
+- `qa/document-verification/` and `backend/common/llm/` categories were each
+  introduced by two PRs → unified index sections, one row per surviving page.
 
-- Target: **`databases/query-optimization/streaming-large-result-sets.md`** (new page).
-- Category `query-optimization` fits (memory-bounding how a query's result is pulled into the app is query-execution optimization); no new category needed.
-- Registered in `databases/index.md` (query-optimization section) and appended to `log.md`.
+Source PRs #6–#13 are closed with a disposition comment crediting the author.

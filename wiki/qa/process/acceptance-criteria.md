@@ -10,7 +10,7 @@ sources:
   - https://www.agilealliance.org/glossary/acceptance/
   - https://www.agilealliance.org/glossary/definition-of-ready/
 last_verified: 2026-07-10
-related: [qa-process-regression-scope, qa-process-release-gates]
+related: [qa-process-regression-scope, qa-process-release-gates, qa-document-verification-spec-document-gates]
 ---
 
 # Writing Acceptance Criteria That Settle "Done" Before Development

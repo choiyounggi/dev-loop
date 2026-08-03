@@ -2,7 +2,8 @@
 
 Route here for: release-quality process — acceptance criteria, gates,
 regression scoping, test-environment parity, post-release verification, bug
-reports, manual/exploratory testing. Writing automated test code → wiki/testing/;
+reports, manual/exploratory testing, and automated verification of document
+deliverables (specs/RFCs). Writing automated test code → wiki/testing/;
 rollout/canary/rollback mechanics → wiki/infrastructure/.
 
 Match your situation to a "load when" line; load only matching pages.
@@ -16,6 +17,13 @@ Match your situation to a "load when" line; load only matching pages.
 | [regression-scope](process/regression-scope.md) | Choosing what to re-test for a release/change when full regression is too expensive; reviewing someone else's proposed regression scope |
 | [severity-and-priority](process/severity-and-priority.md) | Triaging a bug — deciding how bad it is and when it gets fixed; a triage stalled on a severity debate |
 | [post-release-verification](process/post-release-verification.md) | A release just deployed to production; defining what "released safely" means; an incident revealed a release was broken for hours before anyone noticed |
+
+## document-verification
+
+| Page | Load when |
+|------|-----------|
+| [spec-document-gates](document-verification/spec-document-gates.md) | Writing or reviewing automated checks (grep/script) that decide whether a spec/RFC/schema document meets its requirements; a document passed its checklist but the requirement is still unmet; choosing what a doc gate must assert beyond keyword presence (table structure, MUST-vs-SHOULD demotion, closed-set completeness, cross-section consistency); validating a gate pattern for a document that does not exist yet |
+| [editing-a-gated-document](document-verification/editing-a-gated-document.md) | Editing or rewording a document that grep/regex gates or a lint config check; a gate fails on wording whose meaning did not change; describing what an upstream spec says without tripping a "do not redefine it" gate; a check matches the pattern your own document quotes; recording an audit verdict inside the document that was audited; deciding which checks to re-run after editing a gated document |
 
 ## environments
 
