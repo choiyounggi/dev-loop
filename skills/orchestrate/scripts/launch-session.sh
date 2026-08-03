@@ -39,7 +39,16 @@ if "$TMUX" has-session -t "$session" 2>/dev/null; then
 fi
 
 "$TMUX" new-session -d -s "$session" -x 220 -y 50 -c "$wt"
-"$TMUX" send-keys -t "$session" "export PATH=\"$claudedir:\$PATH\" && \"$CLAUDE\" --permission-mode $perm" Enter
+
+# Route guardrails `ask` decisions in this (headless) worker to the coordinator
+# instead of blocking it. The escalation dir is the main repo's; task id = session.
+esc=$(sh "$(dirname "$0")/escalation-dir.sh" "$wt" 2>/dev/null || echo "")
+launchcmd="export PATH=\"$claudedir:\$PATH\""
+if [ -n "$esc" ]; then
+  launchcmd="$launchcmd && export GROUNDWORK_ESCALATION_DIR=\"$esc\" && export GROUNDWORK_TASK_ID=\"$session\""
+fi
+launchcmd="$launchcmd && \"$CLAUDE\" --permission-mode $perm"
+"$TMUX" send-keys -t "$session" "$launchcmd" Enter
 
 # Pass trust screen + permission warning, wait for REPL ready (~60s).
 # NOTE: the bypassPermissions warning defaults to "1. No, exit" — pressing Enter
