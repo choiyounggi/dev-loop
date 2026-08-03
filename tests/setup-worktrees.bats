@@ -35,3 +35,20 @@ setup() {
   run bash "$SW" feat/goal "$root"
   [ "$status" -ne 0 ]
 }
+
+@test "writes a worker-scoped guardrails config into each worktree" {
+  run bash "$SW" feat/goal "$root" main feat/t1
+  [ "$status" -eq 0 ]
+  cfg="$root/.worktrees/feat-t1/.groundwork/guardrails.json"
+  [ -f "$cfg" ]
+  [ "$(jq -r '.rules.rm_rf.mode' "$cfg")" = "off" ]
+  [ "$(jq -r '.rules.cloud_delete.mode' "$cfg")" = "ask" ]
+  [ "$(jq -r '.rules.worktree_escape.mode' "$cfg")" = "ask" ]
+}
+
+@test "worker guardrails config is git-excluded (not accidentally committable)" {
+  run bash "$SW" feat/goal "$root" main feat/t1
+  [ "$status" -eq 0 ]
+  run git -C "$root/.worktrees/feat-t1" status --porcelain
+  [[ "$output" != *".groundwork/guardrails.json"* ]]
+}
