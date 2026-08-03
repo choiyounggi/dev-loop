@@ -7,6 +7,7 @@
 #   exit 0: all reached target (or higher)
 #   exit 2: timeout
 #   exit 3: a failed session detected (abort → orchestrator intervenes)
+#   exit 5: an escalation is pending (a worker's guardrails `ask` needs approval)
 set -eu
 JQ=$(command -v jq) || { echo "watch-status: jq not found" >&2; exit 127; }
 
@@ -22,7 +23,25 @@ if [ "$target_rank" -lt 0 ]; then echo "watch-status: unknown target phase '$tar
 [ -d "$dir" ] || { echo "watch-status: status dir '$dir' does not exist" >&2; exit 4; }
 
 elapsed=0
+# Escalations live beside the status dir: <root>/.orchestration/{status,escalations}.
+escdir="$(dirname "$dir")/escalations"
 while [ "$elapsed" -lt "$timeout" ]; do
+  # A worker's guardrails `ask`, recorded as an escalation, wakes the coordinator
+  # immediately rather than waiting out the timeout.
+  if [ -d "$escdir" ]; then
+    esc_pending=""
+    for e in "$escdir"/*.json; do
+      [ -f "$e" ] || continue
+      etk=$("$JQ" -r '.taskId // "?"' "$e" 2>/dev/null || echo "?")
+      erule=$("$JQ" -r '.rule // "?"' "$e" 2>/dev/null || echo "?")
+      esc_pending="$esc_pending ${etk}:${erule}"
+    done
+    if [ -n "$esc_pending" ]; then
+      echo "[watch] escalation pending —$esc_pending — approve/deny and clear $escdir"
+      exit 5
+    fi
+  fi
+
   done_count=0; failed=0; summary=""
   for f in "$dir"/*.json; do
     [ -f "$f" ] || continue
