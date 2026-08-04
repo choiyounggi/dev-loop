@@ -99,9 +99,9 @@ user's approval** before launching anything.
 the previous Wave is fully approved; `<N>` below = the *current* Wave's task count.
 Single-Wave splits run everyone in parallel (the original behavior).
 
-**Session knobs (set once per run):** `export LO_RUN_ID=<short-run-id>` so every
-`launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reuse that exact
-name for later `send-keys`); the script also exports the guardrails escalation env
+**Session knobs (tmux substrate, set once per run):** `export LO_RUN_ID=<short-run-id>`
+so every `launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reuse that
+exact name for later `send-keys`); the script also exports the guardrails escalation env
 into each worker. Trust-screen wording drifts between CLI releases — if a launch
 hangs, set `LO_READY_EXTRA` / `LO_TRUST_EXTRA` (substrings) or `LO_READY_TIMEOUT`.
 `watch-status.sh` now exits **5** on a pending guardrails escalation (approve/deny,
@@ -111,23 +111,80 @@ file's `session` field) — both abort fast instead of waiting the timeout.
 
 **Substrate selection (automatic — do this FIRST, before any launch):** run
 `scripts/orca-detect.sh`. If it exits 0 (Orca installed, its orchestration skill
-present, runtime reachable), Orca is the substrate — spawn and monitor workers
-through it, not raw tmux. This is the **default when Orca is present, not
-optional**: Orca resolves the trust/TUI screen and gives native liveness. Per
-task, instead of `launch-session.sh`:
-1. create the worktree with Orca (`orca worktree create --repo id:<repoId>
-   --name <task> --no-parent --json` → copy the whole `worktree.id`), then inject
-   the worker guardrails config into its path (as `setup-worktrees.sh` does);
-2. `GROUNDWORK_ESCALATION_DIR=<abs> GROUNDWORK_TASK_ID=<task>
-   scripts/orca-spawn.sh <worktree-id> bypassPermissions "<plan prompt>"` — creates
-   the Claude terminal (escalation env injected), waits for `tui-idle` (no
-   trust-screen guessing), sends the prompt, prints `handle=<agent-handle>`.
-   Liveness: `scripts/orca-worktree-alive.sh <worktree-path>` (0 alive / 1 dead /
-   2 unknown — treat unknown as *not* dead) replaces watch's tmux check.
+present, runtime reachable), Orca is the substrate — spawn **and supervise** workers
+through it, not raw tmux. This is the **default when Orca is present, not optional**:
+Orca resolves the trust/TUI screen, gives native liveness, and pushes worker events
+to you instead of making you poll. Replace steps 1–3 below with O1–O5:
+
+- **O1 — bind the Run once per orchestration run.**
+  `orca orchestration run-create --objective "<goal>" --json` → keep `run_id` for the
+  whole run (on re-entry, `orca orchestration run-use --id <run_id> --json` instead).
+- **O2 — one Task per task-*phase*.**
+  `orca orchestration task-create --spec "<the prompt you would have injected>" --json`
+  → `task_id`. A `worker_done` settles a Task exactly once, so plan / implement /
+  rework are separate Tasks (chain with `--deps` when one must follow another).
+- **O3 — start the worker.** Create the Orca worktree first (`orca worktree create
+  --repo id:<repoId> --name <task> --no-parent --setup run --json` → copy the whole
+  `worktree.id`) and inject the worker guardrails config into its path (as
+  `setup-worktrees.sh` does). Then, with the escalation env exported:
+  `GROUNDWORK_ESCALATION_DIR=<abs> GROUNDWORK_TASK_ID=<task>
+  scripts/orca-worker-start.sh --task <task_id> --worktree id:<repoId>::<path>
+  --agent claude` → prints `dispatch=<id>` and `handle=<agent-handle>`. For this
+  task's **next** phase pass `--terminal <handle>` instead, so the session keeps its
+  context. `worker-start --agent` alone cannot carry environment variables, so with
+  the escalation env set the script creates the agent terminal itself
+  (`terminal create --command`, the escalation contract + `--permission-mode`) and
+  binds the Dispatch to it; that is why the worktree must exist first and why
+  `new-child` / `new-top-level` are refused in this mode.
+  Bare `worktree create` leaves one unused fallback shell beside the agent
+  (measured: 3 workers → 4 terminals). After the worker is up, confirm with
+  `orca terminal list --worktree id:<...> --json` that the extra handle is an idle
+  shell — not a configured default tab — and close just that one with
+  `orca terminal close --terminal <handle> --json`.
+- **O4 — wait on pushed mail, not on a timer.**
+  `GROUNDWORK_ESCALATION_DIR=<abs> scripts/orca-wait.sh <timeout-ms>
+  [<task_id,task_id,...>]` → **0** completions arrived (acked — process them),
+  **2** window elapsed *or* the ack did not land (checkpoint, just re-run), **3** a
+  worker reported failure, **5** escalation pending (approve/deny, **clear
+  `.orchestration/escalations/`**, then re-run — like watch-status, code 5 recurs
+  while a record is still on disk, by design), **6** question pending
+  (`orca orchestration reply --id <msg_id> --body "<answer>" --json`, re-run).
+  Pass this Wave's task ids to get a `completed=<c>/<n>` line scoped to this Wave;
+  without them, an earlier Wave's completed Tasks would inflate the count. Repeat
+  until every Task of this Wave is `completed`. Codes 3/5/6 leave the batch unread
+  on purpose, so an unhandled event is never silently dropped — which also means
+  delivery is **at-least-once**: a replayed batch must be processed idempotently
+  (key off `taskId`, never off a local counter).
+- **O5 — liveness.** `scripts/orca-worktree-alive.sh <worktree-path>` (0 alive /
+  1 dead / 2 unknown — treat unknown as *not* dead) replaces watch's tmux check.
+
+**Worker protocol on this substrate — put this in every `--spec` you dispatch.**
+The worker still calls `status-update.sh` at each phase (the status files remain the
+durable re-entry state); on top of that it must:
+1. report the phase exactly once — `orca orchestration send --type worker_done
+   --subject "<status>" --body "<what changed, what remains>" --task-id <task_id>
+   --dispatch-id <dispatch_id> --outcome succeeded|failed --files-modified "a,b" --json`
+   (a failure is `--outcome failed`, never failure encoded only in prose);
+2. forward a guardrails escalation instead of stalling on it — when a command is
+   denied with an escalation notice, `orca orchestration send --type escalation
+   --subject "guardrails <rule>" --body "<command + why>" --task-id <task_id>
+   --dispatch-id <dispatch_id> --json`;
+3. use `orca orchestration ask --question "<q>" --timeout-ms <n> --json` for a
+   blocking question, and then end its turn.
+
+Step 2 is the *fast* path for a guardrails block — it arrives with the worker's own
+context. It is not the only one: `orca-wait.sh` pre-checks
+`GROUNDWORK_ESCALATION_DIR` before it blocks, so a guardrails record still surfaces
+when the worker never sends the message (it died, or it is not a Claude session).
+Export that dir for both scripts and the file stays the safety net the tmux path
+already relied on.
 
 If `orca-detect.sh` is NON-zero (no Orca), fall back to the tmux `launch-session.sh`
-+ `watch-status.sh` path below. Always verify each Orca `--json` result before
-relying on its fields (the create handle is `.result.terminal.handle`).
++ `watch-status.sh` path below, unchanged. Always verify each Orca `--json` result
+before relying on its fields (`worker-start` returns `.result.dispatchId`, and the
+agent handle as the `role:"agent"` entry in `.result.effects[]`). `orca-spawn.sh`
+remains only for a worker needing custom agent argv (e.g. codex `--model` /
+reasoning-effort flags) that `worker-start` cannot express.
 
 0. **Preceding-interface injection (Wave 2+, and completed base outputs):** before
    launching this Wave, fill each task's brief `<dependencies>` with the **exact
@@ -145,11 +202,17 @@ relying on its fields (the create handle is `.result.terminal.handle`).
    `scripts/launch-session.sh lo-<n> <worktree> bypassPermissions "<plan prompt>"`
    (plan prompt = templates/session-prompt.md §1, with the subagent protocol block).
 3. `scripts/watch-status.sh <status-dir> plan_ready <N>` in the background; when it
-   exits, collect `plans/<task>.md`.
+   exits, collect `plans/<task>.md`. *(Orca substrate: `scripts/orca-wait.sh
+   <timeout-ms> <this Wave's task ids>` per O4 instead — same exit-code contract,
+   event-driven.)*
    *(Plans proceed autonomously per the user's choice — no per-plan gate.)*
 
 ## Phase 4 — Implement + review (max 3 rework)
-Inject §2 (implement) to each session; `watch-status ... impl_done <N>`. Review each
+Inject §2 (implement) to each session; `watch-status ... impl_done <N>`. *(Orca
+substrate: `task-create` the implement Task, then `scripts/orca-worker-start.sh
+--task <impl_task> --terminal <handle>` to reuse that task's existing session, and
+wait with `scripts/orca-wait.sh`. Rework rounds are further Tasks on the same
+`--terminal`.)* Review each
 worktree diff (`git -C <wt> diff <integ>...HEAD`); if a session's tests look weak,
 **cross-call `test-quality-auditor` yourself** (self-call + orchestrator cross-call).
 On shortfall, write `reviews/<task>-rN.md`, inject §3 (rework), repeat. After 3
@@ -178,6 +241,10 @@ On re-invocation with no context, measure real state first: `git worktree list`,
 each `.orchestration/status/*.json` phase, and which `briefs/plans/reviews/`
 artifacts exist. Resume from the earliest incomplete step (idempotently skip done
 steps). Check `tmux ls`; relaunch dead sessions and re-inject the right prompt.
+On the Orca substrate, rebind the Run first (`orca orchestration run-use --id
+<run_id> --json`), then measure with `orca orchestration task-list --json` +
+`scripts/orca-worktree-alive.sh <wt>`; restart a proven-dead worker with
+`scripts/orca-worker-start.sh --task <task_id> --worktree id:<...> --agent claude`.
 `setup-worktrees.sh` is idempotent (existing branches/worktrees are detected and
 kept), so re-running it is safe. Note the difference from **partial resume** (Phase
 0): that handles work done *outside* this orchestration — children with no
