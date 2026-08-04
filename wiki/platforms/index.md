@@ -17,12 +17,14 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [portable-shell-scripts](shells/portable-shell-scripts.md) | Writing a shell script that must run on more than one machine/OS/shell or in CI; a script that works locally fails elsewhere; choosing a shebang (bash vs sh); a bash script misbehaves in zsh or vice versa (unquoted vars, `=word`, array indexing); deciding how `set -euo pipefail` protects (and doesn't); building argument lists safely |
 | [command-text-inspected-before-execution](shells/command-text-inspected-before-execution.md) | A hook, policy gate, allow-list, or audit rule blocked a command that is correct as written; composing a command that must satisfy such a gate first try; deciding whether to write a path literally or as `"$VAR"` in an inspected argument; a gate reports an argument missing or a file nonexistent though both are right; a gate must read a file your command creates; prose containing a dangerous-looking command (release notes, docs, fixtures) trips a text scanner |
+| [escapes-in-shell-string-literals](shells/escapes-in-shell-string-literals.md) | Writing a regex, glob, `sed`/`awk` program, `jq` filter, or `printf` format as a shell string literal (e.g. a hardcoded `grep -E` pattern in a hook) and a metacharacter behaves as though an escape were added or removed; an end-of-line `\$` anchor matches or fails unexpectedly; deciding whether to single- or double-quote a pattern literal |
 
 ## tools
 
 | Page | Load when |
 |------|-----------|
 | [bsd-vs-gnu-cli](tools/bsd-vs-gnu-cli.md) | A command works on Linux but fails on macOS or vice versa (`date`, `sed -i`, `timeout`, `seq`, `grep -P`, `readlink`, `stat`); writing a script or CI step that must run on both userlands; deciding whether to install GNU coreutils on macOS or write POSIX-only |
+| [version-keyed-artifact-cache](tools/version-keyed-artifact-cache.md) | Shipping a code update to a distribution system that caches artifacts by a version string (a Claude Code marketplace plugin, or any tag-pinned cache) and the update runs but the old behavior persists; deciding why `/plugin update` reports "at latest" yet new code never runs; locating and clearing a stale `~/.claude/plugins/cache/<mkt>/<plugin>/<version>/` |
 
 ## environment
 
@@ -45,6 +47,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [background-services](processes/background-services.md) | Something must run persistently or on a schedule on a dev machine or server (daemon, watcher, cron-style job); a "started" process dies when the terminal/SSH/agent session ends; choosing nohup vs LaunchAgent vs systemd unit vs cron/timer; a job works in the terminal but fails under cron/launchd (minimal environment); wiring service logs and restart policy |
 | [non-interactive-cli-invocation](processes/non-interactive-cli-invocation.md) | Calling a tool that can prompt (agent CLI, ssh, git, package manager) from a script, CI step, hook, or agent session, including with its own `-p`/`--print`/`--yes` flag; such a call produced no output and never returned; deciding whether a hang belongs to the client, the network, or the far-side service; choosing the stdin/timeout/fail-fast switches for an unattended call; a TTY-detecting tool changes its output format under automation |
+| [parsing-cli-structured-output](processes/parsing-cli-structured-output.md) | About to write automation that parses another CLI/tool's `--json` output (field names, nesting) — wrapping a desktop app's CLI, an orchestrator, a cloud tool; deciding how to confirm exact field paths without guessing; making the parser unit-testable without the live tool via a captured fixture |
 
 ## toolchains
 
