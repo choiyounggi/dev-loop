@@ -140,10 +140,13 @@ if [ -n "$want_ids" ]; then
   else
     tl=$("$ORCA" orchestration task-list --status completed --json 2>/dev/null) || tl=""
   fi
+  # `index` is exact membership. `inside` would be substring containment
+  # (["task_1"] | inside(["task_12"]) is true), so a shorter id from another Wave
+  # would count here — the exact inflation this scoping exists to prevent.
   completed=$(printf '%s' "$tl" | "$JQ" -r --arg ids "$want_ids" '
     ($ids | split(",") | map(select(length > 0))) as $want |
     [.result.tasks[]? | select((.status // "completed") == "completed")
-                     | select([.id] | inside($want))] | length' 2>/dev/null) || completed=0
+                     | select(.id as $i | $want | index($i))] | length' 2>/dev/null) || completed=0
   case "$completed" in ''|*[!0-9]*) completed=0 ;; esac
   total=$(printf '%s' "$want_ids" | tr ',' '\n' | grep -c '[^[:space:]]')
   echo "completed=$completed/$total"

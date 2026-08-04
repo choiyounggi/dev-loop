@@ -123,10 +123,21 @@ to you instead of making you poll. Replace steps 1–3 below with O1–O5:
   `orca orchestration task-create --spec "<the prompt you would have injected>" --json`
   → `task_id`. A `worker_done` settles a Task exactly once, so plan / implement /
   rework are separate Tasks (chain with `--deps` when one must follow another).
-- **O3 — start the worker.** Create the Orca worktree first (`orca worktree create
-  --repo id:<repoId> --name <task> --no-parent --setup run --json` → copy the whole
-  `worktree.id`) and inject the worker guardrails config into its path (as
-  `setup-worktrees.sh` does). Then, with the escalation env exported:
+- **O3 — start the worker.** First make sure the integration branch exists in the
+  main repo (`git branch <integ> <base>` if it does not) — the tmux path gets this
+  from `setup-worktrees.sh` step 1, this path does not. Then create the Orca
+  worktree **from that branch**: `orca worktree create --repo id:<repoId>
+  --name <task> --base-branch <integ> --no-parent --setup run --json` → copy the
+  whole `worktree.id`. `--base-branch` is **not optional here**: omit it and Orca
+  branches from the repo default (its documented fallback), so a Wave-2 task would
+  not build on Wave 1's merged output and Phase 6's merge would drag in unrelated
+  default-branch drift. Then scope guardrails inside it — **required, not a
+  nicety** — with `scripts/worker-guardrails.sh <worktree-path>`, the same
+  single-source script `setup-worktrees.sh` calls on the tmux path. Skip it and
+  the worker inherits the *repo/global* rules instead of the sandbox ones, so
+  routine in-worktree work (`rm -rf ./build`, `git checkout .`) turns into a
+  `deny` + escalation and the worker stalls on the coordinator for every one of
+  them. Then, with the escalation env exported:
   `GROUNDWORK_ESCALATION_DIR=<abs> GROUNDWORK_TASK_ID=<task>
   scripts/orca-worker-start.sh --task <task_id> --worktree id:<repoId>::<path>
   --agent claude` → prints `dispatch=<id>` and `handle=<agent-handle>`. For this

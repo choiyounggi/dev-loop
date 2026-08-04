@@ -115,6 +115,14 @@ done_msg() { # $1 = outcome, $2 = task id
   [[ "$output" == *"completed=0/2"* ]]
 }
 
+@test "a task id that is a PREFIX of a wanted id does not count (exact match only)" {
+  run env ORCA_WAIT_DRYRUN=1 ORCA_WAIT_CHECK_JSON="$(done_msg succeeded task_12)" \
+      ORCA_WAIT_TASKLIST_JSON='{"result":{"tasks":[{"id":"task_1","status":"completed"}]}}' \
+      bash "$OW" 60000 task_12,task_13
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"completed=0/2"* ]]
+}
+
 @test "rejects a malformed task id list (injection guard)" {
   run env ORCA_WAIT_DRYRUN=1 bash "$OW" 60000 "task_1; rm -rf ~"
   [ "$status" -eq 1 ]
