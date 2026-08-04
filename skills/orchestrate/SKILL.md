@@ -99,6 +99,27 @@ user's approval** before launching anything.
 the previous Wave is fully approved; `<N>` below = the *current* Wave's task count.
 Single-Wave splits run everyone in parallel (the original behavior).
 
+**Session knobs (set once per run):** `export LO_RUN_ID=<short-run-id>` so every
+`launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reuse that exact
+name for later `send-keys`); the script also exports the guardrails escalation env
+into each worker. Trust-screen wording drifts between CLI releases — if a launch
+hangs, set `LO_READY_EXTRA` / `LO_TRUST_EXTRA` (substrings) or `LO_READY_TIMEOUT`.
+`watch-status.sh` now exits **5** on a pending guardrails escalation (approve/deny,
+clear `.orchestration/escalations/`, relaunch) and **3** on a failed OR a *dead*
+worker (a non-terminal task whose tmux session vanished — recorded via the status
+file's `session` field) — both abort fast instead of waiting the timeout.
+
+**Optional Orca substrate:** if `scripts/orca-detect.sh` exits 0 (Orca installed,
+its orchestration skill present, runtime reachable) you MAY spawn/monitor workers
+through Orca instead of raw tmux — Orca handles the trust/TUI screen
+(`orca terminal wait --for tui-idle`), sends prompts (`orca terminal send`), and
+tracks sessions natively (`orca worktree ps --json`, matched by `.path`), removing
+the fragile trust-screen and giving real liveness. Spawn with
+`orca worktree create --name <task> --agent claude --prompt "<brief>" --json` (or
+`terminal create` in an existing worktree). If `orca-detect.sh` is non-zero, use the
+tmux `launch-session.sh` path below (the default). Verify each Orca `--json` result
+before relying on its fields.
+
 0. **Preceding-interface injection (Wave 2+, and completed base outputs):** before
    launching this Wave, fill each task's brief `<dependencies>` with the **exact
    signatures** of (a) the approved preceding Wave and (b) any completed (partial-
