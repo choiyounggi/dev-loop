@@ -7,8 +7,9 @@ confidence: verified
 sources:
   - https://martinfowler.com/articles/nonDeterminism.html
   - https://abseil.io/resources/swe-book/html/ch12.html
-last_verified: 2026-07-10
-related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice]
+  - https://nodejs.org/api/fs.html
+last_verified: 2026-08-04
+related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, platforms-filesystems-permissions-and-exec-bits]
 ---
 
 # Owning Test Data and Isolating Test State
@@ -39,6 +40,7 @@ state-leak symptom.
 | Time-dependent logic (expiry, scheduling, "created today") | Inject a clock/time source and freeze it in the test; assert against the frozen instant |
 | Unique-constrained values (emails, usernames, external ids) | Generate per test (counter, UUID suffix) inside the factory — hardcoded constants collide across tests and across parallel runs |
 | Filesystem / temp files | Create a fresh per-test temp directory and remove it in teardown |
+| A fixture file must carry the executable bit (permission checks, PATH/binary-resolution code) | Create it with the mode set at creation time (`writeFileSync(p, body, { mode: 0o755 })`, `open` with a mode) inside a per-test directory under an already-gitignored build-output path of the repo, and remove it in teardown |
 | Global config / environment variables / singletons mutated by a test | Set in setup, restore in teardown that runs on failure too (`finally`/fixture teardown) |
 
 4. Keep fixture data **minimal**: create only the entities the behavior under
@@ -53,6 +55,8 @@ state-leak symptom.
 | Suite is too slow because every test builds a deep object graph | Move the invariant graph into a per-suite setup that tests never mutate; keep mutated entities per-test |
 | Failure appears only in the full suite, never alone | Run the suite in random order to expose the order dependency, then bisect to the polluting test; fix the polluter's ownership, not the victim ([testing-flaky-diagnosing-flaky-tests]) |
 | Test needs "now"-relative data but the code reads the system clock directly | Refactor the code to accept an injected clock; that seam is the fix — assertions with tolerance windows around real time stay flaky |
+| The executable fixture is rewritten between tests | Delete and recreate it: a write to an existing path keeps the original mode, so a second write with a different mode leaves the first one in place (measured on Node v25.8.1) |
+| The machine runs endpoint security (EDR) that flags an executable created under the system temp directory | Keep the fixture inside the repo's gitignored build-output tree and set the bit at creation; that path is what a "+x file dropped in a temp dir" heuristic looks for, and the fixture only needs the bit, not the location ([platforms-filesystems-permissions-and-exec-bits]) |
 
 ## Instead of
 
@@ -67,3 +71,5 @@ state-leak symptom.
 
 - https://martinfowler.com/articles/nonDeterminism.html — isolation between tests, wrapping the system clock, callbacks/polling over bare sleeps
 - https://abseil.io/resources/swe-book/html/ch12.html — tests should contain the values they depend on; clarity over shared magic setup
+- https://nodejs.org/api/fs.html — `fs.writeFileSync(file, data, { mode })` and `fs.mkdtemp(prefix)` create the file/directory with the mode supplied at creation
+- Field measurement 2026-08-04 (Node v25.8.1, macOS, umask 022): `writeFileSync(p, body, { mode: 0o755 })` produced mode `755`; a second `writeFileSync(p, body2, { mode: 0o644 })` on the same path left the file at `755` — the mode argument applies at creation only. Field context: a 25-fixture suite moved off `tmpdir()` + `chmod +x` onto a gitignored build-output directory ran green (59/59) with the build directory empty and `git status --short` clean afterwards

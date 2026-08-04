@@ -37,7 +37,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [paths-case-and-line-endings](filesystems/paths-case-and-line-endings.md) | A repo moves between macOS/Windows/Linux and files disappear or collide; an import resolves locally but fails on Linux CI (casing); renaming only the case of a file; diffs show every line changed or a script dies with `bad interpreter: ^M` (CRLF); setting up `.gitattributes` line-ending policy; generating file names or paths that must be valid on Windows (reserved names, path length) |
-| [permissions-and-exec-bits](filesystems/permissions-and-exec-bits.md) | "Permission denied" running a script that exists; a script loses its executable bit through git/Windows/zip/CI artifacts; surprise file-mode diffs in git (`core.fileMode`); docker bind-mount files root-owned or unreadable (host/container uid mismatch); pipeline stages can't read each other's artifacts (umask); setting up a shared directory for several users/daemons; reviewing file-permission handling in a repo or pipeline |
+| [permissions-and-exec-bits](filesystems/permissions-and-exec-bits.md) | "Permission denied" running a script that exists; a script loses its executable bit through git/Windows/zip/CI artifacts; surprise file-mode diffs in git (`core.fileMode`); docker bind-mount files root-owned or unreadable (host/container uid mismatch); pipeline stages can't read each other's artifacts (umask); setting up a shared directory for several users/daemons; code that creates a file which must be executable (mode at creation vs a later `chmod`, and where to put it when endpoint security watches temp dirs); reviewing file-permission handling in a repo or pipeline |
 
 ## processes
 

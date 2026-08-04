@@ -1,7 +1,9 @@
-# Knowledge flush — 7 insight(s)
+# Knowledge flush — 9 insight(s)
 
 Drained the whole pending queue (`~/.dev-loop/queue/`, 7 rows across 5 session
-files). Result: **5 new pages, 2 amendments, 1 new category**. Two candidate
+files), then a **second pass** for 2 further candidates that arrived mid-flush
+(15:29 / 15:30) — folded into this same branch so the flush stays one PR.
+Result: **5 new pages, 5 amendments, 1 new category**. Two candidate
 claims were **disproved during verification** and the resulting directives were
 rewritten before ingest — details under *Verified best-practice* (B1).
 
@@ -14,6 +16,8 @@ rewritten before ingest — details under *Verified best-practice* (B1).
 | D1 | Monitor whose grep completion predicate reports done immediately | NEW `testing/quality/completion-predicates` | verified |
 | B1 | Picking a crawl source for Korean public-institution notices | NEW `backend/common/integrations/robots-txt-and-source-selection` (**claim corrected**) | verified |
 | B2 | Client throttle in place, still rate-limited on the first call | NEW `backend/common/reliability/client-side-rate-limiting` | field-tested |
+| A1 | Feeding a readline-style stream consumer from a test double | MERGE → `testing/async/async-testing` | verified |
+| A2 | A test fixture that must carry the executable bit, under EDR | MERGE → `testing/data/test-data-and-isolation` + `platforms/filesystems/permissions-and-exec-bits` | verified (EDR rationale: field-tested) |
 
 ---
 
@@ -252,3 +256,90 @@ worth a maintainer's eye is B2's `field-tested` confidence — the mechanism and
 the timestamped production evidence are solid, but the vendor's published quota
 could not be confirmed, so the page deliberately carries no numbers. Reject that
 page alone if the bar for a `reliability` entry is a cited provider limit.
+
+---
+
+# Addendum — second pass (A1, A2)
+
+Two candidates were written to the queue at 15:29 and 15:30, after the first
+drain. They are folded into this same branch so the flush remains one PR.
+
+## Verified best-practice — second pass
+
+**A1 — feeding a line-oriented stream consumer from a test double.** The claim was
+that batching several answers into one `write` silently loses all but the first.
+**Reproduced live, Node v25.8.1**, `readline.createInterface` over a `PassThrough`
+with three sequential `question` calls:
+
+```
+batched      input.write('one\ntwo\nthree\n')           → ["one"],  then hangs
+one-per-tick write(line+'\n') + await setImmediate ×3   → ["one","two","three"]
+```
+
+Mechanism as the candidate described it: a readable hands the consumer one
+concatenated chunk, and readline walks every newline in that chunk synchronously,
+emitting `'line'` for input no `question` callback is waiting on — those lines are
+gone. Documented API surface: <https://nodejs.org/api/readline.html>. The
+"one shared interface per interaction" half is the same root cause seen from the
+other side (a second interface competes for the same buffered data).
+→ **verified** by reproduction.
+
+**A2 — an executable test fixture: mode at creation, and where to put it.**
+**Measured live, Node v25.8.1 / macOS / umask 022**:
+
+```
+writeFileSync(p, body,  { mode: 0o755 })  → stat 755
+writeFileSync(p, body2, { mode: 0o644 })  → stat 755   (mode applies at creation only)
+```
+
+That second line is a caveat the candidate did not state and the page now carries:
+rewriting an existing fixture keeps the original mode, so a fixture that changes
+mode between tests must be deleted and recreated. API:
+<https://nodejs.org/api/fs.html> (`writeFileSync` `mode`, `mkdtemp`).
+The **EDR rationale is not vendor-documented** — "a +x file created under a system
+temp dir is a dropper heuristic" is operational practice, and the page labels it
+as such rather than citing a detection vendor. What is verifiable and stated: the
+fixture needs the bit, not the location, and a repo-local gitignored build-output
+path additionally leaves `git status` clean when a run crashes (field evidence:
+25 fixtures moved, suite green 59/59, build dir empty afterwards).
+→ **verified** for the mechanics, **field-tested** for the EDR rationale.
+
+## Existing-layer check — second pass
+
+Read before writing: `wiki/testing/async/async-testing.md` (72 body lines),
+`wiki/testing/data/test-data-and-isolation.md` (69),
+`wiki/platforms/filesystems/permissions-and-exec-bits.md` (68).
+
+Both candidates **merged, no new pages**:
+
+- **A1 → `testing/async/async-testing`.** Its "Async shape" table is exactly the
+  routing structure this case needs, and its root rule ("the test must not finish
+  before the work does") is the same principle. Added one table row, two edge-case
+  rows (hang after the first record; a consumer rebuilt per prompt), one
+  `Instead of` row, the readline source and the reproduction. A separate page
+  would have duplicated the table.
+- **A2 → two pages, split by ownership.** The *fixture* half (where to create it,
+  per-test directory, teardown) extends `test-data-and-isolation`'s existing
+  "Filesystem / temp files" row — one new Do row plus two edge cases. The
+  *mode mechanics* half (set at creation, umask, creation-only semantics, EDR
+  location) extends `permissions-and-exec-bits`, whose Do table already owns
+  exec-bit rules — two new Do rows. Cross-linked via `related` in both
+  directions rather than repeating the content.
+
+Conflicts: none. Neither amendment contradicts an existing directive; both extend
+tables their pages already own.
+
+Index lines updated for all three pages (`wiki/testing/index.md` ×2,
+`wiki/platforms/index.md` ×1) so the new use cases are routable. Re-ran the
+invariant checks over the full wiki after these edits: every `related:` id and
+inline `[page-id]` resolves, every index link resolves, all touched pages remain
+under 120 body lines.
+
+## Routing decision — second pass
+
+| Insight | Domain / category | Target | Note |
+|---------|-------------------|--------|------|
+| A1 | `testing` / `async` | **MERGE** `async/async-testing.md` | Stream-fed prompt tests are async-shape routing, which that page's table already owns; no new category |
+| A2 | `testing` / `data` **and** `platforms` / `filesystems` | **MERGE** `data/test-data-and-isolation.md` + `filesystems/permissions-and-exec-bits.md` | Split by artifact: fixture lifecycle belongs to the testing page, file-mode mechanics to the platforms page — matching the domain rule that each page owns the artifact it changes |
+
+No new categories in this pass.
