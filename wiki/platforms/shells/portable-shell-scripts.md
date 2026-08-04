@@ -10,7 +10,8 @@ sources:
   - https://zsh.sourceforge.io/Doc/Release/Parameters.html
   - https://google.github.io/styleguide/shellguide.html
   - https://www.shellcheck.net/
-last_verified: 2026-07-10
+  - https://www.gnu.org/software/bash/manual/html_node/Double-Quotes.html
+last_verified: 2026-08-04
 related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution]
 ---
 
@@ -62,6 +63,7 @@ non-interactive environment).
 | Critical command is in a pipeline but the interpreter is POSIX sh (no `pipefail`) | Run the critical command outside the pipeline (temp file between stages) and test `$?` directly |
 | Script runs via cron/CI/hooks and commands are "not found" | Non-interactive shells load no rc files — no user PATH, no version-manager shims. Call binaries by absolute path (see platforms-toolchains-version-management) |
 | `set -u` breaks on optional variables | Expand with an explicit default: `"${OPT:-}"` |
+| Embedding a regex or pattern in a double-quoted string (`grep -E "…"`, `sed`, `awk`) | Inside double quotes bash strips the backslash only before `$`, backtick, `"`, `\`, or newline — so `"\$"` reaches the tool as a bare `$` (a regex end-of-line anchor) while `"\d"` keeps its backslash. Single-quote regex literals so nothing is stripped, or account for exactly those five escapes |
 
 ## Instead of
 
@@ -70,6 +72,7 @@ non-interactive environment).
 | Build a command string and `eval` it | Build an array and expand it: `cmd "${args[@]}"` | `eval` re-parses quotes and globs; arrays pass arguments through exactly |
 | Put a command plus its flags in one variable and run `$cmd` | Variable holds the binary path only; flags are separate words | zsh runs the whole value as one command name; bash re-splits and re-globs it |
 | Trust a trailing `echo "done"` as proof a step ran | Verify the produced state with an independent command | Inside `&&` chains and subshells, `set -e` misses failures and the echo still prints |
+| Wrap a regex containing `\$`, `\"`, or a backtick in double quotes | Single-quote the pattern (`grep -E '…\$'`), or write only the five double-quote escapes deliberately | Double quotes silently drop the backslash before those characters, so `"\$"` becomes bare `$` and the pattern matches something else |
 
 ## Sources
 
@@ -78,3 +81,4 @@ non-interactive environment).
 - https://zsh.sourceforge.io/Doc/Release/Parameters.html — zsh arrays numbered from 1 (KSH_ARRAYS excepted)
 - https://google.github.io/styleguide/shellguide.html — quote variables, prefer bash for scripts, arrays over eval
 - https://www.shellcheck.net/ — shell script static analysis
+- https://www.gnu.org/software/bash/manual/html_node/Double-Quotes.html — inside double quotes the backslash "retains its special meaning only when followed by one of" `$`, backtick, `"`, `\`, or newline; before any other character it is preserved (verified 2026-08-04: `"(sh|bash)([[:space:]]|-|<|\$)"` reaches grep with a bare `$`, matching `sh` at end-of-line)

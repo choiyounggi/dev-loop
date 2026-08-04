@@ -10,7 +10,8 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/hash.html
   - https://man7.org/linux/man-pages/man7/environ.7.html
   - https://www.sudo.ws/docs/man/sudoers.man/
-last_verified: 2026-07-10
+  - https://docs.brew.sh/FAQ
+last_verified: 2026-08-04
 related: [platforms-toolchains-version-management, platforms-processes-background-services]
 ---
 
@@ -62,6 +63,7 @@ binaries; interactive convenience is the only place bare names are safe.
 | Case | Then |
 |------|------|
 | `command -v` shows an alias/function, not a binary | You are debugging the wrong thing — `type <cmd>` names the kind; bypass with `command <cmd>` or the absolute path to test the real binary |
+| `command -v tool` / `which tool` reports not-found on macOS and you are about to conclude the tool is not installed | A Homebrew **keg-only** formula (llvm, curl, openjdk, node@N, libpq, ruby) is installed but deliberately not symlinked onto `PATH`. Confirm with `brew list --versions <formula>` and `ls "$(brew --prefix <formula>)/bin/"`; invoke via the keg path `"$(brew --prefix <formula>)/bin/tool"`, or `brew link --force <formula>` only if it will not shadow system software |
 | `PATH` reordered in the rc file but the running shell still resolves the old one | Rc edits apply to NEW shells; `exec $SHELL -l` or open a fresh terminal, then `hash -r` |
 | Same command, different result under `env -i sh -c 'cmd'` | The difference is your interactive environment — reproduce daemon/CI behavior this way before blaming the machine |
 | An empty entry or `.` in `PATH` | Current-directory lookup: a file named like a common command in the cwd gets executed — remove the entry and use `./name` for local scripts |
@@ -72,6 +74,7 @@ binaries; interactive convenience is the only place bare names are safe.
 |---------------------|-----------------|-----|
 | Add `export PATH=...` lines to every rc file until it works | Identify which context runs the command (interactive shell, sudo, cron, GUI app, ssh) and set `PATH` in THAT context's init point once | Shotgun exports mask the real resolution order and drift apart across files |
 | `which cmd` for debugging resolution | `type cmd` / `command -v cmd` | `which` is an external binary that scans `PATH` — it cannot see the aliases, functions, and builtins your shell will run first |
+| Conclude a tool is absent because `which`/`command -v` returns not-found on macOS | Check the package manager's own record first: `brew list --versions <formula>` and `ls "$(brew --prefix <formula>)/bin/"` | Keg-only Homebrew formulae are installed but intentionally off `PATH`; PATH-absence is not proof of not-installed |
 | Calling a bare tool name in a hook/daemon/agent script | Resolve to `TOOL="$(command -v tool)"` with a fail-loud check, or hardcode the absolute path | The caller's `PATH` is not yours; silent resolution to a different or missing binary corrupts the run |
 
 ## Sources
@@ -81,3 +84,4 @@ binaries; interactive convenience is the only place bare names are safe.
 - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/hash.html — `hash -r` forgets all remembered utility locations
 - https://man7.org/linux/man-pages/man7/environ.7.html — `PATH`: colon-separated directory prefixes searched for executables
 - https://www.sudo.ws/docs/man/sudoers.man/ — `secure_path` value replaces `PATH` for sudo-run commands (with default `env_reset`)
+- https://docs.brew.sh/FAQ — "keg-only" formulae are installed into the Cellar and **not** symlinked into the prefix, so they are absent from `PATH` though installed; `brew info <formula>` prints why and how to use it (verified 2026-08-04: `which mlir-opt` → not found while `brew list --versions llvm` → 22.1.8 and `/opt/homebrew/opt/llvm/bin/mlir-opt` ran)
