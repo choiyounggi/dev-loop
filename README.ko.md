@@ -50,9 +50,12 @@ Claude Code 플러그인 마켓플레이스로 설치되므로, 스킬과 훅이
   재시도(횟수 제한)`. 별도 실행자는 없습니다 — wiki-executor의 규율
   (명시된 페이지만 로드, 결정 우선, 공백은 BLOCKED)이 이 루프에 흡수돼
   있습니다.
-- **하나의 목표를 병렬 tmux 세션들로 분할** → `orchestrate` 스킬:
+- **하나의 목표를 병렬 워커 세션들로 분할** → `orchestrate` 스킬:
   인테이크 → 분해(승인 게이트) → 웨이브별 계획(wiki-plan) → 구현 + 리뷰
   (각 세션이 `loop-implement` 실행) → 통합 테스트 → 머지 전 게이트 → 머지.
+  **substrate는 자동: Orca가 감지되면 스폰 + liveness를 Orca가 담당(네이티브
+  trust/TUI 처리), 아니면 raw tmux.** 워커 세션은 guardrails `ask`에서 멈추는 대신
+  에스컬레이션하고, 죽은 워커는 런을 멈추지 않고 빠르게 감지됩니다.
 
 ### 스텝 2는 `wiki-plan`에 고정
 
@@ -147,7 +150,7 @@ loop-orchestrator처럼 dev-loop은 설정 **없이도** 완전히 범용으로 
 | 스킬 | 역할 |
 |-------|------|
 | `loop-implement` | **단일 구현자** — wiki-plan을 소비해 태스크를 순서대로 (각 태스크가 명시한 위키 페이지를 로드하며) 검증 루프로 실행. 계획 단계 = wiki-plan. |
-| `orchestrate` | 하나의 목표를 병렬 세션들로 분할, 각 세션은 loop-implement 실행. |
+| `orchestrate` | 하나의 목표를 병렬 워커 세션들로 분할, 각 세션은 loop-implement 실행 — 감지되면 **Orca 위에서**(네이티브 스폰 + liveness), 아니면 tmux. 워커는 guardrails `ask`에서 멈추지 않고 에스컬레이션; 죽은 워커 감지. |
 | `wiki-plan` | **고정된 계획 방법론** — 각 결정을 위키 페이지로 라우팅, 순서 있는 페이지-내비게이션 태스크로 분해. |
 | `wiki-ingest` | 검증된 지식을 올바른 시맨틱 레이어에 추가 (knowledge-flush가 사용). |
 | `wiki-query` | 위키에서 인용과 함께 질문에 답변. |

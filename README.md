@@ -50,10 +50,13 @@ Run it two ways:
   references applied) → 7b reflect + retry (bounded)`. There is no separate
   executor — the wiki-executor discipline (load only named pages, decisions win,
   BLOCKED-on-gap) is folded into this loop.
-- **A whole goal, split across parallel tmux sessions** → the `orchestrate`
+- **A whole goal, split across parallel worker sessions** → the `orchestrate`
   skill: intake → decompose (approval gate) → per-wave plan (wiki-plan) →
   implement + review (each session runs `loop-implement`) → integration test →
-  pre-merge gate → merge.
+  pre-merge gate → merge. **Substrate is automatic: if Orca is detected it drives
+  spawn + liveness (native trust/TUI handling); otherwise raw tmux.** Worker
+  sessions escalate a guardrails `ask` instead of blocking, and a dead worker is
+  detected fast rather than stalling the run.
 
 ### Step 2 is fixed to `wiki-plan`
 
@@ -147,7 +150,7 @@ it never interferes with ordinary `gh pr create` in any repo.
 | Skill | Role |
 |-------|------|
 | `loop-implement` | **The single implementer** — consumes the wiki-plan and executes its tasks in order (loading each task's named wiki pages) through the verification loop. Plan step = wiki-plan. |
-| `orchestrate` | Split one goal into parallel sessions, each running loop-implement. |
+| `orchestrate` | Split one goal into parallel worker sessions, each running loop-implement — over **Orca when detected** (native spawn + liveness), else tmux. Workers escalate guardrails `ask`s instead of blocking; dead workers are detected. |
 | `wiki-plan` | **The fixed plan methodology** — route each decision to a wiki page, decompose into ordered, page-navigated tasks. |
 | `wiki-ingest` | Add verified knowledge to the right semantic layer (used by knowledge-flush). |
 | `wiki-query` | Answer a question from the wiki with citations. |

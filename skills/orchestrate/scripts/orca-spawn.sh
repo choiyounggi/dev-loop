@@ -66,9 +66,11 @@ else
   create_out=$("$ORCA" terminal create --worktree "id:$wtid" --command "$worker_cmd" --json 2>/dev/null)
 fi
 
-# resolve the agent handle: startupTerminal.handle, else .handle, else re-list
+# resolve the agent handle. `terminal create` returns .result.terminal.handle
+# (verified live); .result.startupTerminal.handle is the `worktree create --agent`
+# form; .handle is a generic fallback; else re-list the worktree's terminals.
 if [ -n "$create_out" ]; then
-  handle=$(printf '%s' "$create_out" | "$JQ" -r '.result.startupTerminal.handle // .result.handle // empty' 2>/dev/null)
+  handle=$(printf '%s' "$create_out" | "$JQ" -r '.result.terminal.handle // .result.startupTerminal.handle // .result.handle // empty' 2>/dev/null)
   if [ -z "$handle" ] && [ -z "${ORCA_SPAWN_DRYRUN:-}" ]; then
     handle=$("$ORCA" terminal list --worktree "id:$wtid" --json 2>/dev/null \
       | "$JQ" -r '.result.terminals[0].handle // empty' 2>/dev/null)
