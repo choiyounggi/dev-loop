@@ -28,4 +28,5 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [bytecode-cache-staleness](language/bytecode-cache-staleness.md) | A script or harness rewrites `.py` files and re-runs them in a loop (mutation testing, edit/test/revert, codegen check, bisect) and the result stops tracking what is on disk — a revert that `git diff` reports clean still fails, or an injected change has no effect; choosing between clearing `__pycache__`, refreshing mtime, and hash-based `.pyc` (PEP 552); designing byte-length-preserving mutations; deciding why a re-imported module still shows old behaviour |
 | [mutable-state-traps](language/mutable-state-traps.md) | State persists or leaks across calls/requests in a long-lived Python process — one user's data appears for another, values "remembered" between calls; loop-built callbacks all use the last value; reviewing function signatures (mutable defaults), class bodies (class attributes), or module-level objects for hidden sharing; choosing contextvars vs thread-locals for request context |

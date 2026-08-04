@@ -10,8 +10,8 @@ sources:
   - https://zsh.sourceforge.io/Doc/Release/Parameters.html
   - https://google.github.io/styleguide/shellguide.html
   - https://www.shellcheck.net/
-last_verified: 2026-07-10
-related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution]
+last_verified: 2026-08-04
+related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution, testing-quality-polling-completion-predicates]
 ---
 
 # Shell Scripts That Must Run on More Than One Machine or Shell
@@ -62,6 +62,7 @@ non-interactive environment).
 | Critical command is in a pipeline but the interpreter is POSIX sh (no `pipefail`) | Run the critical command outside the pipeline (temp file between stages) and test `$?` directly |
 | Script runs via cron/CI/hooks and commands are "not found" | Non-interactive shells load no rc files — no user PATH, no version-manager shims. Call binaries by absolute path (see platforms-toolchains-version-management) |
 | `set -u` breaks on optional variables | Expand with an explicit default: `"${OPT:-}"` |
+| A caller passes `VAR=` (empty) to switch a feature off, and the feature stays on | The script reads `"${VAR:-default}"`, and the `<colon>` form tests for *unset or null* — the empty value is discarded and the default is substituted. When you own the script, read it as `"${VAR-default}"` (no colon), which tests only for unset. When you cannot change it, pass a value the script's own validation rejects (`VAR=/nonexistent` for a path it feeds to `command -v`) rather than an empty one |
 
 ## Instead of
 
@@ -70,10 +71,12 @@ non-interactive environment).
 | Build a command string and `eval` it | Build an array and expand it: `cmd "${args[@]}"` | `eval` re-parses quotes and globs; arrays pass arguments through exactly |
 | Put a command plus its flags in one variable and run `$cmd` | Variable holds the binary path only; flags are separate words | zsh runs the whole value as one command name; bash re-splits and re-globs it |
 | Trust a trailing `echo "done"` as proof a step ran | Verify the produced state with an independent command | Inside `&&` chains and subshells, `set -e` misses failures and the echo still prints |
+| Turn a script's feature off by passing `VAR=` when the script reads `"${VAR:-default}"` | Change the read to `"${VAR-default}"`, or pass a value the script's own check rejects | `:-` substitutes the default for null as well as unset, so the empty value is discarded and the feature silently stays on |
+| Write `"${VAR:-default}"` for a variable whose empty value is meaningful | Write `"${VAR-default}"` and reserve `:-` for "unset or empty are both wrong" | The colon collapses "explicitly cleared" and "never set" into one branch, which removes the caller's ability to express the first |
 
 ## Sources
 
-- https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html — POSIX shell quoting and field splitting (sections 2.2, 2.6.5)
+- https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html — POSIX shell quoting and field splitting (sections 2.2, 2.6.5); §2.6.2 Parameter Expansion: "use of the <colon> in the format shall result in a test for a parameter that is unset or null; omission of the <colon> shall result in a test for a parameter that is only unset". Reproduced 2026-08-04 (zsh, macOS): with `V=""`, `${V:-default}` → `default` while `${V-default}` → empty; with `V` unset both → `default`
 - https://zsh.sourceforge.io/Doc/Release/Expansion.html — zsh: no word splitting of unquoted parameters (14.3); `=word` expansion (14.7.3)
 - https://zsh.sourceforge.io/Doc/Release/Parameters.html — zsh arrays numbered from 1 (KSH_ARRAYS excepted)
 - https://google.github.io/styleguide/shellguide.html — quote variables, prefer bash for scripts, arrays over eval

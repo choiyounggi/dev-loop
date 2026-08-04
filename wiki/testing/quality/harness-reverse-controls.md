@@ -11,8 +11,8 @@ sources:
   - https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/
   - https://stryker-mutator.io/docs/mutation-testing-elements/equivalent-mutants/
   - https://testing.googleblog.com/2021/04/mutation-testing.html
-last_verified: 2026-08-02
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set]
+last_verified: 2026-08-04
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-polling-completion-predicates, backend-python-language-bytecode-cache-staleness]
 ---
 
 # Citing a Verification Harness's Own Score
@@ -77,6 +77,8 @@ come out uniform across every case: every mutant caught, or every one surviving.
 | A mutation changes behavior in a way outside what the suite is meant to cover | PIT's second undetectable class (it excludes logging code for this reason) — exclude that region from the mutation set instead of adding a test to chase it |
 | The score is already published and cited | Re-run with the control before defending the number, and correct the citation when the control fails |
 | Individual checks each have a negative control already | Add the harness-level control too — a per-check control asks "can this check go red", the harness control asks "can this harness go green"; the second failure mode survives the first |
+| The harness rewrites source files in place and the runtime caches compiled artifacts | Invalidate the cache between iterations before reading any verdict — a Python harness whose mutations preserve byte length can re-run stale bytecode, producing verdicts detached from the file on disk ([backend-python-language-bytecode-cache-staleness]) |
+| The harness's "all done" signal is a text match over a status board | That predicate needs its own negative control — run it against the incomplete state and require "not done" ([testing-quality-polling-completion-predicates]) |
 
 ## Instead of
 

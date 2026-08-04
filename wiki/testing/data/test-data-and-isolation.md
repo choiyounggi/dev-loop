@@ -7,8 +7,8 @@ confidence: verified
 sources:
   - https://martinfowler.com/articles/nonDeterminism.html
   - https://abseil.io/resources/swe-book/html/ch12.html
-last_verified: 2026-07-10
-related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice]
+last_verified: 2026-08-04
+related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-quality-behavior-not-implementation]
 ---
 
 # Owning Test Data and Isolating Test State
@@ -40,6 +40,7 @@ state-leak symptom.
 | Unique-constrained values (emails, usernames, external ids) | Generate per test (counter, UUID suffix) inside the factory — hardcoded constants collide across tests and across parallel runs |
 | Filesystem / temp files | Create a fresh per-test temp directory and remove it in teardown |
 | Global config / environment variables / singletons mutated by a test | Set in setup, restore in teardown that runs on failure too (`finally`/fixture teardown) |
+| Code under test derives a write path from the environment (`~/...`, `$HOME`, `$XDG_CONFIG_HOME`, `%APPDATA%`) and would touch the real machine | Point that environment variable at a per-test scratch directory in setup and restore it in `finally`; the production path expression then resolves inside the scratch tree with no signature change. Assert afterwards that the real location gained no files |
 
 4. Keep fixture data **minimal**: create only the entities the behavior under
    test reads. Every extra row is a value a reader must rule out and a
@@ -62,8 +63,10 @@ state-leak symptom.
 | Hardcode `test@example.com` / `user1` in many tests | Generate unique values in the factory per test | Unique-constraint collisions fail tests that are individually correct |
 | `sleep()` until background work lands the data | Wait explicitly on the condition/event with a timeout | Sleeps are both too slow and too short; the race remains |
 | Copy a full production-like JSON blob as fixture for one field's behavior | Build the minimal object via a factory, explicit only in that field | Giant fixtures hide the relevant value and break on unrelated schema changes |
+| Add a directory parameter to a production function so a test can redirect its writes | Redirect the environment variable that function already reads, restoring it in `finally` | A test-only parameter widens a public signature the callers are pinned to and lets a caller inject a wrong directory; the env var is a seam the production code already has |
 
 ## Sources
 
 - https://martinfowler.com/articles/nonDeterminism.html — isolation between tests, wrapping the system clock, callbacks/polling over bare sleeps
 - https://abseil.io/resources/swe-book/html/ch12.html — tests should contain the values they depend on; clarity over shared magic setup
+- https://nodejs.org/api/os.html — `os.homedir()`: "On POSIX, it uses the `$HOME` environment variable if defined. Otherwise it uses the effective UID to look up the user's home directory"; on Windows it reads `USERPROFILE`. No caching is documented, and a same-process reproduction (Node v25.8.1, 2026-08-04) confirms it: mutating `process.env.HOME` between two `os.homedir()` calls changed the second return value and restoring `process.env.HOME` restored it — so redirecting the variable in a test carries the unmodified production code with it

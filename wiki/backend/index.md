@@ -5,7 +5,7 @@ three stack subtrees — route by concern first, stack second:
 
 | Subtree | Route there when |
 |---------|------------------|
-| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, LLM completion validation & context budgeting, consuming external-API responses, externally-owned defaults, object-storage references |
+| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, LLM completion validation & context budgeting, consuming external-API responses, externally-owned defaults, crawl permission, client-side rate limiting, object-storage references, migrating callers after a signature change |
 | [java](java/index.md) | You are writing/reviewing JVM backend code (Java/Kotlin, Spring, JPA/Hibernate) and the concern is stack-specific: entity mapping, persistence context, proxy pitfalls, JVM threads/memory |
 | [node](node/index.md) | You are writing/reviewing Node.js/TypeScript backend code: event-loop blocking, promise error handling, runtime validation at boundaries, graceful shutdown |
 | [python](python/index.md) | You are writing/reviewing Python backend code: GIL/concurrency model, pydantic validation, WSGI/ASGI workers, language traps |
@@ -31,6 +31,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [timeouts-and-retries](common/reliability/timeouts-and-retries.md) | Your service calls another service/external API/DB over the network — setting timeouts and deadlines, deciding what to retry per failure type, backoff/jitter, capping concurrency against a slow dependency; debugging pool exhaustion or retry storms |
+| [client-side-rate-limiting](common/reliability/client-side-rate-limiting.md) | You wrapped an external API client in a throttle to stay under a per-second/per-minute quota and rate-limit errors still occur — on the process's first call, or on scattered days with no load pattern; deciding which layer the throttle wraps (public methods vs transport), whether auth/token fetches count, where the throttle's clock is stamped, how the cold-start timestamp is initialised, and how several workers share one quota |
 
 ### caching
 
@@ -83,6 +84,13 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [externally-owned-defaults](common/integrations/externally-owned-defaults.md) | A code/config default names a resource the repo does not own (model alias, endpoint, bucket, queue, index) — reviewing or merging a PR that claims that default works, adding a startup check that the name still resolves, or diagnosing a default path that broke with no code change |
+| [crawl-permission-by-user-agent](common/integrations/crawl-permission-by-user-agent.md) | About to fetch a site's pages programmatically and reading its `robots.txt` to decide whether that is permitted; a `Disallow: /` is about to end the project; choosing among several sites that publish the same records; deciding what a 404/410/5xx on `robots.txt` means; picking the User-Agent your crawler sends and working out which rule group it selects |
+
+### refactoring
+
+| Page | Load when |
+|------|-----------|
+| [call-site-enumeration](common/refactoring/call-site-enumeration.md) | Changing a function's declaration (adding/removing/reordering a parameter, changing an argument's data shape) and migrating its callers, in a language whose compiler will not find them (Python, Ruby, JS, PHP) or where the change is type-compatible but semantically breaking; a migration scoped from a search turned out to have missed call sites; deciding how to bound the search, how to handle test helpers that reproduce the old shape, and how to verify the enumeration was complete |
 
 ### storage
 
