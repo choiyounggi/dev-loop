@@ -53,9 +53,12 @@ Claude Code 플러그인 마켓플레이스로 설치되므로, 스킬과 훅이
 - **하나의 목표를 병렬 워커 세션들로 분할** → `orchestrate` 스킬:
   인테이크 → 분해(승인 게이트) → 웨이브별 계획(wiki-plan) → 구현 + 리뷰
   (각 세션이 `loop-implement` 실행) → 통합 테스트 → 머지 전 게이트 → 머지.
-  **substrate는 자동: Orca가 감지되면 스폰 + liveness를 Orca가 담당(네이티브
-  trust/TUI 처리), 아니면 raw tmux.** 워커 세션은 guardrails `ask`에서 멈추는 대신
-  에스컬레이션하고, 죽은 워커는 런을 멈추지 않고 빠르게 감지됩니다.
+  **substrate는 자동: Orca가 감지되면 스폰 *과 감독*을 Orca가 담당, 아니면 raw
+  tmux.** Orca 위에서는 각 페이즈가 추적되는 Task + Dispatch가 되고, 코디네이터는
+  상태 파일을 타이머로 폴링하는 대신 푸시되는 `worker_done` / `escalation` /
+  `question` 메일에 블로킹합니다 — 워커의 질문이 수 초 안에 도달합니다. tmux에서는
+  기존 상태 파일 폴링이 그대로입니다. 어느 쪽이든 워커 세션은 guardrails `ask`에서
+  멈추는 대신 에스컬레이션하고, 죽은 워커는 런을 멈추지 않고 빠르게 감지됩니다.
 
 ### 스텝 2는 `wiki-plan`에 고정
 
@@ -150,7 +153,7 @@ loop-orchestrator처럼 dev-loop은 설정 **없이도** 완전히 범용으로 
 | 스킬 | 역할 |
 |-------|------|
 | `loop-implement` | **단일 구현자** — wiki-plan을 소비해 태스크를 순서대로 (각 태스크가 명시한 위키 페이지를 로드하며) 검증 루프로 실행. 계획 단계 = wiki-plan. |
-| `orchestrate` | 하나의 목표를 병렬 워커 세션들로 분할, 각 세션은 loop-implement 실행 — 감지되면 **Orca 위에서**(네이티브 스폰 + liveness), 아니면 tmux. 워커는 guardrails `ask`에서 멈추지 않고 에스컬레이션; 죽은 워커 감지. |
+| `orchestrate` | 하나의 목표를 병렬 워커 세션들로 분할, 각 세션은 loop-implement 실행 — 감지되면 **Orca 위에서**(Task/Dispatch 추적, `worker_done`/`ask`/`escalation` 이벤트 대기, 네이티브 liveness), 아니면 tmux 상태 파일 폴링. 워커는 guardrails `ask`에서 멈추지 않고 에스컬레이션; 죽은 워커 감지. |
 | `wiki-plan` | **고정된 계획 방법론** — 각 결정을 위키 페이지로 라우팅, 순서 있는 페이지-내비게이션 태스크로 분해. |
 | `wiki-ingest` | 검증된 지식을 올바른 시맨틱 레이어에 추가 (knowledge-flush가 사용). |
 | `wiki-query` | 위키에서 인용과 함께 질문에 답변. |
@@ -163,7 +166,7 @@ loop-orchestrator처럼 dev-loop은 설정 **없이도** 완전히 범용으로 
 ```
 dev-loop/
 ├── .claude-plugin/{plugin,marketplace}.json
-├── AGENTS.md INDEX.md templates/     # 위키 스키마 + 라우팅 진입점 + 페이지 템플릿
+├── AGENTS.md INDEX.md templates/     # 위키 스키마 + 라우팅 진입점 + 페이지/브리프/세션프롬프트 템플릿
 ├── wiki/                             # 10개 도메인 시맨틱 레이어 지식 베이스
 ├── skills/                           # 위의 스킬 8종 (사용자 호출 가능; / 메뉴에 스킬 이름으로 표시)
 ├── agents/test-quality-auditor.md    # 번들된 독립 테스트 감사자 (루프 스텝 6.5)

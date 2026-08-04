@@ -54,9 +54,13 @@ Run it two ways:
   skill: intake → decompose (approval gate) → per-wave plan (wiki-plan) →
   implement + review (each session runs `loop-implement`) → integration test →
   pre-merge gate → merge. **Substrate is automatic: if Orca is detected it drives
-  spawn + liveness (native trust/TUI handling); otherwise raw tmux.** Worker
-  sessions escalate a guardrails `ask` instead of blocking, and a dead worker is
-  detected fast rather than stalling the run.
+  spawn *and supervision*; otherwise raw tmux.** On Orca each phase is a tracked
+  Task + Dispatch, and the coordinator blocks on pushed `worker_done` /
+  `escalation` / `question` mail instead of polling status files on a timer — so
+  a worker's blocking question reaches you in seconds. On tmux the original
+  status-file poll is unchanged. Either way, worker sessions escalate a
+  guardrails `ask` instead of blocking, and a dead worker is detected fast rather
+  than stalling the run.
 
 ### Step 2 is fixed to `wiki-plan`
 
@@ -150,7 +154,7 @@ it never interferes with ordinary `gh pr create` in any repo.
 | Skill | Role |
 |-------|------|
 | `loop-implement` | **The single implementer** — consumes the wiki-plan and executes its tasks in order (loading each task's named wiki pages) through the verification loop. Plan step = wiki-plan. |
-| `orchestrate` | Split one goal into parallel worker sessions, each running loop-implement — over **Orca when detected** (native spawn + liveness), else tmux. Workers escalate guardrails `ask`s instead of blocking; dead workers are detected. |
+| `orchestrate` | Split one goal into parallel worker sessions, each running loop-implement — over **Orca when detected** (Task/Dispatch tracking, event-driven `worker_done`/`ask`/`escalation` waits, native liveness), else tmux status-file polling. Workers escalate guardrails `ask`s instead of blocking; dead workers are detected. |
 | `wiki-plan` | **The fixed plan methodology** — route each decision to a wiki page, decompose into ordered, page-navigated tasks. |
 | `wiki-ingest` | Add verified knowledge to the right semantic layer (used by knowledge-flush). |
 | `wiki-query` | Answer a question from the wiki with citations. |
@@ -163,7 +167,7 @@ it never interferes with ordinary `gh pr create` in any repo.
 ```
 dev-loop/
 ├── .claude-plugin/{plugin,marketplace}.json
-├── AGENTS.md INDEX.md templates/     # wiki schema + routing entry + page template
+├── AGENTS.md INDEX.md templates/     # wiki schema + routing entry + page/brief/session-prompt templates
 ├── wiki/                             # 10-domain semantic-layer knowledge base
 ├── skills/                           # the 8 skills above (user-invocable; appear in the / menu by skill name)
 ├── agents/test-quality-auditor.md    # bundled independent test auditor (loop step 6.5)

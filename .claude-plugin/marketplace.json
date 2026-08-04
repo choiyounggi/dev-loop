@@ -20,7 +20,7 @@
         "url": "https://github.com/choiyounggi/dev-loop.git"
       },
       "homepage": "https://github.com/choiyounggi/dev-loop",
-      "version": "0.9.0",
+      "version": "0.13.0",
       "tags": [
         "orchestrator",
         "verification-loop",
