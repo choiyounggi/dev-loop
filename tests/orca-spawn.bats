@@ -52,3 +52,11 @@ setup() {
   run bash "$OS"
   [ "$status" -ne 0 ]
 }
+
+@test "single quote in the escalation dir is shell-escaped (no command break)" {
+  run env ORCA_SPAWN_DRYRUN=1 GROUNDWORK_ESCALATION_DIR="/p'q" GROUNDWORK_TASK_ID=lo-1 \
+      bash "$OS" "r::/wt" bypassPermissions "p"
+  [ "$status" -eq 0 ]
+  # the POSIX single-quote escape '\'' must appear — proves the value was escaped
+  [[ "$output" == *"/p'\\''q"* ]]
+}
