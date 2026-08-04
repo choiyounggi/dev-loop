@@ -61,3 +61,26 @@ Framed that way the directive is supported by all three sources, and "prose qual
 No candidate was dropped and none was carried at `unverified`.
 
 Cross-Check: 면제(이 세션은 서브에이전트 사용이 제한됨) — 대신 검색 요약을 신뢰하지 않고 1차 출처(Write the Docs `docs-principles`)를 직접 fetch해 인용문을 원문 대조했고, 그 과정에서 이 지침과 **반대 방향으로 hedge**하는 문장("the best documentation is hand-written", 생성기는 "still require input from humans")을 발견해 페이지의 주장 범위를 "기계적 사실은 생성기, 산문은 손"으로 좁혔다. 중복 여부는 wiki 152개 페이지 전수 grep으로 확인(무관한 3건만 매칭), 라우팅은 databases·qa 두 도메인 index를 모두 읽고 결정했다.
+
+## Decision Log
+
+### D1 — 페이지 주장을 "생성이 우월하다"가 아니라 "기계적 사실만 생성기에서" 로 좁혔다 (의도)
+
+**배제한 대안**: 큐 원문 그대로 "손으로 다시 쓰지 말고 생성기 출력을 써라"로 단정.
+**배제 이유**: 1차 출처(Write the Docs)가 정반대 방향으로 hedge한다 — *"the best documentation is hand-written"*, 생성기는 *"still require input from humans to function"*. 검색 요약만 봤으면 이 문장을 놓치고 출처가 뒷받침하지 않는 주장을 인용으로 달 뻔했다. 그래서 산출물을 **기계적 사실(생성기) / 판단·산문(손)** 으로 쪼갰고, "산문 품질 자체가 산출물인 경우(튜토리얼·온보딩)"는 edge case로 손 작성에 돌려보냈다.
+
+### D2 — 도메인을 `databases` 가 아니라 `qa` 로 (의도)
+
+**배제한 대안**: 큐 행이 제안한 `databases`(증거가 ERD라서).
+**배제 이유**: 지침 자체는 생성기 종류를 가리지 않는다(API 스펙·의존성 인벤토리에 동일 적용). `databases/schema-design` 아래 두면 스키마가 아닌 모든 hand-off에서 라우팅되지 않는다.
+
+### D3 — `deliverables` 카테고리 신설 (의도)
+
+**배제한 대안**: 기존 `qa/document-verification` 에 세 번째 페이지로 추가.
+**배제 이유**: 그 카테고리는 문서를 *검사(gate)* 하는 케이스를 담는다. 이 케이스는 문서의 *내용이 어디서 오는가* 이므로 "load when" 라인이 겹치지 않는다. 기존 5개 카테고리(process·document-verification·environments·bug-reports·exploratory) 어디에도 이름만 다른 동일 개념이 없음을 확인했다.
+
+### 리뷰어가 볼 곳
+
+1. **인용 정확성** — 출처가 hedge한 문장을 페이지 Sources에 그대로 옮겼는지(요약이 붙여준 hedge를 떼면 위조 인용이 된다). 페이지 Sources 첫 항목.
+2. **신규 카테고리 타당성** — D3의 근거가 충분한지. 과하면 `document-verification` 으로 접어도 된다.
+3. **confidence: verified 판정** — SSOT/중복금지 원리는 1차 출처로 검증됐고, 운영 세부(stale이어도 재실행·리프레시는 별도 커밋)는 field evidence 기반이라 페이지 안에서 라벨을 갈라 적었다. 이 조합을 `verified` 로 볼지 `field-tested` 로 내릴지는 소유자 판단.
