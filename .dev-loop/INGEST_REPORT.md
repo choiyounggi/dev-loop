@@ -59,3 +59,5 @@ Framed that way the directive is supported by all three sources, and "prose qual
 ## Nothing left unverified
 
 No candidate was dropped and none was carried at `unverified`.
+
+Cross-Check: 면제(이 세션은 서브에이전트 사용이 제한됨) — 대신 검색 요약을 신뢰하지 않고 1차 출처(Write the Docs `docs-principles`)를 직접 fetch해 인용문을 원문 대조했고, 그 과정에서 이 지침과 **반대 방향으로 hedge**하는 문장("the best documentation is hand-written", 생성기는 "still require input from humans")을 발견해 페이지의 주장 범위를 "기계적 사실은 생성기, 산문은 손"으로 좁혔다. 중복 여부는 wiki 152개 페이지 전수 grep으로 확인(무관한 3건만 매칭), 라우팅은 databases·qa 두 도메인 index를 모두 읽고 결정했다.
