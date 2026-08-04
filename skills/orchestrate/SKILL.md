@@ -110,15 +110,21 @@ worker (a non-terminal task whose tmux session vanished — recorded via the sta
 file's `session` field) — both abort fast instead of waiting the timeout.
 
 **Optional Orca substrate:** if `scripts/orca-detect.sh` exits 0 (Orca installed,
-its orchestration skill present, runtime reachable) you MAY spawn/monitor workers
-through Orca instead of raw tmux — Orca handles the trust/TUI screen
-(`orca terminal wait --for tui-idle`), sends prompts (`orca terminal send`), and
-tracks sessions natively (`orca worktree ps --json`, matched by `.path`), removing
-the fragile trust-screen and giving real liveness. Spawn with
-`orca worktree create --name <task> --agent claude --prompt "<brief>" --json` (or
-`terminal create` in an existing worktree). If `orca-detect.sh` is non-zero, use the
-tmux `launch-session.sh` path below (the default). Verify each Orca `--json` result
-before relying on its fields.
+its orchestration skill present, runtime reachable), spawn/monitor workers through
+Orca instead of raw tmux — this removes the fragile trust-screen and gives native
+liveness. Per task, instead of `launch-session.sh`:
+1. create the worktree with Orca (`orca worktree create --repo id:<repoId>
+   --name <task> --no-parent --json` → copy the whole `worktree.id`), then inject
+   the worker guardrails config into its path (as `setup-worktrees.sh` does);
+2. `GROUNDWORK_ESCALATION_DIR=<abs> GROUNDWORK_TASK_ID=<task>
+   scripts/orca-spawn.sh <worktree-id> bypassPermissions "<plan prompt>"` — it
+   creates the Claude terminal (escalation env injected), waits for `tui-idle`
+   (no trust-screen guessing), sends the prompt, and prints `handle=<agent-handle>`.
+
+For liveness use `scripts/orca-worktree-alive.sh <worktree-path>` (exit 0 alive /
+1 dead / 2 unknown — treat unknown as *not* dead) instead of watch's tmux check.
+If `orca-detect.sh` is non-zero, use the tmux `launch-session.sh` path below (the
+default). Always verify each Orca `--json` result before relying on its fields.
 
 0. **Preceding-interface injection (Wave 2+, and completed base outputs):** before
    launching this Wave, fill each task's brief `<dependencies>` with the **exact
