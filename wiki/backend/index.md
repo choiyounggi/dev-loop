@@ -5,7 +5,7 @@ three stack subtrees — route by concern first, stack second:
 
 | Subtree | Route there when |
 |---------|------------------|
-| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, LLM completion validation & context budgeting, consuming external-API responses, externally-owned defaults, object-storage references |
+| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, LLM completion validation & context budgeting, consuming external-API responses, externally-owned defaults, client-side rate limiting, crawl-source selection via robots.txt, object-storage references, migrating call sites through a signature change |
 | [java](java/index.md) | You are writing/reviewing JVM backend code (Java/Kotlin, Spring, JPA/Hibernate) and the concern is stack-specific: entity mapping, persistence context, proxy pitfalls, JVM threads/memory |
 | [node](node/index.md) | You are writing/reviewing Node.js/TypeScript backend code: event-loop blocking, promise error handling, runtime validation at boundaries, graceful shutdown |
 | [python](python/index.md) | You are writing/reviewing Python backend code: GIL/concurrency model, pydantic validation, WSGI/ASGI workers, language traps |
@@ -31,6 +31,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [timeouts-and-retries](common/reliability/timeouts-and-retries.md) | Your service calls another service/external API/DB over the network — setting timeouts and deadlines, deciding what to retry per failure type, backoff/jitter, capping concurrency against a slow dependency; debugging pool exhaustion or retry storms |
+| [client-side-rate-limiting](common/reliability/client-side-rate-limiting.md) | You throttled an external API client to stay under a requests-per-second quota and still get rate-limit errors; the error appears on the process's first call, or only on some days with no code change; deciding which layer the throttle belongs at, whether token/auth requests count against the quota, and how to initialize the counter |
 
 ### caching
 
@@ -83,6 +84,13 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [externally-owned-defaults](common/integrations/externally-owned-defaults.md) | A code/config default names a resource the repo does not own (model alias, endpoint, bucket, queue, index) — reviewing or merging a PR that claims that default works, adding a startup check that the name still resolves, or diagnosing a default path that broke with no code change |
+| [robots-txt-and-source-selection](common/integrations/robots-txt-and-source-selection.md) | Choosing which site to fetch a published dataset from and reading its robots.txt to decide whether your client may crawl it; the file contains a `Disallow: /` and you are deciding whose group it belongs to; setting the crawler's User-Agent and checking that token against the file; robots.txt returned a non-200 status; the origin restricts your token and you are looking for a portal that republishes the same records |
+
+### refactoring
+
+| Page | Load when |
+|------|-----------|
+| [signature-change-call-sites](common/refactoring/signature-change-call-sites.md) | Changing a function/method/constructor signature (adding, removing, renaming a parameter, or reshaping the value it takes) and migrating every caller; a migration scoped by searching the parameter name left callers broken; deciding how to enumerate positional, keyword, unpacked, and by-reference call sites, when to reach for a CST/AST codemod, and how test helpers that rebuild the old shape hide behind a single hit |
 
 ### storage
 

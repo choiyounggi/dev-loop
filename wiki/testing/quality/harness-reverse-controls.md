@@ -11,8 +11,9 @@ sources:
   - https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/
   - https://stryker-mutator.io/docs/mutation-testing-elements/equivalent-mutants/
   - https://testing.googleblog.com/2021/04/mutation-testing.html
-last_verified: 2026-08-02
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set]
+  - https://docs.python.org/3/library/unittest.mock.html
+last_verified: 2026-08-04
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-differential-run-agreement]
 ---
 
 # Citing a Verification Harness's Own Score
@@ -41,6 +42,7 @@ come out uniform across every case: every mutant caught, or every one surviving.
 | Mixed verdicts, and the no-op control survived | The harness discriminates | Cite the score together with the control's result |
 | Every case caught / red, including the no-op control | Cases die before the rule executes — a broken isolated environment (missing input files, absent dependency, wrong working directory) | Fix the environment, then re-run the control; a 100% catch rate here is a 0% detection rate |
 | Every case survives / green | The harness never applied the mutation or never reached the rule — Stryker's troubleshooting carries two distinct "All mutants survive" sections whose documented causes are both sandbox mechanics, not weak tests (the Jest runner cannot run in a hidden temp directory; sandboxing does not support `module-alias/register`) | Verify one mutation reaches the artifact by hand before adjusting the rules |
+| One deliberate-fault control is green while others in the same harness redden | The patched seam is not on the path that control exercises — the name is patched correctly and never read | Patch a seam the path consults at call time (next item), then re-run and require red |
 
 3. **Observe the harness produce a verdict on the unmutated artifact first.** Stryker
    makes this a named phase — "Initial test run fails" is its own documented failure
@@ -64,7 +66,17 @@ come out uniform across every case: every mutant caught, or every one surviving.
    "detected / valid * 100". A case that blew up before reaching the rule is invalid,
    not a detection — folding the two together is the arithmetic that turns a broken
    environment into a perfect score.
-7. **Publish the score with the control alongside it** — "34/36 caught; no-op
+7. **When a control works by patching a symbol, patch a seam the path under test
+   consults at call time, and require the control to go red before trusting it.**
+   Patching is name rebinding — "you patch where an object is *looked up*, which
+   is not necessarily the same place as where it is defined" — and a name the path
+   never reads is a no-op that reports green. Two resolution sites are the common
+   trap: a parameter that defaults to computing a value (`f(x=None)` → `x = rule()`
+   inside) is dead for any caller that resolves the value itself and passes it
+   explicitly, so patching the callee's copy of `rule` mutates nothing on that
+   path. Pick a symbol the path reads unconditionally, and confirm the control's
+   red run before citing any score derived from it.
+8. **Publish the score with the control alongside it** — "34/36 caught; no-op
    control survived" — so the number carries its own proof of discrimination.
 
 ## Edge cases
@@ -76,6 +88,7 @@ come out uniform across every case: every mutant caught, or every one surviving.
 | The harness genuinely catches every real mutant (small rule set, exhaustive cases) | The no-op control is then the only evidence separating that from a broken harness — report it explicitly rather than the bare percentage |
 | A mutation changes behavior in a way outside what the suite is meant to cover | PIT's second undetectable class (it excludes logging code for this reason) — exclude that region from the mutation set instead of adding a test to chase it |
 | The score is already published and cited | Re-run with the control before defending the number, and correct the citation when the control fails |
+| A refactor moved value resolution from the callee's default into the caller | Re-verify every control that patches that symbol — each one silently became a no-op on the path it was written for, while still passing |
 | Individual checks each have a negative control already | Add the harness-level control too — a per-check control asks "can this check go red", the harness control asks "can this harness go green"; the second failure mode survives the first |
 
 ## Instead of
@@ -86,6 +99,7 @@ come out uniform across every case: every mutant caught, or every one surviving.
 | Read a uniform 100% detection rate as strength | Treat uniformity as the fault signal and run the control | Discriminating measurement produces mixed results; a single verdict for every input is what a constant function looks like |
 | Tighten the rules when every case comes back red | Verify one case reaches the rule, then re-run the control | Rules are not what fails when the environment is missing the inputs the cases need |
 | Copy only the directory under test into the harness's temp tree | Copy the repository, or fail the case on a missing input | Tests that resolve paths from the repo root read as detections when they die on a missing file |
+| Accept a green deliberate-fault control as "the harness cannot be fooled" | Require that control to go red first, patching a seam the path reads at call time | A patch applied to a name the path never looks up mutates nothing, so the control reports the harness's health without ever testing it |
 
 ## Sources
 
@@ -95,4 +109,6 @@ come out uniform across every case: every mutant caught, or every one surviving.
 - https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/ — the state set (`Killed`, `Survived`, `No coverage`, `Timeout`, `Runtime error`, `Compile error`, `Ignored`) and the score as "detected / valid * 100", so errored cases leave the denominator rather than counting as catches
 - https://stryker-mutator.io/docs/mutation-testing-elements/equivalent-mutants/ — an equivalent mutant cannot be killed and "There is no definitive way for Stryker to find and ignore them", which is why a surviving no-op is the correct control verdict
 - https://testing.googleblog.com/2021/04/mutation-testing.html — inserting faults and requiring test failure is what measures detection, as opposed to coverage
+- https://docs.python.org/3/library/unittest.mock.html — "Where to patch": `patch()` "works by (temporarily) changing the object that a *name* points to with another one … you must ensure that you patch the name used by the system under test", and "You patch where an object is *looked up*, which is not necessarily the same place as where it is defined" — patching a name the path does not read leaves the run unmutated
+- Field reproduction 2026-08-04 (linkly `impl/lnpl/differential.py`): `verify` resolved `seeded_entities(...)` itself and passed the result into `observe_mode_b` → `backend.build(seeded=...)`, so `backend._lnpl_ops`'s own `if seeded is None` default never executed on that path. A control patching `backend.seeded_entities` reported `AssertionError: True is not false` — no divergence, control green. Repatching `backend.READ_OPS` and `backend._failure_attempts`, both read unconditionally inside the scan, produced the expected `FAIL 2/4` and `FAIL 3/4`
 - Field reproduction 2026-07-31 (Python rule-conformance harness): the harness copied only the implementation directory into its temp tree while the tests resolved `examples/*.json` from the repo root, so all 105 tests died on `FileNotFoundError` and every mutation reported as caught — "36/36" was cited in five commits and a README. A docstring-capitalization no-op reproduced the red verdict and exposed it; copying the full repository plus adding the no-op control moved the score to 34/36 and surfaced two rules no test asserted
