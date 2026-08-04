@@ -75,6 +75,7 @@ launchcmd="$launchcmd && \"$CLAUDE\" --permission-mode $perm"
 #   LO_READY_EXTRA   an extra substring that means "REPL is ready"
 #   LO_TRUST_EXTRA   an extra substring of a trust prompt to confirm with Enter
 ready_timeout="${LO_READY_TIMEOUT:-60}"; ready_interval="${LO_READY_INTERVAL:-2}"
+[ "$ready_timeout" -ge 1 ] 2>/dev/null || ready_timeout=60
 [ "$ready_interval" -ge 1 ] 2>/dev/null || ready_interval=2
 iters=$(( ready_timeout / ready_interval )); [ "$iters" -ge 1 ] || iters=1
 
