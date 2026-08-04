@@ -31,3 +31,8 @@ setup() {
   jq -e . "$STATUS_DIR/t3.json" >/dev/null
   [ "$(jq -r '.phase' "$STATUS_DIR/t3.json")" = "pending" ]
 }
+
+@test "records the tmux session name (STATUS_SESSION override) for liveness" {
+  ( cd "$BATS_TEST_TMPDIR" && STATUS_SESSION=lo-7 bash "$SU" t4 implementing )
+  [ "$(jq -r '.session' "$STATUS_DIR/t4.json")" = "lo-7" ]
+}

@@ -27,3 +27,30 @@ setup() {
   run bash "$WS" "$ORCH/status" done 1 5 1
   [ "$status" -eq 0 ]
 }
+
+# ---- liveness (dead-worker detection) ----
+
+@test "liveness: a non-terminal task with a dead tmux session aborts (exit 3)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  run env WATCH_TMUX=false bash "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"dead worker"* ]]
+}
+
+@test "liveness: a live session is not flagged and reaches the target (exit 0)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  run env WATCH_TMUX=true bash "$WS" "$ORCH/status" implementing 1 5 1
+  [ "$status" -eq 0 ]
+}
+
+@test "liveness: a terminal phase is not liveness-checked even if session is dead" {
+  printf '{"task":"t1","phase":"done","session":"lo-x"}' > "$ORCH/status/t1.json"
+  run env WATCH_TMUX=false bash "$WS" "$ORCH/status" done 1 5 1
+  [ "$status" -eq 0 ]
+}
+
+@test "liveness: no session field → not checked (backward compat)" {
+  printf '{"task":"t1","phase":"implementing"}' > "$ORCH/status/t1.json"
+  run env WATCH_TMUX=false bash "$WS" "$ORCH/status" implementing 1 5 1
+  [ "$status" -eq 0 ]
+}

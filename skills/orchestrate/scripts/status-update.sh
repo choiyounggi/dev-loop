@@ -20,6 +20,10 @@ file="$dir/$task.json"
 
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)   # cross-platform (GNU/BSD) iso-8601 UTC
 wt=$(pwd -P)                          # physical path so loop-gate can match it
+# Record the tmux session name so watch-status can detect a dead worker. The
+# worker runs inside its tmux session; allow an explicit override (orchestrator
+# / tests) via STATUS_SESSION.
+sess="${STATUS_SESSION:-$(tmux display-message -p '#S' 2>/dev/null || true)}"
 
 # Collect the extra key=value pairs into one JSON object first (in memory — no
 # file writes), so the whole record lands in a single atomic write below.
@@ -37,7 +41,9 @@ done
 # collisions, e.g. an explicit worktree= overrides the cwd default).
 tmp="$file.tmp.$$"
 trap 'rm -f "$tmp"' EXIT
-"$JQ" --arg p "$phase" --arg t "$now" --arg w "$wt" --argjson e "$extra" \
-  '.phase=$p | .updatedAt=$t | .worktree=$w | . + $e' "$file" > "$tmp" && mv "$tmp" "$file"
+"$JQ" --arg p "$phase" --arg t "$now" --arg w "$wt" --arg s "$sess" --argjson e "$extra" \
+  '.phase=$p | .updatedAt=$t | .worktree=$w
+   | (if $s != "" then .session=$s else . end)
+   | . + $e' "$file" > "$tmp" && mv "$tmp" "$file"
 
 echo "status[$task] = $phase"

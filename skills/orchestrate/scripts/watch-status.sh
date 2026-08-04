@@ -25,6 +25,8 @@ if [ "$target_rank" -lt 0 ]; then echo "watch-status: unknown target phase '$tar
 elapsed=0
 # Escalations live beside the status dir: <root>/.orchestration/{status,escalations}.
 escdir="$(dirname "$dir")/escalations"
+# tmux binary for dead-worker (liveness) checks; overridable in tests via WATCH_TMUX.
+TMUX_BIN="${WATCH_TMUX:-$(command -v tmux 2>/dev/null || echo tmux)}"
 while [ "$elapsed" -lt "$timeout" ]; do
   # A worker's guardrails `ask`, recorded as an escalation, wakes the coordinator
   # immediately rather than waiting out the timeout. The coordinator MUST resolve
@@ -51,6 +53,19 @@ while [ "$elapsed" -lt "$timeout" ]; do
     tk=$("$JQ" -r '.task // "?"' "$f" 2>/dev/null || echo "?")
     summary="$summary $tk:$ph"
     [ "$ph" = "failed" ] && { failed=$((failed+1)); continue; }
+    # dead-worker (zombie) detection: a non-terminal task whose tmux session is
+    # gone is treated as a failure, so the run aborts fast instead of waiting the
+    # whole timeout. Terminal phases are skipped (the session may legitimately end).
+    case "$ph" in
+      done|merged|approved) : ;;
+      *)
+        sess=$("$JQ" -r '.session // empty' "$f" 2>/dev/null || echo "")
+        if [ -n "$sess" ] && ! "$TMUX_BIN" has-session -t "$sess" 2>/dev/null; then
+          echo "[watch] task $tk: session '$sess' gone at phase '$ph' — dead worker"
+          failed=$((failed+1)); continue
+        fi
+        ;;
+    esac
     r=$(rank "$ph")
     [ "$r" -ge "$target_rank" ] && done_count=$((done_count+1))
   done
