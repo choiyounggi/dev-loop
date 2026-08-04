@@ -54,3 +54,10 @@ setup() {
   run env WATCH_TMUX=false bash "$WS" "$ORCH/status" implementing 1 5 1
   [ "$status" -eq 0 ]
 }
+
+@test "liveness: unresolvable tmux disables liveness (no false dead-worker abort)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  # tmux binary can't be resolved → skip liveness, do not flag everything dead
+  run env WATCH_TMUX=/nonexistent/tmux bash "$WS" "$ORCH/status" implementing 1 3 1
+  [ "$status" -eq 0 ]
+}

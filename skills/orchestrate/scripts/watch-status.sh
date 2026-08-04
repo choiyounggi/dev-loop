@@ -26,7 +26,10 @@ elapsed=0
 # Escalations live beside the status dir: <root>/.orchestration/{status,escalations}.
 escdir="$(dirname "$dir")/escalations"
 # tmux binary for dead-worker (liveness) checks; overridable in tests via WATCH_TMUX.
-TMUX_BIN="${WATCH_TMUX:-$(command -v tmux 2>/dev/null || echo tmux)}"
+# If it is not resolvable, DISABLE liveness (empty) rather than flag every worker
+# dead — a missing tmux must not abort the run (`! missing-cmd` would invert to true).
+TMUX_BIN="${WATCH_TMUX:-tmux}"
+command -v "$TMUX_BIN" >/dev/null 2>&1 || TMUX_BIN=""
 while [ "$elapsed" -lt "$timeout" ]; do
   # A worker's guardrails `ask`, recorded as an escalation, wakes the coordinator
   # immediately rather than waiting out the timeout. The coordinator MUST resolve
@@ -60,7 +63,7 @@ while [ "$elapsed" -lt "$timeout" ]; do
       done|merged|approved) : ;;
       *)
         sess=$("$JQ" -r '.session // empty' "$f" 2>/dev/null || echo "")
-        if [ -n "$sess" ] && ! "$TMUX_BIN" has-session -t "$sess" 2>/dev/null; then
+        if [ -n "$TMUX_BIN" ] && [ -n "$sess" ] && ! "$TMUX_BIN" has-session -t "$sess" 2>/dev/null; then
           echo "[watch] task $tk: session '$sess' gone at phase '$ph' — dead worker"
           failed=$((failed+1)); continue
         fi
