@@ -35,18 +35,24 @@ esac
 rt="${LO_READY_TIMEOUT:-60}"; [ "$rt" -ge 1 ] 2>/dev/null || rt=60
 timeout_ms=$(( rt * 1000 ))
 
-# Worker command: carry the guardrails escalation env (single-quoted so a path
-# with metacharacters cannot break the command) so a headless worker escalates
-# instead of blocking on an `ask`.
+# Worker command: carry the guardrails escalation env so a headless worker
+# escalates instead of blocking on an `ask`. Values are single-quoted with
+# embedded single quotes escaped (`'\''`) so a path with any metacharacter —
+# including a quote — cannot break out of the command.
+esc_sq() { printf '%s' "$1" | sed "s/'/'\\\\''/g"; }
 env_prefix=""
 if [ -n "${GROUNDWORK_ESCALATION_DIR:-}" ]; then
-  env_prefix="export GROUNDWORK_ESCALATION_DIR='${GROUNDWORK_ESCALATION_DIR}' && export GROUNDWORK_TASK_ID='${GROUNDWORK_TASK_ID:-}' && "
+  env_prefix="export GROUNDWORK_ESCALATION_DIR='$(esc_sq "$GROUNDWORK_ESCALATION_DIR")' && export GROUNDWORK_TASK_ID='$(esc_sq "${GROUNDWORK_TASK_ID:-}")' && "
 fi
 worker_cmd="${env_prefix}claude --permission-mode ${perm}"
 
 print_cmd() { printf 'orca'; for a in "$@"; do printf ' [%s]' "$a"; done; printf '\n'; }
-orca_step() {  # run (discard output) or, in dry-run, print the command
-  if [ -n "${ORCA_SPAWN_DRYRUN:-}" ]; then print_cmd "$@"; else "$ORCA" "$@" >/dev/null 2>&1 || true; fi
+orca_run() {  # $1 = fatal flag (1 = return non-zero on failure); rest = orca args
+  _fatal="$1"; shift
+  if [ -n "${ORCA_SPAWN_DRYRUN:-}" ]; then print_cmd "$@"; return 0; fi
+  "$ORCA" "$@" >/dev/null 2>&1 && return 0
+  if [ "$_fatal" = 1 ]; then echo "orca-spawn: '$1 $2' failed" >&2; return 1; fi
+  echo "orca-spawn: warning: '$1 $2' failed (continuing)" >&2; return 0
 }
 
 # 1) create the Claude terminal in the worktree
@@ -72,9 +78,11 @@ else
   handle="term_DRYRUN"
 fi
 
-# 2) wait for the agent CLI to be ready (replaces the trust-screen pattern match)
-orca_step terminal wait --terminal "$handle" --for tui-idle --timeout-ms "$timeout_ms" --json
-# 3) send the prompt
-orca_step terminal send --terminal "$handle" --text "$prompt" --enter --json
+# 2) wait for the agent CLI to be ready (replaces the trust-screen pattern match).
+#    A timeout here is a warning, not fatal — the terminal still exists.
+orca_run 0 terminal wait --terminal "$handle" --for tui-idle --timeout-ms "$timeout_ms" --json
+# 3) send the prompt — if this fails the worker received nothing, so fail hard.
+orca_run 1 terminal send --terminal "$handle" --text "$prompt" --enter --json \
+  || { echo "orca-spawn: failed to deliver the prompt to $handle" >&2; exit 4; }
 
 echo "handle=$handle"
