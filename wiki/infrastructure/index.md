@@ -20,6 +20,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [environment-config](config/environment-config.md) | Adding configuration that differs per environment; a bug traced to a dev/stg/prd config difference; config sprawled across hardcoded values, files, and env vars; reviewing how a service gets its settings |
+| [path-valued-config](config/path-valued-config.md) | A config key or env var holds a filesystem path (spool/input/output directory, data file, socket) for a process whose working directory is set by launchd/systemd/cron/a container entrypoint/CI; deciding whether to accept a relative path, expand `~`, or crash at startup; a correctly-deployed service processes nothing and reports no error; writing the loader's rejection tests |
 
 ## containers
 

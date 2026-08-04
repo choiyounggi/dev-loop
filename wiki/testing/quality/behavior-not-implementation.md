@@ -9,7 +9,7 @@ sources:
   - https://abseil.io/resources/swe-book/html/ch12.html
   - https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html
 last_verified: 2026-07-10
-related: [testing-quality-minimum-case-set, testing-mocking-what-to-mock]
+related: [testing-quality-minimum-case-set, testing-mocking-what-to-mock, testing-quality-guard-shape-vs-consequence, backend-common-refactoring-call-site-enumeration]
 ---
 
 # Asserting Behavior Through the Public Interface
