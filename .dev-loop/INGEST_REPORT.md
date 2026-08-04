@@ -1,95 +1,192 @@
-# Consolidated review — knowledge PRs #6–#13
+# Knowledge flush — 3 insight(s)
 
-Eight fork PRs (`dch0202-rsquare`, 2026-07-28 → 2026-08-02) were reviewed together
-against `AGENTS.md`. Each PR was audited by an independent reviewer (format rules,
-sources, vague-qualifier ban, ≤120 body lines, index/log invariants), then
-cross-compared to catch duplication the per-PR flushes could not see — they branched
-independently off the same main and rewrote the same shared index/log files. Fork
-branches can't be edited from here and several PRs needed content changes (drop a
-duplicate, merge a colliding page), so this branch carries the reconciled end-state
-rather than merging each PR as-is (which would import the duplicates).
+Queue drained: `~/.dev-loop/queue/0c6a5439-….jsonl` (1 row),
+`~/.dev-loop/queue/fb7e7221-….jsonl` (2 rows). All three were harvested
+2026-08-04 from the `linkly-t1-spec-notation` and `linkly-t1-repo-policy` repos.
+
+Result: **2 new pages, 1 merge into an existing page, 1 new category.**
+
+| # | Insight (trigger → directive) | Outcome | Confidence |
+|---|-------------------------------|---------|------------|
+| 1 | Adding a node kind to a format whose only gate mutates a golden example → commit a fixture holding the new kind, one negative per keyword, verify each reddens | **New page** `testing/quality/schema-additions-under-a-golden-gate` | verified |
+| 2 | Enumerating call sites before a contract change → enumerate by callee name; a parameter-name search is a partial index | **New page + new category** `backend/common/change-impact/call-site-enumeration` | verified |
+| 3 | A fixture helper whose shape depends on a value the test also passes to the SUT → put that value in the helper's signature | **Merged** into `testing/data/test-data-and-isolation` | verified |
+
+---
 
 ## Verified best-practice
 
-Sources are per-page and were live-verified in each originating PR's flush; the
-independent re-reviews re-checked them. Landed pages and their evidence base:
+Every URL below was fetched during this flush; the quotes are from those
+fetches, not from memory. Nothing was cited that I did not open.
 
-| Page | Confidence | Source basis |
-|------|-----------|--------------|
-| backend/common/llm/completion-response-validation | verified | OpenAI reasoning guide + chat `object` spec (5 `finish_reason` values), vLLM/LiteLLM reasoning fields; field incident (200/`length`/empty content/8,173-char reasoning) |
-| backend/common/llm/context-window-budget | verified | Claude context-window docs, LiteLLM exception mapping, vLLM/Claude Code env-var docs |
-| backend/common/integrations/externally-owned-defaults | verified | OpenAI deprecations (notice windows) + models `list`, LiteLLM model_discovery; field incident (alias removed between PR verify and review → 400) |
-| backend/common/storage/object-key-persistence | verified | AWS S3 CompleteMultipartUpload + managed-upload API/source, aws-sdk-js issues #1158/#5656 |
-| infrastructure/containers/host-cgroup-visibility | field-tested | cgroup_namespaces(7), Docker `--cgroupns=host`, nsenter, k8s #103363; OrbStack repro |
-| infrastructure/observability/missing-container-metrics | verified/field-tested | k8s resource-metrics-pipeline docs, kube-prometheus-stack values, kubernetes-mixin; OrbStack #2217 repro |
-| platforms/environment/unicode-text-matching | verified | UAX #15, Unicode core §3.12, APFS FAQ, POSIX grep; local repro (macOS 15/APFS, grep 2.6.0-FreeBSD, Python 3.13) |
-| platforms/shells/command-text-inspected-before-execution | verified | Claude Code hooks docs, POSIX shell §2.6; local reproduction |
-| platforms/processes/non-interactive-cli-invocation | verified | GNU nohup, OpenBSD ssh/ssh_config, git, timeout man pages; no-request-in-gateway-log field incident |
-| qa/document-verification/spec-document-gates | field-tested | ESLint, Google mutation testing, RFC 2119, Vale, markdownlint; 32/32 mutant / 62/62 intact RFC sessions |
-| qa/document-verification/editing-a-gated-document | field-tested | pgrep, Vale, markdownlint; in-house editing methodology |
-| testing/quality/checks-that-cannot-pass | verified | James Shore AoAD2, POSIX grep exit status, Semgrep rule-testing, pytest exit codes; BSD/ugrep measurement |
-| testing/quality/spec-artifact-checks | verified | JSON Schema, ESLint RuleTester, pitest, GFM table spec; local cell-count repro + GitHub renderer cross-check |
-| testing/quality/harness-reverse-controls | verified | mutation-testing + CI-control sources; field repro (re-fetched all cited URLs, PASS) |
+### Insight 1 — a golden-derived negative corpus cannot reach a newly added schema branch
 
-Three pages were reconciled from two overlapping PR versions each, keeping the more
-complete/better-sourced body and folding in the other's unique cases:
-- **completion-response-validation** — #12 body (all five `finish_reason` values,
-  `tool_calls`/`function_call` carve-out, streaming, Responses API, "reasoning is
-  scratch, not deliverable") kept in `llm/` (coherent with #6/#13); folded in #6's
-  DeepSeek first-party edge + the field incident.
-- **externally-owned-defaults** — #12 generalized body (any repo-external resource)
-  in `integrations/`; folded in #6's alias-removed field incident + the
-  gateway-config-vs-live-upstream nuance.
-- **non-interactive-cli-invocation** — #12 body (GNU-nohup extension precision,
-  ssh -n stdin-detach vs BatchMode, pre-log DNS/TLS/proxy + `curl -v`) kept; folded
-  in #11's DEBIAN_FRONTEND, pager/color TTY case, wrapper-CLI case, field incident.
+*Claim under test:* when a format's only gate builds negatives by mutating one
+committed golden example, adding a new node kind to the schema produces a green
+run that proves nothing about the addition.
+
+| Source checked | What it establishes |
+|----------------|---------------------|
+| https://json-schema.org/understanding-json-schema/reference/conditionals | The mechanism, verbatim: *"If `if` is invalid, `else` must also be valid (and `then` is ignored)"* — a branch keyed on the new kind is simply **not applied** to an instance that lacks it. So a mutant of a golden without the new kind cannot exercise the new branch. |
+| https://json-schema.org/understanding-json-schema/reference/object | Why the new branch also needs constraining before a negative can even exist: *"By default any additional properties are allowed"* and *"By default, the properties defined by the `properties` keyword are not required"*. |
+| https://json-schema.org/draft/2020-12/json-schema-core | Sibling applicators *"MUST NOT impact the results of sibling subschemas"*; and *"Unknown keywords SHOULD be treated as annotations"* — a misspelled keyword in a new branch is ignored rather than rejected, a second silent-pass mode. |
+| https://pitest.org/quickstart/basic_concepts/ | The same gap has a name in mutation tooling: *"**No coverage**: the same as **Survived** except there were no tests that exercised the line of code where the mutation was created"* — cited so the page tells a reader using PIT/Stryker what the symptom looks like there. |
+
+*Session evidence (kept as a field observation, not as the basis of the
+directive):* in `linkly-t1-spec-notation`, `grep -rln "lir.schema\|jsonschema"
+impl/tests/` returned 0 of 447 tests, and the only schema gate over `*.lir.json`
+was `scripts/validate_ir.py --self-test`, whose three negatives are all
+`copy.deepcopy` mutations of `examples/login.lir.json`.
+
+**Confidence: `verified`** — the directive's mechanism is stated in the official
+JSON Schema documentation; the incident is corroborating, not load-bearing.
+
+### Insight 2 — enumerate by callee name, not by parameter name
+
+*Claim under test:* a keyword-argument search (`repo_rows=`) is structurally
+incapable of finding call sites that pass the same argument positionally.
+
+| Source checked | What it establishes |
+|----------------|---------------------|
+| https://docs.python.org/3/glossary.html | *positional-or-keyword* — *"specifies an argument that can be passed either positionally or as a keyword argument. **This is the default kind of parameter**"*. The blindness is therefore the default case, not an edge case. |
+| https://docs.python.org/3/library/ast.html | `ast.Call`: *"`args` holds a list of the arguments passed by position"*, *"`keywords` holds a list of `keyword` objects representing arguments passed by keyword"* — the two forms live in **separate fields**, so a keyword-name text search reads only one of them. |
+| https://peps.python.org/pep-0570/ | The `/` and `*` markers, which is what makes the page's "declare it keyword-only so a stale positional call errors instead of rebinding" edge case actionable. |
+
+*Reproduction run this session* (Python 3.14.6, macOS, no files written — piped
+to `python3` on stdin): over four call sites of `verify(...)` of which one passes
+`repo_rows=` by keyword, a regex search for `repo_rows\s*=` matches **1** while
+an AST pass over `Call` nodes named `verify` finds **4** — 3 sites invisible to
+the keyword search. This is the minimal version of the reported incident.
+
+*Session evidence:* recon reported "13 call sites, 7 need editing"; 8 further
+seeds passed the value as `verify()`'s 4th positional argument, and the suite the
+session had reported green then ran `472 tests / FAILED (failures=11)`.
+
+**Confidence: `verified`** — official language reference plus a reproduction.
+
+### Insight 3 — a fixture factory takes the value the test also passes to the SUT
+
+*Claim under test:* when a fixture helper's shape depends on a value the test
+also feeds the system under test, that value belongs in the helper's signature
+rather than in a module-level default.
+
+| Source checked | What it establishes |
+|----------------|---------------------|
+| https://abseil.io/resources/swe-book/html/ch12.html | A test is *complete* when *"its body contains all of the information a reader needs in order to understand how it arrives at its result"*; DAMP over DRY; and, directly on point, that engineers should *"use helper methods with descriptive parameters that make dependencies explicit"* rather than reusing shared constants. |
+| https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html | Keep the inputs a result depends on visible in the test method rather than in shared setup, so cause and effect is readable without jumping elsewhere. |
+
+*Session evidence:* `rows_for(doc)` seeded from the module constant `PAYLOAD`
+while its tests ran payload `{}`; a shape-only migration fixed 1 of 11 failures,
+moving the payload into the signature fixed 11 of 11.
+
+**Confidence: `verified`** — both sources are prescriptive on the exact point.
+
+Note: the canonical name for this smell is xUnit Patterns' *Mystery Guest*.
+`xunitpatterns.com` is HTTP-only and could not be fetched over HTTPS this
+session, so **it is deliberately not cited** — an unfetchable URL is worse than
+none, per the ingest rules.
+
+---
 
 ## Existing-layer check
 
-Cross-PR and against-main duplication was the focus. Findings and resolutions:
+Routed via `INDEX.md` → domain `index.md` → every page whose "load when" line
+overlapped. Pages read in full before deciding: all six of `testing/quality/`,
+`testing/data/test-data-and-isolation`, `testing/index`, `qa/process/regression-scope`,
+`qa/index`, `debugging/index`, `backend/index`, `backend/python/index`, plus a
+repo-wide search for prior coverage (`grep -rliE "call site|callee|positional
+argument|keyword argument"` and a `\bgrep\b` sweep over `wiki/`).
 
-- **spec-artifact-checks (#8) ≡ document-conformance-checks (#9)** — same case
-  (coverage-vs-validity split, per-check negative controls, GFM pipe parsing,
-  ESLint/Semgrep/mutation examples). #9's report predated awareness of #8. →
-  **#8 kept canonical; #9's page dropped, `testing/docs-as-spec` category not created.**
-- **completion-response-validation (#6) ≈ llm-response-completeness (#12)** — ~95%
-  same case (HTTP 200 ≠ usable output; `length`/blank/reasoning-budget). →
-  **merged into one `llm/` page; #12's `integrations/` copy dropped.**
-- **gateway-model-alias-defaults (#6) ≈ externally-owned-defaults (#12)** — ~80%;
-  #12 generalizes the model-alias case to any external resource. →
-  **kept the general `integrations/` page; #6's LLM-only page dropped.**
-- **non-interactive-cli-invocation** — created by BOTH #11 and #12 (file collision).
-  → **single reconciled page.**
-- Distinct (no overlap, all landed): checks-that-cannot-pass, harness-reverse-controls,
-  spec-document-gates, editing-a-gated-document, unicode-text-matching,
-  command-text-inspected-before-execution, object-key-persistence, context-window-budget,
-  host-cgroup-visibility, missing-container-metrics.
-- Reciprocal `related:` links added on existing pages (tests-that-cannot-fail,
-  timeouts-and-retries, environment-config, release-gates, background-services,
-  portable-shell-scripts, timezone-and-locale, paths-case-and-line-endings,
-  acceptance-criteria, resource-limits-and-probes, logs-metrics-signals,
-  minimum-case-set). A dropped-page backlink (#6 → gateway-model-alias-defaults on
-  environment-config and release-gates) was retargeted to externally-owned-defaults.
-- Invariants verified programmatically: all `related:`/inline `[id]` references
-  resolve, every page listed in its domain index, no duplicate ids, no page >120
-  body lines.
+### Insight 1 — nearest neighbours, and why it is not a duplicate
+
+| Page read | Overlap | Decision |
+|-----------|---------|----------|
+| `testing/quality/spec-artifact-checks` | Closest. Already owns *"one negative control per check, mutating only what that check owns"* and the coverage-vs-validity split. | **Not a merge.** Its trigger is *authoring a check*; this insight's trigger is *evolving the artifact the check validates* — the negatives already exist and are individually sound, yet the corpus as a whole cannot reach the new shape. Per the wiki's one-case-per-page rule this is a new trigger. Linked both ways. |
+| `testing/quality/tests-that-cannot-fail` | Owns the break-the-code red-run rule the new page's step 4 depends on. | Referenced inline; `related:` added both ways. |
+| `testing/quality/harness-reverse-controls` | Owns the *harness-level* control (can this harness go green). | Complementary, not overlapping: that page asks whether the harness discriminates at all, this one asks whether the fixture corpus reaches a newly added shape. `related:` added both ways. |
+| `testing/quality/checks-that-cannot-pass` | Trigger is a check whose **target does not exist yet**. | Distinct — here the target exists and the gate is green. No edit. |
+| `qa/document-verification/spec-document-gates` | Release-gate altitude for document deliverables. | Kept as a one-way `related:` from the new page. |
+
+**No conflicts found.** Nothing in the wiki contradicts the new directive.
+
+### Insight 2 — no existing coverage anywhere
+
+The repo-wide search found **zero** pages discussing call-site enumeration,
+callee-name search, or positional-vs-keyword arguments as a recon concern. The
+single adjacent line is `qa/process/regression-scope`'s edge-case row *"The
+change is in code with no test coverage and unclear callers | Trace callers
+before scoping"* — which names the need and does not say how. That row now
+points at the new page, and `regression-scope` gained the new page in
+`related:` (both directions).
+
+Checked and rejected as homes: `debugging/*` (diagnosis of a failure, not
+pre-change recon), `backend/python/language/mutable-state-traps` (mutable
+defaults and shared state — a different mechanism), `platforms/tools/bsd-vs-gnu-cli`
+(grep *flag* portability, not search strategy).
+
+### Insight 3 — merged, not created
+
+`testing/data/test-data-and-isolation` already owns fixture construction and
+carries the adjacent rule *"pass explicitly only the fields the test's behavior
+depends on"* plus a row for shared **mutable** fixture objects. This insight is
+the same trigger with a directive that extends it (a *defaulted* constant, which
+is not mutated and so is not covered by the existing row). Merge-before-create
+applied — no new page. Added: 1 `Do` row, 1 edge-case row (the symptom is a
+lookup miss far from the helper), 1 `Instead of` row, 2 sources, and
+`last_verified` bumped to 2026-08-04.
+
+---
 
 ## Routing decision
 
-- `backend/common/llm/` (new) — LLM-specific server concerns: completion-response-validation,
-  context-window-budget. Coherent home shared by #6 and #13.
-- `backend/common/integrations/` (new) — general repo-external-dependency concern:
-  externally-owned-defaults. Kept separate from `llm/` because its scope is any
-  external resource (bucket/queue/index), not LLM-only.
-- `backend/common/storage/` (new) — object-key-persistence.
-- `qa/document-verification/` (new) — spec-document-gates, editing-a-gated-document.
-  Introduced by both #10 and #11; unified into one index section.
-- `testing/quality/` (existing) — checks-that-cannot-pass, spec-artifact-checks,
-  harness-reverse-controls (test/check-authoring discipline, distinct from
-  qa/document-verification which is release-process gate design).
-- `platforms/{environment,shells,processes}/` (existing) — unicode-text-matching,
-  command-text-inspected-before-execution, non-interactive-cli-invocation.
-- `infrastructure/{containers,observability}/` (existing) — host-cgroup-visibility,
-  missing-container-metrics.
+| Insight | Target | Rationale |
+|---------|--------|-----------|
+| 1 | `testing` / `quality` / **new page** `schema-additions-under-a-golden-gate` | `INDEX.md` routes "writing or structuring automated tests … verifying tests can actually fail" to `testing`; within it, `quality` already holds the five pages about whether a check proves anything. Existing category, no structural change. |
+| 3 | `testing` / `data` / **merge** into `test-data-and-isolation` | Same trigger as the page's own ("tests need fixture data and you are choosing how to create it"); directive extends step 1. |
+| 2 | `backend` / `common` / **NEW category `change-impact`** / `call-site-enumeration` | See below. |
 
-Source PRs #6–#13 are closed with a disposition comment crediting the author.
+### New category: `backend/common/change-impact/`
+
+**Why `backend`:** `AGENTS.md`'s routing protocol resolves a multi-domain match
+by "the domain that owns **the artifact you will change**" — here, application
+code. **Why `common`:** the directive is language-agnostic (any language with
+optional or positional arguments; in a language with no keyword arguments at all
+the parameter-name search returns nothing whatsoever). The Python mechanics are
+cited as the mechanism, not as the scope.
+
+**Why not an existing category** — all eleven `backend/common` categories were
+re-checked by name before creating a new one:
+
+- `api-design` is the only near miss, and all three of its pages are HTTP-shaped
+  (status codes, endpoint idempotency, list-endpoint pagination). Its "load when"
+  lines are written about endpoints; filing an in-process function-signature
+  concern there would make the category's routing lines contradict its contents,
+  which invariant 1 forbids.
+- `reliability`, `caching`, `jobs`, `errors`, `auth`, `orm`, `concurrency`,
+  `llm`, `integrations`, `storage` — all runtime-behaviour categories; none
+  covers a design-time change-impact question under any other name.
+
+`change-impact` is the noun for the concern, leaves room for sibling pages
+(schema/event-contract consumers, deprecation windows), and is registered in
+`wiki/backend/index.md` plus the root `INDEX.md` backend row.
+
+### Plumbing
+
+- `wiki/testing/index.md` — new `quality` row with a use-case-enumerating "load when" line.
+- `wiki/backend/index.md` — new `change-impact` section + subtree summary row updated.
+- `INDEX.md` — backend row's `common/` concern list updated.
+- `log.md` — `## [2026-08-04] ingest | …` entry appended.
+- `related:` added both ways for all four adjacent pages.
+
+### Invariants verified mechanically (not by eye)
+
+Ran over all **141** pages after the edits:
+
+- every page is listed in an ancestor `index.md` → **0 unlisted**
+- every `related:` id and inline `[page-id]` reference resolves → **0 broken**
+- no page exceeds 120 body lines → **0 over**
+- banned vague qualifiers (`usually`, `consider`, `might want to`, `generally`,
+  `as appropriate`) in the three touched pages → **0 hits**
+- every "don't"-shaped statement in the new pages is descriptive prose, not a
+  bare prohibition; anti-patterns appear only in `Instead of` tables, each paired
+  with its replacement.

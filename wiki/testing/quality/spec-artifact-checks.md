@@ -10,7 +10,7 @@ sources:
   - https://pitest.org/
   - https://github.github.com/gfm/
 last_verified: 2026-07-29
-related: [testing-quality-tests-that-cannot-fail]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-schema-additions-under-a-golden-gate]
 ---
 
 # Checks That Verify a Spec or Mapping Artifact
