@@ -109,22 +109,25 @@ clear `.orchestration/escalations/`, relaunch) and **3** on a failed OR a *dead*
 worker (a non-terminal task whose tmux session vanished — recorded via the status
 file's `session` field) — both abort fast instead of waiting the timeout.
 
-**Optional Orca substrate:** if `scripts/orca-detect.sh` exits 0 (Orca installed,
-its orchestration skill present, runtime reachable), spawn/monitor workers through
-Orca instead of raw tmux — this removes the fragile trust-screen and gives native
-liveness. Per task, instead of `launch-session.sh`:
+**Substrate selection (automatic — do this FIRST, before any launch):** run
+`scripts/orca-detect.sh`. If it exits 0 (Orca installed, its orchestration skill
+present, runtime reachable), Orca is the substrate — spawn and monitor workers
+through it, not raw tmux. This is the **default when Orca is present, not
+optional**: Orca resolves the trust/TUI screen and gives native liveness. Per
+task, instead of `launch-session.sh`:
 1. create the worktree with Orca (`orca worktree create --repo id:<repoId>
    --name <task> --no-parent --json` → copy the whole `worktree.id`), then inject
    the worker guardrails config into its path (as `setup-worktrees.sh` does);
 2. `GROUNDWORK_ESCALATION_DIR=<abs> GROUNDWORK_TASK_ID=<task>
-   scripts/orca-spawn.sh <worktree-id> bypassPermissions "<plan prompt>"` — it
-   creates the Claude terminal (escalation env injected), waits for `tui-idle`
-   (no trust-screen guessing), sends the prompt, and prints `handle=<agent-handle>`.
+   scripts/orca-spawn.sh <worktree-id> bypassPermissions "<plan prompt>"` — creates
+   the Claude terminal (escalation env injected), waits for `tui-idle` (no
+   trust-screen guessing), sends the prompt, prints `handle=<agent-handle>`.
+   Liveness: `scripts/orca-worktree-alive.sh <worktree-path>` (0 alive / 1 dead /
+   2 unknown — treat unknown as *not* dead) replaces watch's tmux check.
 
-For liveness use `scripts/orca-worktree-alive.sh <worktree-path>` (exit 0 alive /
-1 dead / 2 unknown — treat unknown as *not* dead) instead of watch's tmux check.
-If `orca-detect.sh` is non-zero, use the tmux `launch-session.sh` path below (the
-default). Always verify each Orca `--json` result before relying on its fields.
+If `orca-detect.sh` is NON-zero (no Orca), fall back to the tmux `launch-session.sh`
++ `watch-status.sh` path below. Always verify each Orca `--json` result before
+relying on its fields (the create handle is `.result.terminal.handle`).
 
 0. **Preceding-interface injection (Wave 2+, and completed base outputs):** before
    launching this Wave, fill each task's brief `<dependencies>` with the **exact

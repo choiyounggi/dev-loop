@@ -21,6 +21,15 @@ setup() {
   [[ "$output" == *"handle=term_DRYRUN"* ]]
 }
 
+@test "extracts the agent handle from terminal create's .result.terminal.handle (verified live)" {
+  run env ORCA_SPAWN_DRYRUN=1 \
+      ORCA_SPAWN_CREATE_JSON='{"result":{"terminal":{"handle":"term_live"}}}' \
+      bash "$OS" "r::/wt" bypassPermissions "p"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"handle=term_live"* ]]
+  [[ "$output" == *"[--terminal] [term_live]"* ]]
+}
+
 @test "extracts the agent handle from startupTerminal.handle and targets it" {
   run env ORCA_SPAWN_DRYRUN=1 \
       ORCA_SPAWN_CREATE_JSON='{"result":{"startupTerminal":{"handle":"term_abc"}}}' \
