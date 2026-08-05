@@ -1,0 +1,84 @@
+---
+id: platforms-tools-harness-mediated-tool-results
+domain: platforms
+category: tools
+applies_to: [claude-code, agent-harness]
+confidence: verified
+sources:
+  - https://code.claude.com/docs/en/hooks
+last_verified: 2026-08-05
+related: [platforms-shells-command-text-inspected-before-execution, platforms-processes-non-interactive-cli-invocation, infrastructure-orchestration-control-signals-vs-primary-artifacts]
+---
+
+# A Plugin Rewrites What a Tool Returns Before the Agent Sees It
+
+## When this applies
+
+A file-reading or search tool returns content that does not match the file on
+disk — truncated to the first line, summarized, or replaced by a note telling you
+to call something else; a plugin/hook is installed in the session; or you are
+about to brief worker sessions that will read files in the same repo.
+
+## Do this
+
+1. **Read the substitution as a hook, not as the file.** A `PostToolUse` hook
+   returns `hookSpecificOutput.updatedToolOutput`, which *replaces* the tool's
+   result before the model sees it; `PreToolUse` returns
+   `hookSpecificOutput.updatedInput`, which rewrites the arguments before the
+   tool runs. The docs name this the interception point "for redaction or
+   transformation use cases". The file is intact; the channel to it is mediated.
+
+2. **Test the suggested workaround exactly once.** The substituted text carries
+   the plugin author's remediation (`offset`/`limit`, an observation-fetch call).
+   Run it once against the same file.
+
+| Result of the one retry | Do |
+|-------------------------|----|
+| Returns the real content | Use the suggested form for the rest of the session |
+| Returns the same substitution again | Switch to the shell path (step 3) and stop retrying the tool |
+
+3. **Reach the bytes through a channel the hook does not match.** Hooks are
+   registered per tool name, so a different tool is not intercepted: locate with
+   `grep -n '<symbol>' <file>`, then read the range with
+   `awk 'NR>=120 && NR<=240' <file>`. Confirm the fallback works by checking the
+   output has more than one line before relying on it.
+
+4. **Put the resolved channel in the brief of every session you spawn against
+   that repo.** State the tool that is mediated, that its own remediation was
+   tested and failed, and the exact fallback command form. Each worker that
+   rediscovers this spends its own probe-retry-fallback round on it.
+
+5. **Record the file's real length once** (`wc -l`) so later range reads are
+   bounded by a number you measured, not by a truncated view.
+
+## Edge cases
+
+| Case | Then |
+|------|------|
+| Only some files return the substitution | The hook matched on a path pattern; treat the mediated set as the unit and use the fallback for the whole directory rather than per file |
+| The substitution names a retrieval call (`get_observations`, a corpus search) | Run it once — when it answers the question, prefer it; the index is cheaper than the file. When it returns unrelated or stale content, fall back to the shell path |
+| Output is plausible but shorter than the file | Do not treat it as the file. Compare against `wc -l` before quoting it in a review, a diff, or a claim about coverage |
+| A second agent reports the tool working normally | Hook config is per settings scope (user/project/local); confirm which scope each session loaded before concluding the hook was removed |
+| The tool is mediated but writes still land | `PostToolUse` runs after execution, so write tools take effect even when their reported result is rewritten — verify the write on disk, not from the returned text |
+
+## Instead of
+
+| If you are about to | Do this instead | Why |
+|---------------------|-----------------|-----|
+| Retry the tool a third time with new offsets | Switch to `grep -n` + `awk` after the first failed retry | The substitution is produced by a hook that does not inspect your arguments; more argument variants return the same text |
+| Conclude the file is empty, one line, or missing | Check `wc -l` on the path | The one-line result is the hook's message, not the file's length |
+| Let each spawned worker discover the mediation itself | Name the mediated tool and the fallback command in the brief | The cost is per agent otherwise, and each pays it before doing any real work |
+| Disable the plugin to get a clean read | Use the unmediated tool for the read you need | The plugin serves the session's other work; a per-read fallback is reversible and scoped |
+
+## Sources
+
+- https://code.claude.com/docs/en/hooks — `PostToolUse` `hookSpecificOutput.updatedToolOutput` "replaces the tool's result"; `PreToolUse` `hookSpecificOutput.updatedInput` "replaces a tool's arguments before it runs"; "For redaction or transformation use cases, intercept at `PreToolUse` for outbound tool inputs and `PostToolUse` for inbound tool results"; `PostToolUse` fires after the tool has executed
+
+## Field context
+
+Observed 2026-08-05 in a repo with a session-memory plugin installed: `Read` on
+four source files returned only line 1 plus a note suggesting `offset`/`limit`;
+the suggested retry (`offset=151, limit=120`) returned line 1 again. Two
+orchestrated worker sessions independently logged the same interception and each
+fell back to `cat -n`/`sed` on its own, having spent three to four tool calls
+apiece rediscovering it.

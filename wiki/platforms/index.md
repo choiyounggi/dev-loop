@@ -6,8 +6,11 @@ case/line-ending/path behavior, file permissions and exec bits across
 git/archives/containers, hidden environment inputs (timezone/locale, Unicode
 normalization form in text and file names, per-context PATH resolution), keeping
 processes alive as services or scheduled jobs, and
-pinning toolchain versions across machines. Application logic stays in backend;
-SQL stays in databases.
+pinning toolchain versions across machines. Also the agent-harness layer that sits
+between you and an operation: gates that read command text before execution, and
+hooks that rewrite what a tool returns. Application logic stays in backend;
+SQL stays in databases; coordinating several worker sessions stays in
+infrastructure/orchestration.
 
 Match your situation to a "load when" line; load only matching pages.
 
@@ -23,6 +26,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [bsd-vs-gnu-cli](tools/bsd-vs-gnu-cli.md) | A command works on Linux but fails on macOS or vice versa (`date`, `sed -i`, `timeout`, `seq`, `grep -P`, `readlink`, `stat`); writing a script or CI step that must run on both userlands; deciding whether to install GNU coreutils on macOS or write POSIX-only |
+| [harness-mediated-tool-results](tools/harness-mediated-tool-results.md) | A file-read/search tool returns content that does not match the file — truncated to one line, summarized, or replaced by a note telling you to call something else; the tool's own suggested workaround returns the same thing; deciding what to put in a spawned worker's brief about reading files in that repo; judging whether a short tool result means a short file |
 
 ## environment
 

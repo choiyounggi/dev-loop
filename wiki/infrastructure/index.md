@@ -4,7 +4,8 @@ Route here for: CI/CD pipeline design, secrets in build/deploy flows, container
 image builds, container resource limits and health probes, per-environment
 configuration (env vars, config drift, startup validation), rollout/rollback
 strategy, observability (logging, metrics, alerting), datastore backup/restore
-and data-loss planning.
+and data-loss planning, and orchestrating parallel worker sessions over one
+repository (status signals, liveness verdicts, run-scoped shared state).
 
 Match your situation to a "load when" line; load only matching pages.
 
@@ -40,6 +41,13 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [rollout-and-rollback](deploy/rollout-and-rollback.md) | Designing how a service reaches production (rollout strategy, health gating); preparing a risky release; a deploy involves a schema change, data migration, or feature flag and you need rollback mechanics |
+
+## orchestration
+
+| Page | Load when |
+|------|-----------|
+| [control-signals-vs-primary-artifacts](orchestration/control-signals-vs-primary-artifacts.md) | An orchestrator is about to restart, discard, merge, or keep waiting on a worker based on a status file, a watcher's exit code, or a heartbeat; a monitor reports a worker dead while it is committing; a worker's status write produced no output and you must decide whether it landed; deciding what identifier a worker should report itself by; distinguishing alive-and-progressing from stalled from dead |
+| [shared-run-state](orchestration/shared-run-state.md) | Several agent/worker sessions coordinate through files in one repository (status directory, briefs, escalations, claim files); choosing the path layout for that state; starting an orchestration in a repo that may already have one running; a watcher woke on a task id it did not create; the default branch moved during a run |
 
 ## observability
 

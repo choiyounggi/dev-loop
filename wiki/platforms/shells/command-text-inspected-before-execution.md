@@ -7,8 +7,8 @@ confidence: verified
 sources:
   - https://code.claude.com/docs/en/hooks
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
-last_verified: 2026-07-30
-related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution]
+last_verified: 2026-08-05
+related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, infrastructure-orchestration-control-signals-vs-primary-artifacts, platforms-tools-harness-mediated-tool-results]
 ---
 
 # Commands Read as Text by a Gate Before the Shell Runs Them
@@ -67,6 +67,9 @@ on the first attempt.
 | Path contains a space, so quoting is unavoidable | Relocate or symlink the target to a space-free path for gated commands; a gate that excludes quote characters cannot receive a quoted path at all |
 | The gate needs `~` expanded | Write the absolute path; a gate that resolves `~` itself is doing so on the literal tilde, which only works if it implements the expansion |
 | The same command must also be portable/robust as a script | Keep the gate-read argument literal and leave the rest of the script quoted normally ([platforms-shells-portable-shell-scripts]) — this page narrows one argument, it does not license unquoted expansions elsewhere |
+| The blocked command was the one that emits your progress/status signal | A blocked command produces no side effect, so a consumer polling for that signal waits forever. `stat` the artifact the command was to write, and report the signal as un-emitted ([infrastructure-orchestration-control-signals-vs-primary-artifacts]) |
+| A gate scoped to a path refuses the harness's own script | Path-scoped rules match the command text, not the command's purpose, so a tool's own helper is refused like any other write. Report the refused path and the rule id rather than rewriting the path to evade it |
+| An editor/Write tool succeeds on the exact path Bash was refused for | The gate is registered for the Bash tool and does not see other tools' writes. Treat the disagreement as gate scope, not as permission to route around the rule |
 
 ## Instead of
 
