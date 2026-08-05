@@ -8,7 +8,7 @@ sources:
   - https://martinfowler.com/articles/nonDeterminism.html
   - https://abseil.io/resources/swe-book/html/ch12.html
 last_verified: 2026-07-10
-related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice]
+related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-data-leaked-test-artifacts]
 ---
 
 # Owning Test Data and Isolating Test State
@@ -38,7 +38,7 @@ state-leak symptom.
 | Shared mutable fixture object (module-level constant a test mutates) | Give each test its own copy from the factory; reserve shared fixtures for immutable data |
 | Time-dependent logic (expiry, scheduling, "created today") | Inject a clock/time source and freeze it in the test; assert against the frozen instant |
 | Unique-constrained values (emails, usernames, external ids) | Generate per test (counter, UUID suffix) inside the factory — hardcoded constants collide across tests and across parallel runs |
-| Filesystem / temp files | Create a fresh per-test temp directory and remove it in teardown |
+| Filesystem / temp files | Create a fresh per-test temp directory and remove it in teardown; when directories are already accumulating, attribute them to their creators first ([testing-data-leaked-test-artifacts]) |
 | Global config / environment variables / singletons mutated by a test | Set in setup, restore in teardown that runs on failure too (`finally`/fixture teardown) |
 
 4. Keep fixture data **minimal**: create only the entities the behavior under

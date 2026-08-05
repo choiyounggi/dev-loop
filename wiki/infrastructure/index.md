@@ -20,6 +20,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [environment-config](config/environment-config.md) | Adding configuration that differs per environment; a bug traced to a dev/stg/prd config difference; config sprawled across hardcoded values, files, and env vars; reviewing how a service gets its settings |
+| [keys-ahead-of-their-consumer](config/keys-ahead-of-their-consumer.md) | Adding a config key that a component outside your repository parses, for a version of it that has not shipped yet; reviewing a change justified by "older versions ignore unknown keys"; deciding whether a parser drops or rejects an unknown key (path query vs permissive binding vs strict schema); pre-declaring a key that carries a security control |
 
 ## containers
 
