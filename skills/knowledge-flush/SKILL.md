@@ -103,15 +103,24 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
    git -C "$REPO" push -u origin "$BR"
    gh pr create --repo choiyounggi/dev-loop --base main --head "$BR" \
      --title "knowledge: <short summary>" \
-     --body-file "$REPO/.dev-loop/INGEST_REPORT.md" \
+     --body-file "$HOME/.dev-loop/repo/.dev-loop/INGEST_REPORT.md" \
      --label dev-loop:knowledge
    ```
+   Write the `--body-file` path so the gate can resolve it as text: the
+   PreToolUse gate inspects the command string before execution and cannot
+   expand skill-local variables like `$REPO` (see
+   wiki/platforms/shells/command-text-inspected-before-execution.md) — use a
+   literal absolute path or `$HOME`/`~` (which the gate expands).
    Do NOT `gh pr merge`. The owner reviews open `dev-loop:knowledge` PRs and
    merges or rejects each one.
 
-5. **Retire processed candidates.** Move the flushed rows out of the active queue
-   (e.g. append them to `~/.dev-loop/queue/.processed.jsonl` and rewrite the
-   session file without them) so the next flush doesn't re-ingest them.
+5. **Retire processed candidates — every one you handled, not only the ingested.**
+   Move each handled row out of the active queue (append it to
+   `~/.dev-loop/queue/.processed.jsonl` and rewrite the session file without it):
+   rows you ingested, rows you merged into existing pages, AND rows you dropped
+   as unverifiable or duplicate. A dropped row left `pending` re-crosses the
+   auto-flush threshold forever — the headless flush would re-run hourly on
+   candidates that can never be promoted.
 
 ## Guardrails
 - PR-only. Never auto-merge, never push to `main`, never force-push `main`.
