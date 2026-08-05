@@ -13,8 +13,9 @@ implementation loop; two human gates bracket it (task-split, pre-merge).
 
 Scripts referenced below live in `${CLAUDE_PLUGIN_ROOT}/skills/orchestrate/scripts/`.
 Communication: session→orchestrator via `.orchestration/status/<task>.json`;
-orchestrator→session via `tmux send-keys` one-liners (templates/session-prompt.md
-§1–§4) on tmux, or the Task `--spec` (same file, §O1–§O4) on Orca.
+orchestrator→session via `launch-session.sh` (the first prompt) then
+`send-prompt.sh` (every later one), carrying templates/session-prompt.md §1–§4 on
+tmux, or the Task `--spec` (same file, §O1–§O4) on Orca.
 
 ## Tool profile
 Resolve the pluggable tool profile once up front:
@@ -95,6 +96,16 @@ design links entirely — the original behavior.
 Report the task list, Waves, session count, and a rough cost note. **Wait for the
 user's approval** before launching anything.
 
+**Substrate — ask here, in this same turn.** Before writing that report, run
+`scripts/orca-detect.sh`. Non-zero (no Orca): tmux, silently — say nothing about
+substrates. Exit 0: report that Orca was detected and put the choice in this same
+report — **Orca**: native trust-screen handling, event-driven waits, native
+liveness; **tmux**: mid-flight steering via `send-prompt.sh`, no extra dependency. **Wait
+for the user's answer**; their answer decides, and you carry it into Phase 3. A
+detected Orca always asks — there is no default, no remembered choice, no
+environment override. Launch nothing until both the split and the substrate are
+answered.
+
 ## Phase 3 — Launch + plan (per Wave)
 **Phases 3–4 repeat per Wave in `## Waves` order.** A later Wave launches only after
 the previous Wave is fully approved; `<N>` below = the *current* Wave's task count.
@@ -102,20 +113,25 @@ Single-Wave splits run everyone in parallel (the original behavior).
 
 **Session knobs (tmux substrate, set once per run):** `export LO_RUN_ID=<short-run-id>`
 so every `launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reuse that
-exact name for later `send-keys`); the script also exports the guardrails escalation env
-into each worker. Trust-screen wording drifts between CLI releases — if a launch
-hangs, set `LO_READY_EXTRA` / `LO_TRUST_EXTRA` (substrings) or `LO_READY_TIMEOUT`.
+exact name for later `send-prompt.sh`); the script also exports the guardrails
+escalation env into each worker. Trust-screen wording drifts between CLI releases —
+if a launch hangs, set `LO_READY_EXTRA` / `LO_TRUST_EXTRA` (substrings) or
+`LO_READY_TIMEOUT`.
 `watch-status.sh` now exits **5** on a pending guardrails escalation (approve/deny,
 clear `.orchestration/escalations/`, relaunch) and **3** on a failed OR a *dead*
 worker (a non-terminal task whose tmux session vanished — recorded via the status
-file's `session` field) — both abort fast instead of waiting the timeout.
+file's `session` field) — both abort fast instead of waiting the timeout. Give each
+phase its own deadline with one exported
+`LO_PHASE_TIMEOUTS="plan_ready=900,impl_done=3600,done=1800"`, keyed on the TARGET
+phase of each wait: precedence is an explicit `[timeout-sec]` argument, then the
+matching entry, then the 3600s default. A malformed entry (no `=`, non-numeric,
+`<= 0`, or an unknown phase name) is refused with **exit 4**, never silently
+defaulted; the effective budget and its source are printed before the wait.
 
-**Substrate selection (automatic — do this FIRST, before any launch):** run
-`scripts/orca-detect.sh`. If it exits 0 (Orca installed, its orchestration skill
-present, runtime reachable), Orca is the substrate — spawn **and supervise** workers
-through it, not raw tmux. This is the **default when Orca is present, not optional**:
-Orca resolves the trust/TUI screen, gives native liveness, and pushes worker events
-to you instead of making you poll. Replace steps 1–3 below with O1–O5:
+**Substrate (the user decided at Gate 1 — do not re-decide here):** the answer was
+Orca or tmux. **Orca** → spawn **and supervise** workers through it, not raw tmux:
+it resolves the trust/TUI screen, gives native liveness, and pushes worker events to
+you instead of making you poll. Replace steps 1–3 below with O1–O5:
 
 - **O1 — bind the Run once per orchestration run.**
   `orca orchestration run-create --objective "<goal>" --json` → keep `run_id` for the
@@ -224,10 +240,11 @@ when the worker never sends the message (it died, or it is not a Claude session)
 Export that dir for both scripts and the file stays the safety net the tmux path
 already relied on.
 
-If `orca-detect.sh` is NON-zero (no Orca), fall back to the tmux `launch-session.sh`
-+ `watch-status.sh` path below, unchanged. Always verify each Orca `--json` result
-before relying on its fields (`worker-start` returns `.result.dispatchId`, and the
-agent handle as the `role:"agent"` entry in `.result.effects[]`). `orca-spawn.sh`
+If the user chose tmux at Gate 1 (or `orca-detect.sh` was non-zero), use the tmux
+`launch-session.sh` + `watch-status.sh` path below, unchanged. Always verify each
+Orca `--json` result before relying on its fields (`worker-start` returns
+`.result.dispatchId`, and the agent handle as the `role:"agent"` entry in
+`.result.effects[]`). `orca-spawn.sh`
 remains only for a worker needing custom agent argv (e.g. codex `--model` /
 reasoning-effort flags) that `worker-start` cannot express.
 
@@ -246,15 +263,32 @@ reasoning-effort flags) that `worker-start` cannot express.
    (Phase 2) — then
    `scripts/launch-session.sh lo-<n> <worktree> bypassPermissions "<plan prompt>"`
    (plan prompt = templates/session-prompt.md §1 — the tmux set — with the
-   subagent protocol block).
+   subagent protocol block). Exit **0** = launched *and* the prompt confirmed
+   submitted; **4** = the REPL never became ready (relaunch); **5** = the prompt was
+   sent but submission could NOT be confirmed — the session is alive and may be
+   holding an unsubmitted prompt, so read it with `scripts/send-prompt.sh state
+   lo-<n>` and re-send, never launch a second session on top of it.
 3. `scripts/watch-status.sh <status-dir> plan_ready <N>` in the background; when it
    exits, collect `plans/<task>.md`. *(Orca substrate: `scripts/orca-wait.sh
    <timeout-ms> <this Wave's task ids>` per O4 instead — same exit-code contract,
    event-driven.)*
    *(Plans proceed autonomously per the user's choice — no per-plan gate.)*
+   `watch-status.sh` only answers "does the session still exist"; a worker can hold a
+   live session and produce nothing for hours. So on a long wait also run
+   `scripts/tmux-worker-stalled.sh lo-<n>` (**0** progressing / **1** stalled /
+   **2** cannot tell — treat unknown as *not* stalled; silence threshold
+   `LO_STALL_SEC`, default 600s), the tmux mirror of O5. Read the pane before acting
+   on a stall: "wedged on a prompt" and "finished but never reported" look identical
+   from outside and need opposite responses.
 
 ## Phase 4 — Implement + review (max 3 rework)
-Inject §2 (implement) to each session; `watch-status ... impl_done <N>`. *(Orca
+Deliver §2 (implement) to each session with `scripts/send-prompt.sh send lo-<n>
+"<prompt>"` — **0** delivered, **4** queued behind a busy turn, **7** unconfirmed,
+**3** the session is gone, **2** the session name or prompt was rejected. Branch on
+the exit code; stdout is exactly one token and stderr is advisory context that must
+never be parsed. On **4**, `scripts/send-prompt.sh wait lo-<n> [timeout]` blocks
+until the worker picks it up (**0** picked-up, **5** deadline expired). Then
+`watch-status ... impl_done <N>`. *(Orca
 substrate: `task-create` the implement Task, then `scripts/orca-worker-start.sh
 --task <impl_task> --terminal <handle>` to reuse that task's existing session, and
 wait with `scripts/orca-wait.sh`. Rework rounds are further Tasks on the same
@@ -279,14 +313,29 @@ Show the full integration diff (`git diff`). **Wait for the user's confirmation.
    worktrees, merges sequentially, stops + reports on conflict (no --force).
 2. `scripts/safe-cleanup.sh remove-worktrees <root> <branch>...` (after merge
    verified; skips any dirty worktree).
-3. `scripts/safe-cleanup.sh kill-sessions lo-<n>...` (exact names only).
+3. `scripts/safe-cleanup.sh kill-sessions lo-<n>...` (exact names only), or — instead
+   of remembering every name — `scripts/safe-cleanup.sh sweep <root>`, the teardown
+   for ONE run: kill every tmux session named `lo-<n>-$LO_RUN_ID`, `git worktree
+   prune`, then report (never delete) any `.worktrees/` directory git does not know.
+   `sweep` REFUSES with exit 1, touching nothing, when `LO_RUN_ID` is unset or is not
+   `[A-Za-z0-9_-]+` — with no scope it would match every concurrent run's sessions.
+4. `scripts/safe-cleanup.sh list-orphans <root>` is read-only (kills, deletes and
+   prunes nothing; needs no `LO_RUN_ID`) — the census across ALL run ids, and the way
+   to read a dead run's id before sweeping it deliberately.
+`--dry-run` may appear in any argument position on any destructive verb: it prints
+exactly what the real run would touch and changes nothing, while refusals (dirty
+worktree) still fire — a dry run never looks safer than the real one.
 **Local merge into the feature branch only.** Remote push / PR is the user's job.
 
 ## Re-entry (resume)
 On re-invocation with no context, measure real state first: `git worktree list`,
 each `.orchestration/status/*.json` phase, and which `briefs/plans/reviews/`
 artifacts exist. Resume from the earliest incomplete step (idempotently skip done
-steps). Check `tmux ls`; relaunch dead sessions and re-inject the right prompt.
+steps). Check `tmux ls`, and run `scripts/tmux-worker-stalled.sh <session>` on each
+live one — a session that exists is not a worker that moves. Relaunch dead sessions and
+re-deliver the right prompt with `scripts/send-prompt.sh send`. For leftovers of a
+run that already died, `scripts/safe-cleanup.sh list-orphans <root>` enumerates them
+read-only, including each session's run id.
 On the Orca substrate, rebind the Run first (`orca orchestration run-use --id
 <run_id> --json`), then measure with `orca orchestration task-list --json` +
 `scripts/orca-worktree-alive.sh <wt>` **and** `scripts/orca-worker-stalled.sh <wt>`
