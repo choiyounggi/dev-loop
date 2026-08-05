@@ -4,8 +4,19 @@
 # `worker-start --agent` cannot express); reuse mode must not re-create anything.
 
 setup() {
+  # These tests select worker mode by exporting GROUNDWORK_ESCALATION_DIR per
+  # case, and `run env FOO=bar ...` INHERITS the caller's environment. Run the
+  # suite inside a dev-loop worker (which always exports it) and every
+  # "no escalation env" case would silently take the worker-mode path instead.
+  # Declare the precondition here rather than depending on the ambient shell.
+  unset GROUNDWORK_ESCALATION_DIR GROUNDWORK_TASK_ID
   OWS="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/orca-worker-start.sh"
   OK_RECEIPT='{"ok":true,"result":{"runId":"run_1","taskId":"task_1","dispatchId":"ctx_abc","state":"ready","stage":"input_accepted","setup":{"state":"running"},"effects":[{"kind":"terminal","role":"agent","action":"created","id":"term_agent"},{"kind":"dispatch_input","role":"agent","id":"term_agent","state":"accepted"}]}}'
+  # re-entry probe fixtures — payload shapes verified against the live Orca CLI:
+  # an unknown task answers ok:true/dispatch:null, so a first start is not a probe failure.
+  DSP_PREV='{"ok":true,"result":{"dispatch":{"assignee_handle":"term_prev"}}}'
+  DSP_NONE='{"ok":true,"result":{"dispatch":null}}'
+  TL_LIVE='{"ok":true,"result":{"terminals":[{"handle":"term_prev","orphaned":false,"connected":true}]}}'
 }
 
 # --- worker mode (escalation contract active) ---------------------------------
@@ -84,6 +95,119 @@ setup() {
   [[ "$output" != *"dispatch="* ]]
 }
 
+# --- re-entry idempotency (worker mode) ---------------------------------------
+# SKILL.md restarts a "dead" worker with --worktree/--agent. If that liveness
+# read was wrong, an unconditional `terminal create` puts a SECOND agent on the
+# same checkout. The probe must bind the live one instead.
+
+@test "re-entry: a live agent terminal on the worktree is reused, not duplicated" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON="$DSP_PREV" \
+      ORCA_WORKER_START_TERMLIST_JSON="$TL_LIVE" \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[--worktree] [id:r::/wt] [--terminal] [term_prev]"* ]]
+  [[ "$output" == *"already has a live agent terminal term_prev"* ]]
+  [[ "$output" != *"[terminal] [create]"* ]]
+}
+
+@test "re-entry: no dispatch on record (first start) still creates the terminal" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON="$DSP_NONE" \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[terminal] [create]"* ]]
+  [[ "$output" != *"reusing it"* ]]
+}
+
+@test "re-entry: a recorded but ORPHANED terminal is dead — create (boundary)" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON="$DSP_PREV" \
+      ORCA_WORKER_START_TERMLIST_JSON='{"ok":true,"result":{"terminals":[{"handle":"term_prev","orphaned":true,"connected":true}]}}' \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[terminal] [create]"* ]]
+  [[ "$output" != *"reusing it"* ]]
+}
+
+@test "re-entry: a recorded but DISCONNECTED terminal is dead — create (boundary)" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON="$DSP_PREV" \
+      ORCA_WORKER_START_TERMLIST_JSON='{"ok":true,"result":{"terminals":[{"handle":"term_prev","orphaned":false,"connected":false}]}}' \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[terminal] [create]"* ]]
+  [[ "$output" != *"reusing it"* ]]
+}
+
+@test "re-entry: an empty terminal list is not a reuse target (boundary)" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON="$DSP_PREV" \
+      ORCA_WORKER_START_TERMLIST_JSON='{"ok":true,"result":{"terminals":[]}}' \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[terminal] [create]"* ]]
+}
+
+@test "re-entry: an assignee living on another worktree is not reused (boundary)" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON="$DSP_PREV" \
+      ORCA_WORKER_START_TERMLIST_JSON='{"ok":true,"result":{"terminals":[{"handle":"term_other","orphaned":false,"connected":true}]}}' \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[terminal] [create]"* ]]
+  [[ "$output" != *"term_prev"* ]]
+}
+
+# --- re-entry: a probe that cannot answer fails closed (exit 6) ---------------
+# "Unknown" must never be treated as "no live agent": that is the direction that
+# silently puts two agents on one checkout.
+
+@test "re-entry: dispatch-show returning ok:false refuses to create (exit 6)" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON='{"ok":false,"error":{"code":"relay_unavailable"}}' \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 6 ]
+  [[ "$output" == *"cannot read the dispatch for 'task_1'"* ]]
+  [[ "$output" != *"[terminal] [create]"* ]]
+  [[ "$output" != *"dispatch="* ]]
+}
+
+@test "re-entry: a malformed dispatch receipt refuses to create (exit 6)" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON='not json at all' \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 6 ]
+  [[ "$output" != *"[terminal] [create]"* ]]
+}
+
+@test "re-entry: terminal list ok:false refuses while the assignee may be live" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON="$DSP_PREV" \
+      ORCA_WORKER_START_TERMLIST_JSON='{"ok":false,"error":{"code":"selector_not_found"}}' \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 6 ]
+  [[ "$output" == *"term_prev"* ]]
+  [[ "$output" != *"[terminal] [create]"* ]]
+}
+
+@test "re-entry: a malformed terminal list refuses to create (exit 6)" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON="$DSP_PREV" \
+      ORCA_WORKER_START_TERMLIST_JSON='garbage' \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 6 ]
+  [[ "$output" != *"[terminal] [create]"* ]]
+}
+
+@test "re-entry: a blank probe payload is unknown, not 'no worker' (boundary)" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON=' ' \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 6 ]
+  [[ "$output" != *"[terminal] [create]"* ]]
+}
+
 # --- composed agent-first mode (no escalation contract requested) -------------
 
 @test "no escalation env: uses Orca's agent-first worker-start with --setup run" {
@@ -147,6 +271,28 @@ setup() {
 }
 
 # --- reuse mode ---------------------------------------------------------------
+
+@test "reuse mode: the re-entry probe never runs or overrides --terminal" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      ORCA_WORKER_START_DISPATCH_JSON="$DSP_PREV" \
+      ORCA_WORKER_START_TERMLIST_JSON="$TL_LIVE" \
+      bash "$OWS" --task task_2 --terminal term_given
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[--terminal] [term_given]"* ]]
+  [[ "$output" != *"term_prev"* ]]
+  [[ "$output" != *"reusing it"* ]]
+}
+
+@test "composed agent-first mode is not probed either (no escalation env)" {
+  run env ORCA_WORKER_START_DRYRUN=1 \
+      ORCA_WORKER_START_DISPATCH_JSON="$DSP_PREV" \
+      ORCA_WORKER_START_TERMLIST_JSON="$TL_LIVE" \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent codex
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[--agent] [codex]"* ]]
+  [[ "$output" != *"[--terminal]"* ]]
+  [[ "$output" != *"term_prev"* ]]
+}
 
 @test "reuse mode: passes --terminal only and creates nothing" {
   run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \

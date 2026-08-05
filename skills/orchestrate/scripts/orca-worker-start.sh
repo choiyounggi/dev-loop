@@ -12,6 +12,20 @@
 #     (same command shape as orca-spawn.sh), waits for `tui-idle`, and only then
 #     binds the Dispatch with `worker-start --terminal`.
 #
+#     On re-entry this mode is idempotent, automatically — no flag to pass.
+#     Before creating anything it asks Orca whether this task's Dispatch already
+#     names a terminal that is still live on the worktree (`orchestration
+#     dispatch-show` joined against `terminal list --worktree`):
+#       live      -> binds THAT terminal and creates nothing, saying so on
+#                    stderr. --perm / --name are inert on this path: the agent
+#                    is already running with the mode it was created with.
+#       not live  -> unchanged: terminal create + tui-idle wait + bind.
+#       no record -> unchanged (this is the task's first start).
+#       can't tell-> exit 6, creates nothing, not retried automatically.
+#     To force a fresh agent, stop the old one first (`orca orchestration
+#     worker-stop`) and re-run. This is a check-then-create, so it protects a
+#     sequential re-entry — not two coordinators racing on one worktree.
+#
 #   REUSE MODE (--terminal <handle>)
 #     Bind this task's next phase (implement / rework) to the agent that already
 #     holds the task's context. No new terminal, no env to re-inject.
@@ -34,11 +48,15 @@
 #   ORCA_WORKER_START_DRYRUN   print the orca commands instead of running them
 #   ORCA_WORKER_START_JSON     canned `worker-start --json` receipt (tests)
 #   ORCA_WORKER_START_CREATE_JSON  canned `terminal create --json` receipt (tests)
+#   ORCA_WORKER_START_DISPATCH_JSON  canned `orchestration dispatch-show --json` (tests)
+#   ORCA_WORKER_START_TERMLIST_JSON  canned `terminal list --json` (tests)
 #
 # On success prints: dispatch=<id>, handle=<agent-terminal-handle>, state=, setup=
 # Exit: 0 ok | 1 usage | 2 unsupported agent/placement for the escalation contract
 #       | 3 receipt without a dispatch | 4 start failed (inspect stage/effects/
 #       residualResources; do NOT auto-retry) | 5 could not create the terminal
+#       | 6 could not determine whether a live agent terminal already exists —
+#       refused to create a second one (verify, then re-run or use --terminal)
 set -u
 
 ORCA="${ORCA_BIN:-orca}"
@@ -129,8 +147,69 @@ dry="${ORCA_WORKER_START_DRYRUN:-}"
 
 rt="${LO_READY_TIMEOUT:-60}"; [ "$rt" -ge 1 ] 2>/dev/null || rt=60
 
-# --- worker mode: create the env-carrying agent terminal ourselves ------------
+reused=""
+
+# --- re-entry idempotency: never put a SECOND agent on one checkout -----------
+# SKILL.md's re-entry path restarts a worker the coordinator believes is dead by
+# calling this script again with --worktree/--agent. If that liveness read was
+# wrong, an unconditional `terminal create` lands a second agent on the same
+# working tree, with the Dispatch bound to only one of them. So ask Orca first:
+# does this task's Dispatch already name a terminal that is still live on this
+# worktree? A probe that cannot answer is UNKNOWN, never "no agent" — creating
+# the second agent is the damaging direction, so we refuse (exit 6).
+# Both calls take `</dev/null`: orca can prompt, and a headless coordinator must
+# not be able to block on a read.
 if [ "$worker_mode" = 1 ]; then
+  probe=1
+  # A dry run makes no orca calls, so there is nothing to probe unless a test
+  # supplies a canned payload.
+  if [ -n "$dry" ] && [ -z "${ORCA_WORKER_START_DISPATCH_JSON:-}" ]; then probe=0; fi
+
+  if [ "$probe" = 1 ]; then
+    if [ -n "${ORCA_WORKER_START_DISPATCH_JSON:-}" ]; then
+      dsp="$ORCA_WORKER_START_DISPATCH_JSON"
+    else
+      dsp=$("$ORCA" orchestration dispatch-show --task "$task" --json </dev/null 2>/dev/null) || dsp=""
+    fi
+    # ok:true with dispatch:null is a definite "no worker yet" (verified live);
+    # anything else means we could not read it — that is unknown, not none.
+    dsp_ok=$(printf '%s' "$dsp" | "$JQ" -r '.ok // false' 2>/dev/null || echo false)
+    if [ "$dsp_ok" != "true" ]; then
+      echo "orca-worker-start: cannot read the dispatch for '$task' — refusing to create a second agent on '$wt'; verify with \`orca orchestration dispatch-show --task $task\`, then re-run or bind the live terminal with --terminal" >&2
+      exit 6
+    fi
+    prev=$(printf '%s' "$dsp" | "$JQ" -r '.result.dispatch.assignee_handle // empty' 2>/dev/null)
+
+    if [ -n "$prev" ]; then
+      # A recorded assignee is only a reuse target while it is STILL LIVE on the
+      # worktree we were asked to start on.
+      if [ -n "${ORCA_WORKER_START_TERMLIST_JSON:-}" ]; then
+        tl="$ORCA_WORKER_START_TERMLIST_JSON"
+      else
+        tl=$("$ORCA" terminal list --worktree "$wt" --json </dev/null 2>/dev/null) || tl=""
+      fi
+      tl_ok=$(printf '%s' "$tl" | "$JQ" -r '.ok // false' 2>/dev/null || echo false)
+      if [ "$tl_ok" != "true" ]; then
+        echo "orca-worker-start: cannot list terminals for '$wt' — refusing to create a second agent while '$prev' may still be live; verify with \`orca terminal list --worktree $wt\`" >&2
+        exit 6
+      fi
+      live=$(printf '%s' "$tl" | "$JQ" -r --arg h "$prev" \
+        '[.result.terminals[]? | select(.handle==$h and .orphaned!=true and .connected==true)] | length' 2>/dev/null)
+      case "$live" in ''|*[!0-9]*) live=0 ;; esac
+      if [ "$live" -ge 1 ]; then
+        echo "orca-worker-start: worktree '$wt' already has a live agent terminal $prev — reusing it instead of creating a second agent (stop it first with \`orca orchestration worker-stop\` if you want a fresh one)" >&2
+        term="$prev"
+        reused=1
+      fi
+    fi
+  fi
+fi
+
+# --- worker mode: create the env-carrying agent terminal ourselves ------------
+# (skipped when the probe above rebound us to the agent that is already there —
+# the tui-idle wait below exists to pass a NEW CLI's trust screen, and a mid-task
+# agent may never report idle)
+if [ "$worker_mode" = 1 ] && [ -z "$reused" ]; then
   # Single-quote the values with embedded quotes escaped (`'\''`) so a path with
   # any metacharacter — including a quote — cannot break out of the command.
   esc_sq() { printf '%s' "$1" | sed "s/'/'\\\\''/g"; }
