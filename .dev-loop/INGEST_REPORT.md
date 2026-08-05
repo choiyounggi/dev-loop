@@ -1,102 +1,192 @@
 # Knowledge flush — 3 insight(s)
 
-Three `★ Insight` candidates drained from `~/.dev-loop/queue`. Each was
-researched, verified, deduped against existing pages, and **merged into an
-existing page** (merge-before-create — no new pages, no new categories).
+Queue drained: `~/.dev-loop/queue/0c6a5439-….jsonl` (1 row),
+`~/.dev-loop/queue/fb7e7221-….jsonl` (2 rows). All three were harvested
+2026-08-04 from the `linkly-t1-spec-notation` and `linkly-t1-repo-policy` repos.
+
+Result: **2 new pages, 1 merge into an existing page, 1 new category.**
+
+| # | Insight (trigger → directive) | Outcome | Confidence |
+|---|-------------------------------|---------|------------|
+| 1 | Adding a node kind to a format whose only gate mutates a golden example → commit a fixture holding the new kind, one negative per keyword, verify each reddens | **New page** `testing/quality/schema-additions-under-a-golden-gate` | verified |
+| 2 | Enumerating call sites before a contract change → enumerate by callee name; a parameter-name search is a partial index | **New page + new category** `backend/common/change-impact/call-site-enumeration` | verified |
+| 3 | A fixture helper whose shape depends on a value the test also passes to the SUT → put that value in the helper's signature | **Merged** into `testing/data/test-data-and-isolation` | verified |
+
+---
 
 ## Verified best-practice
 
-### 1. Homebrew keg-only formulae are installed but deliberately off PATH
-- **Claim:** `which <tool>` / `command -v <tool>` returning "not found" on macOS
-  does **not** mean the toolchain is absent — Homebrew keg-only formulae (llvm,
-  openssl, curl, node@N, libpq) are built into the Cellar but not symlinked into
-  the prefix, so they are off PATH by design. Check the keg directly
-  (`/opt/homebrew/opt/<formula>/bin/`, `brew info <formula>`) before deferring.
-- **Sources checked:** <https://docs.brew.sh/FAQ> — verbatim: "the formula is
-  installed only into the Cellar and is not linked into the default prefix …
-  most tools will not find it"; "You can see why a formula was installed as
-  keg-only, and instructions for including it in your `PATH`, by running
-  `brew info <formula>`." The active version stays reachable at
-  `$(brew --prefix)/opt/<formula>/bin` regardless of version.
-- **How verified:** official Homebrew docs + the field reproduction on record
-  (`which mlir-opt` → not found, while `/opt/homebrew/opt/llvm/bin/mlir-opt
-  --version` → LLVM 22.1.8).
-- **Confidence: verified.**
+Every URL below was fetched during this flush; the quotes are from those
+fetches, not from memory. Nothing was cited that I did not open.
 
-### 2. tmux/REPL prompt injection stalls on bracketed paste; submit is a separate keystroke
-- **Claim:** injecting a long/multiline prompt into an interactive REPL (tmux
-  `send-keys -l`, `expect`, a PTY) and seeing it stall as a collapsed paste
-  (`❯ [Pasted text #1]`) means the REPL captured it as one **bracketed-paste**
-  block; the embedded newline is not treated as submit, so a **separate** Enter
-  (a couple seconds later) is required — or clear with `C-u` and re-inject.
-- **Sources checked:** <https://en.wikipedia.org/wiki/Bracketed-paste> — the
-  terminal wraps a paste in `ESC[200~`/`ESC[201~` so the application treats it as
-  one block and does not act on embedded control characters (newlines) as
-  keypresses. Corroborated by <https://github.com/anthropics/claude-code/issues/43169>
-  (tmux multi-line paste under `extended-keys-format csi-u`).
-- **How verified:** the bracketed-paste mechanism is doc-verified; the specific
-  Claude-CLI "first Enter confirms the paste, second Enter submits" behavior is
-  the session's own reproduction (three orchestration sessions all stalled at
-  `[Pasted text #1]` until a second Enter flipped them to `esc to interrupt`).
-- **Confidence: field-tested** (mechanism doc-verified; the CLI submit specifics
-  are production observation, not an official CLI doc).
+### Insight 1 — a golden-derived negative corpus cannot reach a newly added schema branch
 
-### 3. A "pure" function's test is not dependency-free if its module runs I/O at import
-- **Claim:** importing a module to unit-test a pure function within it runs the
-  module's import-time side effects (module-scope `init_db()`, a top-level DB/HTTP
-  client), so the test is really integration. A function-level
-  `@pytest.mark.skipif` cannot prevent it, because skipif is evaluated at
-  collection **after** the test module (and its top-level imports) has been
-  imported. Gate at module load (`pytest.importorskip`, `pytest.skip(...,
-  allow_module_level=True)`) or move the function to a side-effect-free module.
-- **Sources checked:** <https://docs.pytest.org/en/stable/how-to/skipping.html> —
-  skipif's condition "is evaluated at collection time"; skip an entire module at
-  import with `pytest.skip(reason, allow_module_level=True)`; use
-  `pytest.importorskip` at module level for a missing import.
-- **How verified:** official pytest docs for the timing/mechanism + the field
-  case (`src/web/app.py` calling `init_db()` at import, forcing Postgres onto a
-  `from app import _polygon_centroid` unit test).
-- **Confidence: verified.**
+*Claim under test:* when a format's only gate builds negatives by mutating one
+committed golden example, adding a new node kind to the schema produces a green
+run that proves nothing about the addition.
+
+| Source checked | What it establishes |
+|----------------|---------------------|
+| https://json-schema.org/understanding-json-schema/reference/conditionals | The mechanism, verbatim: *"If `if` is invalid, `else` must also be valid (and `then` is ignored)"* — a branch keyed on the new kind is simply **not applied** to an instance that lacks it. So a mutant of a golden without the new kind cannot exercise the new branch. |
+| https://json-schema.org/understanding-json-schema/reference/object | Why the new branch also needs constraining before a negative can even exist: *"By default any additional properties are allowed"* and *"By default, the properties defined by the `properties` keyword are not required"*. |
+| https://json-schema.org/draft/2020-12/json-schema-core | Sibling applicators *"MUST NOT impact the results of sibling subschemas"*; and *"Unknown keywords SHOULD be treated as annotations"* — a misspelled keyword in a new branch is ignored rather than rejected, a second silent-pass mode. |
+| https://pitest.org/quickstart/basic_concepts/ | The same gap has a name in mutation tooling: *"**No coverage**: the same as **Survived** except there were no tests that exercised the line of code where the mutation was created"* — cited so the page tells a reader using PIT/Stryker what the symptom looks like there. |
+
+*Session evidence (kept as a field observation, not as the basis of the
+directive):* in `linkly-t1-spec-notation`, `grep -rln "lir.schema\|jsonschema"
+impl/tests/` returned 0 of 447 tests, and the only schema gate over `*.lir.json`
+was `scripts/validate_ir.py --self-test`, whose three negatives are all
+`copy.deepcopy` mutations of `examples/login.lir.json`.
+
+**Confidence: `verified`** — the directive's mechanism is stated in the official
+JSON Schema documentation; the incident is corroborating, not load-bearing.
+
+### Insight 2 — enumerate by callee name, not by parameter name
+
+*Claim under test:* a keyword-argument search (`repo_rows=`) is structurally
+incapable of finding call sites that pass the same argument positionally.
+
+| Source checked | What it establishes |
+|----------------|---------------------|
+| https://docs.python.org/3/glossary.html | *positional-or-keyword* — *"specifies an argument that can be passed either positionally or as a keyword argument. **This is the default kind of parameter**"*. The blindness is therefore the default case, not an edge case. |
+| https://docs.python.org/3/library/ast.html | `ast.Call`: *"`args` holds a list of the arguments passed by position"*, *"`keywords` holds a list of `keyword` objects representing arguments passed by keyword"* — the two forms live in **separate fields**, so a keyword-name text search reads only one of them. |
+| https://peps.python.org/pep-0570/ | The `/` and `*` markers, which is what makes the page's "declare it keyword-only so a stale positional call errors instead of rebinding" edge case actionable. |
+
+*Reproduction run this session* (Python 3.14.6, macOS, no files written — piped
+to `python3` on stdin): over four call sites of `verify(...)` of which one passes
+`repo_rows=` by keyword, a regex search for `repo_rows\s*=` matches **1** while
+an AST pass over `Call` nodes named `verify` finds **4** — 3 sites invisible to
+the keyword search. This is the minimal version of the reported incident.
+
+*Session evidence:* recon reported "13 call sites, 7 need editing"; 8 further
+seeds passed the value as `verify()`'s 4th positional argument, and the suite the
+session had reported green then ran `472 tests / FAILED (failures=11)`.
+
+**Confidence: `verified`** — official language reference plus a reproduction.
+
+### Insight 3 — a fixture factory takes the value the test also passes to the SUT
+
+*Claim under test:* when a fixture helper's shape depends on a value the test
+also feeds the system under test, that value belongs in the helper's signature
+rather than in a module-level default.
+
+| Source checked | What it establishes |
+|----------------|---------------------|
+| https://abseil.io/resources/swe-book/html/ch12.html | A test is *complete* when *"its body contains all of the information a reader needs in order to understand how it arrives at its result"*; DAMP over DRY; and, directly on point, that engineers should *"use helper methods with descriptive parameters that make dependencies explicit"* rather than reusing shared constants. |
+| https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html | Keep the inputs a result depends on visible in the test method rather than in shared setup, so cause and effect is readable without jumping elsewhere. |
+
+*Session evidence:* `rows_for(doc)` seeded from the module constant `PAYLOAD`
+while its tests ran payload `{}`; a shape-only migration fixed 1 of 11 failures,
+moving the payload into the signature fixed 11 of 11.
+
+**Confidence: `verified`** — both sources are prescriptive on the exact point.
+
+Note: the canonical name for this smell is xUnit Patterns' *Mystery Guest*.
+`xunitpatterns.com` is HTTP-only and could not be fetched over HTTPS this
+session, so **it is deliberately not cited** — an unfetchable URL is worse than
+none, per the ingest rules.
+
+---
 
 ## Existing-layer check
 
-Pages read for overlap in each target domain/category before editing:
+Routed via `INDEX.md` → domain `index.md` → every page whose "load when" line
+overlapped. Pages read in full before deciding: all six of `testing/quality/`,
+`testing/data/test-data-and-isolation`, `testing/index`, `qa/process/regression-scope`,
+`qa/index`, `debugging/index`, `backend/index`, `backend/python/index`, plus a
+repo-wide search for prior coverage (`grep -rliE "call site|callee|positional
+argument|keyword argument"` and a `\bgrep\b` sweep over `wiki/`).
 
-- **path-resolution** (`platforms/environment`): its "When this applies" already
-  owns "command not found though the tool is installed" and its "Instead of"
-  already steers `which` → `command -v`/`type`. The keg-only case **extends** it
-  with a mechanism neither the page nor `command -v` covers (the binary is off
-  PATH by design, so `command -v` also misses it). **Merged** a "Do this" row, an
-  "Instead of" row, a source, and a "When this applies" clause — no new page.
-  Also read `toolchains/version-management` (owns version-manager shims, a
-  different off-PATH mechanism — left untouched, no conflict).
-- **non-interactive-cli-invocation** (`platforms/processes`): the page owns
-  "automating a prompt-capable CLI (agent CLI) from a harness." The bracketed-paste
-  stall is a distinct failure mode within that theme (driving the *interactive*
-  REPL rather than `-p`). **Merged** an Edge-cases row, a source+field-context
-  bullet, and a "When this applies" clause. No conflict with its stdin-detach
-  guidance (orthogonal: that is fd 0 for `-p` calls; this is paste framing for
-  keystroke injection).
-- **test-level-choice** (`testing/strategy`): its Edge-cases already has "logic
-  worth unit-testing is buried inside a controller/handler that needs the
-  framework to run → extract it." The import-side-effect case is the same family
-  (buried-in-a-module-that-needs-I/O) with a pytest-specific skipif twist.
-  **Merged** two Edge-cases rows + one "Instead of" row + a source. Also read
-  `testing/data/test-data-and-isolation` (owns runtime state leak, not import
-  time) — no duplication; added a reciprocal `related:` link (it already linked
-  back to test-level-choice).
+### Insight 1 — nearest neighbours, and why it is not a duplicate
 
-Conflicts flagged: none. Related links added: test-level-choice ↔
-test-data-and-isolation (reciprocal now complete).
+| Page read | Overlap | Decision |
+|-----------|---------|----------|
+| `testing/quality/spec-artifact-checks` | Closest. Already owns *"one negative control per check, mutating only what that check owns"* and the coverage-vs-validity split. | **Not a merge.** Its trigger is *authoring a check*; this insight's trigger is *evolving the artifact the check validates* — the negatives already exist and are individually sound, yet the corpus as a whole cannot reach the new shape. Per the wiki's one-case-per-page rule this is a new trigger. Linked both ways. |
+| `testing/quality/tests-that-cannot-fail` | Owns the break-the-code red-run rule the new page's step 4 depends on. | Referenced inline; `related:` added both ways. |
+| `testing/quality/harness-reverse-controls` | Owns the *harness-level* control (can this harness go green). | Complementary, not overlapping: that page asks whether the harness discriminates at all, this one asks whether the fixture corpus reaches a newly added shape. `related:` added both ways. |
+| `testing/quality/checks-that-cannot-pass` | Trigger is a check whose **target does not exist yet**. | Distinct — here the target exists and the gate is green. No edit. |
+| `qa/document-verification/spec-document-gates` | Release-gate altitude for document deliverables. | Kept as a one-way `related:` from the new page. |
+
+**No conflicts found.** Nothing in the wiki contradicts the new directive.
+
+### Insight 2 — no existing coverage anywhere
+
+The repo-wide search found **zero** pages discussing call-site enumeration,
+callee-name search, or positional-vs-keyword arguments as a recon concern. The
+single adjacent line is `qa/process/regression-scope`'s edge-case row *"The
+change is in code with no test coverage and unclear callers | Trace callers
+before scoping"* — which names the need and does not say how. That row now
+points at the new page, and `regression-scope` gained the new page in
+`related:` (both directions).
+
+Checked and rejected as homes: `debugging/*` (diagnosis of a failure, not
+pre-change recon), `backend/python/language/mutable-state-traps` (mutable
+defaults and shared state — a different mechanism), `platforms/tools/bsd-vs-gnu-cli`
+(grep *flag* portability, not search strategy).
+
+### Insight 3 — merged, not created
+
+`testing/data/test-data-and-isolation` already owns fixture construction and
+carries the adjacent rule *"pass explicitly only the fields the test's behavior
+depends on"* plus a row for shared **mutable** fixture objects. This insight is
+the same trigger with a directive that extends it (a *defaulted* constant, which
+is not mutated and so is not covered by the existing row). Merge-before-create
+applied — no new page. Added: 1 `Do` row, 1 edge-case row (the symptom is a
+lookup miss far from the helper), 1 `Instead of` row, 2 sources, and
+`last_verified` bumped to 2026-08-04.
+
+---
 
 ## Routing decision
 
-| Insight | Target domain/category/page | Notes |
-|---------|-----------------------------|-------|
-| 1. keg-only off PATH | `platforms/environment/path-resolution.md` | Harvested hint said `infrastructure`; **re-routed** — the wiki has a dedicated PATH page and the insight is a PATH-resolution fact, not a CI/CD or deploy concern |
-| 2. bracketed-paste REPL injection | `platforms/processes/non-interactive-cli-invocation.md` | Matches harvested `platforms`; merged as an edge case of automating a prompt-capable CLI |
-| 3. import-time side effects vs unit test | `testing/strategy/test-level-choice.md` | Matches harvested `testing`; chosen over `testing/data/test-data-and-isolation` because the resolution is a *level/structure* decision (extract to a side-effect-free module / recognize it as integration), extending the page's existing "extract buried logic" edge case |
+| Insight | Target | Rationale |
+|---------|--------|-----------|
+| 1 | `testing` / `quality` / **new page** `schema-additions-under-a-golden-gate` | `INDEX.md` routes "writing or structuring automated tests … verifying tests can actually fail" to `testing`; within it, `quality` already holds the five pages about whether a check proves anything. Existing category, no structural change. |
+| 3 | `testing` / `data` / **merge** into `test-data-and-isolation` | Same trigger as the page's own ("tests need fixture data and you are choosing how to create it"); directive extends step 1. |
+| 2 | `backend` / `common` / **NEW category `change-impact`** / `call-site-enumeration` | See below. |
 
-No new categories created — every insight merged into an existing page under an
-existing category. Domain `index.md` load-when lines for all three pages were
-extended so the new cases are routable, and `log.md` records the ingest.
+### New category: `backend/common/change-impact/`
+
+**Why `backend`:** `AGENTS.md`'s routing protocol resolves a multi-domain match
+by "the domain that owns **the artifact you will change**" — here, application
+code. **Why `common`:** the directive is language-agnostic (any language with
+optional or positional arguments; in a language with no keyword arguments at all
+the parameter-name search returns nothing whatsoever). The Python mechanics are
+cited as the mechanism, not as the scope.
+
+**Why not an existing category** — all eleven `backend/common` categories were
+re-checked by name before creating a new one:
+
+- `api-design` is the only near miss, and all three of its pages are HTTP-shaped
+  (status codes, endpoint idempotency, list-endpoint pagination). Its "load when"
+  lines are written about endpoints; filing an in-process function-signature
+  concern there would make the category's routing lines contradict its contents,
+  which invariant 1 forbids.
+- `reliability`, `caching`, `jobs`, `errors`, `auth`, `orm`, `concurrency`,
+  `llm`, `integrations`, `storage` — all runtime-behaviour categories; none
+  covers a design-time change-impact question under any other name.
+
+`change-impact` is the noun for the concern, leaves room for sibling pages
+(schema/event-contract consumers, deprecation windows), and is registered in
+`wiki/backend/index.md` plus the root `INDEX.md` backend row.
+
+### Plumbing
+
+- `wiki/testing/index.md` — new `quality` row with a use-case-enumerating "load when" line.
+- `wiki/backend/index.md` — new `change-impact` section + subtree summary row updated.
+- `INDEX.md` — backend row's `common/` concern list updated.
+- `log.md` — `## [2026-08-04] ingest | …` entry appended.
+- `related:` added both ways for all four adjacent pages.
+
+### Invariants verified mechanically (not by eye)
+
+Ran over all **141** pages after the edits:
+
+- every page is listed in an ancestor `index.md` → **0 unlisted**
+- every `related:` id and inline `[page-id]` reference resolves → **0 broken**
+- no page exceeds 120 body lines → **0 over**
+- banned vague qualifiers (`usually`, `consider`, `might want to`, `generally`,
+  `as appropriate`) in the three touched pages → **0 hits**
+- every "don't"-shaped statement in the new pages is descriptive prose, not a
+  bare prohibition; anti-patterns appear only in `Instead of` tables, each paired
+  with its replacement.

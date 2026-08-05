@@ -5,7 +5,7 @@ three stack subtrees — route by concern first, stack second:
 
 | Subtree | Route there when |
 |---------|------------------|
-| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, LLM completion validation & context budgeting, consuming external-API responses, externally-owned defaults, object-storage references |
+| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, enumerating call sites before a contract change, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, LLM completion validation & context budgeting, consuming external-API responses, externally-owned defaults, object-storage references |
 | [java](java/index.md) | You are writing/reviewing JVM backend code (Java/Kotlin, Spring, JPA/Hibernate) and the concern is stack-specific: entity mapping, persistence context, proxy pitfalls, JVM threads/memory |
 | [node](node/index.md) | You are writing/reviewing Node.js/TypeScript backend code: event-loop blocking, promise error handling, runtime validation at boundaries, graceful shutdown |
 | [python](python/index.md) | You are writing/reviewing Python backend code: GIL/concurrency model, pydantic validation, WSGI/ASGI workers, language traps |
@@ -25,6 +25,12 @@ Match your situation to a "load when" line; load only matching pages.
 | [error-responses](common/api-design/error-responses.md) | Designing or reviewing API error handling — choosing status codes (400/401/403/404/409/422/500), defining the error body shape, deciding what a 500 may reveal; clients report inconsistent/unparseable errors |
 | [idempotency](common/api-design/idempotency.md) | An endpoint with side effects (create, charge, send) can receive the same request twice — client retry after timeout, user double-submit, gateway retry; designing idempotency-key storage; deciding which operations are safe to retry |
 | [pagination-contract](common/api-design/pagination-contract.md) | Designing a list endpoint's request/response contract — cursor vs page-number, limit caps, total counts, expired-cursor behavior (the backing SQL/index → databases/query-optimization/keyset-pagination) |
+
+### change-impact
+
+| Page | Load when |
+|------|-----------|
+| [call-site-enumeration](common/change-impact/call-site-enumeration.md) | Changing the contract of a function/method/constructor other code calls — adding, removing, reordering or redefining a parameter — and you need the complete call-site list; scoping such a migration from a search; a migration scoped from recon came back green and then failed on call sites the search never listed; deciding whether to append a parameter or make it keyword-only (release-level re-test scope → qa/process/regression-scope) |
 
 ### reliability
 

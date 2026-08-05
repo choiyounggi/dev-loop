@@ -12,7 +12,7 @@ sources:
   - https://stryker-mutator.io/docs/mutation-testing-elements/equivalent-mutants/
   - https://testing.googleblog.com/2021/04/mutation-testing.html
 last_verified: 2026-08-02
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-schema-additions-under-a-golden-gate]
 ---
 
 # Citing a Verification Harness's Own Score
