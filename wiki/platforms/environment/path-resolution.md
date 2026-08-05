@@ -12,7 +12,7 @@ sources:
   - https://www.sudo.ws/docs/man/sudoers.man/
   - https://docs.brew.sh/FAQ
 last_verified: 2026-08-04
-related: [platforms-toolchains-version-management, platforms-processes-background-services]
+related: [platforms-toolchains-version-management, platforms-processes-background-services, platforms-toolchains-macos-sdk-sysroot]
 ---
 
 # The Wrong Binary (or None) Resolving From PATH

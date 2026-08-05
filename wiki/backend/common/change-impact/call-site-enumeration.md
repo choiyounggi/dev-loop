@@ -8,8 +8,8 @@ sources:
   - https://docs.python.org/3/glossary.html
   - https://docs.python.org/3/library/ast.html
   - https://peps.python.org/pep-0570/
-last_verified: 2026-08-04
-related: [qa-process-regression-scope, backend-python-language-mutable-state-traps]
+last_verified: 2026-08-05
+related: [qa-process-regression-scope, backend-python-language-mutable-state-traps, testing-data-test-data-and-isolation]
 ---
 
 # Enumerating Call Sites Before Changing a Callee's Contract
@@ -64,6 +64,7 @@ the search never listed.
 | Call sites live in another repository or a published package | The change is a versioned deprecation, not an in-place edit: keep the old contract accepting its old shape for a release, and enumerate what you own now |
 | The language has no keyword arguments at all (JavaScript, Go) | Every site is positional, so a parameter-name search returns nothing at all — enumerate by callee name from the start |
 | The repo has no working language server for the language | Enumerate by callee name and say so; an AST pass over `Call` nodes is the fallback that survives aliasing |
+| A test helper wraps the callee or rebuilds its data shape (a fixture builder feeding it) | Read every helper definition the enumeration surfaces and enumerate the helper's own call sites too — the helper appears once in the callee enumeration while supplying the old contract to every one of its callers ([testing-data-test-data-and-isolation]) |
 
 ## Instead of
 
@@ -81,3 +82,4 @@ the search never listed.
 - https://peps.python.org/pep-0570/ — the `/` marker for positional-only parameters, alongside the existing `*` marker for keyword-only, as the way a signature fixes how an argument may be passed
 - Local reproduction 2026-08-04 (Python 3.14.6, macOS): over four call sites of `verify(...)` where one passes `repo_rows=` by keyword, a regex search for `repo_rows\s*=` matches 1 while an AST pass over `Call` nodes named `verify` finds 4 — 3 sites invisible to the keyword search
 - Field incident 2026-08-04 (`linkly-t1-repo-policy`, Python): recon by keyword search reported "13 call sites, 7 need editing"; 8 further seeds passed the same value as `verify()`'s fourth positional argument, and the suite the session had reported green then ran `472 tests / FAILED (failures=11)`
+- Field incident 2026-08-05 (`linkly`, Python): a `rows_for()` test helper kept reproducing a removed rule for five call sites while appearing as a single hit in the callee enumeration — helper definitions are fan-out points, not one site

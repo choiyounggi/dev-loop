@@ -15,7 +15,8 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
-| [portable-shell-scripts](shells/portable-shell-scripts.md) | Writing a shell script that must run on more than one machine/OS/shell or in CI; a script that works locally fails elsewhere; choosing a shebang (bash vs sh); a bash script misbehaves in zsh or vice versa (unquoted vars, `=word`, array indexing); deciding how `set -euo pipefail` protects (and doesn't); building argument lists safely |
+| [portable-shell-scripts](shells/portable-shell-scripts.md) | Writing a shell script that must run on more than one machine/OS/shell or in CI; a script that works locally fails elsewhere; choosing a shebang (bash vs sh); a bash script misbehaves in zsh or vice versa (unquoted vars, `=word`, array indexing); deciding how `set -euo pipefail` protects (and doesn't); building argument lists safely; an empty env override (`VAR=`) fails to disable a feature |
+| [warnings-on-stderr-with-exit-zero](shells/warnings-on-stderr-with-exit-zero.md) | Wiring a compiler/linter/build tool into a CI step, pre-commit check, or agent hook and the tool emits warnings on stderr while exiting 0; a gate keyed on the exit code lets warnings through silently; capturing stderr for feedback without mixing in the tool's stdout |
 | [command-text-inspected-before-execution](shells/command-text-inspected-before-execution.md) | A hook, policy gate, allow-list, or audit rule blocked a command that is correct as written; composing a command that must satisfy such a gate first try; deciding whether to write a path literally or as `"$VAR"` in an inspected argument; a gate reports an argument missing or a file nonexistent though both are right; a gate must read a file your command creates; prose containing a dangerous-looking command (release notes, docs, fixtures) trips a text scanner |
 
 ## tools
@@ -51,6 +52,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [version-management](toolchains/version-management.md) | "Works on my machine" from tool-version drift; a project needs a pinned language/tool version (.nvmrc, .python-version, .tool-versions); making CI use the same versions as local; onboarding a machine reproducibly; a script/cron/CI step can't find a version-managed binary (shims absent in non-interactive shells); deciding where lockfiles fit in reproducibility |
+| [macos-sdk-sysroot](toolchains/macos-sdk-sysroot.md) | Homebrew keg-only clang on macOS cannot find system headers (`stdio.h`) while Apple's `/usr/bin/clang` works; mass test failures through a toolchain right after a CommandLineTools/Xcode change; deciding how a build script should locate the macOS SDK |
 
 ## Planned (unseeded categories)
 

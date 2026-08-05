@@ -10,7 +10,7 @@ sources:
   - https://testing.googleblog.com/2021/04/mutation-testing.html
   - https://martinfowler.com/bliki/TestCoverage.html
   - https://testing.googleblog.com/2013/05/testing-on-toilet-dont-overuse-mocks.html
-last_verified: 2026-07-10
+last_verified: 2026-08-05
 related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-checks-that-cannot-pass, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, testing-quality-schema-additions-under-a-golden-gate, qa-document-verification-spec-document-gates]
 ---
 
@@ -49,6 +49,7 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 | Case | Then |
 |------|------|
 | Mutating the code under test is impractical right now (slow build, shared branch) | Invert the expected value in the assertion instead and require red — this proves the assertion executes and compares, though not which code defects it catches |
+| The file you are about to mutate contains uncommitted work (the fix under test is not committed) | Save a copy and its hash before mutating (`cp f f.bak; shasum f`), restore from the copy, and verify the hash — `git checkout -- <path>` replaces the file with the index version, which still holds the pre-fix content |
 | Auditing a whole suite, not one test | Run an automated mutation-testing tool (PIT, Stryker) and treat surviving mutants in changed code as missing or defective tests |
 | The mutation run is your own script rather than PIT/Stryker | Prove the harness discriminates before citing its score — a semantics-preserving no-op must survive ([testing-quality-harness-reverse-controls]) |
 | A test intentionally has no outcome assertion (smoke test: module loads, page renders) | Keep it only when the regression it guards manifests as a throw; name it as a smoke test so reviewers do not count it as behavior coverage |
@@ -62,6 +63,7 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 | Prove an error path with `try { await f() } catch (e) { expect(e.message)... }` alone | Use `rejects`/`assertThrows`-style assertion, or add `expect.assertions(1)` above the try | When `f()` succeeds, the catch never runs and the test passes with zero assertions |
 | Trust "green suite + high coverage" as proof an area is tested | Break the behavior once and require a red run | Coverage counts execution, not detection; high numbers are reachable with assertion-free tests |
 | Delete a suspicious always-green test to clean up | Fix it via the table above, then re-verify it can fail | The test names a behavior someone meant to guard; deletion drops the intent along with the defect |
+| Undo a red-run mutation with `git checkout -- <path>` while the fix under test is uncommitted | Restore from a copy saved before mutating and compare hashes | Undoing the mutation and undoing the unstaged fix are the same checkout; the loss surfaces later as a smaller collected-test count, not as a failure |
 
 ## Sources
 
@@ -70,3 +72,6 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 - https://testing.googleblog.com/2021/04/mutation-testing.html — inserting faults and requiring test failure measures whether tests detect bugs; coverage alone does not
 - https://martinfowler.com/bliki/TestCoverage.html — coverage finds untested code; it is not a measure of test quality
 - https://testing.googleblog.com/2013/05/testing-on-toilet-dont-overuse-mocks.html — mock-heavy tests can pass while the real code is broken
+- https://git-scm.com/docs/git-checkout — `git checkout [--] <pathspec>`: "Replace the specified files ... with the version from the index"; unstaged changes are discarded
+- Local reproduction 2026-08-05 (git, macOS): baseline commit + uncommitted fix + mutation → `git checkout -- f.py` returned the file to the baseline (fix lost); a staged fix survived the same checkout (the index, not HEAD, is the restore source); a copy+hash restore round-tripped identically
+- Field incident 2026-08-05 (`linkly-t1-retry-ceiling`, Python): a `git checkout --` after a mutation check silently deleted the uncommitted implementation; the lost import failed test collection, so the suite reported `Ran 1042 tests … errors=1` instead of 1098 — a green-looking run with 56 tests missing

@@ -6,12 +6,13 @@ applies_to: [bash, zsh, posix-sh]
 confidence: verified
 sources:
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
+  - https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
   - https://zsh.sourceforge.io/Doc/Release/Expansion.html
   - https://zsh.sourceforge.io/Doc/Release/Parameters.html
   - https://google.github.io/styleguide/shellguide.html
   - https://www.shellcheck.net/
-last_verified: 2026-07-10
-related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution]
+last_verified: 2026-08-05
+related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution, platforms-shells-warnings-on-stderr-with-exit-zero]
 ---
 
 # Shell Scripts That Must Run on More Than One Machine or Shell
@@ -62,6 +63,7 @@ non-interactive environment).
 | Critical command is in a pipeline but the interpreter is POSIX sh (no `pipefail`) | Run the critical command outside the pipeline (temp file between stages) and test `$?` directly |
 | Script runs via cron/CI/hooks and commands are "not found" | Non-interactive shells load no rc files — no user PATH, no version-manager shims. Call binaries by absolute path (see platforms-toolchains-version-management) |
 | `set -u` breaks on optional variables | Expand with an explicit default: `"${OPT:-}"` |
+| Passing `VAR=` (empty) to disable a feature has no effect | `${VAR:-default}` substitutes for unset **and** empty — omitting the colon (`${VAR-default}`) tests only for unset. Make the script read `${VAR-default}` when empty must mean "off"; when you cannot edit the script, pass a value its own validation rejects (e.g. `WATCH_TMUX=/nonexistent` so a `command -v` probe fails) |
 
 ## Instead of
 
@@ -70,10 +72,12 @@ non-interactive environment).
 | Build a command string and `eval` it | Build an array and expand it: `cmd "${args[@]}"` | `eval` re-parses quotes and globs; arrays pass arguments through exactly |
 | Put a command plus its flags in one variable and run `$cmd` | Variable holds the binary path only; flags are separate words | zsh runs the whole value as one command name; bash re-splits and re-globs it |
 | Trust a trailing `echo "done"` as proof a step ran | Verify the produced state with an independent command | Inside `&&` chains and subshells, `set -e` misses failures and the echo still prints |
+| Disable a script feature by exporting an empty value against a `${VAR:-default}` read | Pass a deliberately invalid value that fails the script's own probe, or change the read to `${VAR-default}` | The colon form treats empty as unset, silently re-enabling the default you meant to turn off |
 
 ## Sources
 
 - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html — POSIX shell quoting and field splitting (sections 2.2, 2.6.5)
+- https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html — "Omitting the colon results in a test only for a parameter that is unset"; behavior reproduced identically in bash 3.2 and zsh 5.9 (2026-08-05)
 - https://zsh.sourceforge.io/Doc/Release/Expansion.html — zsh: no word splitting of unquoted parameters (14.3); `=word` expansion (14.7.3)
 - https://zsh.sourceforge.io/Doc/Release/Parameters.html — zsh arrays numbered from 1 (KSH_ARRAYS excepted)
 - https://google.github.io/styleguide/shellguide.html — quote variables, prefer bash for scripts, arrays over eval

@@ -8,7 +8,7 @@ sources:
   - https://code.claude.com/docs/en/hooks
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
 last_verified: 2026-07-30
-related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution]
+related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-shells-warnings-on-stderr-with-exit-zero]
 ---
 
 # Commands Read as Text by a Gate Before the Shell Runs Them
