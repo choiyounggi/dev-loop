@@ -1,7 +1,7 @@
 {
   "name": "dev-loop",
   "description": "loop-orchestrator's verification loop (TDD / PDCA / Reflexion) with the plan step FIXED to a wiki-grounded planning methodology (wiki-plan): every design decision is routed to a bundled semantic-layer wiki before code is written. Adds a knowledge-capture loop — sessions emit verified insights, and knowledge-flush researches, dedups, routes, and opens a wiki PR for owner review.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "choiyounggi",
     "url": "https://github.com/choiyounggi"
