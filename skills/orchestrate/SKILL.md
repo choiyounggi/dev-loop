@@ -13,7 +13,8 @@ implementation loop; two human gates bracket it (task-split, pre-merge).
 
 Scripts referenced below live in `${CLAUDE_PLUGIN_ROOT}/skills/orchestrate/scripts/`.
 Communication: session→orchestrator via `.orchestration/status/<task>.json`;
-orchestrator→session via `tmux send-keys` one-liners (templates/session-prompt.md).
+orchestrator→session via `tmux send-keys` one-liners (templates/session-prompt.md
+§1–§4) on tmux, or the Task `--spec` (same file, §O1–§O4) on Orca.
 
 ## Tool profile
 Resolve the pluggable tool profile once up front:
@@ -120,9 +121,15 @@ to you instead of making you poll. Replace steps 1–3 below with O1–O5:
   `orca orchestration run-create --objective "<goal>" --json` → keep `run_id` for the
   whole run (on re-entry, `orca orchestration run-use --id <run_id> --json` instead).
 - **O2 — one Task per task-*phase*.**
-  `orca orchestration task-create --spec "<the prompt you would have injected>" --json`
-  → `task_id`. A `worker_done` settles a Task exactly once, so plan / implement /
-  rework are separate Tasks (chain with `--deps` when one must follow another).
+  `orca orchestration task-create --spec "<the prompt>" --task-title "<short>" --json`
+  → `task_id`. Use `templates/session-prompt.md` §O1–§O4 as the `--spec` body; the
+  tmux §1–§4 one-liners are for `send-keys` and say "wait", which is wrong here.
+  A `worker_done` settles a Task exactly once, so plan / implement / rework are
+  separate Tasks. **You sequence them yourself** — dispatch phase N+1 only after
+  phase N reads `completed`. Do *not* chain with `--deps`: it takes a JSON array
+  (`--deps '["task_x"]'`; a bare id errors), and even then a task created that way
+  came back `task_not_startable` with its dependency already `completed`
+  (isolated: an identical task with no deps started fine on the same terminal).
 - **O3 — start the worker.** First make sure the integration branch exists in the
   main repo (`git branch <integ> <base>` if it does not) — the tmux path gets this
   from `setup-worktrees.sh` step 1, this path does not. Then create the Orca
@@ -152,22 +159,49 @@ to you instead of making you poll. Replace steps 1–3 below with O1–O5:
   `orca terminal list --worktree id:<...> --json` that the extra handle is an idle
   shell — not a configured default tab — and close just that one with
   `orca terminal close --terminal <handle> --json`.
+  A `worker-start` that fails **spends the Task**: it goes to `status=failed` and
+  every later attempt on it returns `task_not_startable`. Do not retry the same
+  Task — create a fresh one with the same spec. (Seen with `runtime_unavailable`,
+  which is what you get when that terminal is still busy with another Dispatch.)
 - **O4 — wait on pushed mail, not on a timer.**
-  `GROUNDWORK_ESCALATION_DIR=<abs> scripts/orca-wait.sh <timeout-ms>
+  `GROUNDWORK_ESCALATION_DIR=<abs> scripts/orca-wait.sh [--until-all] <timeout-ms>
   [<task_id,task_id,...>]` → **0** completions arrived (acked — process them),
   **2** window elapsed *or* the ack did not land (checkpoint, just re-run), **3** a
   worker reported failure, **5** escalation pending (approve/deny, **clear
   `.orchestration/escalations/`**, then re-run — like watch-status, code 5 recurs
   while a record is still on disk, by design), **6** question pending
   (`orca orchestration reply --id <msg_id> --body "<answer>" --json`, re-run).
-  Pass this Wave's task ids to get a `completed=<c>/<n>` line scoped to this Wave;
-  without them, an earlier Wave's completed Tasks would inflate the count. Repeat
-  until every Task of this Wave is `completed`. Codes 3/5/6 leave the batch unread
-  on purpose, so an unhandled event is never silently dropped — which also means
+  **Always pass this Wave's task ids — that is correctness, not a progress
+  nicety.** Heartbeats reach this mailbox despite `--types`, and so do completions
+  from an earlier Wave or an unrelated Task; without the ids none of that can be
+  told apart from your own work. With them, exit 0 means a *successful
+  `worker_done` for one of your ids* and the `completed=<c>/<n>` line is scoped to
+  this Wave. Add `--until-all` to keep consuming batches until every listed id is
+  completed, so one Wave costs one coordinator turn instead of one per batch; it
+  still returns immediately on 3/5/6. Codes 3/5/6 leave the batch unread on
+  purpose, so an unhandled event is never silently dropped — which also means
   delivery is **at-least-once**: a replayed batch must be processed idempotently
-  (key off `taskId`, never off a local counter).
-- **O5 — liveness.** `scripts/orca-worktree-alive.sh <worktree-path>` (0 alive /
-  1 dead / 2 unknown — treat unknown as *not* dead) replaces watch's tmux check.
+  (key off `taskId`, never off a local counter). `ORCA_WAIT_RECHECK_MS` (default
+  15000) slices the wait so a guardrails record written *while* you are blocked
+  surfaces within one interval instead of one full `<timeout-ms>`.
+- **O5 — liveness, in two questions.** `scripts/orca-worktree-alive.sh <wt>`
+  (0 alive / 1 dead / 2 unknown — treat unknown as *not* dead) replaces watch's
+  tmux check. It only asks whether a terminal is attached, which a wedged worker
+  passes: measured, three workers sat on an interactive CLI prompt for 75 minutes,
+  ALIVE the whole time, Tasks still `dispatched`, no escalation, diffs unchanged.
+  So also run `scripts/orca-worker-stalled.sh <wt>` (0 progressing / 1 stalled /
+  2 unknown — treat unknown as *not* stalled; `ORCA_STALL_MS`, default 600000).
+  A stall is not a failure to act on blindly: read the worker's screen
+  (`orca orchestration worker-read --dispatch <id> --limit 40 --json`) before you
+  decide, because "wedged on a prompt" and "finished but never reported" look the
+  same from the outside and need opposite responses.
+
+**You cannot steer a running worker.** `orchestration send --to dispatch:<id>`
+lands in the worker's mailbox, which a Claude worker never polls, and a new
+Dispatch cannot be delivered while the current one runs (that is O2's
+`runtime_unavailable`). So a mid-flight correction does not arrive: the supported
+path is the Phase-4 review/rework round. (If you do send one, omit `--type` —
+`note`/`guidance`/`message`/`info` are all rejected as `invalid_argument`.)
 
 **Worker protocol on this substrate — put this in every `--spec` you dispatch.**
 The worker still calls `status-update.sh` at each phase (the status files remain the
@@ -211,7 +245,8 @@ reasoning-effort flags) that `worker-start` cannot express.
    a UI-facing task fill `<design_spec>` with the `design` role's pulled spec
    (Phase 2) — then
    `scripts/launch-session.sh lo-<n> <worktree> bypassPermissions "<plan prompt>"`
-   (plan prompt = templates/session-prompt.md §1, with the subagent protocol block).
+   (plan prompt = templates/session-prompt.md §1 — the tmux set — with the
+   subagent protocol block).
 3. `scripts/watch-status.sh <status-dir> plan_ready <N>` in the background; when it
    exits, collect `plans/<task>.md`. *(Orca substrate: `scripts/orca-wait.sh
    <timeout-ms> <this Wave's task ids>` per O4 instead — same exit-code contract,
@@ -254,8 +289,13 @@ artifacts exist. Resume from the earliest incomplete step (idempotently skip don
 steps). Check `tmux ls`; relaunch dead sessions and re-inject the right prompt.
 On the Orca substrate, rebind the Run first (`orca orchestration run-use --id
 <run_id> --json`), then measure with `orca orchestration task-list --json` +
-`scripts/orca-worktree-alive.sh <wt>`; restart a proven-dead worker with
-`scripts/orca-worker-start.sh --task <task_id> --worktree id:<...> --agent claude`.
+`scripts/orca-worktree-alive.sh <wt>` **and** `scripts/orca-worker-stalled.sh <wt>`
+— a Task reading `dispatched` proves only that it was handed out, never that the
+worker is moving. Restart a proven-dead worker with a NEW Task (the old one is
+spent, see O2) via `scripts/orca-worker-start.sh --task <new_task_id> --worktree
+id:<...> --agent claude`; that call now probes first and rebinds to a live agent
+terminal on that worktree instead of creating a second one, so re-running it is
+safe (it exits 6 rather than guess when it cannot tell).
 `setup-worktrees.sh` is idempotent (existing branches/worktrees are detected and
 kept), so re-running it is safe. Note the difference from **partial resume** (Phase
 0): that handles work done *outside* this orchestration — children with no
