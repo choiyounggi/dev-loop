@@ -8,7 +8,7 @@ sources:
   - https://pydantic.dev/docs/validation/latest/concepts/models/
   - "Field reproduction (lnpl 0.2.0, 2026-08-05): 5-run override matrix flat under bare key names, exit 0, no warning; canonical dotted name flipped the guarded step — raw traces archived with the QA case"
 last_verified: 2026-08-05
-related: [qa-exploratory-guard-true-path-coverage, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail]
+related: [qa-exploratory-guard-true-path-coverage, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, qa-exploratory-lowered-declaration-survival]
 ---
 
 # A Control Pair Before Trusting a Value-Override Matrix
