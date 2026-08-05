@@ -151,9 +151,15 @@ function main() {
   fs.mkdirSync(queueDir, { recursive: true });
   const queueFile = path.join(queueDir, `${sessionId}.jsonl`);
 
+  // Seed the dedupe set from the session queue AND the processed store —
+  // knowledge-flush empties the queue file when it retires rows, and the next
+  // Stop re-parses the unchanged transcript, so without the second source every
+  // flushed insight would be re-queued. Read-only: only the flush writes there.
+  const processedFile = path.join(queueDir, '.processed.jsonl');
   const seen = new Set();
-  if (fs.existsSync(queueFile)) {
-    for (const line of fs.readFileSync(queueFile, 'utf8').split('\n')) {
+  for (const src of [queueFile, processedFile]) {
+    if (!fs.existsSync(src)) continue;
+    for (const line of fs.readFileSync(src, 'utf8').split('\n')) {
       const o = safeJson(line);
       if (o.hash) seen.add(o.hash);
     }
