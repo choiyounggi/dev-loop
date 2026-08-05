@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://martinfowler.com/articles/rise-test-impact-analysis.html
 last_verified: 2026-07-10
-related: [qa-process-release-gates, qa-bug-reports-reproducible-reports]
+related: [qa-process-release-gates, qa-bug-reports-reproducible-reports, backend-common-change-impact-call-site-enumeration]
 ---
 
 # Choosing What to Re-Test for a Change
@@ -44,7 +44,7 @@ Two standing practices that make the rings work:
 
 | Case | Then |
 |------|------|
-| The change is in code with no test coverage and unclear callers | Trace callers before scoping (text pointer wiki/testing/ for coverage tooling); an adjacency you cannot enumerate defaults into scope |
+| The change is in code with no test coverage and unclear callers | Trace callers before scoping ([backend-common-change-impact-call-site-enumeration] for enumerating them; text pointer wiki/testing/ for coverage tooling); an adjacency you cannot enumerate defaults into scope |
 | Data migration or backfill ships with the release | Add the migrated data's read paths to the direct ring — the "change" is the data, and its consumers are the changed feature |
 | Two changes in one release touch the same adjacency | Test that adjacency once, after both changes are in the release build — testing between them validates a build that will never ship |
 | Config-only or copy-only change | Direct ring only: verify the changed value/text where it surfaces, plus the critical-flows floor if the config gates a critical flow |
