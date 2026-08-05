@@ -5,9 +5,10 @@ category: data
 applies_to: [general]
 confidence: verified
 sources:
+  - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/env.html
   - https://martinfowler.com/articles/nonDeterminism.html
   - https://abseil.io/resources/swe-book/html/ch12.html
-last_verified: 2026-07-10
+last_verified: 2026-08-05
 related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice]
 ---
 
@@ -40,6 +41,7 @@ state-leak symptom.
 | Unique-constrained values (emails, usernames, external ids) | Generate per test (counter, UUID suffix) inside the factory — hardcoded constants collide across tests and across parallel runs |
 | Filesystem / temp files | Create a fresh per-test temp directory and remove it in teardown |
 | Global config / environment variables / singletons mutated by a test | Set in setup, restore in teardown that runs on failure too (`finally`/fixture teardown) |
+| A case whose behavior depends on a variable being **absent** (`run env VAR=x cmd`, `subprocess(env={...})`) | `unset` it in setup — `env` merges into the inherited environment unless given `-i`, so running the suite from a session that exports it silently flips that case to the opposite branch; CI's clean environment stays green and hides it |
 
 4. Keep fixture data **minimal**: create only the entities the behavior under
    test reads. Every extra row is a value a reader must rule out and a

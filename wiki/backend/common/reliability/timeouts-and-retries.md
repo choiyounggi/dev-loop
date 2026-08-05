@@ -8,8 +8,8 @@ sources:
   - https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
   - https://sre.google/sre-book/addressing-cascading-failures/
   - https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
-last_verified: 2026-07-10
-related: [backend-common-api-design-idempotency, backend-common-llm-completion-response-validation]
+last_verified: 2026-08-05
+related: [backend-common-api-design-idempotency, backend-common-llm-completion-response-validation, debugging-concurrency-intermittent-failures]
 ---
 
 # Calling Another Service over the Network: Timeouts, Retries, Backoff
@@ -62,6 +62,7 @@ retry storms, or requests that hang until a client gives up.
 | Retries exist at several layers (SDK, your code, gateway, client) | Retry at one layer only and set the others to 1 attempt — stacked retries multiply (3×3×3 = 27 attempts per user action), which is a self-inflicted DDoS on a struggling dependency |
 | Choosing the timeout value | Derive from the dependency's observed p99 latency plus headroom, not a guess; alert when timeouts actually fire so drift is visible |
 | Batch/scheduled job calling an API in a loop | Same rules per call, plus one overall deadline per run so a hung run does not overlap the next schedule |
+| You added a client-side rate limiter and the dependency still returns 429/rate-limit on the process's first call | Count the auth/token request against the same limiter and stamp the limiter immediately before each request. Token refresh usually happens inside a header builder or interceptor, *below* the throttle layer, so the token POST and the real call land in the same second; a warm token cache hides it on most days, which is why it reads as intermittent ([debugging-concurrency-intermittent-failures]) |
 | Dependency is a DB with its own driver timeout | Set both the driver statement timeout and your outer deadline; the outer one must be the larger of the two, or you cancel work the DB has almost finished |
 
 ## Instead of

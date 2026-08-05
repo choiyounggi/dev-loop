@@ -1,95 +1,140 @@
-# Consolidated review — knowledge PRs #6–#13
+# Knowledge flush — 5 insight(s)
 
-Eight fork PRs (`dch0202-rsquare`, 2026-07-28 → 2026-08-02) were reviewed together
-against `AGENTS.md`. Each PR was audited by an independent reviewer (format rules,
-sources, vague-qualifier ban, ≤120 body lines, index/log invariants), then
-cross-compared to catch duplication the per-PR flushes could not see — they branched
-independently off the same main and rewrote the same shared index/log files. Fork
-branches can't be edited from here and several PRs needed content changes (drop a
-duplicate, merge a colliding page), so this branch carries the reconciled end-state
-rather than merging each PR as-is (which would import the duplicates).
+All five were harvested from real sessions. Three merged into
+`testing/quality/tests-that-cannot-fail`, one into `testing/data/test-data-and-isolation`,
+one into `backend/common/reliability/timeouts-and-retries`. **No new page and no new
+category** — every case had an existing home whose "load when" already overlapped.
 
 ## Verified best-practice
 
-Sources are per-page and were live-verified in each originating PR's flush; the
-independent re-reviews re-checked them. Landed pages and their evidence base:
+### 1. A runner that invokes the subject differently than production → `verified`
 
-| Page | Confidence | Source basis |
-|------|-----------|--------------|
-| backend/common/llm/completion-response-validation | verified | OpenAI reasoning guide + chat `object` spec (5 `finish_reason` values), vLLM/LiteLLM reasoning fields; field incident (200/`length`/empty content/8,173-char reasoning) |
-| backend/common/llm/context-window-budget | verified | Claude context-window docs, LiteLLM exception mapping, vLLM/Claude Code env-var docs |
-| backend/common/integrations/externally-owned-defaults | verified | OpenAI deprecations (notice windows) + models `list`, LiteLLM model_discovery; field incident (alias removed between PR verify and review → 400) |
-| backend/common/storage/object-key-persistence | verified | AWS S3 CompleteMultipartUpload + managed-upload API/source, aws-sdk-js issues #1158/#5656 |
-| infrastructure/containers/host-cgroup-visibility | field-tested | cgroup_namespaces(7), Docker `--cgroupns=host`, nsenter, k8s #103363; OrbStack repro |
-| infrastructure/observability/missing-container-metrics | verified/field-tested | k8s resource-metrics-pipeline docs, kube-prometheus-stack values, kubernetes-mixin; OrbStack #2217 repro |
-| platforms/environment/unicode-text-matching | verified | UAX #15, Unicode core §3.12, APFS FAQ, POSIX grep; local repro (macOS 15/APFS, grep 2.6.0-FreeBSD, Python 3.13) |
-| platforms/shells/command-text-inspected-before-execution | verified | Claude Code hooks docs, POSIX shell §2.6; local reproduction |
-| platforms/processes/non-interactive-cli-invocation | verified | GNU nohup, OpenBSD ssh/ssh_config, git, timeout man pages; no-request-in-gateway-log field incident |
-| qa/document-verification/spec-document-gates | field-tested | ESLint, Google mutation testing, RFC 2119, Vale, markdownlint; 32/32 mutant / 62/62 intact RFC sessions |
-| qa/document-verification/editing-a-gated-document | field-tested | pgrep, Vale, markdownlint; in-house editing methodology |
-| testing/quality/checks-that-cannot-pass | verified | James Shore AoAD2, POSIX grep exit status, Semgrep rule-testing, pytest exit codes; BSD/ugrep measurement |
-| testing/quality/spec-artifact-checks | verified | JSON Schema, ESLint RuleTester, pitest, GFM table spec; local cell-count repro + GitHub renderer cross-check |
-| testing/quality/harness-reverse-controls | verified | mutation-testing + CI-control sources; field repro (re-fetched all cited URLs, PASS) |
+**Claim.** A bats suite that calls `bash "$script"` on a `#!/bin/sh` file cannot detect
+bashisms, because the shebang is bypassed; a green run is evidence about bash only.
 
-Three pages were reconciled from two overlapping PR versions each, keeping the more
-complete/better-sourced body and folding in the other's unique cases:
-- **completion-response-validation** — #12 body (all five `finish_reason` values,
-  `tool_calls`/`function_call` carve-out, streaming, Responses API, "reasoning is
-  scratch, not deliverable") kept in `llm/` (coherent with #6/#13); folded in #6's
-  DeepSeek first-party edge + the field incident.
-- **externally-owned-defaults** — #12 generalized body (any repo-external resource)
-  in `integrations/`; folded in #6's alias-removed field incident + the
-  gateway-config-vs-live-upstream nuance.
-- **non-interactive-cli-invocation** — #12 body (GNU-nohup extension precision,
-  ssh -n stdin-detach vs BatchMode, pre-log DNS/TLS/proxy + `curl -v`) kept; folded
-  in #11's DEBIAN_FRONTEND, pager/color TTY case, wrapper-CLI case, field incident.
+**How verified.** Reproduced locally rather than argued. A one-line `#!/bin/sh` script
+containing `[[ ... ]]`:
+
+| Invocation | Result |
+|---|---|
+| `./s.sh` (direct — shebang honoured; macOS `sh` is bash in POSIX mode) | ran the bashism |
+| `bash s.sh` | ran the bashism |
+| `dash s.sh` (true POSIX) | `s.sh: 2: [[: not found` |
+
+The mechanism is documented: the `#!` interpreter directive is applied by the kernel
+when a file is *executed*; passing the file as an argument to an interpreter means the
+interpreter reads it and the directive never participates
+(<https://man7.org/linux/man-pages/man2/execve.2.html>).
+
+**Confidence: verified** (reproduced + documented mechanism).
+
+### 2. A scripted mutation that never applied ≠ a blind test → `verified`
+
+**Claim.** When a mutation run drives edits with `sed`/`awk`, a pattern that matches
+nothing exits 0 and changes nothing, so the suite stays green for the trivial reason
+that the code is unchanged — indistinguishable from "the tests cannot fail".
+
+**How verified.** Reproduced: `sed -i '' 's/NEVER_MATCHES/x/' f.txt` → exit status **0**,
+file byte-identical. POSIX and GNU both define sed's exit 0 as "completed without error",
+not "substituted something"
+(<https://www.gnu.org/software/sed/manual/html_node/Exit-status.html>,
+<https://man7.org/linux/man-pages/man1/sed.1p.html>).
+
+**Confidence: verified.**
+
+### 3. Mutate an error-code guard toward *unreachable*, not *always-firing* → `field-tested`
+
+**Claim.** Mutating `if [ "$x" != "ok" ]; then exit 6; fi` so the guard fires *more*
+leaves the exit-code test green — it asserts "exits 6", and the mutant produces more
+6s. Only making the guard unreachable answers "does this test go red without the guard".
+
+**How verified.** No external source states this direction rule; it follows from the
+mutation-testing notion that a mutant which cannot change observable behavior is not a
+useful mutant (<https://stryker-mutator.io/docs/mutation-testing-elements/equivalent-mutants/>,
+already cited by the sibling page `harness-reverse-controls`). The session evidence is
+concrete: five exit-6 tests stayed green under an always-firing mutation, and all five
+went red under the never-firing one.
+
+**Confidence: field-tested** — the reasoning is sound and the observation reproducible in
+that repo, but the rule itself is not stated in a primary source.
+
+### 4. `env VAR=x cmd` inherits the caller's environment → `verified`
+
+**Claim.** A test case that assumes a variable is *absent* silently flips when the suite
+runs from a session that exports it, because `env` merges rather than replaces.
+
+**How verified.** POSIX is explicit: `name=value` arguments "shall be placed into the
+**inherited** environment", and only `-i` makes `env` ignore the inherited environment
+completely (<https://pubs.opengroup.org/onlinepubs/9699919799/utilities/env.html>,
+<https://www.man7.org/linux/man-pages/man1/env.1p.html>). Reproduced locally:
+`env OTHER=1 sh -c 'echo $LEAKED'` printed the caller's value; `env -i` printed nothing.
+
+**Confidence: verified.**
+
+### 5. A client-side throttle that the auth path bypasses → `field-tested`
+
+**Claim.** Token/auth refresh usually happens inside a header builder or interceptor,
+below the throttle layer, so the token POST and the real call land in the same second and
+deterministically breach a 2-per-second cap — but only on days the token cache is cold,
+which makes it read as intermittent.
+
+**How verified.** This is an architectural observation about where a refresh sits
+relative to a rate limiter, not a claim any vendor doc makes; searching for a primary
+source that states it turned up none. The session evidence is a specific timeline
+(token POST 00.354 → issued 00.495 → balance call failed 00.543, on the two days the
+token was newly issued; identical code fine on cache-valid days).
+
+**Confidence: field-tested** — recorded as such on the page, not upgraded.
 
 ## Existing-layer check
 
-Cross-PR and against-main duplication was the focus. Findings and resolutions:
+**Pages read before deciding:** `INDEX.md`; `wiki/testing/index.md`;
+`testing/quality/tests-that-cannot-fail`, `testing/quality/harness-reverse-controls`,
+`testing/data/test-data-and-isolation`; `wiki/platforms/index.md` and
+`platforms/shells/portable-shell-scripts`; `wiki/backend/index.md`,
+`backend/common/reliability/timeouts-and-retries`; `wiki/debugging/index.md`.
 
-- **spec-artifact-checks (#8) ≡ document-conformance-checks (#9)** — same case
-  (coverage-vs-validity split, per-check negative controls, GFM pipe parsing,
-  ESLint/Semgrep/mutation examples). #9's report predated awareness of #8. →
-  **#8 kept canonical; #9's page dropped, `testing/docs-as-spec` category not created.**
-- **completion-response-validation (#6) ≈ llm-response-completeness (#12)** — ~95%
-  same case (HTTP 200 ≠ usable output; `length`/blank/reasoning-budget). →
-  **merged into one `llm/` page; #12's `integrations/` copy dropped.**
-- **gateway-model-alias-defaults (#6) ≈ externally-owned-defaults (#12)** — ~80%;
-  #12 generalizes the model-alias case to any external resource. →
-  **kept the general `integrations/` page; #6's LLM-only page dropped.**
-- **non-interactive-cli-invocation** — created by BOTH #11 and #12 (file collision).
-  → **single reconciled page.**
-- Distinct (no overlap, all landed): checks-that-cannot-pass, harness-reverse-controls,
-  spec-document-gates, editing-a-gated-document, unicode-text-matching,
-  command-text-inspected-before-execution, object-key-persistence, context-window-budget,
-  host-cgroup-visibility, missing-container-metrics.
-- Reciprocal `related:` links added on existing pages (tests-that-cannot-fail,
-  timeouts-and-retries, environment-config, release-gates, background-services,
-  portable-shell-scripts, timezone-and-locale, paths-case-and-line-endings,
-  acceptance-criteria, resource-limits-and-probes, logs-metrics-signals,
-  minimum-case-set). A dropped-page backlink (#6 → gateway-model-alias-defaults on
-  environment-config and release-gates) was retargeted to externally-owned-defaults.
-- Invariants verified programmatically: all `related:`/inline `[id]` references
-  resolve, every page listed in its domain index, no duplicate ids, no page >120
-  body lines.
+**Overlaps found, and what they changed:**
+
+- `platforms/shells/portable-shell-scripts` **already** carries the platform half of
+  insight 1 — "`#!/bin/sh` script passes on macOS, fails on Debian/Ubuntu … test under
+  dash". Duplicating it there would have added nothing. What is *not* covered anywhere is
+  that a test suite invoking `bash "$script"` is structurally incapable of catching it,
+  which is a "can this test detect a defect" question. Merged into
+  `tests-that-cannot-fail`'s never-fails table and cross-linked to the platforms page
+  (added to its `related:`).
+- `tests-that-cannot-fail` step 1 already prescribes manual mutation testing, and its
+  edge-case table already routes self-built mutation harnesses to
+  `harness-reverse-controls`. Insights 2 and 3 are failure modes *of that step*, so they
+  became two `Edge cases` rows there rather than a new page — `harness-reverse-controls`
+  answers a different question (whether to cite a harness's score).
+- `test-data-and-isolation` already has "environment variables **mutated by** a test →
+  set in setup, restore in teardown". Insight 4 is the opposite direction: a test that
+  never touches the variable and depends on its absence. Added as its own row beside it.
+- `timeouts-and-retries` covers outbound-call governance including capping concurrency.
+  No rate-limiting page exists anywhere under `backend/`, and insight 5 is one edge case
+  rather than a page's worth, so it merged there and links to
+  `debugging/concurrency/intermittent-failures` (the "reads as intermittent" half).
+
+**Conflicts flagged:** none. No new directive contradicts an existing one.
+
+**Related-links added:** `tests-that-cannot-fail` → `platforms-shells-portable-shell-scripts`;
+`timeouts-and-retries` → `debugging-concurrency-intermittent-failures`.
 
 ## Routing decision
 
-- `backend/common/llm/` (new) — LLM-specific server concerns: completion-response-validation,
-  context-window-budget. Coherent home shared by #6 and #13.
-- `backend/common/integrations/` (new) — general repo-external-dependency concern:
-  externally-owned-defaults. Kept separate from `llm/` because its scope is any
-  external resource (bucket/queue/index), not LLM-only.
-- `backend/common/storage/` (new) — object-key-persistence.
-- `qa/document-verification/` (new) — spec-document-gates, editing-a-gated-document.
-  Introduced by both #10 and #11; unified into one index section.
-- `testing/quality/` (existing) — checks-that-cannot-pass, spec-artifact-checks,
-  harness-reverse-controls (test/check-authoring discipline, distinct from
-  qa/document-verification which is release-process gate design).
-- `platforms/{environment,shells,processes}/` (existing) — unicode-text-matching,
-  command-text-inspected-before-execution, non-interactive-cli-invocation.
-- `infrastructure/{containers,observability}/` (existing) — host-cgroup-visibility,
-  missing-container-metrics.
+| # | Insight | Domain / category | Page | New page? |
+|---|---------|-------------------|------|-----------|
+| 1 | Runner invokes the subject differently than production | testing / quality | `tests-that-cannot-fail` (never-fails table) | merged |
+| 2 | Assert the scripted mutation actually landed | testing / quality | `tests-that-cannot-fail` (edge cases) | merged |
+| 3 | Mutate a guard toward unreachable, not always-firing | testing / quality | `tests-that-cannot-fail` (edge cases) | merged |
+| 4 | `env VAR=x` inherits; `unset` in setup | testing / data | `test-data-and-isolation` (isolation table) | merged |
+| 5 | Auth refresh bypasses the client-side throttle | backend / reliability | `timeouts-and-retries` (edge cases) | merged |
 
-Source PRs #6–#13 are closed with a disposition comment crediting the author.
+**No new category.** Insight 1 was the only real routing question — testing vs platforms.
+It went to testing because the directive is about what a suite can prove, and the
+platforms page already owns the portability fact it would otherwise duplicate.
+
+Plumbing: `wiki/testing/index.md` and `wiki/backend/index.md` "load when" lines widened
+so the new triggers actually route; three `log.md` entries added. All three edited pages
+remain well under the 120-body-line limit (61 / 59 / 68).
