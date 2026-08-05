@@ -8,7 +8,7 @@ sources:
   - https://www.satisfice.com/download/session-based-test-management
   - https://developsense.com/blog/2009/08/testing-vs-checking
 last_verified: 2026-07-10
-related: [qa-bug-reports-reproducible-reports, qa-process-release-gates]
+related: [qa-bug-reports-reproducible-reports, qa-process-release-gates, qa-exploratory-guard-true-path-coverage]
 ---
 
 # Running a Chartered Exploratory Testing Session

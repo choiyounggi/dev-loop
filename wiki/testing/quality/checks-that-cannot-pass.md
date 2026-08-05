@@ -10,7 +10,7 @@ sources:
   - https://docs.semgrep.dev/writing-rules/testing-rules
   - https://docs.pytest.org/en/stable/reference/exit-codes.html
 last_verified: 2026-07-29
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, qa-process-scope-purity-checks]
 ---
 
 # Validating a Check Whose Target Does Not Exist Yet

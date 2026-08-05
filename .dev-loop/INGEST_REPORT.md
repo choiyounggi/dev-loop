@@ -1,192 +1,66 @@
 # Knowledge flush — 3 insight(s)
 
-Queue drained: `~/.dev-loop/queue/0c6a5439-….jsonl` (1 row),
-`~/.dev-loop/queue/fb7e7221-….jsonl` (2 rows). All three were harvested
-2026-08-04 from the `linkly-t1-spec-notation` and `linkly-t1-repo-policy` repos.
+Drained 3 pending rows from `~/.dev-loop/queue` (2 session files: qa-t1-inventory-order ×1, qa-t4-rate-notify ×2). Result: **3 new pages under `wiki/qa/`, 4 reverse related-links, 0 dropped, all `confidence: verified`.** One candidate's stated evidence was corrected during verification (I-3: the runtime failure is an "EventEmit references undeclared event" error, not the "RunError" the queue row named — mechanism identical, wording fixed).
 
-Result: **2 new pages, 1 merge into an existing page, 1 new category.**
-
-| # | Insight (trigger → directive) | Outcome | Confidence |
-|---|-------------------------------|---------|------------|
-| 1 | Adding a node kind to a format whose only gate mutates a golden example → commit a fixture holding the new kind, one negative per keyword, verify each reddens | **New page** `testing/quality/schema-additions-under-a-golden-gate` | verified |
-| 2 | Enumerating call sites before a contract change → enumerate by callee name; a parameter-name search is a partial index | **New page + new category** `backend/common/change-impact/call-site-enumeration` | verified |
-| 3 | A fixture helper whose shape depends on a value the test also passes to the SUT → put that value in the helper's signature | **Merged** into `testing/data/test-data-and-isolation` | verified |
-
----
+| # | Insight | Target page | Confidence |
+|---|---------|-------------|-----------|
+| 1 | `git status --porcelain` needs `-uall` before path-filtering for scope purity | `wiki/qa/process/scope-purity-checks.md` (new) | verified |
+| 2 | Run a control pair before trusting a name-based value-override matrix | `wiki/qa/exploratory/override-control-pairs.md` (new) | verified |
+| 3 | Execute every guard-true path once when static stages don't resolve references | `wiki/qa/exploratory/guard-true-path-coverage.md` (new) | verified |
 
 ## Verified best-practice
 
-Every URL below was fetched during this flush; the quotes are from those
-fetches, not from memory. Nothing was cited that I did not open.
+### 1 — Scope-purity checks over `git status` output need `-uall`
 
-### Insight 1 — a golden-derived negative corpus cannot reach a newly added schema branch
+**Claim as queued:** default porcelain collapses an entirely-untracked directory to one `?? qa/` line, so a per-file path filter (`^?? qa/cases/...`) mis-matches and the purity gate reports a false violation; `-uall` expands to per-file lines.
 
-*Claim under test:* when a format's only gate builds negatives by mutating one
-committed golden example, adding a new node kind to the schema produces a green
-run that proves nothing about the addition.
+**Verified two ways:**
+- **Official docs** — [git-status](https://git-scm.com/docs/git-status): mode `normal` "Show untracked files and directories", mode `all` "Also show individual files in untracked directories"; the default equals `normal` and is user-configurable via `status.showUntrackedFiles`. The config point yields an addition the candidate lacked: a checkout with `showUntrackedFiles=no` hides untracked files entirely, turning the same gate into a **false pass** — so scripts must pass `-uall` explicitly, never rely on the ambient default. Also doc-verified for the page's edge cases: porcelain v1 rename lines are `R <orig-path> -> <path>` (two paths, one line), special-character paths are C-string-quoted unless `-z`, and ignored files are omitted unless `--ignored=matching`.
+- **Local reproduction** (git 2.50.1 Apple Git-155, scratch repo, 2026-08-05): default porcelain printed exactly `?? qa/` and the per-file filter left it as a "violation" line (grep exit 0); `-uall` printed the three real file paths and the filter passed (grep exit 1). Matches the t1 session evidence (14 files proven in scope only after `-uall`).
 
-| Source checked | What it establishes |
-|----------------|---------------------|
-| https://json-schema.org/understanding-json-schema/reference/conditionals | The mechanism, verbatim: *"If `if` is invalid, `else` must also be valid (and `then` is ignored)"* — a branch keyed on the new kind is simply **not applied** to an instance that lacks it. So a mutant of a golden without the new kind cannot exercise the new branch. |
-| https://json-schema.org/understanding-json-schema/reference/object | Why the new branch also needs constraining before a negative can even exist: *"By default any additional properties are allowed"* and *"By default, the properties defined by the `properties` keyword are not required"*. |
-| https://json-schema.org/draft/2020-12/json-schema-core | Sibling applicators *"MUST NOT impact the results of sibling subschemas"*; and *"Unknown keywords SHOULD be treated as annotations"* — a misspelled keyword in a new branch is ignored rather than rejected, a second silent-pass mode. |
-| https://pitest.org/quickstart/basic_concepts/ | The same gap has a name in mutation tooling: *"**No coverage**: the same as **Survived** except there were no tests that exercised the line of code where the mutation was created"* — cited so the page tells a reader using PIT/Stryker what the symptom looks like there. |
+→ `confidence: verified`.
 
-*Session evidence (kept as a field observation, not as the basis of the
-directive):* in `linkly-t1-spec-notation`, `grep -rln "lir.schema\|jsonschema"
-impl/tests/` returned 0 of 447 tests, and the only schema gate over `*.lir.json`
-was `scripts/validate_ir.py --self-test`, whose three negatives are all
-`copy.deepcopy` mutations of `examples/login.lir.json`.
+### 2 — A control pair before trusting a value-override matrix
 
-**Confidence: `verified`** — the directive's mechanism is stated in the official
-JSON Schema documentation; the incident is corroborating, not load-bearing.
+**Claim as queued:** when a CLI takes name-based runtime value injection (`--field key=value`) and ignores unknown keys, run a control pair that flips an observable before trusting any value matrix; uniform output across variants means "key silently ignored", not "behavior stable".
 
-### Insight 2 — enumerate by callee name, not by parameter name
+**Verified:**
+- **Session reproduction with archived raw output** (lnpl 0.2.0, qa-t4-rate-notify, `qa/cases/rate-notify/evidence/05-modeB.md` + `evidence/raw/modeB-b*.txt`): five runs with bare names (`--field value=150/50/100...`) produced effectively identical step traces — guarded create step never fired, until-loop always hit its 16-round cap — with **exit 0 and zero warnings**. The tool's own help documents the policy: "Fields the workflow does not compare on are ignored; omitted ones default to 0." Switching to the canonical dotted name (`--field measurement.value=150`) flipped the guarded step, proving the lever, after which the matrix produced differentiated, meaningful rows.
+- **Mechanism prevalence** — [pydantic models docs](https://pydantic.dev/docs/validation/latest/concepts/models/): "By default, Pydantic models won't error when you provide extra data, and these values will simply be ignored"; `ConfigDict(extra=...)` = `ignore` (default) / `allow` / `forbid`. This grounds the page's directive to prefer strict/forbid modes for measurement runs.
+- **Citation dropped, not approximated:** I attempted to add Kohavi's A/A-test literature as a third source; the candidate URL (kdd.org PDF) could not be content-verified by fetch, so it is **not cited**. The in-repo page [testing-quality-harness-reverse-controls] (mutation-testing-sourced) carries the same "prove the instrument discriminates" principle and is linked instead.
 
-*Claim under test:* a keyword-argument search (`repo_rows=`) is structurally
-incapable of finding call sites that pass the same argument positionally.
+→ `confidence: verified` (reproducible measurement with archived raw traces + official docs for the ignore-unknown mechanism).
 
-| Source checked | What it establishes |
-|----------------|---------------------|
-| https://docs.python.org/3/glossary.html | *positional-or-keyword* — *"specifies an argument that can be passed either positionally or as a keyword argument. **This is the default kind of parameter**"*. The blindness is therefore the default case, not an edge case. |
-| https://docs.python.org/3/library/ast.html | `ast.Call`: *"`args` holds a list of the arguments passed by position"*, *"`keywords` holds a list of `keyword` objects representing arguments passed by keyword"* — the two forms live in **separate fields**, so a keyword-name text search reads only one of them. |
-| https://peps.python.org/pep-0570/ | The `/` and `*` markers, which is what makes the page's "declare it keyword-only so a stale positional call errors instead of rebinding" edge case actionable. |
+### 3 — Guard-true path coverage when static stages skip reference resolution
 
-*Reproduction run this session* (Python 3.14.6, macOS, no files written — piped
-to `python3` on stdin): over four call sites of `verify(...)` of which one passes
-`repo_rows=` by keyword, a regex search for `repo_rows\s*=` matches **1** while
-an AST pass over `Call` nodes named `verify` finds **4** — 3 sites invisible to
-the keyword search. This is the minimal version of the reported incident.
+**Claim as queued:** steps behind guards must be executed with the guard true at least once, because a pipeline whose compile/validation doesn't resolve cross-node references defers those errors to runtime, and guard-false runs return rc=0 forever.
 
-*Session evidence:* recon reported "13 call sites, 7 need editing"; 8 further
-seeds passed the value as `verify()`'s 4th positional argument, and the suite the
-session had reported green then ran `472 tests / FAILED (failures=11)`.
+**Verified:**
+- **Session reproduction** (qa-t4-rate-notify, `qa/cases/rate-notify/evidence/04-modeA.md`): an `emit` referencing an undeclared event passed compile (0 errors) and IR validation (PASS); 6 of 7 runtime runs failed at the emit step with "EventEmit references undeclared event 'event.notification'"; the single run where a presence guard skipped emit exited 0. **Correction to the queue row:** the failure text is the above, not "RunError" — the page and this report quote the actual error. The same evidence file's bidirectional guard table (guard.1/2/3, true and false runs each, all three discriminating) is the template for the page's contrast-table directive, and its guard.3 zero-round observation (0-iteration `until` absent from the skipped list) became the "assert on executed steps, not skip markers" directive.
+- **External grounding** — [ISTQB glossary, branch coverage](https://istqb-glossary.page/branch-coverage/): "The percentage of branches that have been exercised by a test suite. 100% branch coverage implies both 100% decision coverage and 100% statement coverage." The page applies this at whole-program QA level: a guard is a branch; N green runs down one side accumulate no evidence about the other.
 
-**Confidence: `verified`** — official language reference plus a reproduction.
-
-### Insight 3 — a fixture factory takes the value the test also passes to the SUT
-
-*Claim under test:* when a fixture helper's shape depends on a value the test
-also feeds the system under test, that value belongs in the helper's signature
-rather than in a module-level default.
-
-| Source checked | What it establishes |
-|----------------|---------------------|
-| https://abseil.io/resources/swe-book/html/ch12.html | A test is *complete* when *"its body contains all of the information a reader needs in order to understand how it arrives at its result"*; DAMP over DRY; and, directly on point, that engineers should *"use helper methods with descriptive parameters that make dependencies explicit"* rather than reusing shared constants. |
-| https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html | Keep the inputs a result depends on visible in the test method rather than in shared setup, so cause and effect is readable without jumping elsewhere. |
-
-*Session evidence:* `rows_for(doc)` seeded from the module constant `PAYLOAD`
-while its tests ran payload `{}`; a shape-only migration fixed 1 of 11 failures,
-moving the payload into the signature fixed 11 of 11.
-
-**Confidence: `verified`** — both sources are prescriptive on the exact point.
-
-Note: the canonical name for this smell is xUnit Patterns' *Mystery Guest*.
-`xunitpatterns.com` is HTTP-only and could not be fetched over HTTPS this
-session, so **it is deliberately not cited** — an unfetchable URL is worse than
-none, per the ingest rules.
-
----
+→ `confidence: verified`.
 
 ## Existing-layer check
 
-Routed via `INDEX.md` → domain `index.md` → every page whose "load when" line
-overlapped. Pages read in full before deciding: all six of `testing/quality/`,
-`testing/data/test-data-and-isolation`, `testing/index`, `qa/process/regression-scope`,
-`qa/index`, `debugging/index`, `backend/index`, `backend/python/index`, plus a
-repo-wide search for prior coverage (`grep -rliE "call site|callee|positional
-argument|keyword argument"` and a `\bgrep\b` sweep over `wiki/`).
+**Read:** root `INDEX.md`; `wiki/qa/index.md` (all 5 categories); `wiki/qa/exploratory/exploratory-sessions.md` (full); `wiki/testing/index.md`; `wiki/testing/quality/harness-reverse-controls.md`; `wiki/testing/quality/minimum-case-set.md` (full); `wiki/testing/quality/checks-that-cannot-pass.md` (trigger sections); plus repo-wide greps for `porcelain|untracked|-uall`, `control`, `branch coverage|guard|unknown key`.
 
-### Insight 1 — nearest neighbours, and why it is not a duplicate
+**Overlaps found, all resolved as adjacency (cross-link), not duplication:**
+- I-1 vs [testing-quality-checks-that-cannot-pass] — that page validates a check against known-good input; I-1 is a specific gate whose false verdict comes from git's output mode, and its directive 3 routes to that page for the both-ways control. Linked both ways. No existing page mentions porcelain/untracked mechanics (grep confirmed).
+- I-2 vs [testing-quality-harness-reverse-controls] — same principle ("uniform verdict is a property of the instrument; run a control"), different situation: that page is about citing a *scoring harness's* verdict, I-2 about a *measurement matrix* through value injection. Kept separate, linked both ways.
+- I-3 vs [testing-quality-minimum-case-set] — that page selects cases for automated tests of a function; I-3 covers runtime QA of guarded whole-program paths. Its "guarded upstream" edge row is about not forcing unreachable inputs — I-3's unreachable-guard row records the gap instead. Linked both ways.
+- I-2/I-3 are siblings from the same probing activity — cross-linked to each other; I-3 also linked from [qa-exploratory-exploratory-sessions].
 
-| Page read | Overlap | Decision |
-|-----------|---------|----------|
-| `testing/quality/spec-artifact-checks` | Closest. Already owns *"one negative control per check, mutating only what that check owns"* and the coverage-vs-validity split. | **Not a merge.** Its trigger is *authoring a check*; this insight's trigger is *evolving the artifact the check validates* — the negatives already exist and are individually sound, yet the corpus as a whole cannot reach the new shape. Per the wiki's one-case-per-page rule this is a new trigger. Linked both ways. |
-| `testing/quality/tests-that-cannot-fail` | Owns the break-the-code red-run rule the new page's step 4 depends on. | Referenced inline; `related:` added both ways. |
-| `testing/quality/harness-reverse-controls` | Owns the *harness-level* control (can this harness go green). | Complementary, not overlapping: that page asks whether the harness discriminates at all, this one asks whether the fixture corpus reaches a newly added shape. `related:` added both ways. |
-| `testing/quality/checks-that-cannot-pass` | Trigger is a check whose **target does not exist yet**. | Distinct — here the target exists and the gate is green. No edit. |
-| `qa/document-verification/spec-document-gates` | Release-gate altitude for document deliverables. | Kept as a one-way `related:` from the new page. |
+**Open-PR overlap scan (13 open `dev-loop:knowledge` PRs checked by title, closest three by body):** none covers these three insights. Flagged as *cousins, not duplicates*: PR #32's `infrastructure/config/keys-ahead-of-their-consumer` (unknown-key-ignoring consumers — mechanism shared with I-2, situation different: pre-declaring keys vs trusting a probe matrix); PR #24's `testing/quality/polling-completion-predicates` and PR #22's completion-predicate work (predicate controls — same control-run spirit as I-2, different artifact); PR #23's `guard-shape-vs-consequence` (artifact guards in tests, unrelated to runtime `when`/`until` guards). If #32/#24 merge first, a follow-up `related:` link from their pages to I-2's page is worth adding; no content conflict either way.
 
-**No conflicts found.** Nothing in the wiki contradicts the new directive.
-
-### Insight 2 — no existing coverage anywhere
-
-The repo-wide search found **zero** pages discussing call-site enumeration,
-callee-name search, or positional-vs-keyword arguments as a recon concern. The
-single adjacent line is `qa/process/regression-scope`'s edge-case row *"The
-change is in code with no test coverage and unclear callers | Trace callers
-before scoping"* — which names the need and does not say how. That row now
-points at the new page, and `regression-scope` gained the new page in
-`related:` (both directions).
-
-Checked and rejected as homes: `debugging/*` (diagnosis of a failure, not
-pre-change recon), `backend/python/language/mutable-state-traps` (mutable
-defaults and shared state — a different mechanism), `platforms/tools/bsd-vs-gnu-cli`
-(grep *flag* portability, not search strategy).
-
-### Insight 3 — merged, not created
-
-`testing/data/test-data-and-isolation` already owns fixture construction and
-carries the adjacent rule *"pass explicitly only the fields the test's behavior
-depends on"* plus a row for shared **mutable** fixture objects. This insight is
-the same trigger with a directive that extends it (a *defaulted* constant, which
-is not mutated and so is not covered by the existing row). Merge-before-create
-applied — no new page. Added: 1 `Do` row, 1 edge-case row (the symptom is a
-lookup miss far from the helper), 1 `Instead of` row, 2 sources, and
-`last_verified` bumped to 2026-08-04.
-
----
+**Conflicts flagged:** none — no existing directive contradicts any of the three.
 
 ## Routing decision
 
-| Insight | Target | Rationale |
-|---------|--------|-----------|
-| 1 | `testing` / `quality` / **new page** `schema-additions-under-a-golden-gate` | `INDEX.md` routes "writing or structuring automated tests … verifying tests can actually fail" to `testing`; within it, `quality` already holds the five pages about whether a check proves anything. Existing category, no structural change. |
-| 3 | `testing` / `data` / **merge** into `test-data-and-isolation` | Same trigger as the page's own ("tests need fixture data and you are choosing how to create it"); directive extends step 1. |
-| 2 | `backend` / `common` / **NEW category `change-impact`** / `call-site-enumeration` | See below. |
+- **I-1 → `qa/process/scope-purity-checks`.** Queue hint `qa` confirmed: the artifact is a release/session gate ("did this run stay in its lane"), owned by qa/process alongside release-gates and post-release-verification. Not `platforms` (no OS variance — git behaves identically everywhere) and not `testing` (nothing here writes test code); the git mechanics are the page's evidence, not its owner.
+- **I-2 → `qa/exploratory/override-control-pairs`.** Queue hint `qa` confirmed: the situation is probing a live system's behavior during exploratory QA. The alternative home — `testing/quality` next to harness-reverse-controls — was rejected because that category's pages govern authoring/citing automated checks, while this page governs how to *measure* a system by hand; the shared principle is carried by the two-way `related:` link instead.
+- **I-3 → `qa/exploratory/guard-true-path-coverage`.** Same category as I-2 (same probing activity, sibling pages). `testing/quality` rejected for the same reason as I-2.
+- **No new categories.** All three landed in existing qa categories; `qa/exploratory` grows from one page to three, which matches its charter (manual/exploratory probing techniques).
+- **Plumbing:** `wiki/qa/index.md` +3 "load when" rows; reverse `related:` added to `checks-that-cannot-pass`, `harness-reverse-controls`, `minimum-case-set`, `exploratory-sessions`; `log.md` +1 ingest entry.
 
-### New category: `backend/common/change-impact/`
-
-**Why `backend`:** `AGENTS.md`'s routing protocol resolves a multi-domain match
-by "the domain that owns **the artifact you will change**" — here, application
-code. **Why `common`:** the directive is language-agnostic (any language with
-optional or positional arguments; in a language with no keyword arguments at all
-the parameter-name search returns nothing whatsoever). The Python mechanics are
-cited as the mechanism, not as the scope.
-
-**Why not an existing category** — all eleven `backend/common` categories were
-re-checked by name before creating a new one:
-
-- `api-design` is the only near miss, and all three of its pages are HTTP-shaped
-  (status codes, endpoint idempotency, list-endpoint pagination). Its "load when"
-  lines are written about endpoints; filing an in-process function-signature
-  concern there would make the category's routing lines contradict its contents,
-  which invariant 1 forbids.
-- `reliability`, `caching`, `jobs`, `errors`, `auth`, `orm`, `concurrency`,
-  `llm`, `integrations`, `storage` — all runtime-behaviour categories; none
-  covers a design-time change-impact question under any other name.
-
-`change-impact` is the noun for the concern, leaves room for sibling pages
-(schema/event-contract consumers, deprecation windows), and is registered in
-`wiki/backend/index.md` plus the root `INDEX.md` backend row.
-
-### Plumbing
-
-- `wiki/testing/index.md` — new `quality` row with a use-case-enumerating "load when" line.
-- `wiki/backend/index.md` — new `change-impact` section + subtree summary row updated.
-- `INDEX.md` — backend row's `common/` concern list updated.
-- `log.md` — `## [2026-08-04] ingest | …` entry appended.
-- `related:` added both ways for all four adjacent pages.
-
-### Invariants verified mechanically (not by eye)
-
-Ran over all **141** pages after the edits:
-
-- every page is listed in an ancestor `index.md` → **0 unlisted**
-- every `related:` id and inline `[page-id]` reference resolves → **0 broken**
-- no page exceeds 120 body lines → **0 over**
-- banned vague qualifiers (`usually`, `consider`, `might want to`, `generally`,
-  `as appropriate`) in the three touched pages → **0 hits**
-- every "don't"-shaped statement in the new pages is descriptive prose, not a
-  bare prohibition; anti-patterns appear only in `Instead of` tables, each paired
-  with its replacement.
+**Invariants (checked mechanically):** body lines 53/53/56 (≤120) · id matches path 3/3 · all `related:` ids resolve · 0 banned vague qualifiers · every Instead-of row pairs prohibition with replacement · new pages listed in domain index 3/3.
