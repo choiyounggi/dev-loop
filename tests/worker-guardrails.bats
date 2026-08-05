@@ -61,6 +61,51 @@ setup() {
   [ ! -e "${BATS_TEST_TMPDIR}/nope" ]
 }
 
+# The three tests below split the config into two named properties, because one
+# combined assertion cannot say which one broke: COVERAGE (every rule id is still
+# there) and VALIDITY (each rule's mode is still the one it shipped with), plus the
+# new allowPaths declaration. Coverage asserts the rule COUNT before comparing the
+# id set — a config that parsed to zero rules would otherwise satisfy any set
+# comparison and pass vacuously.
+@test "worktree_escape declares .orchestration as an allowed path" {
+  sh "$WG" "$wt"
+  cfg="$wt/.groundwork/guardrails.json"
+  run jq -r '.rules.worktree_escape.allowPaths[0] // "MISSING"' "$cfg"
+  [ "$output" = ".orchestration" ]
+  # boundary: exactly one sanctioned path — this declares a path, it does not
+  # widen the rule into an allow-everything list.
+  run jq -r '.rules.worktree_escape.allowPaths | length' "$cfg"
+  [ "$output" -eq 1 ]
+  # the rule itself must stay `ask`: protection is declared-around, not disabled.
+  run jq -r '.rules.worktree_escape.mode' "$cfg"
+  [ "$output" = "ask" ]
+}
+
+@test "coverage: the emitted config still holds exactly the nine known rule ids" {
+  sh "$WG" "$wt"
+  cfg="$wt/.groundwork/guardrails.json"
+  run jq -r '.rules | length' "$cfg"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 9 ]
+  run jq -r '.rules | keys_unsorted | join(",")' "$cfg"
+  [ "$output" = "rm_rf,git_discard,system_tmp_write,cloud_delete,sql_drop,git_force_push,secret_export,curl_pipe_shell,worktree_escape" ]
+}
+
+@test "validity: every pre-existing rule keeps its mode, and only worktree_escape gains a key" {
+  sh "$WG" "$wt"
+  cfg="$wt/.groundwork/guardrails.json"
+  for pair in rm_rf:off git_discard:off system_tmp_write:off cloud_delete:ask \
+              sql_drop:ask git_force_push:ask secret_export:ask \
+              curl_pipe_shell:ask worktree_escape:ask; do
+    id="${pair%%:*}"; want="${pair##*:}"
+    run jq -r --arg r "$id" '.rules[$r].mode // "MISSING"' "$cfg"
+    [ "$output" = "$want" ]
+  done
+  # no other rule was handed an allowPaths while we were in there
+  run jq -r '[.rules | to_entries[] | select(.value.allowPaths) | .key] | join(",")' "$cfg"
+  [ "$output" = "worktree_escape" ]
+}
+
 @test "boundary: a non-git directory still gets the config (exclude simply skipped)" {
   plain="${BATS_TEST_TMPDIR}/plain"; mkdir -p "$plain"
   run sh "$WG" "$plain"
