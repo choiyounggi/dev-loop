@@ -7,8 +7,9 @@ confidence: verified
 sources:
   - https://martinfowler.com/articles/practical-test-pyramid.html
   - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html
-last_verified: 2026-07-10
-related: [testing-quality-minimum-case-set, testing-mocking-what-to-mock]
+  - https://docs.pytest.org/en/stable/how-to/skipping.html
+last_verified: 2026-08-04
+related: [testing-quality-minimum-case-set, testing-mocking-what-to-mock, testing-data-test-data-and-isolation]
 ---
 
 # Choosing the Test Level for a Behavior
@@ -49,6 +50,8 @@ sits at the right levels.
 | The framework wiring itself is the risk (routing, DI configuration, middleware order) | One integration test that boots the wiring and exercises one representative request — enumerate input cases at the unit level, not per-case through the framework |
 | The behavior is a thin pass-through with no branching (delegating call, field copy) | Cover it via the integration test of the contract it participates in; a dedicated unit test would assert structure, not behavior |
 | A bug escaped to production and you are adding coverage | Add the regression test at the lowest level that reproduces the bug; add a higher-level test only if the bug lived in the interaction itself |
+| A "pure" function you want to unit-test lives in a module that runs I/O at import (module-scope `init_db()`, a DB/HTTP client built at top level) | Importing the module runs those side effects, so the test is really integration. Move the function to an import-side-effect-free module and unit-test that; only if you cannot, gate the whole test module at import and treat it as integration |
+| You tried to keep such a test I/O-free with a function-level skip (`@pytest.mark.skipif`) yet it still needs the DB | The mark is evaluated during collection, **after** the test module is imported — a top-level `from app import fn` has already run app's import-time I/O. Gate at module load instead: `pytest.importorskip("app.db")`, or `if <no db>: pytest.skip(reason, allow_module_level=True)` placed before the import |
 
 ## Instead of
 
@@ -57,8 +60,10 @@ sits at the right levels.
 | Add an e2e test per input variation of a form/endpoint | Enumerate variations in unit tests; keep one e2e smoke test for the flow | E2e per-case multiplies run time and flake surface for no added regression coverage |
 | Unit-test a repository by mocking the DB driver | Integration-test it against a real test database | The mock encodes your assumption of the SQL contract; the test passes even when the query is wrong |
 | Duplicate a passing unit-level case at integration level "for confidence" | Keep the unit test only; add integration tests only for real-dependency contracts | Duplicated levels double maintenance and slow the suite without catching new regressions |
+| Assume a function's test is dependency-free because the function itself is pure | Check what its module executes at import; put the function where importing it is side-effect-free, or mark the test integration | The import graph, not the function body, decides the test's real dependencies — a module-scope `init_db()` drags a live DB into a "unit" test |
 
 ## Sources
 
 - https://martinfowler.com/articles/practical-test-pyramid.html — pyramid proportions, "push your tests as far down the test pyramid as you can", write a lower-level test when a high-level one fails
 - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html — larger tests are measurably flakier (supports keeping e2e minimal)
+- https://docs.pytest.org/en/stable/how-to/skipping.html — `skipif` is evaluated at collection time (after the test module has been imported); to skip at/before import use `pytest.importorskip(...)` or `pytest.skip(reason, allow_module_level=True)`. Field context: `src/web/app.py` ran `init_db()` at import, so `from app import _polygon_centroid` required Postgres and a function `skipif` could not prevent it
