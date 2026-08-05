@@ -10,7 +10,8 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/hash.html
   - https://man7.org/linux/man-pages/man7/environ.7.html
   - https://www.sudo.ws/docs/man/sudoers.man/
-last_verified: 2026-07-10
+  - https://docs.brew.sh/FAQ
+last_verified: 2026-08-04
 related: [platforms-toolchains-version-management, platforms-processes-background-services]
 ---
 
@@ -20,8 +21,10 @@ related: [platforms-toolchains-version-management, platforms-processes-backgroun
 
 "command not found" though the tool is installed; a DIFFERENT version runs than
 the one you installed; sudo, CI, or cron can't find a command your shell finds;
-two installations of the same tool conflict. (PATH/sudo/hash mechanics are
-doc-backed; the GUI-app and ssh rows are field-tested practice.)
+two installations of the same tool conflict; a package manager reports a tool
+installed yet no PATH lookup finds it (keg-only / deliberately unlinked). (PATH/
+sudo/hash/keg-only mechanics are doc-backed; the GUI-app and ssh rows are
+field-tested practice.)
 
 ## Do this
 
@@ -35,6 +38,7 @@ Two installations / wrong version:
 | Case | Do |
 |------|----|
 | brew/user-installed tool shadowed by a system binary (or vice versa) | `command -v` reveals which wins; fix by reordering `PATH` in the shell init of the context that runs it, or invoke the absolute path |
+| A package manager says the tool is installed but `command -v`/`type` find nothing (Homebrew **keg-only** formula — `llvm`, `openssl`, `curl`, `node@N`, `libpq`) | Not on `PATH` by design: the manager built it into the Cellar but skipped the prefix symlink. Run it from the stable opt path (`"$(brew --prefix)/opt/<formula>/bin/<tool>"`, e.g. `/opt/homebrew/opt/llvm/bin/mlir-opt`) or prepend that dir to `PATH`; `brew info <formula>` prints why and the exact PATH line |
 | You just installed/moved a binary but the OLD one still runs | `hash -r` — the shell remembers resolved locations and reuses them until told to forget or until `PATH` is reassigned |
 | A version manager's tool resolves interactively but not in scripts/cron/CI | Shims sit first in `PATH` only where the manager's rc hook ran — [platforms-toolchains-version-management] owns that case |
 
@@ -72,6 +76,7 @@ binaries; interactive convenience is the only place bare names are safe.
 |---------------------|-----------------|-----|
 | Add `export PATH=...` lines to every rc file until it works | Identify which context runs the command (interactive shell, sudo, cron, GUI app, ssh) and set `PATH` in THAT context's init point once | Shotgun exports mask the real resolution order and drift apart across files |
 | `which cmd` for debugging resolution | `type cmd` / `command -v cmd` | `which` is an external binary that scans `PATH` — it cannot see the aliases, functions, and builtins your shell will run first |
+| Conclude a toolchain is absent because `which <tool>` (or `command -v`) returns not-found, and defer the work | Check the package manager's own install root first — `brew info <formula>`, `ls "$(brew --prefix)/opt/<formula>/bin"`, `brew list --versions <formula>` | `command -v` only sees `PATH`; keg-only/unlinked installs are present but deliberately off `PATH`, so "not found" ≠ "not installed" and a stale check defers work the installed binary could do |
 | Calling a bare tool name in a hook/daemon/agent script | Resolve to `TOOL="$(command -v tool)"` with a fail-loud check, or hardcode the absolute path | The caller's `PATH` is not yours; silent resolution to a different or missing binary corrupts the run |
 
 ## Sources
@@ -81,3 +86,4 @@ binaries; interactive convenience is the only place bare names are safe.
 - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/hash.html — `hash -r` forgets all remembered utility locations
 - https://man7.org/linux/man-pages/man7/environ.7.html — `PATH`: colon-separated directory prefixes searched for executables
 - https://www.sudo.ws/docs/man/sudoers.man/ — `secure_path` value replaces `PATH` for sudo-run commands (with default `env_reset`)
+- https://docs.brew.sh/FAQ — keg-only: "the formula is installed only into the Cellar and is not linked into the default prefix … most tools will not find it"; `brew info <formula>` shows why and the PATH instructions. The active version stays reachable under `$(brew --prefix)/opt/<formula>/bin` regardless of version. Field-confirmed: `which mlir-opt` → not found while `/opt/homebrew/opt/llvm/bin/mlir-opt --version` → LLVM 22.1.8

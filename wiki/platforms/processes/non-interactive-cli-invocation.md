@@ -10,7 +10,8 @@ sources:
   - https://man.openbsd.org/ssh_config
   - https://git-scm.com/docs/git
   - https://man7.org/linux/man-pages/man1/timeout.1.html
-last_verified: 2026-07-31
+  - https://en.wikipedia.org/wiki/Bracketed-paste
+last_verified: 2026-08-04
 related: [platforms-processes-background-services, platforms-tools-bsd-vs-gnu-cli, platforms-shells-portable-shell-scripts, debugging-methodology-hypothesis-testing]
 ---
 
@@ -22,7 +23,9 @@ Calling a CLI that is able to prompt (agent CLIs, `ssh`, `git`, package managers
 from a script, CI step, hook, or agent harness — including when you passed its own
 non-interactive flag (`-p`, `--print`, `--yes`). Also when such a call hangs with no
 output and no error and you must decide whether the client, the network, or the
-remote service is at fault.
+remote service is at fault; or you drive the tool's interactive REPL by injecting
+keystrokes (tmux `send-keys`, `expect`, a raw PTY) and a pasted prompt is shown but
+never runs.
 
 ## Do this
 
@@ -64,6 +67,7 @@ remote service is at fault.
 | Still hangs with stdin closed and nothing in the server log | Look for a non-stdin block: a lockfile, a keychain/credential prompt that only resolves in a GUI session, or a missing binary ([platforms-environment-path-resolution]) |
 | The process must outlive the session | [platforms-processes-background-services] owns detach/supervision choice |
 | Output arrives only after the process exits | The tool buffers when fd 1 is not a TTY — read the log after exit, or use the tool's line-buffered/streaming flag |
+| You inject a long/multiline prompt into a REPL (tmux `send-keys -l`, `expect`) and it stalls showing a collapsed paste (`❯ [Pasted text #1]`) that never runs | The REPL took it as one **bracketed-paste** block (`ESC[200~ … ESC[201~`) and does not treat the embedded newline as submit — send the submit key as a **separate** `send-keys` call a beat later (2–3 s), or clear with `C-u` and re-inject; if newlines are being mangled instead, set tmux `extended-keys-format` off `csi-u` |
 
 ## Instead of
 
@@ -81,3 +85,4 @@ remote service is at fault.
 - https://git-scm.com/docs/git — `GIT_TERMINAL_PROMPT`: "If this Boolean environment variable is set to false, git will not prompt on the terminal (e.g., when asking for HTTP authentication)"
 - https://man7.org/linux/man-pages/man1/timeout.1.html — "Start COMMAND, and kill it if still running after DURATION"; exit status 124 "if COMMAND times out"
 - Field context: a 2026-07 session ran an agent CLI with its non-interactive `--tools` flag in the foreground; two runs hung (300 s, 150 s) with zero output. The gateway access log showed **no request from that host** in either window (ruling out the model and gateway); the same command with stdin taken from `/dev/null` completed immediately
+- https://en.wikipedia.org/wiki/Bracketed-paste — the terminal wraps a paste in `ESC[200~`/`ESC[201~` so the application can treat it as one block and not act on embedded newlines as Enter; submitting the block is therefore a keystroke distinct from the paste. Field context: a 2026-07 orchestration harness injected multi-hundred-char prompts into tmux Claude-CLI sessions with `send-keys -l` + one Enter; every session stalled at `❯ [Pasted text #1]` until a second Enter (2–3 s later) was sent, after which each flipped to `esc to interrupt` and ran (see also anthropics/claude-code#43169 on tmux multi-line paste under `extended-keys-format csi-u`)
