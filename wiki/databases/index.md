@@ -1,7 +1,8 @@
 # databases — Domain Index
 
 Route here for: schema/table/key design, index decisions, query writing and
-optimization, transaction/concurrency behavior.
+optimization, transaction/concurrency behavior, and reading live data as
+evidence for a rule.
 
 Match your situation to a "load when" line; load only matching pages.
 
@@ -38,6 +39,12 @@ Match your situation to a "load when" line; load only matching pages.
 | [nullability-and-defaults](schema-design/nullability-and-defaults.md) | Declaring column nullability/defaults; queries dropping rows around NULLs |
 | [soft-delete](schema-design/soft-delete.md) | Deleted records themselves must be restorable or kept (deleted_at schemas); deciding what a parent's deletion does to children that must survive (for who-changed-what history → requirements-to-tables) |
 | [online-schema-changes](schema-design/online-schema-changes.md) | Running ALTER TABLE / CREATE INDEX on a large table under live traffic; a migration blocks reads/writes (ACCESS EXCLUSIVE); adding a column/constraint/NOT NULL/index/type change safely; expand-and-contract to decouple DB migration from app deploy |
+
+## data-survey
+
+| Page | Load when |
+|------|-----------|
+| [surveying-live-data-for-a-rule](data-survey/surveying-live-data-for-a-rule.md) | A task says to sample real data to decide a mapping table, normalization/canonicalization rule, enum value set, or parsing rule; a `GROUP BY`/`DISTINCT` survey came back with zero rows; deciding what evidence replaces the data when the table is empty; recording in the deliverable which evidence a rule was actually derived from |
 
 ## operations
 

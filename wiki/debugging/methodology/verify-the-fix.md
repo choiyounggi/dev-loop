@@ -8,7 +8,7 @@ sources:
   - https://www.debuggingbook.org/html/Intro_Debugging.html
   - https://sre.google/sre-book/effective-troubleshooting/
 last_verified: 2026-07-10
-related: [debugging-methodology-reproduce-first, debugging-methodology-hypothesis-testing]
+related: [debugging-methodology-reproduce-first, debugging-methodology-hypothesis-testing, qa-process-enumerating-call-sites-of-a-changed-signature]
 ---
 
 # Verifying a Fix Before Closing the Bug

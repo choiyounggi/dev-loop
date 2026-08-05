@@ -1,95 +1,186 @@
-# Consolidated review — knowledge PRs #6–#13
+# Knowledge flush — 4 insight(s)
 
-Eight fork PRs (`dch0202-rsquare`, 2026-07-28 → 2026-08-02) were reviewed together
-against `AGENTS.md`. Each PR was audited by an independent reviewer (format rules,
-sources, vague-qualifier ban, ≤120 body lines, index/log invariants), then
-cross-compared to catch duplication the per-PR flushes could not see — they branched
-independently off the same main and rewrote the same shared index/log files. Fork
-branches can't be edited from here and several PRs needed content changes (drop a
-duplicate, merge a colliding page), so this branch carries the reconciled end-state
-rather than merging each PR as-is (which would import the duplicates).
+Drained from `~/.dev-loop/queue/` (4 pending rows across 3 sessions / 3 repos:
+`chungyak-alimi`, `track-b-ranking`, `linkly`). Four pages created, one new
+category, twelve existing pages back-linked. No page overwritten, no conflict found.
 
 ## Verified best-practice
 
-Sources are per-page and were live-verified in each originating PR's flush; the
-independent re-reviews re-checked them. Landed pages and their evidence base:
+### 1. Import-time I/O makes a "pure function" unit test infrastructure-bound
+**Claim** — a pure function reached by importing a module whose top level runs
+`init_db()`/connect is not DB-free; a module-level `pytestmark = pytest.mark.skipif(...)`
+cannot prevent it, because collection imports the module body top-to-bottom and the
+app import above that line has already run.
 
-| Page | Confidence | Source basis |
-|------|-----------|--------------|
-| backend/common/llm/completion-response-validation | verified | OpenAI reasoning guide + chat `object` spec (5 `finish_reason` values), vLLM/LiteLLM reasoning fields; field incident (200/`length`/empty content/8,173-char reasoning) |
-| backend/common/llm/context-window-budget | verified | Claude context-window docs, LiteLLM exception mapping, vLLM/Claude Code env-var docs |
-| backend/common/integrations/externally-owned-defaults | verified | OpenAI deprecations (notice windows) + models `list`, LiteLLM model_discovery; field incident (alias removed between PR verify and review → 400) |
-| backend/common/storage/object-key-persistence | verified | AWS S3 CompleteMultipartUpload + managed-upload API/source, aws-sdk-js issues #1158/#5656 |
-| infrastructure/containers/host-cgroup-visibility | field-tested | cgroup_namespaces(7), Docker `--cgroupns=host`, nsenter, k8s #103363; OrbStack repro |
-| infrastructure/observability/missing-container-metrics | verified/field-tested | k8s resource-metrics-pipeline docs, kube-prometheus-stack values, kubernetes-mixin; OrbStack #2217 repro |
-| platforms/environment/unicode-text-matching | verified | UAX #15, Unicode core §3.12, APFS FAQ, POSIX grep; local repro (macOS 15/APFS, grep 2.6.0-FreeBSD, Python 3.13) |
-| platforms/shells/command-text-inspected-before-execution | verified | Claude Code hooks docs, POSIX shell §2.6; local reproduction |
-| platforms/processes/non-interactive-cli-invocation | verified | GNU nohup, OpenBSD ssh/ssh_config, git, timeout man pages; no-request-in-gateway-log field incident |
-| qa/document-verification/spec-document-gates | field-tested | ESLint, Google mutation testing, RFC 2119, Vale, markdownlint; 32/32 mutant / 62/62 intact RFC sessions |
-| qa/document-verification/editing-a-gated-document | field-tested | pgrep, Vale, markdownlint; in-house editing methodology |
-| testing/quality/checks-that-cannot-pass | verified | James Shore AoAD2, POSIX grep exit status, Semgrep rule-testing, pytest exit codes; BSD/ugrep measurement |
-| testing/quality/spec-artifact-checks | verified | JSON Schema, ESLint RuleTester, pitest, GFM table spec; local cell-count repro + GitHub renderer cross-check |
-| testing/quality/harness-reverse-controls | verified | mutation-testing + CI-control sources; field repro (re-fetched all cited URLs, PASS) |
+**Sources checked**
+- https://docs.pytest.org/en/stable/how-to/skipping.html — confirms the three real
+  escape hatches: `pytest.importorskip` at module level, `pytest.skip(reason,
+  allow_module_level=True)`, and `pytestmark = pytest.mark.skipif(...)` for a module.
+  (Read from the upstream doc source `doc/en/how-to/skipping.rst` on
+  `pytest-dev/pytest@main` after docs.pytest.org returned HTTP 429.)
+- https://docs.pytest.org/en/stable/example/pythoncollection.html — `collect_ignore` /
+  `collect_ignore_glob`; states pytest imports files matching the discovery patterns,
+  which breaks on files that raise on import. This is the mechanism the insight names.
+- https://docs.python.org/3/reference/import.html — module body executes on first import.
 
-Three pages were reconciled from two overlapping PR versions each, keeping the more
-complete/better-sourced body and folding in the other's unique cases:
-- **completion-response-validation** — #12 body (all five `finish_reason` values,
-  `tool_calls`/`function_call` carve-out, streaming, Responses API, "reasoning is
-  scratch, not deliverable") kept in `llm/` (coherent with #6/#13); folded in #6's
-  DeepSeek first-party edge + the field incident.
-- **externally-owned-defaults** — #12 generalized body (any repo-external resource)
-  in `integrations/`; folded in #6's alias-removed field incident + the
-  gateway-config-vs-live-upstream nuance.
-- **non-interactive-cli-invocation** — #12 body (GNU-nohup extension precision,
-  ssh -n stdin-detach vs BatchMode, pre-log DNS/TLS/proxy + `curl -v`) kept; folded
-  in #11's DEBIAN_FRONTEND, pager/color TTY case, wrapper-CLI case, field incident.
+**How verified** — official docs plus a local reproduction (2026-08-05): a module
+whose first line prints a side effect still prints it when only its pure function is
+imported (`from modside import pure_fn` → side effect printed, then `pure_fn(2) == 4`).
+
+**Refinement made during verification** — the queued directive said skipif markers are
+"무력" (powerless). That holds for the *ordering* reason only; the docs show that an
+`allow_module_level` skip placed **above** the import, `importorskip`, and
+`collect_ignore` all do work. The page states the ordering rule ("place the guard above
+the import it protects") rather than the blanket claim.
+
+**Confidence: verified**
+
+### 2. Confirm volume before reading a distribution query
+**Claim** — `GROUP BY`/`DISTINCT` over an empty table return zero rows without error,
+which reads as "no values to normalize"; `count(*)` returns a row containing `0` and is
+the only unambiguous shape. When the count is 0, derive the rule from the writers and
+fixtures instead, and record the substitution in the artifact.
+
+**Sources checked**
+- https://www.postgresql.org/docs/current/functions-aggregate.html — "except for
+  `count`, these functions return a null value when no rows are selected. In
+  particular, `sum` of no rows returns null, not zero as one might expect, and
+  `array_agg` returns null rather than an empty array".
+- https://greatexpectations.io/blog/exploring-data-quality-volume/ — volume (row count)
+  as a first-class data-quality dimension; undetected volume anomalies "skew analyses
+  and lead to flawed decision-making". Supports "check volume first" as established
+  practice rather than a local habit.
+- https://www.postgresql.org/docs/current/tutorial-agg.html was checked first and does
+  **not** state the empty-input behaviour; it is therefore not cited.
+
+**How verified** — reproduced 2026-08-05 in `sqlite3 :memory:` over an empty table:
+`SELECT area_nm, count(*) … GROUP BY area_nm` → 0 rows; `SELECT count(*)` → one row
+`0`; `SELECT max(area_nm)` → one row `NULL`. Matches the PostgreSQL-documented
+semantics, so the page is written engine-neutral.
+
+**Confidence: verified**
+
+### 3. Enumerate call sites by call target, not by parameter name
+**Claim** — grepping `param=` cannot find callers that pass the argument positionally,
+so a keyword-based census silently under-reports; test helpers compound this by
+reproducing the old shape at many sites while appearing once in a call-target search.
+
+**Sources checked**
+- https://docs.python.org/3/reference/expressions.html#calls — "If there are N
+  positional arguments, they are placed in the first N slots"; keyword arguments are
+  matched by identifier. This is the mechanism: a positional call site contains no
+  parameter name, so no keyword pattern can match it.
+- https://libcst.readthedocs.io/en/latest/codemods.html — a codemod is "an automated
+  refactor that can be applied to a codebase of arbitrary size"; CST transforms match
+  call nodes rather than text. (Definition confirmed via the upstream
+  `docs/source/codemods.rst`; readthedocs returned HTTP 429.) The page cites LibCST
+  only for the tool-choice row. A widely-repeated "regex is insufficient for call-site
+  refactors" line traces to a Medium post I could not fetch, so that wording is **not**
+  asserted anywhere in the page.
+- The originating session's own failure record: a `repo_rows=` census reported 13 hits,
+  the real run was `Ran 472 tests / FAILED (failures=11)`, all in `test_backend.py`,
+  plus a `rows_for()` helper feeding 5 further sites.
+
+**How verified** — language-reference semantics (positional binding by position) plus
+the reproduced failure above. The mechanism generalizes to any language with positional
+calls, so `applies_to: [general]`.
+
+**Confidence: verified**
+
+### 4. `${VAR:-default}` discards an empty override
+**Claim** — passing `VAR=` to turn a feature off is silently ignored when the script
+reads `${VAR:-default}`, because the colon form substitutes the default for null *and*
+unset. Pass a sentinel the script's own validation rejects, or change the read to
+`${VAR-default}`.
+
+**Sources checked**
+- https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html (POSIX
+  2.6.2) — "use of the <colon> in the format shall result in a test for a parameter
+  that is unset or null; omission of the <colon> shall result in a test for a parameter
+  that is only unset", with the full four-operator behaviour table.
+- https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html —
+  "Omitting the colon results in a test only for a parameter that is unset."
+
+**How verified** — reproduced 2026-08-05 in `bash`: with `v=""`, `${v:-tmux}` → `tmux`
+while `${v-tmux}` → empty; with `v` unset both → `tmux`.
+
+**Confidence: verified**
 
 ## Existing-layer check
 
-Cross-PR and against-main duplication was the focus. Findings and resolutions:
+**Pages read in full before writing** — `AGENTS.md`, `INDEX.md`, the `testing`,
+`databases`, `platforms`, `debugging`, `qa` and `backend/python` domain indexes,
+`testing/strategy/test-level-choice`, `testing/data/test-data-and-isolation`,
+`databases/query-optimization/existence-and-count-checks`,
+`databases/schema-design/requirements-to-tables`, `qa/process/regression-scope`,
+`platforms/shells/portable-shell-scripts`, plus the full 135-page inventory.
 
-- **spec-artifact-checks (#8) ≡ document-conformance-checks (#9)** — same case
-  (coverage-vs-validity split, per-check negative controls, GFM pipe parsing,
-  ESLint/Semgrep/mutation examples). #9's report predated awareness of #8. →
-  **#8 kept canonical; #9's page dropped, `testing/docs-as-spec` category not created.**
-- **completion-response-validation (#6) ≈ llm-response-completeness (#12)** — ~95%
-  same case (HTTP 200 ≠ usable output; `length`/blank/reasoning-budget). →
-  **merged into one `llm/` page; #12's `integrations/` copy dropped.**
-- **gateway-model-alias-defaults (#6) ≈ externally-owned-defaults (#12)** — ~80%;
-  #12 generalizes the model-alias case to any external resource. →
-  **kept the general `integrations/` page; #6's LLM-only page dropped.**
-- **non-interactive-cli-invocation** — created by BOTH #11 and #12 (file collision).
-  → **single reconciled page.**
-- Distinct (no overlap, all landed): checks-that-cannot-pass, harness-reverse-controls,
-  spec-document-gates, editing-a-gated-document, unicode-text-matching,
-  command-text-inspected-before-execution, object-key-persistence, context-window-budget,
-  host-cgroup-visibility, missing-container-metrics.
-- Reciprocal `related:` links added on existing pages (tests-that-cannot-fail,
-  timeouts-and-retries, environment-config, release-gates, background-services,
-  portable-shell-scripts, timezone-and-locale, paths-case-and-line-endings,
-  acceptance-criteria, resource-limits-and-probes, logs-metrics-signals,
-  minimum-case-set). A dropped-page backlink (#6 → gateway-model-alias-defaults on
-  environment-config and release-gates) was retargeted to externally-owned-defaults.
-- Invariants verified programmatically: all `related:`/inline `[id]` references
-  resolve, every page listed in its domain index, no duplicate ids, no page >120
-  body lines.
+**Overlaps found, and what was done**
+
+| Existing page | Overlap | Decision |
+|---|---|---|
+| `testing/strategy/test-level-choice` | Its edge case "logic buried in a controller… extract it" shares the *extraction* remedy | **New page.** Different trigger (import-time I/O, failing at collection) and a different decision set (`importorskip` / module-level skip / `collect_ignore`). Cross-linked both ways |
+| `testing/data/test-data-and-isolation` | Owns state leakage between tests | **Not merged.** Import-time coupling is a dependency-surface question, not fixture ownership; the new page hands off to it for the module-singleton case |
+| `databases/query-optimization/existence-and-count-checks` | Both discuss `count(*)` | **Not merged.** That page answers "how do I write an existence check cheaply"; the new page answers "what does an empty result prove". No conflict — the `count(*)`-first rule is about evidence, not cost. Cross-linked |
+| `databases/schema-design/requirements-to-tables` | Deriving structure from requirements | **Not merged.** Requirements-driven vs data-driven derivation. Cross-linked |
+| `qa/process/regression-scope` | Its Integration ring: "test **every** consumer of that contract, not a sample" | **Complementary.** regression-scope says *which* consumers must be tested; the new page says *how to find all of them*. Strongest link in the batch; cross-linked both ways |
+| `platforms/shells/portable-shell-scripts` | Mentions `"${OPT:-}"` once, as a `set -u` workaround | **Not merged.** That page's trigger is cross-machine portability; nothing in it covers colon-vs-no-colon semantics or the caller-side override problem. The new page's `set -u` edge case defers to it. Cross-linked |
+| `platforms/environment/unicode-text-matching` | Also a "grep returns fewer hits than reality" page | **Distinct and deliberately not linked** — encoding/normalization cause vs call-syntax cause, different domain; a link would create a misleading route |
+
+**Conflicts flagged:** none. No existing directive is contradicted by any of the four.
+
+**Related-links added (both ways):** 12 existing pages gained the new ids —
+`testing/strategy/test-level-choice`, `testing/data/test-data-and-isolation`,
+`backend/python/language/mutable-state-traps`,
+`databases/query-optimization/existence-and-count-checks`,
+`databases/schema-design/requirements-to-tables`,
+`databases/schema-design/nullability-and-defaults`, `qa/process/regression-scope`,
+`testing/quality/checks-that-cannot-pass`, `debugging/methodology/verify-the-fix`,
+`platforms/shells/portable-shell-scripts`, `platforms/environment/path-resolution`,
+`platforms/processes/non-interactive-cli-invocation`.
 
 ## Routing decision
 
-- `backend/common/llm/` (new) — LLM-specific server concerns: completion-response-validation,
-  context-window-budget. Coherent home shared by #6 and #13.
-- `backend/common/integrations/` (new) — general repo-external-dependency concern:
-  externally-owned-defaults. Kept separate from `llm/` because its scope is any
-  external resource (bucket/queue/index), not LLM-only.
-- `backend/common/storage/` (new) — object-key-persistence.
-- `qa/document-verification/` (new) — spec-document-gates, editing-a-gated-document.
-  Introduced by both #10 and #11; unified into one index section.
-- `testing/quality/` (existing) — checks-that-cannot-pass, spec-artifact-checks,
-  harness-reverse-controls (test/check-authoring discipline, distinct from
-  qa/document-verification which is release-process gate design).
-- `platforms/{environment,shells,processes}/` (existing) — unicode-text-matching,
-  command-text-inspected-before-execution, non-interactive-cli-invocation.
-- `infrastructure/{containers,observability}/` (existing) — host-cgroup-visibility,
-  missing-container-metrics.
+| # | Target page | New category? |
+|---|---|---|
+| 1 | `testing / strategy / import-time-side-effects` | No |
+| 2 | `databases / data-survey / surveying-live-data-for-a-rule` | **Yes — `data-survey`** |
+| 3 | `qa / process / enumerating-call-sites-of-a-changed-signature` | No |
+| 4 | `platforms / shells / disabling-a-feature-through-an-environment-variable` | No |
 
-Source PRs #6–#13 are closed with a disposition comment crediting the author.
+**1 — testing/strategy.** The decision this page forces is structural: what level the
+test really sits at, and whether the function moves or the whole module gets gated.
+`strategy` owns level/structure decisions; `data` owns fixtures and state, which is not
+the question.
+
+**2 — databases/data-survey (new category).** Existing categories are `indexing`,
+`query-optimization`, `schema-design`, `operations`, `sqlite`, `transactions`. None
+covers *reading live data as evidence for a decision*: `query-optimization` is about
+cost, `schema-design` derives structure from requirements rather than from rows. Each
+was re-checked under its alternative reading before creating the category, per
+wiki-ingest step 3. `databases` is the right domain because the artifact queried and
+misread is the database. Root `INDEX.md` and the domain index were widened to route in.
+
+**3 — qa/process.** The one judgement call worth the owner's attention. The queue's own
+hint was `domain: testing` and the observed failure was 11 broken tests — but the
+page's subject is *enumerating what a change touches*, which is
+`qa/process/regression-scope`'s question one level lower (a code-level census feeding
+its Integration ring). Alternatives considered and rejected: `testing/*` (the practice
+governs production call sites too, not test authoring); `testing/quality` (sibling to
+the grep-gate pages, but those are about *checks*, not censuses); `debugging` (nothing
+is being diagnosed); `backend/common` (the practice is language- and tier-agnostic).
+**If you prefer it under `testing`, this is the page to move — say so on review and it
+moves with its links.**
+
+**4 — platforms/shells.** Category already exists and the case is squarely shell
+semantics. Folding it into `portable-shell-scripts` as an edge-case row was considered
+and rejected: that page's trigger is "runs on machine A, fails on machine B", which
+does not match "my override was ignored", and one-case-per-page applies.
+
+## Verification of the wiki edit itself
+
+- Body lengths: 56 / 65 / 58 / 58 lines — all under the 120-line cap.
+- All `related:` ids across all 135 pages resolve; all inline `[page-id]` refs resolve.
+- All `INDEX.md` and domain-index links resolve to existing files.
+- No banned vague qualifiers in the new pages.
+- `log.md` carries the `## [2026-08-05] ingest | …` entry.

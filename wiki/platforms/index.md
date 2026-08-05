@@ -3,7 +3,8 @@
 Route here for: OS-level differences that break code and scripts moving between
 macOS, Linux, and Windows — shell portability, BSD-vs-GNU CLI flags, filesystem
 case/line-ending/path behavior, file permissions and exec bits across
-git/archives/containers, hidden environment inputs (timezone/locale, Unicode
+git/archives/containers, environment variables that switch a script's behavior on
+or off, hidden environment inputs (timezone/locale, Unicode
 normalization form in text and file names, per-context PATH resolution), keeping
 processes alive as services or scheduled jobs, and
 pinning toolchain versions across machines. Application logic stays in backend;
@@ -16,6 +17,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [portable-shell-scripts](shells/portable-shell-scripts.md) | Writing a shell script that must run on more than one machine/OS/shell or in CI; a script that works locally fails elsewhere; choosing a shebang (bash vs sh); a bash script misbehaves in zsh or vice versa (unquoted vars, `=word`, array indexing); deciding how `set -euo pipefail` protects (and doesn't); building argument lists safely |
+| [disabling-a-feature-through-an-environment-variable](shells/disabling-a-feature-through-an-environment-variable.md) | Setting an env var (often `VAR=` / `export VAR=""`) to turn off a behaviour in a shell script, hook, CI step, or watcher; the feature stayed on though the variable was set; choosing between a rejected sentinel value and editing the script's expansion; writing a script that must honour an explicit "off"; deciding `${VAR:-default}` vs `${VAR-default}` vs an explicit enable flag |
 | [command-text-inspected-before-execution](shells/command-text-inspected-before-execution.md) | A hook, policy gate, allow-list, or audit rule blocked a command that is correct as written; composing a command that must satisfy such a gate first try; deciding whether to write a path literally or as `"$VAR"` in an inspected argument; a gate reports an argument missing or a file nonexistent though both are right; a gate must read a file your command creates; prose containing a dangerous-looking command (release notes, docs, fixtures) trips a text scanner |
 
 ## tools

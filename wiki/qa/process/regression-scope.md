@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://martinfowler.com/articles/rise-test-impact-analysis.html
 last_verified: 2026-07-10
-related: [qa-process-release-gates, qa-bug-reports-reproducible-reports]
+related: [qa-process-release-gates, qa-bug-reports-reproducible-reports, qa-process-enumerating-call-sites-of-a-changed-signature]
 ---
 
 # Choosing What to Re-Test for a Change

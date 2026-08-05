@@ -11,7 +11,7 @@ sources:
   - https://git-scm.com/docs/git
   - https://man7.org/linux/man-pages/man1/timeout.1.html
 last_verified: 2026-07-31
-related: [platforms-processes-background-services, platforms-tools-bsd-vs-gnu-cli, platforms-shells-portable-shell-scripts, debugging-methodology-hypothesis-testing]
+related: [platforms-processes-background-services, platforms-tools-bsd-vs-gnu-cli, platforms-shells-portable-shell-scripts, debugging-methodology-hypothesis-testing, platforms-shells-disabling-a-feature-through-an-environment-variable]
 ---
 
 # Invoking a Prompt-Capable CLI from a Script or Agent Harness

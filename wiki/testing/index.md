@@ -3,7 +3,8 @@
 Route here for: writing or structuring automated tests — choosing the test
 level, selecting cases and assertions, test data and isolation, mock/fake
 decisions, fixing flaky tests, verifying tests can actually fail, validating a
-check before its target exists, testing
+check before its target exists, keeping a module's import-time I/O out of a unit
+test, testing
 async code (promises/timers/events), and browser E2E selector/wait/setup
 strategy. Release-process quality (gates, manual testing, bug triage) →
 wiki/qa/.
@@ -15,6 +16,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [test-level-choice](strategy/test-level-choice.md) | Deciding at which level (unit/integration/e2e) to test new or changed behavior; reviewing a test plan's level distribution; logic buried in a controller or framework wiring needs coverage |
+| [import-time-side-effects](strategy/import-time-side-effects.md) | Unit-testing a pure function whose module runs real I/O at import (`init_db()`, client connect, app object at module scope); a test errors during collection instead of skipping; a module-level `skipif`/marker fails to prevent a DB connect; deciding whether to move the function to a side-effect-free module or gate the whole test module; choosing between `importorskip`, module-level skip, and `collect_ignore` |
 
 ## quality
 

@@ -8,7 +8,7 @@ sources:
   - https://martinfowler.com/articles/nonDeterminism.html
   - https://abseil.io/resources/swe-book/html/ch12.html
 last_verified: 2026-07-10
-related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice]
+related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-strategy-import-time-side-effects]
 ---
 
 # Owning Test Data and Isolating Test State

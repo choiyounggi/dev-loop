@@ -11,7 +11,7 @@ sources:
   - https://man7.org/linux/man-pages/man7/environ.7.html
   - https://www.sudo.ws/docs/man/sudoers.man/
 last_verified: 2026-07-10
-related: [platforms-toolchains-version-management, platforms-processes-background-services]
+related: [platforms-toolchains-version-management, platforms-processes-background-services, platforms-shells-disabling-a-feature-through-an-environment-variable]
 ---
 
 # The Wrong Binary (or None) Resolving From PATH
