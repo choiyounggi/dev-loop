@@ -15,6 +15,47 @@ unsubstituted and the worker reads it from its own Orca dispatch context.
 
 **tmux substrate.** §1–§4 — one line each, `send-keys -l`.
 
+## tmux delivery — how §1–§4 reach a worker
+
+§1 is injected by `launch-session.sh`, which owns the trust screen and the first
+injection. Do not re-implement that path.
+
+Every prompt after §1 — §2, §3, §4 — goes to the already-running session through
+`send-prompt.sh`. Raw `send-keys` returns 0 as soon as the keys reach the pane,
+which does not mean the worker took them: measured here, a prompt sent to a busy
+worker sat queued and invisible for 55s while a Stop-hook chain drained.
+
+```
+sh {SKILL}/scripts/send-prompt.sh send  <session> "<the one-line prompt>"
+sh {SKILL}/scripts/send-prompt.sh wait  <session> [timeout]
+sh {SKILL}/scripts/send-prompt.sh state <session>
+```
+
+Branch on the exit code. stdout is exactly one token; stderr is advisory context
+and must never be parsed.
+
+| exit | `send` | `wait` | `state` |
+|------|--------|--------|---------|
+| 0 | delivered | picked-up | ready |
+| 3 | gone | gone | gone |
+| 4 | queued | — | busy |
+| 5 | — | deadline expired | — |
+| 7 | unconfirmed | — | — |
+
+Shared codes: `1` usage · `2` invalid session name or prompt (injection guard) ·
+`6` tmux failed against a live session · `127` tmux not found.
+
+Exit 4 is not a failure — the worker holds the prompt but is still mid-turn.
+Follow it with `wait` (default 180s): exit 0 means the worker picked it up, exit 5
+means it is still working, NOT that the prompt was lost. That distinction is the
+whole point; do not retry a send on exit 5.
+
+Exit 7 means the keys were written but the pane showed no reaction — treat it as
+unknown and query `state`, never as success.
+
+The queued/busy markers are the Claude CLI's own wording, not this repo's.
+Override `LO_QUEUED_PATTERN` / `LO_BUSY_PATTERN` when a CLI release renames them.
+
 ## (1) Plan — injected at session launch
 
 You are the session for {TASK}. Treat .orchestration/briefs/{TASK}.md `<task_brief>` as authority — especially `<scope_boundaries>`, `<dependencies>`, and `<definition_of_done>`. Use the loop-implement skill but STOP after planning: run its step 2 with the bundled `wiki-plan` skill (make every design decision grounded in a `wiki/` page — record the decision->page map; leave nothing "as appropriate"), write the resulting implementation plan to .orchestration/plans/{TASK}.md, then run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} plan_ready worktree=$PWD` and wait for an approval message. Do NOT write implementation code yet.
