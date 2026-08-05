@@ -8,6 +8,15 @@
 # turns into a coordinator escalation rather than a hard block. Unknown rule ids
 # are ignored by older guardrails, so worktree_escape is forward-compatible.
 #
+# worktree_escape stays `ask` — `allowPaths` declares the ONE sanctioned path
+# (`.orchestration`, the coordination dir a worker writes its status and plan into)
+# rather than disabling the rule. Without it every such write reads as a write into
+# the main worktree: measured 2026-08-05, three escalations in one run, each
+# aborting the watch (exit 5) for legitimate coordination writes. Older guardrails
+# read only `.rules[<id>].mode` (guardrails 1.0.0 hooks/bash-guard.sh, inspected
+# 2026-08-05), so they ignore the extra key — safe to ship before the release that
+# implements it. Paths are relative to the MAIN worktree root.
+#
 # This is the SINGLE source of the worker config. `setup-worktrees.sh` calls it
 # for the tmux substrate; on the Orca substrate the worktree is created by
 # `orca worktree create`, so the orchestrator calls this script directly with the
@@ -23,7 +32,7 @@ wt="${1:-}"
 
 mkdir -p "$wt/.groundwork"
 cat > "$wt/.groundwork/guardrails.json" <<'GRJSON'
-{"rules":{"rm_rf":{"mode":"off"},"git_discard":{"mode":"off"},"system_tmp_write":{"mode":"off"},"cloud_delete":{"mode":"ask"},"sql_drop":{"mode":"ask"},"git_force_push":{"mode":"ask"},"secret_export":{"mode":"ask"},"curl_pipe_shell":{"mode":"ask"},"worktree_escape":{"mode":"ask"}}}
+{"rules":{"rm_rf":{"mode":"off"},"git_discard":{"mode":"off"},"system_tmp_write":{"mode":"off"},"cloud_delete":{"mode":"ask"},"sql_drop":{"mode":"ask"},"git_force_push":{"mode":"ask"},"secret_export":{"mode":"ask"},"curl_pipe_shell":{"mode":"ask"},"worktree_escape":{"mode":"ask","allowPaths":[".orchestration"]}}}
 GRJSON
 
 # Keep the sandbox config out of commits (worktree-local git exclude). Create the
