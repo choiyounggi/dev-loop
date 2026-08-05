@@ -7,10 +7,28 @@
 #   exit 0: all reached target (or higher)
 #   exit 2: timeout
 #   exit 3: a failed session detected (abort → orchestrator intervenes)
+#   exit 4: bad arguments (unknown target phase, missing dir, bad LO_PHASE_TIMEOUTS)
 #   exit 5: an escalation is pending (a worker's guardrails `ask` needs approval)
+#
+# Per-phase deadlines: one flat timeout gave a plan phase and a long implement
+# phase the same budget. LO_PHASE_TIMEOUTS carries a per-phase budget keyed on
+# the TARGET phase of this wait, so one exported value serves every call:
+#
+#   LO_PHASE_TIMEOUTS="plan_ready=900,impl_done=3600,done=1800"
+#
+# Precedence, highest first:
+#   1. an explicitly passed [timeout-sec] argument   (source=arg)
+#   2. the entry matching <target-phase>             (source=LO_PHASE_TIMEOUTS)
+#   3. the 3600s default                             (source=default)
+# A malformed entry (no `=`, non-numeric, <= 0, or a phase name that is not in
+# the phase order) is refused with exit 4 rather than silently defaulted — the
+# same treatment an unknown target phase already gets, and for the same reason:
+# a typo must not quietly buy a wildly wrong deadline. The effective budget and
+# its source are printed before the wait and repeated in the TIMEOUT line.
 set -eu
 JQ=$(command -v jq) || { echo "watch-status: jq not found" >&2; exit 127; }
 
+argc=$#
 dir="$1"; target="$2"; expected="$3"; timeout="${4:-3600}"; interval="${5:-15}"
 
 # monotonic phase order (low->high); failed handled separately
@@ -22,6 +40,37 @@ target_rank=$(rank "$target")
 if [ "$target_rank" -lt 0 ]; then echo "watch-status: unknown target phase '$target'" >&2; exit 4; fi
 [ -d "$dir" ] || { echo "watch-status: status dir '$dir' does not exist" >&2; exit 4; }
 
+# ---- effective budget (see the header for the precedence rules) -------------
+budget=3600; budget_src=default
+if [ -n "${LO_PHASE_TIMEOUTS:-}" ]; then
+  # Split on commas via $@ rather than looping with IFS=',' still set: `rank` below
+  # splits $order on whitespace, so IFS must be back to normal inside the loop.
+  # `set -f` keeps an entry from being glob-expanded on the way in.
+  oldifs=$IFS; IFS=','; set -f
+  # shellcheck disable=SC2086
+  set -- $LO_PHASE_TIMEOUTS
+  set +f; IFS=$oldifs
+  for entry in "$@"; do
+    [ -n "$entry" ] || continue          # tolerate a trailing/doubled comma
+    case "$entry" in
+      *=*) : ;;
+      *) echo "watch-status: invalid LO_PHASE_TIMEOUTS entry '$entry' (expected phase=seconds)" >&2; exit 4 ;;
+    esac
+    ph=${entry%%=*}; val=${entry#*=}
+    case "$val" in
+      ''|*[!0-9]*) echo "watch-status: invalid LO_PHASE_TIMEOUTS entry '$entry' (seconds must be a positive integer)" >&2; exit 4 ;;
+    esac
+    [ "$val" -gt 0 ] || { echo "watch-status: invalid LO_PHASE_TIMEOUTS entry '$entry' (seconds must be > 0)" >&2; exit 4; }
+    [ "$(rank "$ph")" -ge 0 ] || { echo "watch-status: invalid LO_PHASE_TIMEOUTS entry '$entry' (unknown phase '$ph')" >&2; exit 4; }
+    if [ "$ph" = "$target" ]; then budget="$val"; budget_src=LO_PHASE_TIMEOUTS; fi
+  done
+fi
+# An explicitly passed argument is the caller's direct instruction and outranks
+# the environment's policy. $# alone cannot say whether the 4th argument was
+# given or defaulted, so the count is captured before anything consumes it.
+if [ "$argc" -ge 4 ]; then budget="$timeout"; budget_src=arg; fi
+echo "[watch] budget=${budget}s target=${target} source=${budget_src}"
+
 elapsed=0
 # Escalations live beside the status dir: <root>/.orchestration/{status,escalations}.
 escdir="$(dirname "$dir")/escalations"
@@ -30,7 +79,7 @@ escdir="$(dirname "$dir")/escalations"
 # dead — a missing tmux must not abort the run (`! missing-cmd` would invert to true).
 TMUX_BIN="${WATCH_TMUX:-tmux}"
 command -v "$TMUX_BIN" >/dev/null 2>&1 || TMUX_BIN=""
-while [ "$elapsed" -lt "$timeout" ]; do
+while [ "$elapsed" -lt "$budget" ]; do
   # A worker's guardrails `ask`, recorded as an escalation, wakes the coordinator
   # immediately rather than waiting out the timeout. The coordinator MUST resolve
   # (approve/deny) and clear these records before relaunching watch; exit 5 recurs
@@ -77,4 +126,4 @@ while [ "$elapsed" -lt "$timeout" ]; do
   [ "$done_count" -ge "$expected" ] && { echo "[watch] all reached $target"; exit 0; }
   sleep "$interval"; elapsed=$((elapsed+interval))
 done
-echo "[watch] TIMEOUT (${timeout}s):$summary"; exit 2
+echo "[watch] TIMEOUT (${budget}s, source=${budget_src}):$summary"; exit 2

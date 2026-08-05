@@ -36,6 +36,20 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
+# Regression: the script cd's to <repo-root>, so a RELATIVE $0 must be resolved
+# to an absolute dir first — otherwise the sibling worker-guardrails.sh is looked
+# up under the repo root, is not found, and set -e aborts mid-provision leaving a
+# worktree with no guardrails sandbox.
+@test "invoked by a relative path from another cwd: still provisions the sandbox" {
+  scriptdir=$(cd "$(dirname "$SW")" && pwd -P)
+  parent=$(dirname "$scriptdir")                       # .../skills/orchestrate
+  base=$(dirname "$parent")                            # .../skills
+  run env -C "$base" sh "orchestrate/scripts/$(basename "$SW")" feat/goal "$root" main feat/t1
+  [ "$status" -eq 0 ]
+  [ -f "$root/.worktrees/feat-t1/.groundwork/guardrails.json" ]
+  [[ "$output" != *"No such file or directory"* ]]
+}
+
 @test "writes a worker-scoped guardrails config into each worktree" {
   run bash "$SW" feat/goal "$root" main feat/t1
   [ "$status" -eq 0 ]

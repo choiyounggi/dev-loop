@@ -30,7 +30,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [timezone-and-locale](environment/timezone-and-locale.md) | Date/time or text-processing code behaves differently across machines (passes locally, fails in CI or vice versa); a cron/scheduled job fires at the wrong hour or double-fires/skips around DST; reviewing code that formats, parses, or compares dates or strings; writing tests that touch time; building case-insensitive keys, sorted output, or number parsing that must agree across machines |
 | [unicode-text-matching](environment/unicode-text-matching.md) | A grep/regex pattern over non-ASCII text (Korean/Japanese/accented Latin/emoji) returns zero hits on text you can see; writing a pattern that must match an inflected or precomposed word; a search or name comparison works on one machine and misses after the file crossed an OS/archive/editor boundary; deciding where to normalize (NFC/NFD) user-supplied text used as a key |
-| [path-resolution](environment/path-resolution.md) | "command not found" though the tool is installed; a different version runs than the one installed; sudo/CI/cron/GUI apps/ssh can't find a command the interactive shell finds; two installations of the same tool conflict; deciding how a script should locate its correctness-critical tools |
+| [path-resolution](environment/path-resolution.md) | "command not found" though the tool is installed; a different version runs than the one installed; sudo/CI/cron/GUI apps/ssh can't find a command the interactive shell finds; two installations of the same tool conflict; a package manager reports a tool installed yet no PATH lookup finds it (Homebrew keg-only/unlinked); deciding how a script should locate its correctness-critical tools |
 
 ## filesystems
 
@@ -44,7 +44,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [background-services](processes/background-services.md) | Something must run persistently or on a schedule on a dev machine or server (daemon, watcher, cron-style job); a "started" process dies when the terminal/SSH/agent session ends; choosing nohup vs LaunchAgent vs systemd unit vs cron/timer; a job works in the terminal but fails under cron/launchd (minimal environment); wiring service logs and restart policy |
-| [non-interactive-cli-invocation](processes/non-interactive-cli-invocation.md) | Calling a tool that can prompt (agent CLI, ssh, git, package manager) from a script, CI step, hook, or agent session, including with its own `-p`/`--print`/`--yes` flag; such a call produced no output and never returned; deciding whether a hang belongs to the client, the network, or the far-side service; choosing the stdin/timeout/fail-fast switches for an unattended call; a TTY-detecting tool changes its output format under automation |
+| [non-interactive-cli-invocation](processes/non-interactive-cli-invocation.md) | Calling a tool that can prompt (agent CLI, ssh, git, package manager) from a script, CI step, hook, or agent session, including with its own `-p`/`--print`/`--yes` flag; such a call produced no output and never returned; deciding whether a hang belongs to the client, the network, or the far-side service; choosing the stdin/timeout/fail-fast switches for an unattended call; a TTY-detecting tool changes its output format under automation; driving its interactive REPL with injected keystrokes (tmux `send-keys`/`expect`) and a pasted prompt never submits |
 
 ## toolchains
 

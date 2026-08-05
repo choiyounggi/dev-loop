@@ -12,6 +12,13 @@
 set -eu
 GIT=$(command -v git) || { echo "setup-worktrees: git not found" >&2; exit 127; }
 
+# Resolve our own directory to an ABSOLUTE path before the `cd "$root"` below:
+# `$0` may be relative to the invocation cwd, and after the cd a relative
+# `$(dirname "$0")/worker-guardrails.sh` resolves against the repo root instead
+# — the sibling script is then not found and set -e aborts mid-provision.
+SCRIPT_DIR=$(cd "$(dirname "$0")" 2>/dev/null && pwd -P) \
+  || { echo "setup-worktrees: cannot resolve script directory from '$0'" >&2; exit 1; }
+
 [ $# -ge 4 ] || { echo "usage: setup-worktrees.sh <integ-branch> <repo-root> <base-ref> <task-branch>..." >&2; exit 1; }
 integ="$1"; root="$2"; base="$3"; shift 3
 
@@ -43,26 +50,9 @@ for br in "$@"; do
     "$GIT" worktree add -b "$br" "$path" "$integ"
     echo "ok: worktree $path ($br)"
   fi
-  # Scope guardrails inside this worktree: an isolated sandbox loosens harmless
-  # rules (rm_rf, git_discard, tmp writes) and keeps genuinely dangerous ones as
-  # `ask` — which the escalation env (launch-session) turns into a coordinator
-  # escalation rather than a hard block. Unknown rule ids are ignored by older
-  # guardrails, so worktree_escape is forward-compatible.
-  mkdir -p "$path/.groundwork"
-  cat > "$path/.groundwork/guardrails.json" <<'GRJSON'
-{"rules":{"rm_rf":{"mode":"off"},"git_discard":{"mode":"off"},"system_tmp_write":{"mode":"off"},"cloud_delete":{"mode":"ask"},"sql_drop":{"mode":"ask"},"git_force_push":{"mode":"ask"},"secret_export":{"mode":"ask"},"curl_pipe_shell":{"mode":"ask"},"worktree_escape":{"mode":"ask"}}}
-GRJSON
-  # keep the sandbox config out of commits (worktree-local git exclude). Create
-  # the exclude file if it does not exist, and never let an append failure abort
-  # the whole run (set -e) — warn instead.
-  excl=$("$GIT" -C "$path" rev-parse --git-path info/exclude 2>/dev/null || echo "")
-  if [ -n "$excl" ]; then
-    mkdir -p "$(dirname "$excl")" 2>/dev/null || true
-    if ! grep -qxF '.groundwork/' "$excl" 2>/dev/null; then
-      printf '.groundwork/\n' >> "$excl" 2>/dev/null \
-        || echo "setup-worktrees: warn — could not exclude .groundwork/ in $path" >&2
-    fi
-  fi
+  # Scope guardrails inside this worktree (single source: worker-guardrails.sh —
+  # the Orca substrate calls the same script for an orca-created worktree).
+  sh "$SCRIPT_DIR/worker-guardrails.sh" "$path"
   # optional env copy if the project provides one (e.g. monorepos)
   if [ -f "$root/scripts/worktree-copy-env.sh" ]; then
     sh "$root/scripts/worktree-copy-env.sh" "$path" >/dev/null 2>&1 \
