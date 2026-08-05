@@ -1,7 +1,8 @@
 # qa — Domain Index
 
 Route here for: release-quality process — acceptance criteria, gates,
-regression scoping, test-environment parity, post-release verification, bug
+regression scoping, enumerating a change's call sites/consumers before calling
+a migration complete, test-environment parity, post-release verification, bug
 reports, manual/exploratory testing, and automated verification of document
 deliverables (specs/RFCs). Writing automated test code → wiki/testing/;
 rollout/canary/rollback mechanics → wiki/infrastructure/.
@@ -15,6 +16,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [acceptance-criteria](process/acceptance-criteria.md) | Writing or reviewing a feature ticket/user story before development starts; "done" is disputed at QA time; a delivered feature technically works but misses the intent |
 | [release-gates](process/release-gates.md) | Deciding whether a build/release is ready to ship; defining or reviewing the checklist that makes that decision |
 | [regression-scope](process/regression-scope.md) | Choosing what to re-test for a release/change when full regression is too expensive; reviewing someone else's proposed regression scope |
+| [call-site-enumeration](process/call-site-enumeration.md) | Changing a function/constructor/method signature (parameter count, order, or the shape of a structure it takes) and migrating every caller; reviewing a migration whose completeness rests on a search; deciding which search finds positional callers, test helpers, and indirect references, and what the full-suite run audits |
 | [severity-and-priority](process/severity-and-priority.md) | Triaging a bug — deciding how bad it is and when it gets fixed; a triage stalled on a severity debate |
 | [post-release-verification](process/post-release-verification.md) | A release just deployed to production; defining what "released safely" means; an incident revealed a release was broken for hours before anyone noticed |
 

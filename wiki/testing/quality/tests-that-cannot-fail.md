@@ -11,7 +11,7 @@ sources:
   - https://martinfowler.com/bliki/TestCoverage.html
   - https://testing.googleblog.com/2013/05/testing-on-toilet-dont-overuse-mocks.html
 last_verified: 2026-07-10
-related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-checks-that-cannot-pass, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, qa-document-verification-spec-document-gates]
+related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-checks-that-cannot-pass, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, testing-quality-write-path-assertions, qa-document-verification-spec-document-gates]
 ---
 
 # Proving a Test Can Fail
@@ -38,6 +38,7 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 | Error-path test that passes when no error is thrown (`expect` sits in the `catch` block; nothing asserts the throw happened) | Use `await expect(...).rejects.toThrow(ErrorType)` / `assertThrows`-style APIs, which fail when the code succeeds |
 | Always-true assertion (`toBeDefined`/`toBeTruthy` on a value that is always defined, `expect(arr.length).toBeGreaterThanOrEqual(0)`) | Assert the specific expected value or shape — the observable-outcome rule in [testing-quality-minimum-case-set] |
 | Testing the mock instead of the code (mock returns X, test asserts X came back) | Assert the unit's transformation of its inputs, not the pass-through; when no transformation exists at this layer, test the layer that has one ([testing-mocking-what-to-mock]) |
+| HTTP test of a write endpoint asserting only the response status | Read the persisted record back and assert the values sent — a request whose body never decoded still returns the success status ([testing-quality-write-path-assertions]) |
 | Copied test body with the name changed but identical inputs and expectation | Give each case distinct inputs and its own expectation; delete exact duplicates — a renamed copy re-proves the same fact and guards nothing new |
 
 3. **Coverage note:** a covered line is only an executed line. Use coverage to

@@ -4,9 +4,18 @@ Route here for: CI/CD pipeline design, secrets in build/deploy flows, container
 image builds, container resource limits and health probes, per-environment
 configuration (env vars, config drift, startup validation), rollout/rollback
 strategy, observability (logging, metrics, alerting), datastore backup/restore
-and data-loss planning.
+and data-loss planning, and orchestrating parallel agent worker sessions
+(terminal-pane delivery, completion gates, worktree-isolated briefs).
 
 Match your situation to a "load when" line; load only matching pages.
+
+## agent-orchestration
+
+| Page | Load when |
+|------|-----------|
+| [pane-delivery-confirmation](agent-orchestration/pane-delivery-confirmation.md) | An orchestrator drives another program through a terminal multiplexer (`tmux send-keys` + `capture-pane`) and must decide whether the input was consumed, retry, or escalate; a pane diff is being used as delivery evidence; the target echoes but never runs the input |
+| [session-completion-gates](agent-orchestration/session-completion-gates.md) | Writing a Stop/completion hook that blocks a worker session from ending while its phase is non-terminal; the gate fires on a worker that followed its own prompt; deciding the terminal phase set, the unknown-phase default, and how the gate bounds its own repetition |
+| [worktree-isolated-workers](agent-orchestration/worktree-isolated-workers.md) | Authoring the brief/output contract for parallel workers each confined to its own git worktree; workers stall at the same phase with no task-level error; deciding where shared or produced artifacts live and which direction (read vs write) a worktree guardrail stops |
 
 ## ci-cd
 
