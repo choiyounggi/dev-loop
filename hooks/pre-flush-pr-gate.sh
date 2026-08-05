@@ -53,7 +53,12 @@ printf '%s' "$CMD" | grep -Eq -- 'INGEST_REPORT' && IS_FLUSH=1
 
 # Locate the --body-file path referenced by the command. Portable (grep/sed only,
 # no node) so the enforcement path never depends on node being installed.
-BODY_FILE="$(printf '%s' "$CMD" | grep -oE -- "--body-file[= ]+[^ '\"\`]+" | head -1 | sed -E 's/^--body-file[= ]+//')"
+# The path may be bare, or wrapped in single or double quotes (the flush skill's
+# own example quotes it) — accept all three and strip the quotes.
+BODY_FILE="$(printf '%s' "$CMD" \
+  | grep -oE -- "--body-file[= ]+(\"[^\"]+\"|'[^']+'|[^ '\"\`]+)" | head -1 \
+  | sed -E "s/^--body-file[= ]+//" \
+  | sed -E "s/^\"(.*)\"$/\\1/" | sed -E "s/^'(.*)'$/\\1/")"
 
 fail() {
   echo "dev-loop knowledge-flush gate: $1" >&2
@@ -69,8 +74,13 @@ fail() {
 }
 
 [ -n "$BODY_FILE" ] || fail "no --body-file found on the gh pr create command."
-# Expand a leading ~ if present.
-case "$BODY_FILE" in "~"/*) BODY_FILE="$HOME/${BODY_FILE#~/}" ;; esac
+# Expand a leading ~, $HOME, or ${HOME} — the only variable forms the gate can
+# resolve safely; anything else must be written as a literal path.
+case "$BODY_FILE" in
+  "~"/*)        BODY_FILE="$HOME/${BODY_FILE#~/}" ;;
+  '$HOME'/*)    BODY_FILE="$HOME/${BODY_FILE#\$HOME/}" ;;
+  '${HOME}'/*)  BODY_FILE="$HOME/${BODY_FILE#\$\{HOME\}/}" ;;
+esac
 [ -f "$BODY_FILE" ] || fail "body file '$BODY_FILE' does not exist yet."
 
 miss=""
