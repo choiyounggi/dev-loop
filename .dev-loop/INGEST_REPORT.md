@@ -1,95 +1,190 @@
-# Consolidated review — knowledge PRs #6–#13
+# Knowledge flush — 9 insight(s)
 
-Eight fork PRs (`dch0202-rsquare`, 2026-07-28 → 2026-08-02) were reviewed together
-against `AGENTS.md`. Each PR was audited by an independent reviewer (format rules,
-sources, vague-qualifier ban, ≤120 body lines, index/log invariants), then
-cross-compared to catch duplication the per-PR flushes could not see — they branched
-independently off the same main and rewrote the same shared index/log files. Fork
-branches can't be edited from here and several PRs needed content changes (drop a
-duplicate, merge a colliding page), so this branch carries the reconciled end-state
-rather than merging each PR as-is (which would import the duplicates).
+Drained 9 pending candidates from 7 session files in `~/.dev-loop/queue`. Result:
+**5 new pages, 2 existing pages extended, 0 dropped.** No candidate was accepted on
+assertion alone — each was re-derived from primary docs, reproduced locally, or
+demoted to `field-tested` with the reason stated.
 
 ## Verified best-practice
 
-Sources are per-page and were live-verified in each originating PR's flush; the
-independent re-reviews re-checked them. Landed pages and their evidence base:
+### 1. `create_all()` + hand-written ALTER — testing additive migrations
+**Claim:** a test that calls `init_db()` twice does not test the migration; only a
+run that starts from the *previous* schema does.
+**Checked:** SQLAlchemy [metadata](https://docs.sqlalchemy.org/en/20/core/metadata.html)
+— `create_all()` "will issue queries that first check for the existence of each
+individual table, and if not found will issue the CREATE statements", and altering
+constructs "via the ALTER statement … is outside of the scope of SQLAlchemy itself".
+SQLAlchemy [defaults](https://docs.sqlalchemy.org/en/20/core/defaults.html) —
+`server_default` "gets placed in the CREATE TABLE statement", and neither default
+backfills existing rows. PostgreSQL [ddl-alter](https://www.postgresql.org/docs/current/ddl-alter.html)
+— "the default value will be returned the next time the row is accessed".
+**Correction applied:** the candidate credited the surviving-row values to the model's
+`server_default`. The docs place the backfill on the `DEFAULT` clause of the `ALTER`
+instead; the page now says so, and adds `ADD COLUMN` without a `DEFAULT` as the defect
+the assertion catches. → **verified**
 
-| Page | Confidence | Source basis |
-|------|-----------|--------------|
-| backend/common/llm/completion-response-validation | verified | OpenAI reasoning guide + chat `object` spec (5 `finish_reason` values), vLLM/LiteLLM reasoning fields; field incident (200/`length`/empty content/8,173-char reasoning) |
-| backend/common/llm/context-window-budget | verified | Claude context-window docs, LiteLLM exception mapping, vLLM/Claude Code env-var docs |
-| backend/common/integrations/externally-owned-defaults | verified | OpenAI deprecations (notice windows) + models `list`, LiteLLM model_discovery; field incident (alias removed between PR verify and review → 400) |
-| backend/common/storage/object-key-persistence | verified | AWS S3 CompleteMultipartUpload + managed-upload API/source, aws-sdk-js issues #1158/#5656 |
-| infrastructure/containers/host-cgroup-visibility | field-tested | cgroup_namespaces(7), Docker `--cgroupns=host`, nsenter, k8s #103363; OrbStack repro |
-| infrastructure/observability/missing-container-metrics | verified/field-tested | k8s resource-metrics-pipeline docs, kube-prometheus-stack values, kubernetes-mixin; OrbStack #2217 repro |
-| platforms/environment/unicode-text-matching | verified | UAX #15, Unicode core §3.12, APFS FAQ, POSIX grep; local repro (macOS 15/APFS, grep 2.6.0-FreeBSD, Python 3.13) |
-| platforms/shells/command-text-inspected-before-execution | verified | Claude Code hooks docs, POSIX shell §2.6; local reproduction |
-| platforms/processes/non-interactive-cli-invocation | verified | GNU nohup, OpenBSD ssh/ssh_config, git, timeout man pages; no-request-in-gateway-log field incident |
-| qa/document-verification/spec-document-gates | field-tested | ESLint, Google mutation testing, RFC 2119, Vale, markdownlint; 32/32 mutant / 62/62 intact RFC sessions |
-| qa/document-verification/editing-a-gated-document | field-tested | pgrep, Vale, markdownlint; in-house editing methodology |
-| testing/quality/checks-that-cannot-pass | verified | James Shore AoAD2, POSIX grep exit status, Semgrep rule-testing, pytest exit codes; BSD/ugrep measurement |
-| testing/quality/spec-artifact-checks | verified | JSON Schema, ESLint RuleTester, pitest, GFM table spec; local cell-count repro + GitHub renderer cross-check |
-| testing/quality/harness-reverse-controls | verified | mutation-testing + CI-control sources; field repro (re-fetched all cited URLs, PASS) |
+### 2. tmux pane-diff is not delivery evidence
+**Claim:** a busy pane echoes typed characters, so a `capture-pane` diff reports
+"delivered" for input that was never consumed.
+**Reproduced (tmux 3.7b, macOS):** sent `echo SECOND_PROMPT` to a pane running
+`sleep 6` — pane content changed (naive diff → delivered) while the command's own
+output count stayed **0**, becoming **1** only after the sleep drained. Mechanism is
+terminal `ECHO` in canonical mode
+([POSIX chap11](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap11.html)).
+→ **verified**
 
-Three pages were reconciled from two overlapping PR versions each, keeping the more
-complete/better-sourced body and folding in the other's unique cases:
-- **completion-response-validation** — #12 body (all five `finish_reason` values,
-  `tool_calls`/`function_call` carve-out, streaming, Responses API, "reasoning is
-  scratch, not deliverable") kept in `llm/` (coherent with #6/#13); folded in #6's
-  DeepSeek first-party edge + the field incident.
-- **externally-owned-defaults** — #12 generalized body (any repo-external resource)
-  in `integrations/`; folded in #6's alias-removed field incident + the
-  gateway-config-vs-live-upstream nuance.
-- **non-interactive-cli-invocation** — #12 body (GNU-nohup extension precision,
-  ssh -n stdin-detach vs BatchMode, pre-log DNS/TLS/proxy + `curl -v`) kept; folded
-  in #11's DEBIAN_FRONTEND, pager/color TTY case, wrapper-CLI case, field incident.
+### 3. `tmux send-keys` payloads need a `--` separator
+**Reproduced:** `tmux send-keys -t S -l "-n hello"` → `command send-keys: unknown flag -n`,
+exit 1; the identical call with `-- "-n hello"` → exit 0.
+[POSIX Guideline 10](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html)
+gives the mechanism. Noted honestly in the page: [tmux.1](https://man.openbsd.org/tmux.1)
+documents `-l` but does **not** document `--`; the behaviour follows getopt convention.
+→ **verified**
+
+### 4. Backticks survive double quotes and gut a CLI text payload
+**Reproduced** — in zsh, with the command example backquoted inside double quotes:
+
+```
+$ echo "run: `pip install -e .[dev]` first"
+zsh:1: no matches found: .[dev]
+run:  first          # exit 0, message gutted
+```
+
+bash substituted the command's output instead; the single-quoted form printed the
+text verbatim.
+[POSIX 2.2.3](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html):
+the backquote "shall retain its special meaning introducing the other form of command
+substitution" inside double quotes. → **verified**
+
+### 5. POSIX `set --` inside a helper function is discarded
+**Reproduced under `/bin/sh` and `dash`:** `parse_flags "$@"` left the caller with
+`argc=4` still containing `--dry-run`; the identical loop inline gave `argc=3` with the
+space-bearing operand intact. `DRY=1` in **both** — the flag is detected either way, so
+only the operand list is wrong and nothing errors. POSIX 2.9.5: on return "the value of
+the special parameter `#` and the positional parameters shall be restored to the values
+they had before the function was executed". → **verified**
+
+### 6. A gate-blocked command is indistinguishable from a silent success
+**Claim:** a `worktree_escape` guardrail blocked the orchestrator's own
+`status-update.sh`; empty stdout read as success while no status file was written.
+**Verified in-session:** the status directory was empty afterwards, and a Write-tool
+call to the same tree succeeded — proving the block is command-text-scoped, not a
+filesystem permission. Consistent with the page's already-cited
+[hooks doc](https://code.claude.com/docs/en/hooks) (exit 2 blocks; the reason goes to
+stderr, not stdout). → **verified**
+
+### 7. A harness hook can replace a tool's result
+**Claim:** a session-memory plugin returned only line 1 of a file plus a remediation
+note that did not work.
+**Checked:** the [hooks doc](https://code.claude.com/docs/en/hooks) documents
+`PostToolUse` `updatedToolOutput` — it "replaces the tool's result" — and names
+transformation of "inbound tool results" as an intended use. The *mechanism* is
+therefore verified; the specific plugin's behaviour is dated field context in the page,
+and the page's rule is "size-check with `wc` first, because interception and a
+genuinely small file look identical". → **verified** (mechanism) with dated field context
+
+### 8. PATH-injected recording fake for destructive daemon sweeps
+**Reproduced:** with a fake `tmux` prepended to `PATH`, a prefix sweep over fixtures
+`run-1, run-2, mydev` logged exactly `KILL run-1` / `KILL run-2`, **zero** bystander
+lines, and an **empty** log for a non-matching prefix — while the machine's 8 real tmux
+sessions, 3 of which matched the pattern under test, were untouched. The seam is
+[POSIX chap08](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap08.html)
+`PATH` search order; fake-vs-mock framing from
+[Fowler](https://martinfowler.com/articles/mocksArentStubs.html). → **verified**
+
+### 9. Auth/token requests bypass a method-level rate-limit throttle
+**Claim:** a throttle on the client's public methods misses the token POST issued
+inside `_headers()`, so two requests leave in the same second.
+**Checked:** [Okta](https://developer.okta.com/docs/reference/rate-limits/) documents
+per-endpoint rate-limit buckets covering OAuth token endpoints;
+[Auth0](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy)
+publishes an `/oauth/token` limit; [GitHub](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
+states OAuth-app requests "count towards" the user's limit. Together these source the
+general rule (token issuance is metered) and the remedy (throttle at the lowest
+HTTP-issuing layer).
+**Honest limit:** the specific 2-requests/second quota and the timestamped log evidence
+come from one provider's mock environment and were **not** confirmed against that
+provider's published spec — no primary doc stating the number was found, and no URL was
+invented for it. The page is therefore **field-tested**, not verified, with the
+provider-specific numbers confined to a "Field context" note.
 
 ## Existing-layer check
 
-Cross-PR and against-main duplication was the focus. Findings and resolutions:
+Routed via `INDEX.md`, then read every domain index whose route line overlapped, then
+every page whose "load when" line could collide.
 
-- **spec-artifact-checks (#8) ≡ document-conformance-checks (#9)** — same case
-  (coverage-vs-validity split, per-check negative controls, GFM pipe parsing,
-  ESLint/Semgrep/mutation examples). #9's report predated awareness of #8. →
-  **#8 kept canonical; #9's page dropped, `testing/docs-as-spec` category not created.**
-- **completion-response-validation (#6) ≈ llm-response-completeness (#12)** — ~95%
-  same case (HTTP 200 ≠ usable output; `length`/blank/reasoning-budget). →
-  **merged into one `llm/` page; #12's `integrations/` copy dropped.**
-- **gateway-model-alias-defaults (#6) ≈ externally-owned-defaults (#12)** — ~80%;
-  #12 generalizes the model-alias case to any external resource. →
-  **kept the general `integrations/` page; #6's LLM-only page dropped.**
-- **non-interactive-cli-invocation** — created by BOTH #11 and #12 (file collision).
-  → **single reconciled page.**
-- Distinct (no overlap, all landed): checks-that-cannot-pass, harness-reverse-controls,
-  spec-document-gates, editing-a-gated-document, unicode-text-matching,
-  command-text-inspected-before-execution, object-key-persistence, context-window-budget,
-  host-cgroup-visibility, missing-container-metrics.
-- Reciprocal `related:` links added on existing pages (tests-that-cannot-fail,
-  timeouts-and-retries, environment-config, release-gates, background-services,
-  portable-shell-scripts, timezone-and-locale, paths-case-and-line-endings,
-  acceptance-criteria, resource-limits-and-probes, logs-metrics-signals,
-  minimum-case-set). A dropped-page backlink (#6 → gateway-model-alias-defaults on
-  environment-config and release-gates) was retargeted to externally-owned-defaults.
-- Invariants verified programmatically: all `related:`/inline `[id]` references
-  resolve, every page listed in its domain index, no duplicate ids, no page >120
-  body lines.
+**Pages read in full:** `platforms/shells/portable-shell-scripts`,
+`platforms/shells/command-text-inspected-before-execution`,
+`platforms/processes/non-interactive-cli-invocation`,
+`platforms/processes/background-services` (its tmux mention),
+`databases/schema-design/online-schema-changes`, `testing/mocking/what-to-mock`,
+`backend/common/reliability/timeouts-and-retries`. Plus a repo-wide grep for
+`tmux|orchestrat|rate limit|throttl|quota` to catch coverage the index lines hide.
+
+**Merged rather than duplicated (2):**
+
+| Candidate | Merged into | What was added |
+|-----------|-------------|----------------|
+| POSIX `set --` in a function; backticks in a double-quoted payload | `platforms/shells/portable-shell-scripts` | Step 5 extended with the POSIX-sh in-place `"$@"` reordering idiom + the inline-only rule; new step 6 on single- vs double-quoting a text payload; 3 edge cases, 3 Instead-of rows, 3 sources |
+| Guardrail blocks a script, silent failure | `platforms/shells/command-text-inspected-before-execution` | New steps 6–7 (verify the artifact, not the silence; hand a blocked signal back as un-emitted); 2 edge cases, 2 Instead-of rows, dated field context |
+
+Both pages' `last_verified` bumped to 2026-08-05; both stay under the 120-line cap
+(92 and 107 body lines).
+
+**Overlap examined and rejected as a merge (4):**
+
+- `timeouts-and-retries` covers outbound-call reliability (timeouts, retry-by-failure-type,
+  backoff, concurrency caps) but never client-side pacing to a provider quota — a
+  repo-wide grep found no `throttl|rate limit` page outside edge/WAF contexts in
+  `security/`. New page; cross-linked for the 429/`Retry-After` path.
+- `what-to-mock` decides *whether* to substitute an in-process dependency at an
+  interface. The daemon case has a different seam (`PATH`, not an interface) and a
+  different stake (the test can destroy the developer's environment). New page,
+  `related`-linked.
+- `online-schema-changes` owns ALTER **lock** behaviour, not proving that a hand-rolled
+  migration ran. New sibling page in the same category, cross-linked for the
+  volatile-default rewrite case.
+- `non-interactive-cli-invocation` owns *starting* a prompt-capable CLI; driving an
+  *already-running* TUI through a pty is a distinct case. New page, `related`-linked.
+
+**Conflicts flagged:** none. No new directive contradicts an existing one.
+
+**Related-links added:** every new page links back into the existing graph
+(`online-schema-changes`, `nullability-and-defaults`, `test-data-and-isolation`,
+`tests-that-cannot-fail`, `what-to-mock`, `path-resolution`,
+`command-text-inspected-before-execution`, `non-interactive-cli-invocation`,
+`background-services`, `timeouts-and-retries`, `jwt-server-side`, `hypothesis-testing`).
+An invariant pass confirms every `related:` id and inline `[page-id]` reference
+resolves, all 7 touched pages appear in their domain index, and no page exceeds 120
+body lines.
 
 ## Routing decision
 
-- `backend/common/llm/` (new) — LLM-specific server concerns: completion-response-validation,
-  context-window-budget. Coherent home shared by #6 and #13.
-- `backend/common/integrations/` (new) — general repo-external-dependency concern:
-  externally-owned-defaults. Kept separate from `llm/` because its scope is any
-  external resource (bucket/queue/index), not LLM-only.
-- `backend/common/storage/` (new) — object-key-persistence.
-- `qa/document-verification/` (new) — spec-document-gates, editing-a-gated-document.
-  Introduced by both #10 and #11; unified into one index section.
-- `testing/quality/` (existing) — checks-that-cannot-pass, spec-artifact-checks,
-  harness-reverse-controls (test/check-authoring discipline, distinct from
-  qa/document-verification which is release-process gate design).
-- `platforms/{environment,shells,processes}/` (existing) — unicode-text-matching,
-  command-text-inspected-before-execution, non-interactive-cli-invocation.
-- `infrastructure/{containers,observability}/` (existing) — host-cgroup-visibility,
-  missing-container-metrics.
+| # | Insight | Target | New/merge |
+|---|---------|--------|-----------|
+| 1 | Testing an additive migration under `create_all()` + hand-written ALTER | `databases/schema-design/verifying-additive-migrations` | **new** |
+| 2+3 | Confirming a keystroke reached a TUI in a tmux pane; `--` for `send-keys` payloads | `platforms/processes/driving-a-tui-in-a-tmux-pane` | **new** (one page — both are the same operation) |
+| 7 | A harness hook substituted a tool's result | `platforms/processes/harness-tool-result-interception` | **new** |
+| 8 | Sweep-tests against a live shared daemon | `testing/mocking/destructive-operations-on-shared-daemons` | **new** |
+| 9 | Token requests bypassing a client throttle | `backend/common/reliability/client-side-rate-limit-pacing` | **new** |
+| 4+5 | POSIX `set --` scope; backticks in a double-quoted payload | `platforms/shells/portable-shell-scripts` | merge |
+| 6 | Gate-blocked command reads as a silent success | `platforms/shells/command-text-inspected-before-execution` | merge |
 
-Source PRs #6–#13 are closed with a disposition comment crediting the author.
+**No new categories were created.** Each new page landed in an existing category, and
+in the two places a new category was tempting the closest fit was taken instead:
+
+- Insight 1 could have opened `databases/migrations/`, but `schema-design/` already
+  holds `online-schema-changes`, which is migration machinery. A category holding one
+  page next to its sibling adds a routing hop for no discrimination.
+- Insights 2, 3 and 7 are agent/orchestration concerns that could have opened
+  `platforms/orchestration/`. `platforms/processes/` already covers "keeping processes
+  alive as services" and "invoking prompt-capable CLIs non-interactively"; driving and
+  observing another process is the same concern, so all three went there.
+
+Root `INDEX.md` route lines were extended for all four touched domains (databases,
+backend, testing, platforms); `log.md` gained one `ingest` and one `revise` entry.
+
+**Reviewer's attention is best spent on:** the `field-tested` rating on
+`client-side-rate-limit-pacing` (§9 — the provider-specific quota is unsourced by
+design), and on whether insights 2, 3 and 7 belong under `platforms/processes/` or
+justify an `orchestration` category once more agent-harness pages accumulate.

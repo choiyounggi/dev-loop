@@ -31,6 +31,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [timeouts-and-retries](common/reliability/timeouts-and-retries.md) | Your service calls another service/external API/DB over the network — setting timeouts and deadlines, deciding what to retry per failure type, backoff/jitter, capping concurrency against a slow dependency; debugging pool exhaustion or retry storms |
+| [client-side-rate-limit-pacing](common/reliability/client-side-rate-limit-pacing.md) | You throttle your own calls to stay under a provider's per-second quota and rate-limit errors still occur; deciding which layer the throttle belongs at and when its clock is stamped; auth/token requests issued inside header-building or an interceptor; a rate-limit failure that only reproduces on the process's first call or on days the credential cache is cold; sharing one API key across workers |
 
 ### caching
 

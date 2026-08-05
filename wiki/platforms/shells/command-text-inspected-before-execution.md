@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://code.claude.com/docs/en/hooks
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
-last_verified: 2026-07-30
+last_verified: 2026-08-05
 related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution]
 ---
 
@@ -58,11 +58,26 @@ on the first attempt.
    your exact command string before rewriting anything else — one run tells you
    whether you are in the missing-argument or nonexistent-file mode above.
 
+6. **Verify the artifact, never the silence.** A blocked command emits nothing on
+   stdout, which is byte-identical to a command that ran and printed nothing. When
+   the command's whole purpose is a side effect (writing a status file, touching a
+   marker, sending a signal), `ls`/`stat` that artifact before reporting the step
+   done. A gate that matches on a path blocks on the path text regardless of the
+   command's purpose — including the harness's own scripts, invoked exactly as the
+   harness documents them.
+
+7. **Hand a blocked signal back rather than routing around it.** When the gate
+   escalates, report the signal as *un-emitted* to whoever is waiting on it. A
+   consumer polling for a file that will never appear waits forever, and an
+   improvised workaround defeats a control the human put there deliberately.
+
 ## Edge cases
 
 | Case | Then |
 |------|------|
 | Blocking feedback appears without the gate's message | Exit code 2 sends the reason to **stderr**, not stdout; read stderr for the actual cause |
+| A path-scoped gate blocks a script the harness itself told you to run | The gate matched the absolute path in the command text, not the script's role — the two are indistinguishable to a text rule. Report it to the human who owns the gate; do not rewrite the path to evade the match |
+| The same target is writable through a file-writing tool but not through the shell | The block is command-text-scoped, not a filesystem permission. That asymmetry is the diagnostic: use it to confirm the gate rather than to bypass it |
 | The gate matches an intended-as-prose mention of a dangerous command (in a commit message, doc, or test fixture) | Move the text into a file and pass it by path (step 4) rather than reshaping the sentence |
 | Path contains a space, so quoting is unavoidable | Relocate or symlink the target to a space-free path for gated commands; a gate that excludes quote characters cannot receive a quoted path at all |
 | The gate needs `~` expanded | Write the absolute path; a gate that resolves `~` itself is doing so on the literal tilde, which only works if it implements the expansion |
@@ -76,6 +91,8 @@ on the first attempt.
 | Assume a blocked command means the deliverable is wrong | Reproduce the gate's extraction pattern against your literal command string first | A quoting-level extraction failure and a genuinely incomplete deliverable produce the same refusal, so fixing content wastes the round |
 | Build the file the gate checks with a heredoc in the same command | Write it in a prior command and reference the path | The gate is evaluated before execution, so the file is absent at decision time |
 | Reword prose to get a dangerous-looking string past a scanner | Put the prose in a file and pass `--notes-file`/`--body-file` | Editing meaning to satisfy a text scanner degrades the artifact; a file is not scanned as a command |
+| Treat a side-effect command's empty output as success | `ls`/`stat` the artifact it should have produced | A blocked command and a silent successful one produce identical stdout; only the artifact distinguishes them |
+| Retry a gated status-emitting command with a reshaped path | Report the signal as un-emitted to its consumer | The consumer polls forever on a wrong assumption, and evading the gate removes a control the human installed |
 
 ## Sources
 
@@ -92,3 +109,11 @@ missing), `--body-file $REPO/…` → literal `$REPO/…` (blocked as nonexisten
 `--body-file /abs/…` and `--body-file=/abs/…` extracted correctly. A same-command
 heredoc body-file was separately blocked as not-yet-existing until moved to a
 preceding call.
+
+On 2026-08-05 a worker session inside a git worktree ran the orchestrator's own
+`status-update.sh` with the status directory pointing at the main checkout. A
+`worktree_escape` guardrail matched the absolute main-checkout path and returned
+only an escalation notice; `ls -la` on the status directory then showed it empty,
+so the orchestrator would have polled indefinitely for a file that was never
+written. A Write-tool call to the same tree succeeded, confirming the block was
+scoped to the Bash command text rather than to filesystem permissions.

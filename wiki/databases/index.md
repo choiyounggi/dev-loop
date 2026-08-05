@@ -38,6 +38,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [nullability-and-defaults](schema-design/nullability-and-defaults.md) | Declaring column nullability/defaults; queries dropping rows around NULLs |
 | [soft-delete](schema-design/soft-delete.md) | Deleted records themselves must be restorable or kept (deleted_at schemas); deciding what a parent's deletion does to children that must survive (for who-changed-what history → requirements-to-tables) |
 | [online-schema-changes](schema-design/online-schema-changes.md) | Running ALTER TABLE / CREATE INDEX on a large table under live traffic; a migration blocks reads/writes (ACCESS EXCLUSIVE); adding a column/constraint/NOT NULL/index/type change safely; expand-and-contract to decouple DB migration from app deploy |
+| [verifying-additive-migrations](schema-design/verifying-additive-migrations.md) | The project has no migration tool and schema comes from an ORM `create_all()` plus hand-written `ALTER TABLE ADD COLUMN IF NOT EXISTS`; writing the test that proves a new column reaches an already-deployed database; deciding what a migration test's starting DB state must be; asserting a column's type/nullability/default from the catalog; a column added on the model never appeared on the deployed table |
 
 ## operations
 

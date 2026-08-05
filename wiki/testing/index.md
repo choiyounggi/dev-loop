@@ -38,6 +38,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [what-to-mock](mocking/what-to-mock.md) | Deciding whether to mock/stub/fake a dependency or use the real one; mocks breaking on refactors; testing handling of a third-party's failure modes; the same mock setup is copy-pasted across tests |
+| [destructive-operations-on-shared-daemons](mocking/destructive-operations-on-shared-daemons.md) | The code under test enumerates and deletes a machine-wide daemon's resources by name/pattern (tmux sessions, docker containers, systemd units, namespaces) and that daemon runs on the test machine; proving a sweep deletes the targets and spares bystanders; keeping a scope bug from destroying the dev environment instead of failing the test; giving a shell script a substitution seam for the tool it shells out to |
 
 ## flaky
 
