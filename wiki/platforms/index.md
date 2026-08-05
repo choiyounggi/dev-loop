@@ -44,12 +44,14 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [background-services](processes/background-services.md) | Something must run persistently or on a schedule on a dev machine or server (daemon, watcher, cron-style job); a "started" process dies when the terminal/SSH/agent session ends; choosing nohup vs LaunchAgent vs systemd unit vs cron/timer; a job works in the terminal but fails under cron/launchd (minimal environment); wiring service logs and restart policy |
+| [tool-diagnostics-without-a-failing-exit-code](processes/tool-diagnostics-without-a-failing-exit-code.md) | Wiring a compiler/linter/type-checker/validator into a hook, CI step, or agent loop so its complaints reach the author; the tool prints warnings but exits 0 so an exit-code-only wrapper reports success; choosing between capturing the diagnostic stream and promoting warnings with `-Werror`/`--max-warnings 0`; a redirection captured the tool's artifact instead of its diagnostics |
 | [non-interactive-cli-invocation](processes/non-interactive-cli-invocation.md) | Calling a tool that can prompt (agent CLI, ssh, git, package manager) from a script, CI step, hook, or agent session, including with its own `-p`/`--print`/`--yes` flag; such a call produced no output and never returned; deciding whether a hang belongs to the client, the network, or the far-side service; choosing the stdin/timeout/fail-fast switches for an unattended call; a TTY-detecting tool changes its output format under automation |
 
 ## toolchains
 
 | Page | Load when |
 |------|-----------|
+| [compiler-sysroot-on-macos](toolchains/compiler-sysroot-on-macos.md) | On macOS a non-Xcode compiler (Homebrew/MacPorts LLVM) fails with `'stdio.h' file not found`, `ld: library 'System' not found`, or a `-Wmissing-sysroot` warning naming an SDK directory that does not exist; a build works under `/usr/bin/clang` but not under the toolchain the project requires; choosing between `-isysroot`, `SDKROOT`, `CPATH`, and `LIBRARY_PATH`; separating a toolchain precondition from a code regression when only the compiled tests fail |
 | [version-management](toolchains/version-management.md) | "Works on my machine" from tool-version drift; a project needs a pinned language/tool version (.nvmrc, .python-version, .tool-versions); making CI use the same versions as local; onboarding a machine reproducibly; a script/cron/CI step can't find a version-managed binary (shims absent in non-interactive shells); deciding where lockfiles fit in reproducibility |
 
 ## Planned (unseeded categories)

@@ -15,6 +15,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [test-level-choice](strategy/test-level-choice.md) | Deciding at which level (unit/integration/e2e) to test new or changed behavior; reviewing a test plan's level distribution; logic buried in a controller or framework wiring needs coverage |
+| [differential-testing](strategy/differential-testing.md) | Two code paths must satisfy one specification and you want each to act as the other's oracle — interpreter vs compiled backend, a rewrite beside the service it replaces, v1 vs v2, a fast path beside a reference path, a cache beside its source; deciding which observable classes must agree and which the contract permits to differ; needing migration evidence beyond "the new one's own tests pass" |
 
 ## quality
 
@@ -32,6 +33,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [test-data-and-isolation](data/test-data-and-isolation.md) | Tests need fixture data and you are choosing how to create it; tests pass alone but fail together (or vice versa); DB cleanup, shared fixtures, time-dependent logic, or unique-value collisions |
+| [artifact-leakage-from-a-suite](data/artifact-leakage-from-a-suite.md) | Temp directories, build outputs, or scratch files pile up in the repo or system temp after a suite runs; a clone grows with no obvious owner; you suspect the leak comes from everywhere and need a way to locate it; deciding between per-site cleanup, the runner's owned-temp API, and a static rule that enforces the convention |
 
 ## mocking
 

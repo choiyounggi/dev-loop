@@ -9,8 +9,8 @@ sources:
   - https://eslint.org/docs/latest/integrate/nodejs-api
   - https://pitest.org/
   - https://github.github.com/gfm/
-last_verified: 2026-07-29
-related: [testing-quality-tests-that-cannot-fail]
+last_verified: 2026-08-05
+related: [testing-quality-tests-that-cannot-fail, backend-common-api-design-unenforced-declarations]
 ---
 
 # Checks That Verify a Spec or Mapping Artifact
@@ -84,6 +84,7 @@ cells = [c.replace(r"\|", "|").strip()
 | The source list the mapping is checked against is itself derived (a parsed enum, a globbed file set) | Assert the parsed list's length against a known count before comparing; a source list that parses to zero items makes coverage pass vacuously |
 | Asserting a fixed cell count on body rows | Enforce it as your repo's convention and state it as one: GFM requires only the header row to match the delimiter row in cell count, while body rows with fewer cells get empty cells inserted and excess cells are ignored |
 | The artifact is generated rather than hand-written | Point the must-pass input at a committed golden output of the generator, so a generator change reddens the check instead of silently redefining the spec |
+| The artifact is a hand-written projection of a value that lives in code (a doc table restating an enum, lexicon, or rule constant) | Name the code constant as canonical **inside the document**, and assert the document against the imported constant rather than re-listing its members in the checker. A reader who then finds the table wrong knows the edit belongs in the code, and the checker cannot drift into a third copy |
 | A cell legitimately holds no value (a rule with no mapped target) | Give the validity check an explicit sentinel to accept (`—`, `n/a`) and assert that sentinel's spelling, so an empty cell stays distinguishable from an intended blank |
 
 ## Instead of
@@ -94,6 +95,7 @@ cells = [c.replace(r"\|", "|").strip()
 | Add every check, mutate one thing, and confirm the harness goes red | Mutate once per check and require the owning check to be the one that reddens | One red proves some check fired, not that each check detects the defect it claims to own |
 | Split Markdown rows with `row.split("\|")` and assert the cell count | Split on unescaped pipes and unescape each cell first | An escaped `\|` inside a cell inflates the naive count, so the checker reports a false "broken table" on a document that renders correctly |
 | Treat a green coverage run over a parsed source list as proof of completeness | Assert the parsed list's item count first, then compare sets | An empty source list satisfies set equality against anything, so coverage passes while nothing was checked |
+| Keep a documentation table in sync with a code constant by review discipline | Declare the constant canonical in the document and add a check that imports it and fails on divergence | Two hand-maintained copies drift, and the document is the copy readers act on — so the drift is discovered by someone following instructions that are already wrong |
 
 ## Sources
 
@@ -102,4 +104,5 @@ cells = [c.replace(r"\|", "|").strip()
 - https://pitest.org/ — "Faults (or mutations) are automatically seeded into your code, then your tests are run. If your tests fail then the mutation is killed, if your tests pass then the mutation lived"; line coverage "measures only which code is executed by your tests. It does not check that your tests are actually able to detect faults in the executed code"
 - https://github.github.com/gfm/ — tables extension: "Include a pipe in a cell's content by escaping it, including inside other inline spans"; "The header row must match the delimiter row in the number of cells. If not, a table will not be recognized"; for body rows, "If there are a number of cells fewer than the number of cells in the header row, empty cells are inserted. If there are greater, the excess is ignored"
 - Local reproduction 2026-07-29 (Python 3.9.6, macOS): a 5-column row whose third cell holds `create\|update\|delete` splits to 7 cells with `split("|")` and to 5 cells with `re.split(r"(?<!\\)\|", …)`, matching the 5-cell header
+- Field observation 2026-08-05: a repository whose declaration→effect table in `docs/` restates two implementation constants states in the document itself that "the canonical form is the code", and a test imports both constants and fails when the table diverges — so the doc edit is routed to the code rather than accumulating a second truth
 - Cross-checked against GitHub's own renderer 2026-07-29 (`POST /markdown`, `mode: gfm`): the row `|a|b\||` renders as two cells, `a` and `b|`; the anchored-delimiter snippet above returns `['a', 'b|']`, while `.strip("|")` returns `['a', 'b\\']` — the defect the delimiter-stripping note describes

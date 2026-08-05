@@ -5,7 +5,7 @@ three stack subtrees — route by concern first, stack second:
 
 | Subtree | Route there when |
 |---------|------------------|
-| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, LLM completion validation & context budgeting, consuming external-API responses, externally-owned defaults, object-storage references |
+| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, idempotency, declarative input the system does not enforce, JWT issuance, outbound calls, client-side rate limiting, caching, jobs, transactions in app code, shared state/pools, exception structure, LLM completion validation & context budgeting, consuming external-API responses, externally-owned defaults, object-storage references |
 | [java](java/index.md) | You are writing/reviewing JVM backend code (Java/Kotlin, Spring, JPA/Hibernate) and the concern is stack-specific: entity mapping, persistence context, proxy pitfalls, JVM threads/memory |
 | [node](node/index.md) | You are writing/reviewing Node.js/TypeScript backend code: event-loop blocking, promise error handling, runtime validation at boundaries, graceful shutdown |
 | [python](python/index.md) | You are writing/reviewing Python backend code: GIL/concurrency model, pydantic validation, WSGI/ASGI workers, language traps |
@@ -25,6 +25,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [error-responses](common/api-design/error-responses.md) | Designing or reviewing API error handling — choosing status codes (400/401/403/404/409/422/500), defining the error body shape, deciding what a 500 may reveal; clients report inconsistent/unparseable errors |
 | [idempotency](common/api-design/idempotency.md) | An endpoint with side effects (create, charge, send) can receive the same request twice — client retry after timeout, user double-submit, gateway retry; designing idempotency-key storage; deciding which operations are safe to retry |
 | [pagination-contract](common/api-design/pagination-contract.md) | Designing a list endpoint's request/response contract — cursor vs page-number, limit caps, total counts, expired-cursor behavior (the backing SQL/index → databases/query-optimization/keyset-pagination) |
+| [unenforced-declarations](common/api-design/unenforced-declarations.md) | Your system accepts declarative input (config file, DSL/manifest, policy block, schema annotation) and part of what a caller may write is unimplemented — an unknown key, a verb outside your vocabulary, or a knob recorded but never acted on; a user reports "I declared X and nothing happened"; choosing between reject/warn/ignore and where that strictness is selected |
 
 ### reliability
 
@@ -82,6 +83,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [client-side-rate-limiting](common/integrations/client-side-rate-limiting.md) | You added a throttle to an API client wrapper and the provider still returns 429 — especially on the first call after process start, or only on some days; a rate-limit failure was filed as intermittent because a rerun passed; deciding which layer the throttle belongs in and whether token/auth requests count against the quota |
 | [externally-owned-defaults](common/integrations/externally-owned-defaults.md) | A code/config default names a resource the repo does not own (model alias, endpoint, bucket, queue, index) — reviewing or merging a PR that claims that default works, adding a startup check that the name still resolves, or diagnosing a default path that broke with no code change |
 
 ### storage
