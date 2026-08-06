@@ -6,7 +6,7 @@ applies_to: [git, general]
 confidence: verified
 sources:
   - https://git-scm.com/docs/git-worktree
-last_verified: 2026-08-05
+last_verified: 2026-08-06
 related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, platforms-shells-command-text-inspected-before-execution]
 ---
 
@@ -56,6 +56,10 @@ wait loop keeps escalating with no error from the task itself.
 | The brief names the main checkout only as a read source | It works, and it still couples the brief to one machine's layout — pass it as a named variable so the brief stays portable |
 | The guardrail is heuristic and matches on absolute paths | A relative path inside the worktree cannot trip it at all; that is the second reason to write paths relative |
 | A worker writes to a path under the main root that is a *sibling* string (`<main_root>-backup/…`) | The guardrail does not fire — the match requires a path separator after the main root — but the write is still outside the worktree; keep it out of the brief |
+| A worker reads another **worker's** worktree (`<main_root>/<other-worktree>/FINDINGS.md`) — a later wave consuming an earlier wave's output | The rule strips only the worker's *own* worktree path before looking for a main-root mention, so a sibling worktree's path stays in the string and the read is one write verb away from firing. Give the consumer a copy in its own worktree, or keep the cross-worktree read on a command line of its own |
+| A read of a main-root path shares a command line with any write verb (`mkdir -p .claude/tmp && grep … <main_root>/x`) | It fires `ask`, even though the write targets a worktree-relative path — the two conditions are matched independently over the whole command string, not correlated with each other. Split the write and the read into separate commands |
+| A read of a main-root path is redirected to an absolute path (`grep … <main_root>/x > /tmp/out`) | It fires — the redirect-to-absolute branch matches regardless of what is being read. Redirect to a worktree-relative path |
+| The escalation is read-only in substance and the coordinator must clear it | Budget the round trip (read the recorded escalation → approve → clear `escalations/` → restart the watcher) and state in the worker's first brief that reads are approved and only writes outside the worktree are refused, so the same class does not re-escalate |
 
 ## Instead of
 
@@ -69,4 +73,5 @@ wait loop keeps escalating with no error from the task itself.
 
 - https://git-scm.com/docs/git-worktree — linked worktrees are separate checkouts sharing one repository; each has its own working directory
 - Field reproduction 2026-08-05 (groundwork guardrails 1.0.0 `hooks/bash-guard.sh`, `worktree_escape` rule, macOS): from a linked worktree, `cp ./a <main_root>/b` and `echo z > <main_root>/f` were both stopped; `cat <main_root>/f`, `ls <main_root>/.orchestration`, and `grep -n x <main_root>/f` all passed. The rule matches an absolute main-root mention together with a write verb (`rm|mv|cp|tee|mkdir|touch|install|dd`) or a redirect to an absolute path
+- Local reproduction 2026-08-06 (groundwork guardrails 1.2.0 `hooks/bash-guard.sh`, `worktree_escape`, macOS), run from a linked worktree against a sibling worktree's path: `grep -n foo <main_root>/<other>/FINDINGS.md`, `awk 'NR<5' <main_root>/<other>/FINDINGS.md`, `cat <main_root>/README.md` and `git -C <main_root>/<other> status --short` all passed; `mkdir -p .claude/tmp && grep -n foo <main_root>/<other>/FINDINGS.md`, `cp <main_root>/README.md ./x` and `grep -n foo <main_root>/<other>/FINDINGS.md > /tmp/out` each returned `ask`. Reading the rule confirms why: it fires when a main-root mention survives the strip **and** `(rm|mv|cp|tee|mkdir|touch|install|dd)` or a redirect to an absolute path matches anywhere in the command — the two tests are independent
 - Field context: a parallel run stalled at the same phase for two workers whose brief's `<output_contract>` named a main-checkout absolute path; the coordinator's wait loop returned its escalation status repeatedly. Rewriting the contract to worktree-relative paths let the remaining workers record their plans locally

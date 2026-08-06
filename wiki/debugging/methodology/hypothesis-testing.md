@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://www.debuggingbook.org/html/Intro_Debugging.html
   - https://sre.google/sre-book/effective-troubleshooting/
-last_verified: 2026-07-10
+last_verified: 2026-08-06
 related: [debugging-methodology-reproduce-first, debugging-methodology-isolate-by-bisection]
 ---
 
@@ -53,6 +53,8 @@ applies when several suspects compete and you must pick what to investigate next
 | Every hypothesis you can think of is falsified | Your model of the system is wrong somewhere upstream. Return to evidence gathering: widen what you observe ([debugging-signals-logs-and-correlation]) or bisect to relocate the fault ([debugging-methodology-isolate-by-bisection]) |
 | Testing the hypothesis requires touching prod | Prefer a read-only prediction (something already in logs/metrics that must be true if the hypothesis holds); active prod experiments require owner approval and a rollback plan |
 | Hypothesis confirmed but the fix belongs to another domain (slow query, infra limit) | Record the confirmed mechanism, then route the fix to the owning domain — e.g. a slow SQL statement goes to wiki/databases/query-optimization/reading-execution-plans.md |
+| One suspect is a mechanism designed to be invisible to you (silent moderation, shadowban, silent spam-drop, a filter that returns success) | An explicit error message refutes that suspect: concealment is the mechanism's defining property, so a system that told you it refused you is a different system. Test the visible-refusal suspects first — they are the ones with readable evidence |
+| Your only evidence is a query that returned zero results | Zero is consistent with "the thing was removed" and with "the thing was never accepted", so it cannot separate them. Run a positive control through the same query path — an input you know must return rows — to establish the path works, then find evidence that differs between the two suspects |
 
 ## Instead of
 
@@ -67,3 +69,5 @@ applies when several suspects compete and you must pick what to investigate next
 
 - https://www.debuggingbook.org/html/Intro_Debugging.html — scientific method for debugging: hypothesis → prediction → experiment → repeat
 - https://sre.google/sre-book/effective-troubleshooting/ — hypothetico-deductive troubleshooting; test causes, treat the confirmed one
+- https://news.ycombinator.com/newsfaq.html — a killed post is marked `[dead]` and "aren't displayed by default"; the FAQ documents no notification to the author, i.e. the suppression carries no message to the affected party — which is why receiving an explicit refusal falsifies the silent-suppression hypothesis
+- Field application 2026-08-06: a submission was assumed silently suppressed; the account had in fact received an explicit restriction notice, and a search API returning zero hits for the item was shown to be uninformative by a control query on the same endpoint returning 8,462 hits — the control separated "endpoint broken" from "item absent"
