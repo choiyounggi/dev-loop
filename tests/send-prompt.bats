@@ -16,9 +16,14 @@ setup() {
   SP="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/send-prompt.sh"
   TPL="${BATS_TEST_DIRNAME}/../skills/orchestrate/templates/session-prompt.md"
   S="t3s-$$-${BATS_TEST_NUMBER}"
+  # Per-test scratch root for the injected tmux fake (keys tests). Kept INSIDE
+  # the repo (.claude/ is git-ignored), not under $BATS_TEST_TMPDIR: the fake
+  # needs an exec bit and host EDR flags chmod +x under /tmp,$TMPDIR.
+  STUB_ROOT="${BATS_TEST_DIRNAME}/../.claude/tmp/sp-$$-${BATS_TEST_NUMBER:-0}"
 }
 
 teardown() {
+  [ -n "${STUB_ROOT:-}" ] && rm -rf "$STUB_ROOT"
   tmux kill-session -t "$S" 2>/dev/null || true
 }
 
@@ -465,4 +470,169 @@ tpl_sections_single_line() {
   # a bare status check would pass vacuously. The diagnosis belongs on stderr.
   case "$stderr" in *"tmux not found"*) : ;; *) return 1 ;; esac
   [ -z "$output" ]
+}
+
+# ---------------------------------------------------------------- keys
+#
+# `keys` answers an interactive chooser with tmux key EVENTS. The properties
+# under test — argv order of the sends, zero sends on any rejection, the exact
+# invocation shape (no -l) — are invisible to a real pane, so these tests use a
+# RECORDING tmux fake on PATH. One real-tmux smoke test keeps the fake honest.
+
+# Install the recording fake for THIS test only. send-keys argv is logged on
+# success; attempts are counted separately, so "validated but never sent"
+# (attempts=0) and "sent then failed" (attempts>sends) are distinguishable.
+# Liveness is the alive flag file. FAKE_SEND_FAIL_AT=N fails the Nth send-keys
+# call; FAKE_KILL_ON_FAIL=1 additionally removes the alive file at that
+# failure, modelling a session that died mid-sequence.
+_use_fake_tmux() {
+  mkdir -p "$STUB_ROOT/bin"
+  FAKE_SEND_LOG="$STUB_ROOT/sends.log";  : > "$FAKE_SEND_LOG"
+  FAKE_ATTEMPTS="$STUB_ROOT/attempts";   : > "$FAKE_ATTEMPTS"
+  FAKE_ALIVE_FILE="$STUB_ROOT/alive";    : > "$FAKE_ALIVE_FILE"
+  export FAKE_SEND_LOG FAKE_ATTEMPTS FAKE_ALIVE_FILE
+  cat > "$STUB_ROOT/bin/tmux" <<'FAKE'
+#!/bin/sh
+verb="$1"; shift
+case "$verb" in
+  has-session)  [ -e "$FAKE_ALIVE_FILE" ]; exit $? ;;
+  capture-pane) printf 'FAKE_PANE_LINE\n'; exit 0 ;;
+  send-keys)
+    echo x >> "$FAKE_ATTEMPTS"
+    n=$(wc -l < "$FAKE_ATTEMPTS" | tr -d ' ')
+    if [ -n "${FAKE_SEND_FAIL_AT:-}" ] && [ "$n" -eq "$FAKE_SEND_FAIL_AT" ]; then
+      [ "${FAKE_KILL_ON_FAIL:-0}" = "1" ] && rm -f "$FAKE_ALIVE_FILE"
+      exit 1
+    fi
+    printf '%s\n' "$*" >> "$FAKE_SEND_LOG"
+    exit 0 ;;
+esac
+exit 0
+FAKE
+  chmod +x "$STUB_ROOT/bin/tmux"
+  PATH="$STUB_ROOT/bin:$PATH"; export PATH
+}
+_send_count()    { wc -l < "$FAKE_SEND_LOG" | tr -d ' '; }
+_attempt_count() { wc -l < "$FAKE_ATTEMPTS" | tr -d ' '; }
+
+@test "keys: multi-key sequence is sent one event per key, in argv order" {
+  _use_fake_tmux
+  run --separate-stderr sh "$SP" keys "$S" Down Down Enter
+  [ "$status" -eq 0 ]
+  [ "$output" = "sent" ]
+  [ "$(_send_count)" -eq 3 ]
+  # Order is the contract: line 3 differing from lines 1-2 makes a reorder red.
+  [ "$(sed -n '1p' "$FAKE_SEND_LOG")" = "-t =$S: Down" ]
+  [ "$(sed -n '2p' "$FAKE_SEND_LOG")" = "-t =$S: Down" ]
+  [ "$(sed -n '3p' "$FAKE_SEND_LOG")" = "-t =$S: Enter" ]
+  # Named keys must be key EVENTS: with -l tmux would type the text "Down".
+  ! grep -qF -- ' -l ' "$FAKE_SEND_LOG"
+}
+
+@test "keys: single key is sent (boundary)" {
+  _use_fake_tmux
+  run --separate-stderr sh "$SP" keys "$S" y
+  [ "$status" -eq 0 ]
+  [ "$output" = "sent" ]
+  [ "$(_send_count)" -eq 1 ]
+  [ "$(sed -n '1p' "$FAKE_SEND_LOG")" = "-t =$S: y" ]
+}
+
+@test "keys: real tmux smoke — digits land in the pane in order" {
+  # Keeps the fake honest: real tmux must accept the allowlisted tokens as key
+  # names and deliver them in argv order. '78' in the pane proves both (a swap
+  # would echo '87'); the executed line then errors, which is fine — the keys
+  # arriving is the behavior under test.
+  mk_session
+  run --separate-stderr sh "$SP" keys "$S" 7 8 Enter
+  [ "$status" -eq 0 ]
+  [ "$output" = "sent" ]
+  sleep 1
+  tmux capture-pane -t "=$S:" -p | grep -qF '78'
+}
+
+@test "keys: unknown key is rejected with nothing sent" {
+  # validate-all-before-send-any: the bad key sits AFTER a valid one, so a
+  # validate-as-you-send implementation would leak the first Down.
+  _use_fake_tmux
+  run --separate-stderr sh "$SP" keys "$S" Down frobnicate Enter
+  [ "$status" -eq 2 ]
+  [ "$output" != "sent" ]
+  [ "$(_attempt_count)" -eq 0 ]
+  case "$stderr" in *frobnicate*) : ;; *) return 1 ;; esac
+}
+
+@test "keys: allowlist is case-sensitive — lowercase 'down' is rejected" {
+  # tmux would accept 'down' as a key name, but the contract fixes exact
+  # tokens; a case-folding allowlist would silently widen the surface.
+  _use_fake_tmux
+  run --separate-stderr sh "$SP" keys "$S" down
+  [ "$status" -eq 2 ]
+  [ "$(_attempt_count)" -eq 0 ]
+}
+
+@test "keys: a key that looks like a tmux flag is rejected, never sent" {
+  _use_fake_tmux
+  run --separate-stderr sh "$SP" keys "$S" -l
+  [ "$status" -eq 2 ]
+  [ "$(_attempt_count)" -eq 0 ]
+}
+
+@test "keys: invalid session name is rejected with nothing sent" {
+  _use_fake_tmux
+  run --separate-stderr sh "$SP" keys '; rm -rf ~' Enter
+  [ "$status" -eq 2 ]
+  [ "$output" != "sent" ]
+  [ "$(_attempt_count)" -eq 0 ]
+}
+
+@test "keys: gone session reports gone before any send" {
+  _use_fake_tmux
+  rm "$FAKE_ALIVE_FILE"
+  run --separate-stderr sh "$SP" keys "$S" Enter
+  [ "$status" -eq 3 ]
+  [ "$output" = "gone" ]
+  [ "$(_attempt_count)" -eq 0 ]
+}
+
+@test "boundary: keys with an empty key list is a usage error" {
+  run sh "$SP" keys "$S"
+  [ "$status" -eq 1 ]
+}
+
+@test "usage: keys without any argument exits 1" {
+  run sh "$SP" keys
+  [ "$status" -eq 1 ]
+}
+
+@test "keys: mid-sequence send failure on a live session exits 6" {
+  _use_fake_tmux
+  run --separate-stderr env FAKE_SEND_FAIL_AT=2 sh "$SP" keys "$S" Down Up Enter
+  [ "$status" -eq 6 ]
+  [ -z "$output" ]
+  # Only the first key landed; the loop stopped AT the failure, not after it.
+  [ "$(_send_count)" -eq 1 ]
+  [ "$(_attempt_count)" -eq 2 ]
+  # The failure names the exact key that did not land.
+  case "$stderr" in *"'Up'"*) : ;; *) return 1 ;; esac
+}
+
+@test "keys: mid-sequence failure because the session died reports gone" {
+  # Same failure point as the exit-6 case; only the session's survival differs.
+  # Mirrors cmd_send: a failed send is re-diagnosed before being reported.
+  _use_fake_tmux
+  run --separate-stderr env FAKE_SEND_FAIL_AT=2 FAKE_KILL_ON_FAIL=1 \
+    sh "$SP" keys "$S" Down Up Enter
+  [ "$status" -eq 3 ]
+  [ "$output" = "gone" ]
+}
+
+@test "keys: stdout carries exactly one token; advisory pane line on stderr" {
+  _use_fake_tmux
+  run --separate-stderr sh "$SP" keys "$S" Enter
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | wc -l | tr -d ' ')" = "0" ]
+  [ "$(printf '%s' "$output" | wc -w | tr -d ' ')" = "1" ]
+  # The trailing note_pane advisory: pane context for the caller's log.
+  case "$stderr" in *FAKE_PANE_LINE*) : ;; *) return 1 ;; esac
 }
