@@ -15,21 +15,22 @@
 #   send-prompt.sh send  <session> <prompt>    deliver one prompt, classify it
 #   send-prompt.sh wait  <session> [timeout]   block until the worker picks it up
 #   send-prompt.sh state <session>             read-only: print one state token
+#   send-prompt.sh keys  <session> <key>...    press allowlisted keys, in order
 #
-# exit  send            wait                   state
-#  0    delivered       picked-up              ready
-#  1    usage error     usage error            usage error
-#  2    invalid input (session name / prompt rejected) — injection guard
-#  3    session gone    session gone           gone
-#  4    queued          —                      busy
-#  5    —               deadline expired       —
+# exit  send            wait                   state          keys
+#  0    delivered       picked-up              ready          sent
+#  1    usage error     usage error            usage error    usage error
+#  2    invalid input (session name / prompt / key rejected) — injection guard
+#  3    session gone    session gone           gone           gone
+#  4    queued          —                      busy           —
+#  5    —               deadline expired       —              —
 #  6    tmux command failed against a live session
-#  7    unconfirmed     —                      —
+#  7    unconfirmed     —                      —              —
 # 127   tmux not found
 #
 # stdout is exactly one token — delivered|queued|unconfirmed|picked-up|timeout|
-# ready|busy|gone. Branch on the exit code; stderr is advisory context only and
-# must never be parsed.
+# ready|busy|gone|sent. Branch on the exit code; stderr is advisory context only
+# and must never be parsed.
 #
 # env:
 #   LO_QUEUED_PATTERN   substring meaning "queued behind a busy turn"
@@ -69,6 +70,7 @@ usage: send-prompt.sh <subcommand> ...
   send  <session> <prompt>    deliver one prompt to a running session
   wait  <session> [timeout]   block until the worker picks the prompt up
   state <session>             print one state token (read-only)
+  keys  <session> <key>...    press allowlisted keys (answer a chooser)
 EOF
   exit 1
 }
@@ -190,6 +192,46 @@ cmd_send() {
   echo "unconfirmed"; exit 7
 }
 
+# keys <session> <key>...
+# Answer an interactive chooser (trust screen, usage-limit picker) with tmux
+# key EVENTS. The allowlist is the whole safety argument: every token is a
+# named key or a single safe character, so nothing here can become a tmux
+# flag or free text — free text goes through `send`, which validates it.
+cmd_keys() {
+  [ $# -ge 2 ] || usage
+  validate_session "$1"
+  sess="$1"; shift
+
+  # Validate ALL keys before sending ANY. A chooser fed half a sequence is
+  # in a state the coordinator can no longer predict — worse than untouched.
+  for k in "$@"; do
+    case "$k" in
+      Up|Down|Left|Right|Enter|Escape|Tab|Space|0|1|2|3|4|5|6|7|8|9|y|n) ;;
+      *)
+        echo "send-prompt: key '$k' not in allowlist (Up Down Left Right Enter Escape Tab Space 0-9 y n)" >&2
+        exit 2 ;;
+    esac
+  done
+
+  if ! session_alive "$sess"; then
+    echo "gone"; exit 3
+  fi
+
+  # One send-keys per key: ordering stays deterministic and a failure names
+  # the key that did not land. Named keys go WITHOUT -l — with it tmux would
+  # type the literal text "Down" instead of pressing the key.
+  for k in "$@"; do
+    if ! "$TMUX_BIN" send-keys -t "$(target_pane "$sess")" "$k"; then
+      session_alive "$sess" || { echo "gone"; exit 3; }
+      echo "send-prompt: send-keys '$k' failed for live session '$sess'" >&2
+      exit 6
+    fi
+  done
+
+  note_pane "$sess"
+  echo "sent"; exit 0
+}
+
 # Bounded wait for the worker to actually pick a queued prompt up.
 #
 # The deadline is counted in poll iterations, not clock arithmetic: `timeout(1)`
@@ -239,5 +281,6 @@ case "$sub" in
   send)  cmd_send "$@" ;;
   wait)  cmd_wait "$@" ;;
   state) cmd_state "$@" ;;
+  keys)  cmd_keys "$@" ;;
   *) usage ;;
 esac
