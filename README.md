@@ -111,15 +111,22 @@ The wiki is meant to grow from what you actually learn. Three moving parts:
    directive / why / evidence / domain / tags).
 
 2. **Harvest (automatic, offline).** A Stop hook scrapes those blocks from the
-   session transcript into a local queue (`~/.dev-loop/queue/`). It never edits
-   the wiki and never opens a PR — harvesting is cheap and non-blocking.
+   session transcript into a local queue (`~/.dev-loop/queue/`). It dedupes
+   against both the session's queue file and the already-flushed store
+   (`.processed.jsonl`), caps a session at 10 rows as a runaway backstop, and
+   cleans up emptied queue files. It never edits the wiki and never opens a
+   PR — harvesting is cheap and non-blocking.
 
 3. **Flush → verified PR (automatic, or on-demand).** The queue is drained by the
    `knowledge-flush` pipeline. For **each** candidate it must, before any PR:
    - **research & verify** the best-practice against real sources (official docs,
      primary references) and assign a confidence (verified / field-tested /
      unverified — never a fabricated citation),
-   - **check existing layers** for duplicates to merge into and pages to link,
+   - **check existing layers** for duplicates to merge into and pages to link
+     (naming the page ids it actually read),
+   - **check open `knowledge/*` PRs** so sibling flushes don't pile up duplicate
+     PRs — each candidate is folded into an in-flight PR, dropped as a pending
+     duplicate, or ingested as new,
    - **decide the target layer/category** (or justify a new category),
    - then run `wiki-ingest` and write an `INGEST_REPORT.md`.
 
@@ -142,10 +149,13 @@ The wiki is meant to grow from what you actually learn. Three moving parts:
 ### This ordering is enforced by a hook
 
 `hooks/pre-flush-pr-gate.sh` (PreToolUse) **blocks** `gh pr create` on a
-knowledge branch unless the `INGEST_REPORT.md` exists and has all three sections
-(`## Verified best-practice`, `## Existing-layer check`, `## Routing decision`)
-filled with real content. The gate is narrowly scoped to knowledge-flush PRs, so
-it never interferes with ordinary `gh pr create` in any repo.
+knowledge branch unless the `INGEST_REPORT.md` exists and has all four sections
+(`## Verified best-practice`, `## Existing-layer check`, `## Open-PR check`,
+`## Routing decision`) filled with real content. The Existing-layer check must
+carry a `Pages read: <id>, …` line, and each id is resolved against the
+checkout's `wiki/` — a report citing pages that don't exist fails closed. The
+gate is narrowly scoped to knowledge-flush PRs, so it never interferes with
+ordinary `gh pr create` in any repo.
 
 ---
 
@@ -181,6 +191,7 @@ dev-loop/
 │   ├── auto-flush.sh                 # Stop: auto-run knowledge-flush (guarded) → PR
 │   └── pre-flush-pr-gate.sh          # PreToolUse: enforce the flush pre-PR pipeline
 ├── scripts/resolve-tools.sh          # capability-role profile resolver (no `plan` role)
+├── tests/                            # bats suites — hooks (harvest, flush gate, loop gate) + orchestration scripts; CI runs them on ubuntu + macos
 ├── references/tool-profile.md
 └── docs/                             # inherited design notes (loop-orchestrator lineage)
 ```
