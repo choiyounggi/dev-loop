@@ -8,8 +8,8 @@ sources:
   - https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
   - https://sre.google/sre-book/addressing-cascading-failures/
   - https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
-last_verified: 2026-07-10
-related: [backend-common-api-design-idempotency, backend-common-llm-completion-response-validation]
+last_verified: 2026-08-05
+related: [backend-common-api-design-idempotency, backend-common-llm-completion-response-validation, backend-common-reliability-client-side-rate-limiting, debugging-concurrency-intermittent-failures]
 ---
 
 # Calling Another Service over the Network: Timeouts, Retries, Backoff
@@ -44,6 +44,7 @@ retry storms, or requests that hang until a client gives up.
 | Request timeout after sending (no reply) | Retry only if idempotent or keyed — the request may have executed |
 | 500 / 502 / 503 / 504 | Retry within the 2–3 attempt budget if idempotent; on repeated failure, fail and surface the error |
 | 429 | Wait the `Retry-After` value if present, then retry; absent the header, back off with jitter |
+| You added a client-side rate limiter and the dependency still returns 429/rate-limit on the process's first call | Count the auth/token request against the same limiter and stamp the limiter immediately before each request — token-refresh code paths sit inside a header builder or interceptor, *below* the throttle layer, so the token POST and the real call land in the same second; a warm token cache hides it on most days, which is why it reads as intermittent ([backend-common-reliability-client-side-rate-limiting], [debugging-concurrency-intermittent-failures]) |
 | 400 / 401 / 403 / 404 / 422 | Never retry — the request itself is wrong; the same bytes fail again. Fix and resend is a new request |
 
 6. Propagate cancellation: when your caller disconnects or its deadline passes,

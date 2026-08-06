@@ -10,8 +10,10 @@ sources:
   - https://zsh.sourceforge.io/Doc/Release/Parameters.html
   - https://google.github.io/styleguide/shellguide.html
   - https://www.shellcheck.net/
-last_verified: 2026-07-10
-related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution]
+  - https://www.gnu.org/software/bash/manual/html_node/Double-Quotes.html
+  - https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
+last_verified: 2026-08-05
+related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution, platforms-shells-escapes-in-shell-string-literals, platforms-shells-env-var-off-switches, platforms-shells-unset-versus-empty-parameters, platforms-shells-option-like-argument-values, platforms-processes-tool-diagnostics-without-a-failing-exit-code, testing-quality-completion-predicates]
 ---
 
 # Shell Scripts That Must Run on More Than One Machine or Shell
@@ -51,7 +53,38 @@ non-interactive environment).
 | Array indexing | 0-based | 1-based (unless `KSH_ARRAYS`) | Iterate with `"${arr[@]}"`; when a numeric index is unavoidable, gate the script to one shell via the shebang |
 
 5. Build argument lists as arrays and expand quoted: `args=(-o "$out"); cmd "${args[@]}"`.
-6. Run `shellcheck` on every script before it ships or gates anything; it flags
+   In POSIX sh there are no arrays — reorder the positional parameters in place, and
+   write that loop **inline at the top level of the dispatcher**, never inside a
+   helper function:
+
+   ```sh
+   n=$#; while [ "$n" -gt 0 ]; do a="$1"; shift
+     case "$a" in --dry-run) DRY=1 ;; *) set -- "$@" "$a" ;; esac
+     n=$((n-1)); done
+   ```
+
+   POSIX restores a function's caller positional parameters on return, so a helper's
+   `set --` is discarded and the caller's `"$@"` still carries the flag as an operand.
+6. Choose the default-expansion form by what an empty value must mean. The colon
+   decides it: with the colon the test is "unset **or null**", without it the test
+   is "unset" only (POSIX 2.6.2).
+
+| You want | Write | `VAR=` (empty) yields | `VAR` unset yields |
+|----------|-------|-----------------------|--------------------|
+| An empty value to mean "caller supplied nothing" — a blank config field falls back | `${VAR:-default}` | `default` | `default` |
+| An empty value to mean "caller deliberately set it empty" — passing `VAR=` turns the feature off | `${VAR-default}` | *(empty)* | `default` |
+
+   When you cannot change the script and it reads `${VAR:-default}`, disable the
+   feature by supplying a value that fails the script's own validation
+   (`WATCH_TMUX=/nonexistent-tmux` makes the `command -v` check fail) rather than
+   an empty string, which the expansion replaces with the default.
+7. Choose the quoting by what the text is, not by habit. Inside double quotes the
+   backquote "shall retain its special meaning introducing … command substitution"
+   and `$` still introduces expansion, so text quoting a command runs it. Wrap
+   literal text — prose, error messages, anything containing a command example — in
+   **single** quotes, and pass long bodies via a file (`--body-file`) rather than as
+   an argument.
+8. Run `shellcheck` on every script before it ships or gates anything; it flags
    unquoted expansions, bashisms under `#!/bin/sh`, and `set -e` blind spots.
 
 ## Edge cases
@@ -62,6 +95,11 @@ non-interactive environment).
 | Critical command is in a pipeline but the interpreter is POSIX sh (no `pipefail`) | Run the critical command outside the pipeline (temp file between stages) and test `$?` directly |
 | Script runs via cron/CI/hooks and commands are "not found" | Non-interactive shells load no rc files — no user PATH, no version-manager shims. Call binaries by absolute path (see platforms-toolchains-version-management) |
 | `set -u` breaks on optional variables | Expand with an explicit default: `"${OPT:-}"` |
+| Embedding a regex or pattern in a double-quoted string (`grep -E "…"`, `sed`, `awk`) | Inside double quotes bash strips the backslash only before `$`, backtick, `"`, `\`, or newline — so `"\$"` reaches the tool as a bare `$` (a regex end-of-line anchor) while `"\d"` keeps its backslash. Single-quote regex literals so nothing is stripped, or account for exactly those five escapes ([platforms-shells-escapes-in-shell-string-literals]) |
+| An env var you set to empty to switch a feature off has no effect | The script reads `${VAR:-default}`, which substitutes the default for empty as well as unset. Pass a value the script's own check rejects, or change the script to `${VAR-default}` ([platforms-shells-env-var-off-switches]) |
+| A flag is parsed correctly but still appears among the operands | The reordering loop is inside a function. Flags set globals (which survive), operands are set positionally (which do not) — so detection works and the argument list stays wrong, with no error. Move the loop inline (step 5) |
+| A payload argument begins with `-` | Pass it after a `--` separator (`cmd -- "$text"`); quoting does not help, because the option parser, not the shell, is what claims it ([platforms-shells-option-like-argument-values]) |
+| Message text must contain a command example | Single-quote the whole argument, or write the text to a file and pass the path — a double-quoted backtick executes and the message ships with the output spliced in |
 
 ## Instead of
 
@@ -70,6 +108,12 @@ non-interactive environment).
 | Build a command string and `eval` it | Build an array and expand it: `cmd "${args[@]}"` | `eval` re-parses quotes and globs; arrays pass arguments through exactly |
 | Put a command plus its flags in one variable and run `$cmd` | Variable holds the binary path only; flags are separate words | zsh runs the whole value as one command name; bash re-splits and re-globs it |
 | Trust a trailing `echo "done"` as proof a step ran | Verify the produced state with an independent command | Inside `&&` chains and subshells, `set -e` misses failures and the echo still prints |
+| Wrap a regex containing `\$`, `\"`, or a backtick in double quotes | Single-quote the pattern (`grep -E '…\$'`), or write only the five double-quote escapes deliberately | Double quotes silently drop the backslash before those characters, so `"\$"` becomes bare `$` and the pattern matches something else |
+| Pass `VAR=` to turn off a feature a script reads as `${VAR:-default}` | Pass a value the script's validation rejects, or change the script to `${VAR-default}` | `:-` substitutes the default for an empty value too, so the feature stays on and the disable is silently ignored |
+| Write `"${VAR:-default}"` for a variable whose empty value is meaningful | Write `"${VAR-default}"` and reserve `:-` for "unset or empty are both wrong" | The colon collapses "explicitly cleared" and "never set" into one branch, which removes the caller's ability to express the first |
+| Wrap POSIX-sh flag parsing in a `parse_flags "$@"` helper | Keep the `set --` reordering loop inline in the dispatcher | Positional parameters are restored when the function returns, so the caller runs with the original, unfiltered arguments |
+| Accumulate POSIX-sh operands into a string to work around the missing array | Reorder `"$@"` in place with `set -- "$@" "$a"` | A string re-splits on whitespace, so a path containing a space becomes two operands |
+| Double-quote a message that quotes a command | Single-quote it, or pass it with `--body-file` | `` "…`cmd`…" `` runs `cmd`, substitutes its output, and can exit 0 with the message silently gutted |
 
 ## Sources
 

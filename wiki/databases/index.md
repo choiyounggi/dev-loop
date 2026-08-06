@@ -38,12 +38,19 @@ Match your situation to a "load when" line; load only matching pages.
 | [nullability-and-defaults](schema-design/nullability-and-defaults.md) | Declaring column nullability/defaults; queries dropping rows around NULLs |
 | [soft-delete](schema-design/soft-delete.md) | Deleted records themselves must be restorable or kept (deleted_at schemas); deciding what a parent's deletion does to children that must survive (for who-changed-what history → requirements-to-tables) |
 | [online-schema-changes](schema-design/online-schema-changes.md) | Running ALTER TABLE / CREATE INDEX on a large table under live traffic; a migration blocks reads/writes (ACCESS EXCLUSIVE); adding a column/constraint/NOT NULL/index/type change safely; expand-and-contract to decouple DB migration from app deploy |
+| [verifying-additive-migrations](schema-design/verifying-additive-migrations.md) | The project has no migration tool and schema comes from an ORM `create_all()` plus hand-written `ALTER TABLE ADD COLUMN IF NOT EXISTS`; writing the test that proves a new column reaches an already-deployed database; asserting a column's type/nullability/default from the catalog; a column added on the model never appeared on the deployed table |
 
 ## operations
 
 | Page | Load when |
 |------|-----------|
 | [autovacuum-and-wraparound](operations/autovacuum-and-wraparound.md) | A write-heavy table bloats or slows over time; tuning autovacuum for a hot table; monitoring/preventing transaction-ID wraparound (age(datfrozenxid)); the database starts refusing writes to avoid wraparound; deciding VACUUM vs VACUUM FULL vs pg_repack |
+
+## data-survey
+
+| Page | Load when |
+|------|-----------|
+| [surveying-live-data-for-a-rule](data-survey/surveying-live-data-for-a-rule.md) | A task says to sample real data to decide a mapping table, normalization/canonicalization rule, enum value set, or parsing rule; a `GROUP BY`/`DISTINCT` survey came back with zero rows; deciding what evidence replaces the data when the table is empty; recording in the deliverable which evidence a rule was actually derived from |
 
 ## sqlite
 

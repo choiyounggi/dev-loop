@@ -8,7 +8,7 @@ sources:
   - https://www.postgresql.org/docs/current/functions-subquery.html
   - https://wiki.postgresql.org/wiki/Count_estimate
 last_verified: 2026-07-10
-related: [databases-query-optimization-reading-execution-plans, databases-query-optimization-keyset-pagination]
+related: [databases-query-optimization-reading-execution-plans, databases-query-optimization-keyset-pagination, databases-data-survey-surveying-live-data-for-a-rule]
 ---
 
 # Existence Checks and Counts
