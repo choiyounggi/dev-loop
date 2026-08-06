@@ -11,7 +11,7 @@ sources:
   - https://google.github.io/styleguide/shellguide.html
   - https://www.shellcheck.net/
 last_verified: 2026-07-10
-related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution]
+related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution, platforms-shells-warning-only-diagnostics]
 ---
 
 # Shell Scripts That Must Run on More Than One Machine or Shell

@@ -1,192 +1,60 @@
-# Knowledge flush — 3 insight(s)
-
-Queue drained: `~/.dev-loop/queue/0c6a5439-….jsonl` (1 row),
-`~/.dev-loop/queue/fb7e7221-….jsonl` (2 rows). All three were harvested
-2026-08-04 from the `linkly-t1-spec-notation` and `linkly-t1-repo-policy` repos.
-
-Result: **2 new pages, 1 merge into an existing page, 1 new category.**
-
-| # | Insight (trigger → directive) | Outcome | Confidence |
-|---|-------------------------------|---------|------------|
-| 1 | Adding a node kind to a format whose only gate mutates a golden example → commit a fixture holding the new kind, one negative per keyword, verify each reddens | **New page** `testing/quality/schema-additions-under-a-golden-gate` | verified |
-| 2 | Enumerating call sites before a contract change → enumerate by callee name; a parameter-name search is a partial index | **New page + new category** `backend/common/change-impact/call-site-enumeration` | verified |
-| 3 | A fixture helper whose shape depends on a value the test also passes to the SUT → put that value in the helper's signature | **Merged** into `testing/data/test-data-and-isolation` | verified |
-
----
+# Knowledge flush — 7 insight(s): 6 ingested (1 new page, 5 merges), 1 dropped
 
 ## Verified best-practice
 
-Every URL below was fetched during this flush; the quotes are from those
-fetches, not from memory. Nothing was cited that I did not open.
+**1. Policy gates must parse all three shell quoting forms and expand only resolvable prefixes** (`d3ef0214`, from dev-loop)
+Claim: a PreToolUse/policy gate extracting an argument from raw command text must accept bare, single-quoted, and double-quoted forms and expand `~`/`$HOME`/`${HOME}` itself; a bare-token regex denies well-formed commands with a misleading "argument missing" error.
+Sources checked: https://code.claude.com/docs/en/hooks (hook receives the unexecuted `tool_input.command` string), https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html (2.2 Quoting defines exactly escape/single/double-quote forms; expansion happens only when the shell processes the line).
+Verification: re-ran the repo's own regression suite this session — `bats tests/pre-flush-pr-gate.bats` tests 12 (double-quoted `--body-file` recognized) and 13 (`$HOME` path expanded) pass on current main. **Confidence: verified.**
 
-### Insight 1 — a golden-derived negative corpus cannot reach a newly added schema branch
+**2. Invoke helper scripts via `sh "$SCRIPT"` so test stubs need no exec bit (EDR-safe seam)** (`cc8801d1`, from dev-loop t1)
+Claim: designing production code to call external scripts through the interpreter lets tests inject stubs as plain read-only files — no `chmod +x`, which EDR agents (SentinelOne) flag on temp/test paths — and survives mode-stripping distribution paths (plugin cache).
+Sources checked: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/sh.html — command_file "need not be executable" (stated for both slash and no-slash pathnames).
+Verification: local reproduction 2026-08-06 — a mode-644 script ran via `sh file` (exit 0) and failed direct exec with permission denied (exit 126). Original field evidence: 8 stubs injected without chmod, 331/331 bats green. **Confidence: verified** (mechanism doc-backed + reproduced; EDR angle annotated as field practice).
 
-*Claim under test:* when a format's only gate builds negatives by mutating one
-committed golden example, adding a new node kind to the schema produces a green
-run that proves nothing about the addition.
+**3. Gate warnings by captured stderr, not exit code; redirection order `2>&1 >/dev/null`** (`e3b04b0e`, from linkly)
+Claim: warning-emitting tools exit 0, so a feedback hook must capture stderr (`OUT=$(tool "$F" 2>&1 >/dev/null)`) and, in a Claude Code PostToolUse hook, forward non-empty output via exit 2.
+Sources checked: https://code.claude.com/docs/en/hooks — PostToolUse "Shows stderr to Claude; the tool already ran" on exit 2; exit-0 stderr "goes to the debug log only, never the transcript". https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html — 2.7 Redirection: "the order of evaluation is from beginning to end". (gnu.org bash manual returned HTTP 429 repeatedly; POSIX covers the same semantics and is cited instead.)
+Verification: local reproduction 2026-08-06 — `cc -Wall` on unused-variable code: exit 0 with 157 bytes on stderr; correct order captured the 156-char diagnostic, reversed order captured 0 chars. **Confidence: verified.**
 
-| Source checked | What it establishes |
-|----------------|---------------------|
-| https://json-schema.org/understanding-json-schema/reference/conditionals | The mechanism, verbatim: *"If `if` is invalid, `else` must also be valid (and `then` is ignored)"* — a branch keyed on the new kind is simply **not applied** to an instance that lacks it. So a mutant of a golden without the new kind cannot exercise the new branch. |
-| https://json-schema.org/understanding-json-schema/reference/object | Why the new branch also needs constraining before a negative can even exist: *"By default any additional properties are allowed"* and *"By default, the properties defined by the `properties` keyword are not required"*. |
-| https://json-schema.org/draft/2020-12/json-schema-core | Sibling applicators *"MUST NOT impact the results of sibling subschemas"*; and *"Unknown keywords SHOULD be treated as annotations"* — a misspelled keyword in a new branch is ignored rather than rejected, a second silent-pass mode. |
-| https://pitest.org/quickstart/basic_concepts/ | The same gap has a name in mutation tooling: *"**No coverage**: the same as **Survived** except there were no tests that exercised the line of code where the mutation was created"* — cited so the page tells a reader using PIT/Stryker what the symptom looks like there. |
+**4. Attribute temp-artifact leaks by prefix histogram before fixing; then a static cleanup guard observed red first** (`a61dfd51`, from linkly)
+Claim: histogram surviving temp names by prefix and match against `mkdtemp` call sites — the distribution pinpoints the few offending sites; enforce the cleanup convention with an AST/lint guard proven red on pre-fix code.
+Sources checked: https://docs.python.org/3/library/tempfile.html — "The user of mkdtemp() is responsible for deleting the temporary directory and its contents when done with it."
+Verification: field measurement (998 leaked dirs = 686+306 under two prefixes, exactly the 2/6 call-site files without cleanup; post-fix suite temp delta 0, 72 MB → 3.3 MB). The histogram-attribution method itself has no external source. **Confidence: field-tested** (cleanup-responsibility claim doc-backed).
 
-*Session evidence (kept as a field observation, not as the basis of the
-directive):* in `linkly-t1-spec-notation`, `grep -rln "lir.schema\|jsonschema"
-impl/tests/` returned 0 of 447 tests, and the only schema gate over `*.lir.json`
-was `scripts/validate_ir.py --self-test`, whose three negatives are all
-`copy.deepcopy` mutations of `examples/login.lir.json`.
+**5. A pre-implementation test that cannot go red: record vacuous green, prove later by guard mutation** (`d245e299`, from dev-loop t2)
+Claim: when a usage-error test expects the exit code the unimplemented path already produces, red-first silently fails; mark it vacuously green and after implementation mutate the specific guard, require red, restore.
+Sources checked: existing page sources apply directly — James Shore AoAD2 TDD ("predict *how* it will fail") and https://testing.googleblog.com/2021/04/mutation-testing.html (already cited on the two target pages; both live-verified in prior flushes).
+Verification: session reproduction — `sed` mutation of the arg-count guard (`-ge 2`→`-ge 1`) flipped the test to `not ok`; restore flipped it back. **Confidence: verified.**
 
-**Confidence: `verified`** — the directive's mechanism is stated in the official
-JSON Schema documentation; the incident is corroborating, not load-bearing.
+**6. Client-side throttles must count token/auth issuance requests and stamp at actual send** (`58d7e79d`, from auto-trading-bot/stock-trader)
+Claim: auth refresh inside `_headers()`/interceptors bypasses a throttle layered above it; token POST + first API GET land in the same second, deterministically exceeding a 2-req/s cap only on cold-token days — presenting as intermittent failure.
+Sources checked: searched for an official cross-provider statement that token-endpoint calls count toward rate limits; Auth0/Okta rate-limit docs confirm token endpoints are themselves rate-limited but state no general counting rule, so no external URL is cited for the directive itself.
+Verification: provider-log evidence from the field incident (token POST :00.354 → issuance :00.495 → rate-limited API call :00.543 on both token-issuance days; cache-valid days clean). **Confidence: field-tested** — the merged row is annotated as such inside the otherwise-verified page, following the existing `permissions-and-exec-bits` mixed-provenance precedent.
 
-### Insight 2 — enumerate by callee name, not by parameter name
-
-*Claim under test:* a keyword-argument search (`repo_rows=`) is structurally
-incapable of finding call sites that pass the same argument positionally.
-
-| Source checked | What it establishes |
-|----------------|---------------------|
-| https://docs.python.org/3/glossary.html | *positional-or-keyword* — *"specifies an argument that can be passed either positionally or as a keyword argument. **This is the default kind of parameter**"*. The blindness is therefore the default case, not an edge case. |
-| https://docs.python.org/3/library/ast.html | `ast.Call`: *"`args` holds a list of the arguments passed by position"*, *"`keywords` holds a list of `keyword` objects representing arguments passed by keyword"* — the two forms live in **separate fields**, so a keyword-name text search reads only one of them. |
-| https://peps.python.org/pep-0570/ | The `/` and `*` markers, which is what makes the page's "declare it keyword-only so a stale positional call errors instead of rebinding" edge case actionable. |
-
-*Reproduction run this session* (Python 3.14.6, macOS, no files written — piped
-to `python3` on stdin): over four call sites of `verify(...)` of which one passes
-`repo_rows=` by keyword, a regex search for `repo_rows\s*=` matches **1** while
-an AST pass over `Call` nodes named `verify` finds **4** — 3 sites invisible to
-the keyword search. This is the minimal version of the reported incident.
-
-*Session evidence:* recon reported "13 call sites, 7 need editing"; 8 further
-seeds passed the value as `verify()`'s 4th positional argument, and the suite the
-session had reported green then ran `472 tests / FAILED (failures=11)`.
-
-**Confidence: `verified`** — official language reference plus a reproduction.
-
-### Insight 3 — a fixture factory takes the value the test also passes to the SUT
-
-*Claim under test:* when a fixture helper's shape depends on a value the test
-also feeds the system under test, that value belongs in the helper's signature
-rather than in a module-level default.
-
-| Source checked | What it establishes |
-|----------------|---------------------|
-| https://abseil.io/resources/swe-book/html/ch12.html | A test is *complete* when *"its body contains all of the information a reader needs in order to understand how it arrives at its result"*; DAMP over DRY; and, directly on point, that engineers should *"use helper methods with descriptive parameters that make dependencies explicit"* rather than reusing shared constants. |
-| https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html | Keep the inputs a result depends on visible in the test method rather than in shared setup, so cause and effect is readable without jumping elsewhere. |
-
-*Session evidence:* `rows_for(doc)` seeded from the module constant `PAYLOAD`
-while its tests ran payload `{}`; a shape-only migration fixed 1 of 11 failures,
-moving the payload into the signature fixed 11 of 11.
-
-**Confidence: `verified`** — both sources are prescriptive on the exact point.
-
-Note: the canonical name for this smell is xUnit Patterns' *Mystery Guest*.
-`xunitpatterns.com` is HTTP-only and could not be fetched over HTTPS this
-session, so **it is deliberately not cited** — an unfetchable URL is worse than
-none, per the ingest rules.
-
----
+**7. dev-loop orchestrate `worktree_escape` fires on read-only cross-worktree access — budget escalation round-trips** (`28fd6dfe`) — **DROPPED** (see Routing decision).
 
 ## Existing-layer check
 
-Routed via `INDEX.md` → domain `index.md` → every page whose "load when" line
-overlapped. Pages read in full before deciding: all six of `testing/quality/`,
-`testing/data/test-data-and-isolation`, `testing/index`, `qa/process/regression-scope`,
-`qa/index`, `debugging/index`, `backend/index`, `backend/python/index`, plus a
-repo-wide search for prior coverage (`grep -rliE "call site|callee|positional
-argument|keyword argument"` and a `\bgrep\b` sweep over `wiki/`).
+Pages read: `INDEX.md`; domain indexes for platforms, testing, backend, infrastructure; full pages `command-text-inspected-before-execution`, `portable-shell-scripts` (headings), `permissions-and-exec-bits`, `tests-that-cannot-fail`, `checks-that-cannot-pass`, `test-data-and-isolation`, `what-to-mock` (index line), `timeouts-and-retries`. Grepped the whole wiki for guardrail/escalation/orchestrate coverage (none).
 
-### Insight 1 — nearest neighbours, and why it is not a duplicate
-
-| Page read | Overlap | Decision |
-|-----------|---------|----------|
-| `testing/quality/spec-artifact-checks` | Closest. Already owns *"one negative control per check, mutating only what that check owns"* and the coverage-vs-validity split. | **Not a merge.** Its trigger is *authoring a check*; this insight's trigger is *evolving the artifact the check validates* — the negatives already exist and are individually sound, yet the corpus as a whole cannot reach the new shape. Per the wiki's one-case-per-page rule this is a new trigger. Linked both ways. |
-| `testing/quality/tests-that-cannot-fail` | Owns the break-the-code red-run rule the new page's step 4 depends on. | Referenced inline; `related:` added both ways. |
-| `testing/quality/harness-reverse-controls` | Owns the *harness-level* control (can this harness go green). | Complementary, not overlapping: that page asks whether the harness discriminates at all, this one asks whether the fixture corpus reaches a newly added shape. `related:` added both ways. |
-| `testing/quality/checks-that-cannot-pass` | Trigger is a check whose **target does not exist yet**. | Distinct — here the target exists and the gate is green. No edit. |
-| `qa/document-verification/spec-document-gates` | Release-gate altitude for document deliverables. | Kept as a one-way `related:` from the new page. |
-
-**No conflicts found.** Nothing in the wiki contradicts the new directive.
-
-### Insight 2 — no existing coverage anywhere
-
-The repo-wide search found **zero** pages discussing call-site enumeration,
-callee-name search, or positional-vs-keyword arguments as a recon concern. The
-single adjacent line is `qa/process/regression-scope`'s edge-case row *"The
-change is in code with no test coverage and unclear callers | Trace callers
-before scoping"* — which names the need and does not say how. That row now
-points at the new page, and `regression-scope` gained the new page in
-`related:` (both directions).
-
-Checked and rejected as homes: `debugging/*` (diagnosis of a failure, not
-pre-change recon), `backend/python/language/mutable-state-traps` (mutable
-defaults and shared state — a different mechanism), `platforms/tools/bsd-vs-gnu-cli`
-(grep *flag* portability, not search strategy).
-
-### Insight 3 — merged, not created
-
-`testing/data/test-data-and-isolation` already owns fixture construction and
-carries the adjacent rule *"pass explicitly only the fields the test's behavior
-depends on"* plus a row for shared **mutable** fixture objects. This insight is
-the same trigger with a directive that extends it (a *defaulted* constant, which
-is not mutated and so is not covered by the existing row). Merge-before-create
-applied — no new page. Added: 1 `Do` row, 1 edge-case row (the symptom is a
-lookup miss far from the helper), 1 `Instead of` row, 2 sources, and
-`last_verified` bumped to 2026-08-04.
-
----
+- Insight 1 overlaps `command-text-inspected-before-execution` — that page covered the **caller** side only; merged the **gate-author** side as new step 6 + one Instead-of row + field context. No conflict: caller-side rows ("a gate that excludes quote characters cannot receive a quoted path") remain correct defensive guidance against naive gates.
+- Insight 2 overlaps `permissions-and-exec-bits`, which already had "invoke through the interpreter" as a mode-stripping workaround; merged the EDR/test-seam design angle as one edge-case row + one Instead-of row + POSIX source. No conflict.
+- Insight 3 had no owning page (checked `portable-shell-scripts` — portability scope, wrong home; `command-text-…` — PreToolUse command inspection, different mechanism). Created a new sibling page; `related:` linked both ways to `command-text-inspected-before-execution` and `portable-shell-scripts`.
+- Insight 4 overlaps `test-data-and-isolation` ("Filesystem / temp files" row existed but only as per-test practice); merged the attribution/enforcement case as one edge-case row with an inline sanctioned hop to `checks-that-cannot-pass` (guard-red-first). Frontmatter `related` not cross-added — adjacency is one directive, not page-level.
+- Insight 5 fit both `tests-that-cannot-fail` (mutation proof) and `checks-that-cannot-pass` (target-does-not-exist scope). Merged into `checks-that-cannot-pass` — its existing "test for behavior you are about to implement" row is the exact parent case — with an inline link to `tests-that-cannot-fail` for the mutation mechanics. The two pages already `related:`-link each other.
+- Insight 6 had no rate-limiting page; `timeouts-and-retries` owns outbound-call discipline and already handles 429s — merged as one edge-case row + field-incident source line rather than creating a single-row `client-rate-limiting` page.
 
 ## Routing decision
 
-| Insight | Target | Rationale |
-|---------|--------|-----------|
-| 1 | `testing` / `quality` / **new page** `schema-additions-under-a-golden-gate` | `INDEX.md` routes "writing or structuring automated tests … verifying tests can actually fail" to `testing`; within it, `quality` already holds the five pages about whether a check proves anything. Existing category, no structural change. |
-| 3 | `testing` / `data` / **merge** into `test-data-and-isolation` | Same trigger as the page's own ("tests need fixture data and you are choosing how to create it"); directive extends step 1. |
-| 2 | `backend` / `common` / **NEW category `change-impact`** / `call-site-enumeration` | See below. |
+| # | Target | Decision |
+|---|--------|----------|
+| 1 | platforms/shells/command-text-inspected-before-execution | Merge (gate-author side of the same case) |
+| 2 | platforms/filesystems/permissions-and-exec-bits | Merge (harvest hinted `testing`; the mechanism — exec-bit semantics of invocation style — is owned by this platforms page, and the testing route now reaches it via the updated index line) |
+| 3 | platforms/shells/warning-only-diagnostics | **New page** (harvest hinted `testing`; the case is shell-stream/hook-protocol mechanics, not test design — placed beside the other hook-engineering page in platforms/shells; no new category needed) |
+| 4 | testing/data/test-data-and-isolation | Merge (suite-hygiene case of the existing temp-files row) |
+| 5 | testing/quality/checks-that-cannot-pass | Merge (exact refinement of its pre-implementation-test edge row) |
+| 6 | backend/common/reliability/timeouts-and-retries | Merge (single edge-case row; a new `client-rate-limiting` page was rejected as one-row-page fragmentation) |
+| 7 | — | **Dropped from wiki**: specific to dev-loop's own orchestrate guardrail (`worktree_escape` ask-on-read behavior and escalation workflow). No wiki domain/category owns agent-orchestration coordination, and creating one for a single tool-specific page is unjustified. The right home is the orchestrate skill's own docs — schema/workflow layer, owner-approval-only per AGENTS.md — so it is surfaced here for the owner instead: *brief authors should budget escalation round-trips when briefs reference other worktrees, and state "read approved, write + /tmp forbidden" in the worker's first instruction*. Candidate retired to `.processed.jsonl` (status `dropped`). |
 
-### New category: `backend/common/change-impact/`
-
-**Why `backend`:** `AGENTS.md`'s routing protocol resolves a multi-domain match
-by "the domain that owns **the artifact you will change**" — here, application
-code. **Why `common`:** the directive is language-agnostic (any language with
-optional or positional arguments; in a language with no keyword arguments at all
-the parameter-name search returns nothing whatsoever). The Python mechanics are
-cited as the mechanism, not as the scope.
-
-**Why not an existing category** — all eleven `backend/common` categories were
-re-checked by name before creating a new one:
-
-- `api-design` is the only near miss, and all three of its pages are HTTP-shaped
-  (status codes, endpoint idempotency, list-endpoint pagination). Its "load when"
-  lines are written about endpoints; filing an in-process function-signature
-  concern there would make the category's routing lines contradict its contents,
-  which invariant 1 forbids.
-- `reliability`, `caching`, `jobs`, `errors`, `auth`, `orm`, `concurrency`,
-  `llm`, `integrations`, `storage` — all runtime-behaviour categories; none
-  covers a design-time change-impact question under any other name.
-
-`change-impact` is the noun for the concern, leaves room for sibling pages
-(schema/event-contract consumers, deprecation windows), and is registered in
-`wiki/backend/index.md` plus the root `INDEX.md` backend row.
-
-### Plumbing
-
-- `wiki/testing/index.md` — new `quality` row with a use-case-enumerating "load when" line.
-- `wiki/backend/index.md` — new `change-impact` section + subtree summary row updated.
-- `INDEX.md` — backend row's `common/` concern list updated.
-- `log.md` — `## [2026-08-04] ingest | …` entry appended.
-- `related:` added both ways for all four adjacent pages.
-
-### Invariants verified mechanically (not by eye)
-
-Ran over all **141** pages after the edits:
-
-- every page is listed in an ancestor `index.md` → **0 unlisted**
-- every `related:` id and inline `[page-id]` reference resolves → **0 broken**
-- no page exceeds 120 body lines → **0 over**
-- banned vague qualifiers (`usually`, `consider`, `might want to`, `generally`,
-  `as appropriate`) in the three touched pages → **0 hits**
-- every "don't"-shaped statement in the new pages is descriptive prose, not a
-  bare prohibition; anti-patterns appear only in `Instead of` tables, each paired
-  with its replacement.
+No new categories created; no contradictions flagged. Indexes updated: platforms (2 load-when lines + 1 new page row), testing (2 load-when lines), backend (1 load-when line). `log.md` appended.

@@ -7,8 +7,8 @@ confidence: verified
 sources:
   - https://code.claude.com/docs/en/hooks
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
-last_verified: 2026-07-30
-related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution]
+last_verified: 2026-08-06
+related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-shells-warning-only-diagnostics]
 ---
 
 # Commands Read as Text by a Gate Before the Shell Runs Them
@@ -58,6 +58,16 @@ on the first attempt.
    your exact command string before rewriting anything else — one run tells you
    whether you are in the missing-argument or nonexistent-file mode above.
 
+6. **When you author the gate, accept all three shell quoting forms and expand
+   only prefixes the gate can resolve from its own environment.** Correct shell
+   style quotes paths, so an extraction pattern that excludes quote characters
+   (`[^ '"]+`) denies exactly the well-formed commands, with a misleading
+   missing-argument error. Parse the argument bare, single-quoted, and
+   double-quoted (POSIX 2.2 defines only these three forms), expand `~`, `$HOME`,
+   and `${HOME}` against the gate's own environment, and state in the gate's
+   error message that any other variable must be written as a literal path.
+   Prove the parser with one regression test per form before relying on it.
+
 ## Edge cases
 
 | Case | Then |
@@ -76,6 +86,7 @@ on the first attempt.
 | Assume a blocked command means the deliverable is wrong | Reproduce the gate's extraction pattern against your literal command string first | A quoting-level extraction failure and a genuinely incomplete deliverable produce the same refusal, so fixing content wastes the round |
 | Build the file the gate checks with a heredoc in the same command | Write it in a prior command and reference the path | The gate is evaluated before execution, so the file is absent at decision time |
 | Reword prose to get a dangerous-looking string past a scanner | Put the prose in a file and pass `--notes-file`/`--body-file` | Editing meaning to satisfy a text scanner degrades the artifact; a file is not scanned as a command |
+| Extract a gate's file argument with a bare-token pattern like `[^ '"]+` | Parse bare, single-quoted, and double-quoted forms and expand `~`/`$HOME`/`${HOME}` yourself (step 6) | The quote characters callers are taught to use land inside the match window, so the extractor returns empty and the gate reports a present argument as missing |
 
 ## Sources
 
@@ -92,3 +103,10 @@ missing), `--body-file $REPO/…` → literal `$REPO/…` (blocked as nonexisten
 `--body-file /abs/…` and `--body-file=/abs/…` extracted correctly. A same-command
 heredoc body-file was separately blocked as not-yet-existing until moved to a
 preceding call.
+
+Gate-author side reproduced 2026-08-05/06 on the same gate: the original
+bare-token extractor denied a double-quoted `--body-file` path as missing;
+after adding quoted-form parsing plus `~`/`$HOME`/`${HOME}` expansion, the bats
+regressions covering a double-quoted path and a `$HOME`-prefixed path
+(`tests/pre-flush-pr-gate.bats` tests 12–13) went red-then-green and still pass
+(re-run 2026-08-06).

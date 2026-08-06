@@ -8,7 +8,7 @@ sources:
   - https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
   - https://sre.google/sre-book/addressing-cascading-failures/
   - https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
-last_verified: 2026-07-10
+last_verified: 2026-08-06
 related: [backend-common-api-design-idempotency, backend-common-llm-completion-response-validation]
 ---
 
@@ -63,6 +63,7 @@ retry storms, or requests that hang until a client gives up.
 | Choosing the timeout value | Derive from the dependency's observed p99 latency plus headroom, not a guess; alert when timeouts actually fire so drift is visible |
 | Batch/scheduled job calling an API in a loop | Same rules per call, plus one overall deadline per run so a hung run does not overlap the next schedule |
 | Dependency is a DB with its own driver timeout | Set both the driver statement timeout and your outer deadline; the outer one must be the larger of the two, or you cancel work the DB has almost finished |
+| The dependency enforces a requests-per-second cap and your client-side throttle still trips it on a fresh process's first call | Route every outbound HTTP request through the throttle — including token/credential issuance fired from header builders or auth interceptors (those are rate-limited requests too); stamp the throttle's timestamp immediately before the actual send; and check the initial state (`last_request_at = 0`) cannot satisfy the spacing check. An interceptor-issued token POST landing in the same second as the first API call exceeds a 2-req/s cap deterministically, but only on days the token cache is cold — which presents as an intermittent failure |
 
 ## Instead of
 
@@ -77,3 +78,4 @@ retry storms, or requests that hang until a client gives up.
 - https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/ — timeouts on every remote call, backoff, jitter, idempotency precondition for retries
 - https://sre.google/sre-book/addressing-cascading-failures/ — deadlines and propagation, retry budgets, per-request retry limits, failing fast under overload
 - https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/ — jittered backoff outperforms plain exponential backoff; full-jitter formula
+- Field incident 2026-08-06 (`stock-trader`, KIS API, 2-req/s cap; this row is field-tested): `_headers()` called `_throttle()` and then `_get_token()`, so the token POST bypassed the throttle; provider logs on the two token-issuance days showed token POST at :00.354, issuance at :00.495, and the first API call rate-limited at :00.543, while cache-valid days ran clean — misdiagnosed as intermittent until the interceptor path was counted

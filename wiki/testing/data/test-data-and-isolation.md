@@ -8,7 +8,7 @@ sources:
   - https://martinfowler.com/articles/nonDeterminism.html
   - https://abseil.io/resources/swe-book/html/ch12.html
   - https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html
-last_verified: 2026-08-04
+last_verified: 2026-08-06
 related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice]
 ---
 
@@ -56,6 +56,7 @@ state-leak symptom.
 | Failure appears only in the full suite, never alone | Run the suite in random order to expose the order dependency, then bisect to the polluting test; fix the polluter's ownership, not the victim ([testing-flaky-diagnosing-flaky-tests]) |
 | Test needs "now"-relative data but the code reads the system clock directly | Refactor the code to accept an injected clock; that seam is the fix — assertions with tolerance windows around real time stay flaky |
 | A group of tests fails as a lookup miss, an empty result, or a "not found" far from any fixture code | Compare each factory's defaulted values against the input the test actually runs before migrating fixture shape; when the two disagree, the fixture was built for a different input and only the signature change fixes the group |
+| Temp artifacts accumulate across suite runs and the leak seems to come from "everywhere" | Attribute before fixing: histogram survivors by name prefix (`ls \| sed 's/-[a-z0-9]*$//' \| sort \| uniq -c`) and match the distribution against the creation sites (`mkdtemp`/`mktemp` callers) — the few sites matching the top counts are the cause. Fix those teardowns, then encode the cleanup convention as a static lint/AST guard and observe it fail on the pre-fix code before trusting it ([testing-quality-checks-that-cannot-pass]) |
 
 ## Instead of
 
@@ -73,3 +74,5 @@ state-leak symptom.
 - https://abseil.io/resources/swe-book/html/ch12.html — a test is complete when "its body contains all of the information a reader needs in order to understand how it arrives at its result"; prefer DAMP over DRY, and where a helper is used, give it "descriptive parameters that make dependencies explicit" rather than reusing shared constants
 - https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html — keep the inputs a test's result depends on visible in the test method instead of in shared setup, so the cause-and-effect relationship is readable without jumping elsewhere
 - Field incident 2026-08-04 (`linkly-t1-repo-policy`, Python): `rows_for(doc)` seeded its rows from the module constant `PAYLOAD` while its tests ran payload `{}`; a shape-only migration of the helper fixed 1 of 11 failures, and moving the payload into the helper's signature fixed 11 of 11
+- https://docs.python.org/3/library/tempfile.html — "The user of mkdtemp() is responsible for deleting the temporary directory and its contents when done with it"; `TemporaryDirectory` cleans up as a context manager
+- Field incident 2026-08-06 (`linkly`): 998 leaked temp dirs; prefix histogram showed 686 + 306 under two prefixes, and exactly the 2 of 6 `mkdtemp`-calling test files without cleanup matched them; after the fix, full-suite temp delta measured 0 (72 MB → 3.3 MB)

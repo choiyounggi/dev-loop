@@ -9,7 +9,7 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
   - https://docs.semgrep.dev/writing-rules/testing-rules
   - https://docs.pytest.org/en/stable/reference/exit-codes.html
-last_verified: 2026-07-29
+last_verified: 2026-08-06
 related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set]
 ---
 
@@ -76,6 +76,7 @@ known-good file + wrong anchor → 1; missing target → 3; invalid regex → 4.
 | The check's output is piped (`grep -c … \| tail -1`) | Set `set -o pipefail`, or capture into a variable and compare. Without it the pipeline reports the last command's status, so grep's error 2 becomes exit 0 — the absent target reads as a pass. Measured on the same runs |
 | A count is compared without a value (`[ "$n" -eq 7 ]`, `$n` empty) | Default the capture (`n=${n:-0}`) after the existence guard: `grep -c` on an unreadable path writes nothing to stdout, and the empty comparison raises a shell error whose message hides the real cause |
 | The check is a test for behavior you are about to implement | Red is the expected state; require that it fails with the assertion the behavior owns, not with a collection/import error. `pytest` exit 5 means "no tests were collected" — a selector typo, not a failing test |
+| The pre-implementation test cannot go red at all — the failure it asserts (usage error, exit 1) is exactly what the not-yet-implemented path already produces (unknown subcommand, catch-all 404) | Record it as vacuously green during the red run, and after implementation prove it by mutating the specific guard it targets (e.g. flip the arg-count check), requiring red, then restoring ([testing-quality-tests-that-cannot-fail]) — a test green for the wrong reason before the code exists never demonstrated it can catch the guard breaking |
 | The check is already adopted and has never been observed passing | Run it against a known-good input now; when the expected result does not appear, treat the gate as defective rather than the work as incomplete |
 
 ## Instead of
@@ -94,3 +95,4 @@ known-good file + wrong anchor → 1; missing target → 3; invalid regex → 4.
 - https://docs.semgrep.dev/writing-rules/testing-rules — rule tests annotate `ruleid:` lines "for protecting against false negatives" and `ok:` lines "for protecting against false positives"; a rule is validated against inputs that must match and inputs that must not
 - https://docs.pytest.org/en/stable/reference/exit-codes.html — exit code 5 = "No tests were collected", distinct from 1 = tests ran and failed
 - Field reproduction 2026-07-29 (BSD grep 2.6.0-FreeBSD, ugrep 7.5.0, macOS): missing path → exit 2; wrong-but-valid pattern on a present file → exit 1; `grep -q` over missing + matching paths → exit 0; unpiped `grep -c missing | tail -1` → exit 0 without `pipefail`
+- Field reproduction 2026-08-05 (dev-loop `t2-send-keys`, bats): a new subcommand's usage-error test expected exit 1, which the CLI's unknown-subcommand path already produced — green before implementation; post-green, a `sed` mutation of the arg-count guard (`-ge 2` → `-ge 1`) flipped the test to `not ok`, and restoring flipped it back
