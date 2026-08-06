@@ -277,3 +277,75 @@ pane_not_ready() { # matches none of the ready/trust patterns
   [ "$status" -eq 5 ]
   [ "$elapsed" -lt 10 ]
 }
+
+# --- Task t3: status pre-seed at launch (pre-plan_ready blind-spot fix) ---
+# A worker that dies during planning leaves no status file, so dead/stalled
+# detection cannot see it. When BOTH LO_STATUS_DIR and LO_TASK_ID are set, a
+# successful launch pre-seeds phase=pending via status-update.sh. With either
+# var unset, behavior is byte-identical to before. A seeding failure warns on
+# stderr and never changes the exit code.
+
+@test "pre-seed: a successful launch writes phase=pending with the resolved session name" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_ready_submitted > "$sd/pane"
+  st="$BATS_TEST_TMPDIR/status"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_RUN_ID=r7 LO_STATUS_DIR="$st" LO_TASK_ID=t3 \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$BATS_TEST_TMPDIR/wt" bypassPermissions "ZZPROMPTHEAD hello"
+  [ "$status" -eq 0 ]
+  [ -f "$st/t3.json" ]
+  [ "$(jq -r .phase "$st/t3.json")" = "pending" ]
+  [ "$(jq -r .session "$st/t3.json")" = "lo-1-r7" ]
+  [ "$(jq -r .worktree "$st/t3.json")" = "$BATS_TEST_TMPDIR/wt" ]
+}
+
+@test "pre-seed: with both vars unset no status file is written and stdout is unchanged (boundary)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_ready_submitted > "$sd/pane"
+  st="$BATS_TEST_TMPDIR/status"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$BATS_TEST_TMPDIR/wt" bypassPermissions "ZZPROMPTHEAD hello"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok: lo-1 launched + prompt submitted (confirmed)" ]
+  [ ! -e "$st" ]
+}
+
+@test "pre-seed: LO_STATUS_DIR alone (LO_TASK_ID unset) writes nothing (boundary)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_ready_submitted > "$sd/pane"
+  st="$BATS_TEST_TMPDIR/status"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_STATUS_DIR="$st" \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$BATS_TEST_TMPDIR/wt" bypassPermissions "ZZPROMPTHEAD hello"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok: lo-1 launched + prompt submitted (confirmed)" ]
+  [ ! -e "$st" ]
+}
+
+@test "pre-seed: a failing status-update warns on stderr but the launch still exits 0 (error tolerated)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_ready_submitted > "$sd/pane"
+  # a status dir UNDER a regular file: status-update's mkdir -p fails deterministically
+  touch "$BATS_TEST_TMPDIR/blocker"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_STATUS_DIR="$BATS_TEST_TMPDIR/blocker/sub" LO_TASK_ID=t3 \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$BATS_TEST_TMPDIR/wt" bypassPermissions "ZZPROMPTHEAD hello"
+  [ "$status" -eq 0 ]
+  # grep, not [[ ]]: a false mid-test [[ ]] does not fail a test under this
+  # bats/bash combination, which would make these assertions decoration
+  printf '%s\n' "$output" | grep -qF "status pre-seed failed"
+  printf '%s\n' "$output" | grep -qF "ok: lo-1 launched + prompt submitted (confirmed)"
+}
+
+@test "pre-seed: the session-already-exists reuse path also seeds the record" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; echo 0 > "$sd/has-session-rc"
+  st="$BATS_TEST_TMPDIR/status"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_STATUS_DIR="$st" LO_TASK_ID=t3 \
+      sh "$LS" lo-1 "$BATS_TEST_TMPDIR/wt" bypassPermissions "p"
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | grep -qF "session=lo-1"
+  [ "$(jq -r .phase "$st/t3.json")" = "pending" ]
+  [ "$(jq -r .session "$st/t3.json")" = "lo-1" ]
+  [ "$(jq -r .worktree "$st/t3.json")" = "$BATS_TEST_TMPDIR/wt" ]
+}
