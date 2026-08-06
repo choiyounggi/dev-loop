@@ -17,7 +17,7 @@ setup() {
   REPORT="${BATS_TEST_TMPDIR}/INGEST_REPORT.md"
 }
 
-# A complete, filled report that must satisfy the gate.
+# A complete, filled report that must satisfy the gate (4 sections + Pages read).
 _mk_full_report() {
   cat > "$REPORT" <<'EOF'
 # Knowledge flush — 1 insight
@@ -29,10 +29,28 @@ directive reproduces locally; confidence: verified.
 ## Existing-layer check
 Read databases/index.md and both indexing pages; no duplicate trigger found;
 added related-links both ways.
+Pages read: databases-indexing-index-selection, databases-indexing-covering-indexes
+
+## Open-PR check
+Listed open knowledge/* heads via gh pr list; no open PR touches this trigger;
+verdict per candidate: new.
 
 ## Routing decision
 Target databases/indexing — existing category fits; no new category needed.
 EOF
+}
+
+# A flush-checkout-shaped fixture: report inside <repo>/.dev-loop/ with a wiki
+# sibling whose pages carry the ids the report claims to have read.
+_mk_checkout_fixture() {
+  CHECKOUT="$BATS_TEST_TMPDIR/repo"
+  mkdir -p "$CHECKOUT/.dev-loop" "$CHECKOUT/wiki/databases/indexing"
+  printf -- '---\nid: databases-indexing-index-selection\n---\n' \
+    > "$CHECKOUT/wiki/databases/indexing/index-selection.md"
+  printf -- '---\nid: databases-indexing-covering-indexes\n---\n' \
+    > "$CHECKOUT/wiki/databases/indexing/covering-indexes.md"
+  REPORT="$CHECKOUT/.dev-loop/INGEST_REPORT.md"
+  _mk_full_report
 }
 
 # Report with one required section removed. $1 = section heading to drop.
@@ -97,7 +115,7 @@ _run_gate() { # <command string>
 }
 
 @test "boundary: headers-only report (empty stubs) is denied" {
-  printf '## Verified best-practice\n## Existing-layer check\n## Routing decision\n' > "$REPORT"
+  printf '## Verified best-practice\n## Existing-layer check\n## Open-PR check\n## Routing decision\n' > "$REPORT"
   run _run_gate "gh pr create --head knowledge/me-1 --body-file $REPORT"
   [ "$status" -eq 2 ]
   [[ "$output" == *"empty"* ]]
@@ -122,6 +140,47 @@ _run_gate() { # <command string>
   _mk_full_report
   run _run_gate "gh pr create --head knowledge/me-1 --body-file \"$REPORT\""
   [ "$status" -eq 0 ]
+}
+
+@test "contract: missing 'Open-PR check' section is denied and named" {
+  _mk_full_report
+  grep -v '^## Open-PR check$' "$REPORT" > "$REPORT.tmp" && mv "$REPORT.tmp" "$REPORT"
+  run _run_gate "gh pr create --head knowledge/me-1 --body-file $REPORT"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"Open-PR check"* ]]
+}
+
+@test "contract: a report without a 'Pages read:' line is denied" {
+  _mk_full_report
+  grep -v '^Pages read:' "$REPORT" > "$REPORT.tmp" && mv "$REPORT.tmp" "$REPORT"
+  run _run_gate "gh pr create --head knowledge/me-1 --body-file $REPORT"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"Pages read"* ]]
+}
+
+@test "contract: a Pages-read id absent from the checkout wiki is denied and named" {
+  _mk_checkout_fixture
+  sed -i.bak 's/databases-indexing-covering-indexes/databases-indexing-nonexistent-page/' "$REPORT" && rm -f "$REPORT.bak"
+  run _run_gate "gh pr create --head knowledge/me-1 --body-file $REPORT"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"databases-indexing-nonexistent-page"* ]]
+}
+
+@test "contract: valid Pages-read ids against the checkout wiki pass" {
+  _mk_checkout_fixture
+  run _run_gate "gh pr create --head knowledge/me-1 --body-file $REPORT"
+  [ "$status" -eq 0 ]
+}
+
+@test "contract boundary: no wiki dir beside the body-file skips id verification" {
+  _mk_full_report
+  run _run_gate "gh pr create --head knowledge/me-1 --body-file $REPORT"
+  [ "$status" -eq 0 ]
+}
+
+@test "detection: a --title containing knowledge: engages the gate alone" {
+  run _run_gate "gh pr create --title \"knowledge: short summary\" --body-file ${BATS_TEST_TMPDIR}/missing.md"
+  [ "$status" -eq 2 ]
 }
 
 @test "regression: a \$HOME-prefixed --body-file path is expanded by the gate" {

@@ -140,8 +140,6 @@ function main() {
     if (/<[^>]+>/.test(fields.trigger) || /<[^>]+>/.test(fields.directive)) continue;
     found.push({ body, fields, hash: contentHash(body) });
   }
-  if (!found.length) return;
-
   const sessionId =
     payload.session_id ||
     path.basename(transcript, '.jsonl') ||
@@ -150,6 +148,21 @@ function main() {
   const queueDir = path.join(os.homedir(), '.dev-loop', 'queue');
   fs.mkdirSync(queueDir, { recursive: true });
   const queueFile = path.join(queueDir, `${sessionId}.jsonl`);
+
+  const countRows = () => {
+    if (!fs.existsSync(queueFile)) return 0;
+    return fs.readFileSync(queueFile, 'utf8').split('\n').filter((l) => l.trim()).length;
+  };
+  // A flush empties the session file it drained; when this Stop has nothing to
+  // add, remove the leftover so empty files stop accumulating in the queue dir.
+  const cleanupIfEmpty = () => {
+    if (fs.existsSync(queueFile) && countRows() === 0) fs.unlinkSync(queueFile);
+  };
+
+  if (!found.length) {
+    cleanupIfEmpty();
+    return;
+  }
 
   // Seed the dedupe set from the session queue AND the processed store —
   // knowledge-flush empties the queue file when it retires rows, and the next
@@ -189,7 +202,14 @@ function main() {
       })
     );
   }
-  if (rows.length) fs.appendFileSync(queueFile, rows.join('\n') + '\n');
+  // Backstop cap, not policy: the SessionStart instruction asks for 0-3 insights
+  // per session; 10 leaves room for legitimately rich sessions while stopping a
+  // runaway session from queueing dozens (and burning a headless auto-flush run).
+  const CAP = 10;
+  const budget = Math.max(0, CAP - countRows());
+  const toAppend = rows.slice(0, budget);
+  if (toAppend.length) fs.appendFileSync(queueFile, toAppend.join('\n') + '\n');
+  else cleanupIfEmpty();
 }
 
 try {
