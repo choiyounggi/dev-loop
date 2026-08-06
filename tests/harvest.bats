@@ -141,3 +141,53 @@ _flush_queue() {
   [ "$status" -eq 0 ]
   [ "$(_queue_lines)" -eq 0 ]
 }
+
+# Write a transcript with N distinct insight blocks (distinct triggers → distinct
+# hashes) so cap behavior can be observed.
+_mk_transcript_many() { # <count>
+  local i body line=""
+  for i in $(seq 1 "$1"); do
+    body="★ Insight ─────\ntrigger: distinct runaway case number $i of a session\ndirective: enforce a backstop cap on the per-session queue file\nwhy: a runaway session should not queue dozens\nevidence: synthetic case $i\n─────"
+    line="$line$body\n\n"
+  done
+  printf '{"message":{"role":"assistant","content":"%s"}}\n' "$line" > "$TRANSCRIPT"
+}
+
+@test "cap: a transcript with 12 insights queues at most 10 rows" {
+  _mk_transcript_many 12
+  run _run_harvest
+  [ "$status" -eq 0 ]
+  [ "$(_queue_lines)" -eq 10 ]
+}
+
+@test "cap boundary: 9 existing rows + 3 new appends only 1" {
+  _mk_transcript_many 9
+  _run_harvest
+  [ "$(_queue_lines)" -eq 9 ]
+  # New transcript with 3 different triggers (10..12) → only one fits the cap.
+  local body line="" i
+  for i in 10 11 12; do
+    body="★ Insight ─────\ntrigger: distinct runaway case number $i of a session\ndirective: enforce a backstop cap on the per-session queue file\nwhy: a runaway session should not queue dozens\nevidence: synthetic case $i\n─────"
+    line="$line$body\n\n"
+  done
+  printf '{"message":{"role":"assistant","content":"%s"}}\n' "$line" > "$TRANSCRIPT"
+  run _run_harvest
+  [ "$status" -eq 0 ]
+  [ "$(_queue_lines)" -eq 10 ]
+}
+
+@test "cleanup: an empty session file left by a flush is removed when nothing is harvested" {
+  : > "$QFILE"
+  _mk_transcript_without_insight
+  run _run_harvest
+  [ "$status" -eq 0 ]
+  [ ! -f "$QFILE" ]
+}
+
+@test "cleanup boundary: an empty session file is kept (and filled) when a new insight arrives" {
+  : > "$QFILE"
+  _mk_transcript
+  run _run_harvest
+  [ "$status" -eq 0 ]
+  [ "$(_queue_lines)" -eq 1 ]
+}

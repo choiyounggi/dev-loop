@@ -70,7 +70,7 @@ touch "$STAMP" 2>/dev/null
 
 # --- spawn the detached headless flush ------------------------------------
 CLAUDE_BIN="$(command -v claude)"
-PROMPT='Run the dev-loop:knowledge-flush skill now. Drain ~/.dev-loop/queue: for each pending insight research and verify the best-practice against real sources, check existing wiki layers for duplicates/links, decide the target layer/category, run wiki-ingest, write the INGEST_REPORT, then open exactly ONE reviewed PR (label dev-loop:knowledge) under my own gh identity. Do NOT merge. If the queue is empty, do nothing.'
+PROMPT='Run the dev-loop:knowledge-flush skill now. Drain ~/.dev-loop/queue: for each pending insight research and verify the best-practice against real sources, check existing wiki layers for duplicates/links, ALSO check open knowledge/* PRs for overlapping candidates (fold into that branch or drop as pending-duplicate — never open a sibling duplicate PR), decide the target layer/category, run wiki-ingest, write the 4-section INGEST_REPORT (Verified best-practice / Existing-layer check with a "Pages read:" id list / Open-PR check / Routing decision), then open exactly ONE reviewed PR (label dev-loop:knowledge) under my own gh identity, passing --body-file with a LITERAL absolute path (never --body). Do NOT merge. If the queue is empty, do nothing.'
 
 (
   DEV_LOOP_FLUSHING=1 nohup "$CLAUDE_BIN" -p "$PROMPT" \

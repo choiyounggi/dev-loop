@@ -49,6 +49,7 @@ IS_FLUSH=0
 printf '%s' "$CMD" | grep -Eq -- '--head[[:space:]=]+knowledge/' && IS_FLUSH=1
 printf '%s' "$CMD" | grep -Eq -- 'dev-loop:knowledge' && IS_FLUSH=1
 printf '%s' "$CMD" | grep -Eq -- 'INGEST_REPORT' && IS_FLUSH=1
+printf '%s' "$CMD" | grep -Eq -- '--title[[:space:]=]+["'"'"']?knowledge:' && IS_FLUSH=1
 [ "$IS_FLUSH" -eq 1 ] || exit 0
 
 # Locate the --body-file path referenced by the command. Portable (grep/sed only,
@@ -86,6 +87,7 @@ esac
 miss=""
 grep -q '## *Verified best-practice' "$BODY_FILE" || miss="$miss 'Verified best-practice'"
 grep -q '## *Existing-layer check'   "$BODY_FILE" || miss="$miss 'Existing-layer check'"
+grep -q '## *Open-PR check'          "$BODY_FILE" || miss="$miss 'Open-PR check'"
 grep -q '## *Routing decision'       "$BODY_FILE" || miss="$miss 'Routing decision'"
 
 # Each section must have real content, not just a header (guard empty stubs):
@@ -94,5 +96,20 @@ CONTENT_CHARS="$(grep -vE '^\s*(#|$)' "$BODY_FILE" | tr -d '[:space:]' | wc -c |
 
 [ -z "$miss" ] || fail "INGEST_REPORT is missing required section(s):$miss."
 [ "${CONTENT_CHARS:-0}" -ge 40 ] || fail "INGEST_REPORT sections look empty — fill them with real findings."
+
+# The Existing-layer check must name the wiki pages actually read, as ids, so the
+# dedup claim is checkable rather than free prose. When the report lives inside a
+# flush checkout (its wiki sibling exists), every listed id must resolve there —
+# this also catches fabricated page ids.
+PAGES_LINE="$(grep -E '^Pages read:' "$BODY_FILE" | head -1)"
+[ -n "$PAGES_LINE" ] || fail "the Existing-layer check needs a 'Pages read: <id>[, <id>…]' line naming the page ids actually read."
+IDS="$(printf '%s' "$PAGES_LINE" | sed 's/^Pages read://' | tr ',' '\n' | tr -d ' \t' | grep -E '^[a-z0-9-]+$')"
+[ -n "$IDS" ] || fail "the 'Pages read:' line lists no valid page ids (lowercase-hyphen ids, comma-separated)."
+WIKI_ROOT="$(dirname "$BODY_FILE")/../wiki"
+if [ -d "$WIKI_ROOT" ]; then
+  for id in $IDS; do
+    grep -rq "^id: ${id}\$" "$WIKI_ROOT" || fail "'Pages read:' names '$id', which resolves to no page under $WIKI_ROOT — dedup evidence must cite real pages."
+  done
+fi
 
 exit 0
