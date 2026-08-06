@@ -6,7 +6,7 @@ applies_to: [git, general]
 confidence: verified
 sources:
   - https://git-scm.com/docs/git-worktree
-last_verified: 2026-08-05
+last_verified: 2026-08-06
 related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, platforms-shells-command-text-inspected-before-execution]
 ---
 
@@ -56,6 +56,7 @@ wait loop keeps escalating with no error from the task itself.
 | The brief names the main checkout only as a read source | It works, and it still couples the brief to one machine's layout — pass it as a named variable so the brief stays portable |
 | The guardrail is heuristic and matches on absolute paths | A relative path inside the worktree cannot trip it at all; that is the second reason to write paths relative |
 | A worker writes to a path under the main root that is a *sibling* string (`<main_root>-backup/…`) | The guardrail does not fire — the match requires a path separator after the main root — but the write is still outside the worktree; keep it out of the brief |
+| A read-only command (`ls`, `grep`, `awk`, `git status`) naming the main checkout's or another worktree's absolute path raises an `ask` escalation anyway, halting the watch | Guardrail rules differ by version: a conservative rule treats any cross-worktree path reference in command text as a potential write, reads included. Extend the step-6 dry run with one read probe to learn which behavior you have; when reads escalate, budget the round-trip into the phase (read the escalation record → approve or deny → clear the escalation state → restart the watch) and state in the worker's first briefing which reads are pre-approved and that writes and system-temp use stay forbidden — this cuts repeat escalations for the same access |
 
 ## Instead of
 
@@ -69,4 +70,5 @@ wait loop keeps escalating with no error from the task itself.
 
 - https://git-scm.com/docs/git-worktree — linked worktrees are separate checkouts sharing one repository; each has its own working directory
 - Field reproduction 2026-08-05 (groundwork guardrails 1.0.0 `hooks/bash-guard.sh`, `worktree_escape` rule, macOS): from a linked worktree, `cp ./a <main_root>/b` and `echo z > <main_root>/f` were both stopped; `cat <main_root>/f`, `ls <main_root>/.orchestration`, and `grep -n x <main_root>/f` all passed. The rule matches an absolute main-root mention together with a write verb (`rm|mv|cp|tee|mkdir|touch|install|dd`) or a redirect to an absolute path
+- Field evidence 2026-08-06 (dev-loop orchestrate, Wave 2 worker consuming an upstream worktree's FINDINGS file): a read-only `awk`/`grep` verification and a `git status` check each raised `worktree_escape` as `ask` and stopped the coordinator's watch with exit 5; both were confirmed read-only and approved. This rule version fired on reads, unlike the 1.0.0 reproduction above where bare `cat`/`ls`/`grep` passed — the read/write asymmetry in the Do-this table is version-dependent, so probe before fanning out
 - Field context: a parallel run stalled at the same phase for two workers whose brief's `<output_contract>` named a main-checkout absolute path; the coordinator's wait loop returned its escalation status repeatedly. Rewriting the contract to worktree-relative paths let the remaining workers record their plans locally

@@ -15,7 +15,7 @@ sources:
   - https://www.gnu.org/software/sed/manual/html_node/Exit-status.html
   - https://git-scm.com/docs/git-checkout
   - https://git-scm.com/docs/git-restore
-last_verified: 2026-08-05
+last_verified: 2026-08-06
 related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-checks-that-cannot-pass, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, testing-quality-schema-additions-under-a-golden-gate, testing-quality-differential-run-agreement, testing-quality-completion-predicates, testing-quality-guard-shape-vs-consequence, testing-quality-injected-clock-duration-assertions, testing-quality-write-path-assertions, backend-common-change-impact-call-site-enumeration, platforms-shells-portable-shell-scripts, qa-document-verification-spec-document-gates]
 ---
 
@@ -73,6 +73,7 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 | Testing the mock instead of the code (mock returns X, test asserts X came back) | Assert the unit's transformation of its inputs, not the pass-through; when no transformation exists at this layer, test the layer that has one ([testing-mocking-what-to-mock]) |
 | Copied test body with the name changed but identical inputs and expectation | Give each case distinct inputs and its own expectation; delete exact duplicates — a renamed copy re-proves the same fact and guards nothing new |
 | Assertion inherited from a shared base class, mixin, or parameterised harness, whose name announces the new subject's whole shape while its body pins the original narrow scope | Read the inherited body and list what it compares; add a subject-specific assertion for each part of the shape the name claims, then prove each one with its own mutation |
+| Bats assertion written as `[[ … ]]` anywhere but the test's last command, when bats resolves to bash 3.2 (macOS system bash) — a false `[[ ]]` mid-test does not fail the test | Write bats assertions as simple commands — `[ … ]` or `printf '%s\n' "$output" \| grep -qF "expected"` — which fail at any position; before bash 4.0, `set -e` ignores a failing compound command, so a mid-test `[[ ]]` is decoration on that shell (same shape as the documented bats `!`-negation gotcha) |
 
 6. **Coverage note:** a covered line is only an executed line. Use coverage to
    find untested code; it cannot certify tested behavior. The proof a test
@@ -119,3 +120,6 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 - https://man7.org/linux/man-pages/man2/execve.2.html — the shebang is honoured only on direct execution, not when a file is passed to an interpreter
 - https://www.gnu.org/software/sed/manual/html_node/Exit-status.html — a `sed` expression that matches nothing still exits 0
 - https://git-scm.com/docs/git-checkout, https://git-scm.com/docs/git-restore — `checkout -- <path>` restores the index copy, discarding unstaged changes; measured 2026-08-05: with the fix unstaged the checkout removed fix and mutation together, and the lost import surfaced as `Ran 1042 … errors=1` where the intact tree ran 1098
+- https://tiswww.case.edu/php/chet/bash/COMPAT — bash-4.0 changed `set -e` handling so the shell exits when a compound command fails; bash-3.2 and earlier do not, which is what lets a false mid-test `[[ ]]` pass silently under bats on macOS system bash
+- https://bats-core.readthedocs.io/en/stable/gotchas.html, https://www.shellcheck.net/wiki/SC2314 — the documented same-shape gotcha: bats commands whose failure is excluded from errexit (negated `!` commands) "can never fail when used in the middle of a test"
+- Local reproduction 2026-08-06 (Bats 1.14.0, GNU bash 3.2.57, macOS arm64): a false `[[ "a" == *"zzz"* ]]` mid-test → `ok`; the same false comparison as `[ "a" = "zzz" ]` or piped `grep -qF` mid-test → `not ok`; the `[[ ]]` as the test's last line → `not ok`. Outside bats, `bash -ec '[[ … ]]; echo survived'` printed and exited 0 while the `[ ]` form aborted — bash-3.2 errexit semantics, not a bats defect
