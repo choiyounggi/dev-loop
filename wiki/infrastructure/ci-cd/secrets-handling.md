@@ -9,7 +9,9 @@ sources:
   - https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect
   - https://12factor.net/config
   - https://docs.docker.com/build/building/secrets/
-last_verified: 2026-07-10
+  - https://cli.github.com/manual/gh_auth_login
+  - https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests
+last_verified: 2026-08-06
 related: [infrastructure-containers-image-builds, infrastructure-ci-cd-pipeline-structure]
 ---
 
@@ -59,6 +61,7 @@ package fetch, signing key), or you are reviewing how secrets flow through CI.
 | Secret already pushed to a shared branch | Rotate first — history rewriting does not unleak; then scrub history (git filter-repo or provider support) so scanners stop flagging it |
 | Local development needs credentials too | Local `.env` in `.gitignore`, values distributed through the team's secret manager, using dev-scoped credentials distinct from CI's and prd's |
 | Third-party CI plugin/action receives a secret | Pin the action/plugin to a full version or commit hash before giving it a secret; an unpinned dependency can start exfiltrating on its next release |
+| A non-interactive job or agent must push and open a PR, but its primary CLI token (e.g. `gh`) reports invalid and interactive re-auth is impossible | Test the remaining credential channels independently before declaring the run blocked — they are separate stores: `gh` keeps its own OAuth token in the system credential store, git remote auth can ride SSH keys or a credential helper (`gh` even configures the git protocol separately), and any configured API/MCP integration holds a third token. `git push --dry-run` proves push auth without mutating anything; an issue/PR search with `author:@me` reveals an API token's account without any write call. When the working channels belong to the same account, combine them: push via git, open the PR via the API |
 
 ## Instead of
 
@@ -75,3 +78,6 @@ package fetch, signing key), or you are reviewing how secrets flow through CI.
 - https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect — OIDC short-lived tokens replacing stored cloud credentials
 - https://12factor.net/config — credentials live in the environment, never in code
 - https://docs.docker.com/build/building/secrets/ — build args/env unsuitable for secrets; secret mounts
+- https://cli.github.com/manual/gh_auth_login — `gh` stores its token in the system credential store; git protocol (ssh/https) is configured independently of the API token
+- https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests — `@me` value for `author:`/`commenter:` qualifiers resolves to the authenticated account
+- Field incident 2026-08-06 (non-interactive agent session; the credential-channel row is field-tested on top of the doc-verified store separation): `gh auth status` 401 → `git push --dry-run` over SSH OK → GitHub MCP `search_issues author:@me` resolved the token's account → PR opened via API while pushing via git

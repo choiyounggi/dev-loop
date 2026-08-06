@@ -9,7 +9,7 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
   - https://docs.semgrep.dev/writing-rules/testing-rules
   - https://docs.pytest.org/en/stable/reference/exit-codes.html
-last_verified: 2026-08-05
+last_verified: 2026-08-06
 related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, backend-common-change-impact-call-site-enumeration, platforms-processes-tool-diagnostics-without-a-failing-exit-code, qa-process-scope-purity-checks]
 ---
 
@@ -77,6 +77,7 @@ known-good file + wrong anchor → 1; missing target → 3; invalid regex → 4.
 | A count is compared without a value (`[ "$n" -eq 7 ]`, `$n` empty) | Default the capture (`n=${n:-0}`) after the existence guard: `grep -c` on an unreadable path writes nothing to stdout, and the empty comparison raises a shell error whose message hides the real cause |
 | The check is a test for behavior you are about to implement | Red is the expected state; require that it fails with the assertion the behavior owns, not with a collection/import error. `pytest` exit 5 means "no tests were collected" — a selector typo, not a failing test |
 | The check is already adopted and has never been observed passing | Run it against a known-good input now; when the expected result does not appear, treat the gate as defective rather than the work as incomplete |
+| The pre-implementation test cannot go red at all — the failure it asserts (usage error, exit 1) is exactly what the not-yet-implemented path already produces (unknown subcommand, catch-all 404) | Record it as vacuously green during the red run, and after implementation prove it by mutating the specific guard it targets (e.g. flip the arg-count check), requiring red, then restoring ([testing-quality-tests-that-cannot-fail]) — a test green for the wrong reason before the code exists never demonstrated it can catch the guard breaking |
 
 ## Instead of
 
