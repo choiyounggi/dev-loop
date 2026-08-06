@@ -29,21 +29,28 @@ worker sat queued and invisible for 55s while a Stop-hook chain drained.
 sh {SKILL}/scripts/send-prompt.sh send  <session> "<the one-line prompt>"
 sh {SKILL}/scripts/send-prompt.sh wait  <session> [timeout]
 sh {SKILL}/scripts/send-prompt.sh state <session>
+sh {SKILL}/scripts/send-prompt.sh keys  <session> <key>...
 ```
 
 Branch on the exit code. stdout is exactly one token; stderr is advisory context
 and must never be parsed.
 
-| exit | `send` | `wait` | `state` |
-|------|--------|--------|---------|
-| 0 | delivered | picked-up | ready |
-| 3 | gone | gone | gone |
-| 4 | queued | — | busy |
-| 5 | — | deadline expired | — |
-| 7 | unconfirmed | — | — |
+| exit | `send` | `wait` | `state` | `keys` |
+|------|--------|--------|---------|--------|
+| 0 | delivered | picked-up | ready | sent |
+| 3 | gone | gone | gone | gone |
+| 4 | queued | — | busy | — |
+| 5 | — | deadline expired | — | — |
+| 7 | unconfirmed | — | — | — |
 
-Shared codes: `1` usage · `2` invalid session name or prompt (injection guard) ·
-`6` tmux failed against a live session · `127` tmux not found.
+Shared codes: `1` usage · `2` invalid session name, prompt, or key (injection
+guard / allowlist — nothing sent) · `6` tmux failed against a live session (for
+`keys`: the send failed) · `127` tmux not found.
+
+`keys` presses tmux key EVENTS in order — the way to answer an interactive
+chooser or trust screen on a wedged worker. Allowlist exactly
+`Up Down Left Right Enter Escape Tab Space 0-9 y n`; ALL keys are validated
+before ANY is sent, so exit 2 means nothing was pressed.
 
 Exit 4 is not a failure — the worker holds the prompt but is still mid-turn.
 Follow it with `wait` (default 180s): exit 0 means the worker picked it up, exit 5
@@ -55,6 +62,9 @@ unknown and query `state`, never as success.
 
 The queued/busy markers are the Claude CLI's own wording, not this repo's.
 Override `LO_QUEUED_PATTERN` / `LO_BUSY_PATTERN` when a CLI release renames them.
+
+Append the **tmux worker protocol** block below — together with the Subagent
+block — to every §1–§4 prompt, flattened into the single sent line.
 
 ## (1) Plan — injected at session launch
 
@@ -71,6 +81,20 @@ Address the issues in .orchestration/reviews/{TASK}-r{N}.md via the loop-impleme
 ## (4) Merge-prep — injected after final approval
 
 Approved. Commit your changes on {BRANCH} with a conventional message (no push, no PR — the orchestrator merges into {INTEG} locally). Then run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} done worktree=$PWD`. You may then stop.
+
+## tmux worker protocol — REQUIRED block, append to every §1–§4 prompt above
+
+[1] NEVER open a local interactive prompt and NEVER use the AskUserQuestion
+    tool — no human is attached to this tmux session, so an interactive
+    prompt blocks forever with nothing to show for it (the Orca set's rule
+    [4], mirrored here).
+
+[2] Blocking question — run
+    `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/ask-coordinator.sh {TASK} "<question>" [options-csv]`
+    (writes one pending question record — `questions/{TASK}.json`; a second
+    call overwrites it), then WAIT at the REPL: the coordinator's answer
+    arrives as a new prompt via send-prompt.sh. Do not poll, do not proceed
+    on a guess.
 
 **Orca substrate.** §O1–§O4 — one `--spec` per task-phase, delivered by Orca. Not
 send-keys: a `--spec` MAY span multiple lines. Each phase is a separate Task, so no

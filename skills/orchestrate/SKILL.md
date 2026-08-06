@@ -118,9 +118,15 @@ escalation env into each worker. Trust-screen wording drifts between CLI release
 if a launch hangs, set `LO_READY_EXTRA` / `LO_TRUST_EXTRA` (substrings) or
 `LO_READY_TIMEOUT`.
 `watch-status.sh` now exits **5** on a pending guardrails escalation (approve/deny,
-clear `.orchestration/escalations/`, relaunch) and **3** on a failed OR a *dead*
-worker (a non-terminal task whose tmux session vanished — recorded via the status
-file's `session` field) — both abort fast instead of waiting the timeout. Give each
+clear `.orchestration/escalations/`, then DELIVER the outcome to the now-idle
+worker with `scripts/send-prompt.sh send lo-<n> "approved — re-run: <cmd>, then
+continue"` or `"denied — <alternative>"` — the guardrails deny message told the
+worker the orchestrator would re-run it, so a cleared escalation without a
+delivered answer leaves it waiting forever — then relaunch) and **3** on a failed
+OR a *dead* worker (a non-terminal task whose tmux session vanished — recorded via
+the status file's `session` field) — both abort fast instead of waiting the
+timeout. It also exits **6** on a pending worker question and **7** on a live
+worker whose pane is stalled — playbooks in Phase 3 step 3. Give each
 phase its own deadline with one exported
 `LO_PHASE_TIMEOUTS="plan_ready=900,impl_done=3600,done=1800"`, keyed on the TARGET
 phase of each wait: precedence is an explicit `[timeout-sec]` argument, then the
@@ -261,9 +267,16 @@ reasoning-effort flags) that `worker-start` cannot express.
    tools (the plan step is fixed to `wiki-plan`, not a configurable role), and for
    a UI-facing task fill `<design_spec>` with the `design` role's pulled spec
    (Phase 2) — then
-   `scripts/launch-session.sh lo-<n> <worktree> bypassPermissions "<plan prompt>"`
+   `LO_STATUS_DIR=<abs status dir> LO_TASK_ID=<task> scripts/launch-session.sh
+   lo-<n> <worktree> bypassPermissions "<plan prompt>"`
    (plan prompt = templates/session-prompt.md §1 — the tmux set — with the
-   subagent protocol block). Exit **0** = launched *and* the prompt confirmed
+   subagent + tmux worker protocol blocks). With BOTH vars set, a successful
+   launch (the confirmed-submission path AND the session-reuse path) pre-seeds
+   `<LO_STATUS_DIR>/<LO_TASK_ID>.json` phase=pending with the resolved session
+   name via the sibling status-update.sh, so dead/stalled-worker detection covers
+   the pre-plan_ready window; a seeding failure warns on stderr only and never
+   changes the exit code; either var unset = the previous behavior exactly.
+   Exit **0** = launched *and* the prompt confirmed
    submitted; **4** = the REPL never became ready (relaunch); **5** = the prompt was
    sent but submission could NOT be confirmed — the session is alive and may be
    holding an unsubmitted prompt, so read it with `scripts/send-prompt.sh state
@@ -280,6 +293,32 @@ reasoning-effort flags) that `worker-start` cannot express.
    `LO_STALL_SEC`, default 600s), the tmux mirror of O5. Read the pane before acting
    on a stall: "wedged on a prompt" and "finished but never reported" look identical
    from outside and need opposite responses.
+
+**Watch exit playbooks (tmux).** Mechanical responses for the non-terminal watch
+exits — handle, then relaunch watch with the same target:
+- **6 — question pending** (prints `[watch] question pending — <task>: <question>`;
+  recurs while `questions/<task>.json` exists, like exit 5; exit 5 wins when both
+  are pending): read the record (`{ts, taskId, question, options, worktree}`),
+  answer with `scripts/send-prompt.sh send lo-<n> "<answer>"`, delete the record
+  file, relaunch watch.
+- **7 — stalled live worker** (prints `[watch] worker stalled — <task>:<session>`;
+  the weakest signal — failed(3) and all-reached(0) win over it; driven by
+  `tmux-worker-stalled.sh`, silence threshold `LO_STALL_SEC` default 600s; a
+  missing script or tmux disables the check): read the pane FIRST
+  (`tmux capture-pane -t "=<session>:" -p | tail`) and classify before acting —
+  interactive chooser → answer with `scripts/send-prompt.sh keys <session>
+  <key>...` (allowlist exactly `Up Down Left Right Enter Escape Tab Space 0-9 y n`;
+  ALL keys validated before ANY is sent; **0** sent / **2** invalid session or
+  key, nothing sent / **3** gone / **6** send failed on a live session);
+  usage-limit stop ("You've hit your session limit · resets HH:MM") → wait for
+  the reset time, then re-send a resume prompt that orders a state re-check
+  (git status / tests) before continuing; finished-but-silent (forgot
+  status-update) → send a prompt to emit the missing signal; auth/trust screen →
+  keys per the screen. Then relaunch watch.
+- **2 — timeout** (prints `[watch] TIMEOUT (<budget>s, source=<source>)`): a
+  checkpoint, not a verdict — re-check each session with
+  `scripts/tmux-worker-stalled.sh lo-<n>` and `scripts/send-prompt.sh state
+  lo-<n>`, read panes, then relaunch watch with the same target.
 
 ## Phase 4 — Implement + review (max 3 rework)
 Deliver §2 (implement) to each session with `scripts/send-prompt.sh send lo-<n>
