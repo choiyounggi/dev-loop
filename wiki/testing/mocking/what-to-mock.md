@@ -8,8 +8,10 @@ sources:
   - https://martinfowler.com/articles/mocksArentStubs.html
   - https://testing.googleblog.com/2013/05/testing-on-toilet-dont-overuse-mocks.html
   - https://abseil.io/resources/swe-book/html/ch12.html
-last_verified: 2026-07-10
-related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation]
+  - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import
+  - https://nodejs.org/api/test.html
+last_verified: 2026-08-06
+related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-tests-that-cannot-fail]
 ---
 
 # Deciding Whether to Mock, Fake, or Use the Real Dependency
@@ -51,6 +53,8 @@ where mocks are breaking on refactors.
 | You need to test your code's handling of a provider's failure modes (500, timeout, malformed body) | Stub those responses at your wrapper boundary per case — this is the main payoff of mocking unowned I/O |
 | The mock setup has grown to mirror the collaborator's logic (conditional returns, sequencing) | Replace it with a fake or the real object — a mock that reimplements the dependency is a second implementation that can drift |
 | The fake and the real implementation can diverge | Run one shared contract test suite against both; the fake stays trustworthy only while it passes the real thing's tests |
+| The dependency is consumed as ESM named imports (e.g. `import { spawnSync } from "node:child_process"`) and you planned to monkey-patch it | Inject it behind a deps interface the subject receives instead — imported bindings are read-only live bindings the importer cannot reassign, and `node:test`'s `mock.module()` only works under the `--experimental-test-module-mocks` flag (still Stability 1 as of Node 26), so DI is the unflagged interception point |
+| The test must prove a negative — "no real child process / external command ran" | Route every spawn through the injected deps interface, then in the test empty `process.env.PATH` as a tripwire and deep-equal the full stub-recorded call sequence: a clean exit fully explained by the stubs proves no PATH-resolved spawn could have succeeded, turning "trust the structure" into an executable assertion ([testing-quality-tests-that-cannot-fail]) |
 
 ## Instead of
 
@@ -66,3 +70,6 @@ where mocks are breaking on refactors.
 - https://martinfowler.com/articles/mocksArentStubs.html — stub/fake/mock distinctions; state vs behavior verification
 - https://testing.googleblog.com/2013/05/testing-on-toilet-dont-overuse-mocks.html — prefer real objects, fakes, or local test databases over mocks
 - https://abseil.io/resources/swe-book/html/ch12.html — prefer state testing; interaction testing only where the interaction is the contract
+- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import — imported bindings are read-only live bindings; reassignment by the importer throws
+- https://nodejs.org/api/test.html — `mock.module()` requires the `--experimental-test-module-mocks` CLI flag
+- Field evidence 2026-08-06 (ESM CLI, `node:test`; the two ESM/tripwire rows are field-tested on top of the doc-verified mechanism): boundary test passed with `PATH=""` while a real `spawnSync("npm")` under the same emptied PATH returned ENOENT; 365/365 suite green

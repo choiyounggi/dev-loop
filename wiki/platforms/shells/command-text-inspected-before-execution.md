@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://code.claude.com/docs/en/hooks
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
-last_verified: 2026-08-05
+last_verified: 2026-08-06
 related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-shells-escapes-in-shell-string-literals, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-harness-mediated-tool-results, platforms-processes-tool-diagnostics-without-a-failing-exit-code]
 ---
 
@@ -71,6 +71,16 @@ on the first attempt.
    consumer polling for a file that will never appear waits forever, and an
    improvised workaround defeats a control the human put there deliberately.
 
+8. **When you author the gate, accept all three shell quoting forms and expand
+   only prefixes the gate can resolve from its own environment.** Correct shell
+   style quotes paths, so an extraction pattern that excludes quote characters
+   (`[^ '"]+`) denies exactly the well-formed commands, with a misleading
+   missing-argument error. Parse the argument bare, single-quoted, and
+   double-quoted (POSIX 2.2 defines only these three forms), expand `~`, `$HOME`,
+   and `${HOME}` against the gate's own environment, and state in the gate's
+   error message that any other variable must be written as a literal path.
+   Prove the parser with one regression test per form before relying on it.
+
 ## Edge cases
 
 | Case | Then |
@@ -94,6 +104,7 @@ on the first attempt.
 | Reword prose to get a dangerous-looking string past a scanner | Put the prose in a file and pass `--notes-file`/`--body-file` | Editing meaning to satisfy a text scanner degrades the artifact; a file is not scanned as a command |
 | Treat a side-effect command's empty output as success | `ls`/`stat` the artifact it should have produced | A blocked command and a silent successful one produce identical stdout; only the artifact distinguishes them |
 | Retry a gated status-emitting command with a reshaped path | Report the signal as un-emitted to its consumer | The consumer polls forever on a wrong assumption, and evading the gate removes a control the human installed |
+| Extract a gate's file argument with a bare-token pattern like `[^ '"]+` | Parse bare, single-quoted, and double-quoted forms and expand `~`/`$HOME`/`${HOME}` yourself (step 8) | The quote characters callers are taught to use land inside the match window, so the extractor returns empty and the gate reports a present argument as missing |
 
 ## Sources
 
@@ -111,10 +122,10 @@ missing), `--body-file $REPO/…` → literal `$REPO/…` (blocked as nonexisten
 heredoc body-file was separately blocked as not-yet-existing until moved to a
 preceding call.
 
-On 2026-08-05 a worker session inside a git worktree ran the orchestrator's own
-`status-update.sh` with the status directory pointing at the main checkout. A
-`worktree_escape` guardrail matched the absolute main-checkout path and returned
-only an escalation notice; `ls -la` on the status directory then showed it empty,
-so the orchestrator would have polled indefinitely for a file that was never
-written. A Write-tool call to the same tree succeeded, confirming the block was
-scoped to the Bash command text rather than to filesystem permissions.
+2026-08-05/06, same repo: a `worktree_escape` guardrail blocked the
+orchestrator's own `status-update.sh` (path text match) — `ls` showed the status
+directory empty while a Write-tool call succeeded, proving a command-text-scoped
+block, and the consumer would have polled forever. Gate-author side: the
+bare-token extractor denied a double-quoted `--body-file` path as missing; after
+quoted-form parsing plus `~`/`$HOME`/`${HOME}` expansion, the bats regressions
+(`tests/pre-flush-pr-gate.bats` 12–13) went red-then-green and still pass.
