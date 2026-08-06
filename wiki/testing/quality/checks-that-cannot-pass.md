@@ -9,8 +9,8 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
   - https://docs.semgrep.dev/writing-rules/testing-rules
   - https://docs.pytest.org/en/stable/reference/exit-codes.html
-last_verified: 2026-07-29
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set]
+last_verified: 2026-08-05
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, backend-common-change-impact-call-site-enumeration, platforms-processes-tool-diagnostics-without-a-failing-exit-code, qa-process-scope-purity-checks]
 ---
 
 # Validating a Check Whose Target Does Not Exist Yet

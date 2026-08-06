@@ -11,8 +11,8 @@ sources:
   - https://man7.org/linux/man-pages/man7/inode.7.html
   - https://docs.docker.com/engine/containers/run/
   - https://docs.docker.com/engine/storage/bind-mounts/
-last_verified: 2026-07-10
-related: [platforms-filesystems-paths-case-and-line-endings]
+last_verified: 2026-08-04
+related: [platforms-filesystems-paths-case-and-line-endings, testing-data-test-data-and-isolation]
 ---
 
 # Exec Bits and File Ownership Lost Across git, Archives, and Containers
@@ -40,6 +40,8 @@ channels that preserve modes.
 | Files a container created on a bind mount are root-owned on the host | Same numeric-uid rule in reverse — created files belong to the container process's uid (root by default). Set `--user` to your host uid before the container writes |
 | A later pipeline stage can't read artifacts an earlier stage produced | Created-file modes are `mode & ~umask` — a restrictive umask in the producing step yields group/other-unreadable files. Set `umask 022` (or the mode you need) explicitly at the top of steps that share files |
 | A directory is shared by several users/daemons | Group-own the directory, `chmod g+ws` it (setgid: files created inside inherit the directory's group), and put both users in the group |
+| Code creates a file that must be executable (a generated script, a test fixture) | Pass the mode at creation — `open`/`writeFileSync` with `mode: 0o755`, `install -m 755` — rather than creating then `chmod +x`. Creation-time modes are still masked by umask, and the mode argument applies only when the file is new: a rewrite of an existing path keeps the original mode |
+| The machine runs endpoint security (EDR/antivirus) | Create executables inside the project tree (a gitignored build-output directory) rather than under the system temp directory; "an executable bit set on a file under a temp dir" is a standard dropper heuristic, and a repo-local path also leaves no untracked residue in `git status` when a run crashes |
 
 ## Edge cases
 
@@ -66,3 +68,5 @@ channels that preserve modes.
 - https://man7.org/linux/man-pages/man7/inode.7.html — setgid on a directory: files created inside inherit the directory's group
 - https://docs.docker.com/engine/containers/run/ — container default user is root (uid 0); `--user`/`-u` overrides with `uid:gid`
 - https://docs.docker.com/engine/storage/bind-mounts/ — bind-mount mechanics (host uid/gid visibility rows are field practice, not stated on this page)
+- https://nodejs.org/api/fs.html — `fs.writeFileSync(file, data, { mode })` sets the mode when the file is created
+- Field measurement 2026-08-04 (Node v25.8.1, macOS, umask 022): `writeFileSync` with `mode: 0o755` produced mode `755`; a second write to the same path with `mode: 0o644` left it at `755`, confirming the creation-only semantics. The EDR row is operational practice, not vendor-documented — a 25-fixture suite was moved off `tmpdir()` + `chmod +x` to a gitignored build-output directory and ran green (59/59) with no alert

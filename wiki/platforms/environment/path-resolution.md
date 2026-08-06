@@ -12,7 +12,7 @@ sources:
   - https://www.sudo.ws/docs/man/sudoers.man/
   - https://docs.brew.sh/FAQ
 last_verified: 2026-08-04
-related: [platforms-toolchains-version-management, platforms-processes-background-services]
+related: [platforms-toolchains-version-management, platforms-processes-background-services, platforms-shells-env-var-off-switches, platforms-toolchains-compiler-sysroot-on-macos]
 ---
 
 # The Wrong Binary (or None) Resolving From PATH
@@ -66,6 +66,7 @@ binaries; interactive convenience is the only place bare names are safe.
 | Case | Then |
 |------|------|
 | `command -v` shows an alias/function, not a binary | You are debugging the wrong thing — `type <cmd>` names the kind; bypass with `command <cmd>` or the absolute path to test the real binary |
+| `command -v tool` / `which tool` reports not-found on macOS and you are about to conclude the tool is not installed | A Homebrew **keg-only** formula (llvm, curl, openjdk, node@N, libpq, ruby) is installed but deliberately not symlinked onto `PATH`. Confirm with `brew list --versions <formula>` and `ls "$(brew --prefix <formula>)/bin/"`; invoke via the keg path `"$(brew --prefix <formula>)/bin/tool"`, or `brew link --force <formula>` only if it will not shadow system software |
 | `PATH` reordered in the rc file but the running shell still resolves the old one | Rc edits apply to NEW shells; `exec $SHELL -l` or open a fresh terminal, then `hash -r` |
 | Same command, different result under `env -i sh -c 'cmd'` | The difference is your interactive environment — reproduce daemon/CI behavior this way before blaming the machine |
 | An empty entry or `.` in `PATH` | Current-directory lookup: a file named like a common command in the cwd gets executed — remove the entry and use `./name` for local scripts |

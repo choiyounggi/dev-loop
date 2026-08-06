@@ -25,6 +25,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [error-responses](common/api-design/error-responses.md) | Designing or reviewing API error handling — choosing status codes (400/401/403/404/409/422/500), defining the error body shape, deciding what a 500 may reveal; clients report inconsistent/unparseable errors |
 | [idempotency](common/api-design/idempotency.md) | An endpoint with side effects (create, charge, send) can receive the same request twice — client retry after timeout, user double-submit, gateway retry; designing idempotency-key storage; deciding which operations are safe to retry |
 | [pagination-contract](common/api-design/pagination-contract.md) | Designing a list endpoint's request/response contract — cursor vs page-number, limit caps, total counts, expired-cursor behavior (the backing SQL/index → databases/query-optimization/keyset-pagination) |
+| [unenforced-declarations](common/api-design/unenforced-declarations.md) | Your system accepts declarative input (config file, DSL/manifest, policy block, schema annotation) and part of what a caller may write is unimplemented — an unknown key, a verb outside your vocabulary, or a knob recorded but never acted on; a user reports "I declared X and nothing happened"; choosing between reject/warn/ignore and where that strictness is selected |
 
 ### change-impact
 
@@ -37,6 +38,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [timeouts-and-retries](common/reliability/timeouts-and-retries.md) | Your service calls another service/external API/DB over the network — setting timeouts and deadlines, deciding what to retry per failure type, backoff/jitter, capping concurrency against a slow dependency; debugging pool exhaustion or retry storms |
+| [client-side-rate-limiting](common/reliability/client-side-rate-limiting.md) | You added a throttle to an API client wrapper and the provider still returns 429 — especially on the first call after process start, or only on some days; a rate-limit failure was filed as intermittent because a rerun passed; deciding which layer the throttle belongs in and whether token/auth requests count against the quota |
 
 ### caching
 
@@ -89,6 +91,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [externally-owned-defaults](common/integrations/externally-owned-defaults.md) | A code/config default names a resource the repo does not own (model alias, endpoint, bucket, queue, index) — reviewing or merging a PR that claims that default works, adding a startup check that the name still resolves, or diagnosing a default path that broke with no code change |
+| [robots-txt-and-source-selection](common/integrations/robots-txt-and-source-selection.md) | Choosing which site to fetch a published dataset from and reading its robots.txt to decide whether your client may crawl it; the file contains a `Disallow: /` and you are deciding whose group it belongs to; setting the crawler's User-Agent and checking that token against the file; robots.txt returned a non-200 status; the origin restricts your token and you are looking for a portal that republishes the same records |
 
 ### storage
 

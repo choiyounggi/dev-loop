@@ -9,8 +9,8 @@ sources:
   - https://eslint.org/docs/latest/integrate/nodejs-api
   - https://pitest.org/
   - https://github.github.com/gfm/
-last_verified: 2026-07-29
-related: [testing-quality-tests-that-cannot-fail, testing-quality-schema-additions-under-a-golden-gate]
+last_verified: 2026-08-05
+related: [testing-quality-tests-that-cannot-fail, testing-quality-schema-additions-under-a-golden-gate, backend-common-api-design-unenforced-declarations]
 ---
 
 # Checks That Verify a Spec or Mapping Artifact
