@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://www.postgresql.org/docs/current/ddl-constraints.html
 last_verified: 2026-07-10
-related: [databases-schema-design-primary-key-choice, databases-schema-design-nullability-and-defaults, databases-schema-design-naming-conventions, databases-schema-design-foreign-keys-and-referential-actions, databases-schema-design-column-data-types]
+related: [databases-schema-design-primary-key-choice, databases-schema-design-nullability-and-defaults, databases-schema-design-naming-conventions, databases-schema-design-foreign-keys-and-referential-actions, databases-schema-design-column-data-types, databases-data-survey-surveying-live-data-for-a-rule]
 ---
 
 # Deriving Tables and Columns from Requirements

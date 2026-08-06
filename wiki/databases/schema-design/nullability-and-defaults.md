@@ -8,7 +8,7 @@ sources:
   - https://www.postgresql.org/docs/current/ddl-constraints.html
   - https://www.postgresql.org/docs/current/functions-comparison.html
 last_verified: 2026-07-10
-related: [databases-schema-design-requirements-to-tables, databases-query-optimization-large-in-lists]
+related: [databases-schema-design-requirements-to-tables, databases-query-optimization-large-in-lists, databases-data-survey-surveying-live-data-for-a-rule]
 ---
 
 # Nullability, Defaults, and Three-Valued Logic

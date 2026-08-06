@@ -11,7 +11,7 @@ sources:
   - https://docs.python.org/3/library/contextvars.html
   - https://docs.python.org/3/library/asyncio-task.html
 last_verified: 2026-07-10
-related: [backend-common-concurrency-shared-state-and-pools]
+related: [backend-common-concurrency-shared-state-and-pools, testing-strategy-import-time-side-effects]
 ---
 
 # Mutable State Shared Across Calls and Requests in Python

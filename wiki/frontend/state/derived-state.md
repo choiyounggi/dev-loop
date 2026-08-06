@@ -9,7 +9,12 @@ sources:
   - https://react.dev/learn/choosing-the-state-structure
   - https://react.dev/reference/react/useMemo
 last_verified: 2026-07-10
-related: [frontend-state-client-vs-server-state, frontend-rendering-rerender-and-memoization]
+related:
+  [
+    frontend-state-client-vs-server-state,
+    frontend-rendering-rerender-and-memoization,
+    qa-deliverables-generated-artifacts-as-deliverable-source,
+  ]
 ---
 
 # Values Computable from Existing State or Props
@@ -40,20 +45,20 @@ you are debugging two copies of the same fact that have drifted apart.
 
 Cases that look derived but need different handling:
 
-| Case | Then |
-|------|------|
-| Computation is measured-expensive (profiled, perceptible lag) | Still compute — wrap in `useMemo` with the inputs as dependencies; do not move it to state + effect |
-| Editable draft initialized from a prop (edit form seeded by an entity) | It is real state: initialize once from the prop (`useState(entity.name)`) and pass a `key={entity.id}` so the component remounts (resetting the draft) when the entity changes |
-| Value derived from async/server data (needs a fetch to compute) | It is server state — put it in the server-state cache and transform at read time; see [frontend-state-client-vs-server-state] |
-| Derived value must persist across the inputs disappearing (last non-empty result) | It is its own state; set it at the event that produces it, not in an effect watching the inputs |
+| Case                                                                              | Then                                                                                                                                                                           |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Computation is measured-expensive (profiled, perceptible lag)                     | Still compute — wrap in `useMemo` with the inputs as dependencies; do not move it to state + effect                                                                            |
+| Editable draft initialized from a prop (edit form seeded by an entity)            | It is real state: initialize once from the prop (`useState(entity.name)`) and pass a `key={entity.id}` so the component remounts (resetting the draft) when the entity changes |
+| Value derived from async/server data (needs a fetch to compute)                   | It is server state — put it in the server-state cache and transform at read time; see [frontend-state-client-vs-server-state]                                                  |
+| Derived value must persist across the inputs disappearing (last non-empty result) | It is its own state; set it at the event that produces it, not in an effect watching the inputs                                                                                |
 
 ## Instead of
 
-| If you are about to | Do this instead | Why |
-|---------------------|-----------------|-----|
-| Write a `useEffect` that sets state from other state/props | Compute the value in render | The effect version renders a stale frame first, then re-renders; it is an extra copy that can drift |
-| Store `filteredItems` next to `items` + `filter` | Derive `filteredItems` in render | Any update path that touches `items` but forgets `filteredItems` ships a drift bug |
-| Store the full selected object in state | Store `selectedId`, derive the object with `find` | The copy goes stale when the source list changes |
+| If you are about to                                        | Do this instead                                   | Why                                                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Write a `useEffect` that sets state from other state/props | Compute the value in render                       | The effect version renders a stale frame first, then re-renders; it is an extra copy that can drift |
+| Store `filteredItems` next to `items` + `filter`           | Derive `filteredItems` in render                  | Any update path that touches `items` but forgets `filteredItems` ships a drift bug                  |
+| Store the full selected object in state                    | Store `selectedId`, derive the object with `find` | The copy goes stale when the source list changes                                                    |
 
 ## Sources
 

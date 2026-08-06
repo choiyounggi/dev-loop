@@ -49,3 +49,4 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [pii-handling](data/pii-handling.md) | A feature stores/processes personal data (emails, names, phones, addresses, government ids); reviewing a log/analytics/export/URL path that can carry PII; designing retention/erasure or handling an erasure request; choosing staging/test data for tables holding PII |
+| [masking-verification](data/masking-verification.md) | About to claim masking/redaction of a sensitive field works (logger filter, type-driven masking, serializer); a masking check passed on one output channel; reviewing an automated "masking PASS" verdict |

@@ -8,6 +8,16 @@ and data-loss planning.
 
 Match your situation to a "load when" line; load only matching pages.
 
+## agent-orchestration
+
+| Page | Load when |
+|------|-----------|
+| [control-signals-vs-primary-artifacts](agent-orchestration/control-signals-vs-primary-artifacts.md) | An orchestrator is about to restart, discard, merge, or keep waiting on a worker based on a status file, a watcher's exit code, or a heartbeat; a monitor reports a worker dead while it is committing; a worker's status write produced no output and you must decide whether it landed; distinguishing alive-and-progressing from stalled from dead |
+| [shared-run-state](agent-orchestration/shared-run-state.md) | Several agent/worker sessions coordinate through files in one repository (status directory, briefs, escalations, claim files); choosing the path layout for that state; starting an orchestration in a repo that may already have one running; a watcher woke on a task id it did not create; the default branch moved during a run |
+| [pane-delivery-confirmation](agent-orchestration/pane-delivery-confirmation.md) | An orchestrator drives another program through a terminal multiplexer (`tmux send-keys` + `capture-pane`) and must decide whether the input was consumed, retry, or escalate; a pane diff is being used as delivery evidence; the target echoes but never runs the input |
+| [session-completion-gates](agent-orchestration/session-completion-gates.md) | Writing a Stop/completion hook that blocks a worker session from ending while its phase is non-terminal; the gate fires on a worker that followed its own prompt; deciding the terminal phase set, the unknown-phase default, and how the gate bounds its own repetition |
+| [worktree-isolated-workers](agent-orchestration/worktree-isolated-workers.md) | Authoring the brief/output contract for parallel workers each confined to its own git worktree; workers stall at the same phase with no task-level error; deciding where shared or produced artifacts live and which direction (read vs write) a worktree guardrail stops |
+
 ## ci-cd
 
 | Page | Load when |
@@ -20,6 +30,8 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [environment-config](config/environment-config.md) | Adding configuration that differs per environment; a bug traced to a dev/stg/prd config difference; config sprawled across hardcoded values, files, and env vars; reviewing how a service gets its settings |
+| [path-valued-config](config/path-valued-config.md) | A config key or env var holds a filesystem path (spool/input/output directory, data file, socket) for a process whose working directory is set by launchd/systemd/cron/a container entrypoint/CI; deciding whether to accept a relative path, expand `~`, or crash at startup; a correctly-deployed service processes nothing and reports no error; writing the loader's rejection tests |
+| [keys-ahead-of-their-consumer](config/keys-ahead-of-their-consumer.md) | Adding a config key that a component outside your repository parses, for a version of it that has not shipped yet; reviewing a change justified by "older versions ignore unknown keys"; deciding whether a parser drops or rejects an unknown key (path query vs permissive binding vs strict schema); pre-declaring a key that carries a security control |
 
 ## containers
 
