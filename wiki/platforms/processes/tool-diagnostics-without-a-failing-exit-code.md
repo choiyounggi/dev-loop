@@ -9,7 +9,7 @@ sources:
   - https://clang.llvm.org/docs/UsersManual.html
   - https://www.gnu.org/software/bash/manual/bash.html#Redirections
   - https://code.claude.com/docs/en/hooks
-last_verified: 2026-08-05
+last_verified: 2026-08-06
 related: [platforms-processes-non-interactive-cli-invocation, platforms-shells-command-text-inspected-before-execution, testing-quality-checks-that-cannot-pass]
 ---
 
@@ -78,6 +78,7 @@ OUT=$(tool "$FILE" 2>&1 >/dev/null)
 | The tool is run through a pipeline (`tool f \| tee log`) | Capture into a variable or file first, then inspect; a pipeline reports the last command's status and the diagnostics land in the pipe |
 | The tool offers `-Werror` / `--max-warnings 0` | Use it **in addition** — it converts the status, and the captured text is still what names which warning fired |
 | The wrapper runs under `set -e` | Command substitution failure inside `OUT=$(…)` is not suppressed by a condition context — assign first, test after, as above |
+| Warnings must not repeat on every run of an unchanged file | Hash `$OUT` per file and forward only on change; an unconditional exit 2 re-feeds the same text each time |
 
 ## Instead of
 
@@ -96,3 +97,4 @@ OUT=$(tool "$FILE" 2>&1 >/dev/null)
 - https://www.gnu.org/software/bash/manual/bash.html#Redirections — "Redirections are processed in the order they appear, from left to right", with the `ls > dirlist 2>&1` vs `ls 2>&1 > dirlist` example
 - https://code.claude.com/docs/en/hooks — exit 2: "stderr text is fed back to Claude as an error message"; `PostToolUse` cannot block ("the tool already ran") but shows stderr to Claude
 - Field reproduction 2026-08-05: compiler with warning input → exit 0 with 3 warnings on stderr; clean input → exit 0 with empty stderr; error → non-zero exit with errors; the three outcomes observed directly when the gate was tested
+- Local reproduction 2026-08-06 (macOS, Apple clang): `cc -Wall` on a snippet with an unused variable → exit 0, 157 bytes on stderr; `OUT=$(cc … 2>&1 >/dev/null)` captured the diagnostic while the reversed redirection order captured 0 chars

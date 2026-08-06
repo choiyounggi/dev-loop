@@ -11,7 +11,7 @@ sources:
   - https://man7.org/linux/man-pages/man7/inode.7.html
   - https://docs.docker.com/engine/containers/run/
   - https://docs.docker.com/engine/storage/bind-mounts/
-last_verified: 2026-08-04
+last_verified: 2026-08-06
 related: [platforms-filesystems-paths-case-and-line-endings, testing-data-test-data-and-isolation]
 ---
 
@@ -51,6 +51,7 @@ channels that preserve modes.
 | You need a mode other than 755/644 tracked in git | git tracks only executable-or-not (`100755`/`100644`) — enforce fuller modes (setgid, 600 secrets) in a deploy/entrypoint step, not via git |
 | Exec bit committed but Windows-checkout users still can't run it | Windows doesn't consume the POSIX exec bit; invoke via the interpreter there. Line-ending/casing breakage on the same journey: [platforms-filesystems-paths-case-and-line-endings] |
 | Rootless Docker / userns-remap in play | uids are remapped, so host-uid matching arithmetic changes — verify with `ls -ln` on the host and `id` inside the container before choosing `--user` |
+| An endpoint-security agent (EDR, e.g. SentinelOne) flags `chmod +x` on temp or test-injected files, or tests must swap in stub scripts via an env var | Design the calling code to invoke the helper as `sh "$SCRIPT"` (POSIX: the command file "need not be executable") — stubs are then plain read-only files needing no `chmod`, and the same call keeps working when a distribution path (plugin cache, artifact store) strips modes |
 
 ## Instead of
 
@@ -58,6 +59,7 @@ channels that preserve modes.
 |---------------------|-----------------|-----|
 | `chmod 777` to make a permission error go away | Identify WHICH user/process needs WHICH access (`ls -ln` + the failing process's uid) and grant exactly that — owner change, group+setgid, or `--user` | 777 is an incident deferred: any local user/process can now modify or replace the file |
 | `chmod +x` locally and moving on | `git update-index --chmod=+x <file>` and commit | The local bit doesn't reach the repo; every fresh clone and CI run re-breaks |
+| `chmod +x` a test stub so the code under test can exec it | Have the code call helpers via `sh "$SCRIPT"` and inject the stub as a plain file | The exec-bit requirement is a property of the caller's invocation style; interpreter invocation removes it for stubs and deployed copies alike, and avoids EDR rules that treat `chmod +x` on fresh files as malicious |
 | Running the container as root because the mount "just works" that way | `--user` matching the host owner, or entrypoint `chown` | Root-in-container writes root-owned files onto the host and widens container-escape blast radius |
 
 ## Sources
