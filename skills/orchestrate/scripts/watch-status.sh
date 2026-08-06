@@ -9,6 +9,10 @@
 #   exit 3: a failed session detected (abort → orchestrator intervenes)
 #   exit 4: bad arguments (unknown target phase, missing dir, bad LO_PHASE_TIMEOUTS)
 #   exit 5: an escalation is pending (a worker's guardrails `ask` needs approval)
+#   exit 6: a worker question is pending (an ask-coordinator.sh record — answer
+#           and clear questions/ before relaunching)
+#   exit 7: a live non-terminal worker's pane is stalled (tmux-worker-stalled.sh
+#           reported 1 — a wedged/idle worker; inspect or nudge the session)
 #
 # Per-phase deadlines: one flat timeout gave a plan phase and a long implement
 # phase the same budget. LO_PHASE_TIMEOUTS carries a per-phase budget keyed on
@@ -74,11 +78,18 @@ echo "[watch] budget=${budget}s target=${target} source=${budget_src}"
 elapsed=0
 # Escalations live beside the status dir: <root>/.orchestration/{status,escalations}.
 escdir="$(dirname "$dir")/escalations"
+# Worker questions (ask-coordinator.sh) use the same sibling layout: <root>/.orchestration/questions.
+qdir="$(dirname "$dir")/questions"
 # tmux binary for dead-worker (liveness) checks; overridable in tests via WATCH_TMUX.
 # If it is not resolvable, DISABLE liveness (empty) rather than flag every worker
 # dead — a missing tmux must not abort the run (`! missing-cmd` would invert to true).
 TMUX_BIN="${WATCH_TMUX:-tmux}"
 command -v "$TMUX_BIN" >/dev/null 2>&1 || TMUX_BIN=""
+# Per-session stall detection (a live pane silent for LO_STALL_SEC), run via
+# tmux-worker-stalled.sh; overridable in tests via WATCH_STALL_SCRIPT. A missing
+# script DISABLES the check (empty), mirroring the TMUX_BIN treatment above.
+STALL_SCRIPT="${WATCH_STALL_SCRIPT:-$(dirname "$0")/tmux-worker-stalled.sh}"
+[ -f "$STALL_SCRIPT" ] || STALL_SCRIPT=""
 while [ "$elapsed" -lt "$budget" ]; do
   # A worker's guardrails `ask`, recorded as an escalation, wakes the coordinator
   # immediately rather than waiting out the timeout. The coordinator MUST resolve
@@ -98,7 +109,23 @@ while [ "$elapsed" -lt "$budget" ]; do
     fi
   fi
 
-  done_count=0; failed=0; summary=""
+  # A worker question (ask-coordinator.sh) wakes the coordinator the same way an
+  # escalation does. The coordinator MUST answer and clear the record before
+  # relaunching watch; exit 6 recurs while the record file exists, like exit 5.
+  # The escalation check above runs first, so exit 5 wins when both are pending.
+  if [ -d "$qdir" ]; then
+    q_found=0
+    for q in "$qdir"/*.json; do
+      [ -f "$q" ] || continue
+      qtk=$("$JQ" -r '.taskId // "?"' "$q" 2>/dev/null || echo "?")
+      qtxt=$("$JQ" -r '.question // "?"' "$q" 2>/dev/null || echo "?")
+      echo "[watch] question pending — ${qtk}: ${qtxt}"
+      q_found=1
+    done
+    if [ "$q_found" -eq 1 ]; then exit 6; fi
+  fi
+
+  done_count=0; failed=0; summary=""; stalled=""
   for f in "$dir"/*.json; do
     [ -f "$f" ] || continue
     ph=$("$JQ" -r '.phase // "pending"' "$f" 2>/dev/null || echo "pending")
@@ -116,6 +143,13 @@ while [ "$elapsed" -lt "$budget" ]; do
           echo "[watch] task $tk: session '$sess' gone at phase '$ph' — dead worker"
           failed=$((failed+1)); continue
         fi
+        # Per-session stall check: only rc 1 marks a stall. rc 0 (progressing),
+        # rc 2 (unknown), or a broken script are all NOT stalled — the explicit
+        # rc capture means no failure here can abort the watch loop.
+        if [ -n "$STALL_SCRIPT" ] && [ -n "$TMUX_BIN" ] && [ -n "$sess" ]; then
+          src=0; sh "$STALL_SCRIPT" "$sess" >/dev/null 2>&1 || src=$?
+          if [ "$src" -eq 1 ]; then stalled="$stalled $tk:$sess"; fi
+        fi
         ;;
     esac
     r=$(rank "$ph")
@@ -124,6 +158,8 @@ while [ "$elapsed" -lt "$budget" ]; do
   echo "[watch ->$target] $done_count/$expected |$summary"
   [ "$failed" -gt 0 ] && { echo "[watch] failed session detected — abort"; exit 3; }
   [ "$done_count" -ge "$expected" ] && { echo "[watch] all reached $target"; exit 0; }
+  # Stall is the weakest signal: failed(3) and all-reached(0) above win over it.
+  if [ -n "$stalled" ]; then echo "[watch] worker stalled —$stalled"; exit 7; fi
   sleep "$interval"; elapsed=$((elapsed+interval))
 done
 echo "[watch] TIMEOUT (${budget}s, source=${budget_src}):$summary"; exit 2

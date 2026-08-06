@@ -4,7 +4,7 @@
 setup() {
   WS="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/watch-status.sh"
   ORCH="${BATS_TEST_TMPDIR}/.orchestration"
-  mkdir -p "$ORCH/status" "$ORCH/escalations"
+  mkdir -p "$ORCH/status" "$ORCH/escalations" "$ORCH/questions"
 }
 
 @test "exits 5 when an escalation is pending (wakes coordinator, no long wait)" {
@@ -154,4 +154,134 @@ setup() {
   printf '{"task":"t1","phase":"done"}' > "$ORCH/status/t1.json"
   run env LO_PHASE_TIMEOUTS="plan_ready" sh "$WS" "$ORCH/status" done 1
   [ "$status" -eq 4 ]
+}
+
+# ---- question channel (exit 6) ----------------------------------------------
+# A worker question (an ask-coordinator.sh record in questions/) wakes the
+# coordinator with exit 6 within one poll interval. Precedence per iteration:
+# escalation(5) -> question(6) -> failed/dead(3) -> all-reached(0).
+
+@test "question: exits 6 with the task and question text (normal)" {
+  printf '{"task":"t1","phase":"implementing"}' > "$ORCH/status/t1.json"
+  printf '{"taskId":"t1","question":"Which DB?"}' > "$ORCH/questions/t1.json"
+  run sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 6 ]
+  [[ "$output" == *"question pending"* ]]
+  [[ "$output" == *"t1"* ]]
+  [[ "$output" == *"Which DB?"* ]]
+}
+
+@test "question: recurs on relaunch while the record remains (normal)" {
+  printf '{"task":"t1","phase":"implementing"}' > "$ORCH/status/t1.json"
+  printf '{"taskId":"t1","question":"Which DB?"}' > "$ORCH/questions/t1.json"
+  run sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 6 ]
+  run sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 6 ]
+}
+
+@test "question: escalation wins when both are pending (precedence)" {
+  printf '{"task":"t1","phase":"implementing"}' > "$ORCH/status/t1.json"
+  printf '{"taskId":"t1","question":"Which DB?"}' > "$ORCH/questions/t1.json"
+  printf '{"taskId":"t1","rule":"git_force_push"}' > "$ORCH/escalations/e1.json"
+  run sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 5 ]
+  [[ "$output" == *"escalation pending"* ]]
+}
+
+@test "question: checked before a failed session (precedence)" {
+  printf '{"task":"t1","phase":"failed"}' > "$ORCH/status/t1.json"
+  printf '{"taskId":"t1","question":"Which DB?"}' > "$ORCH/questions/t1.json"
+  run sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 6 ]
+}
+
+@test "question: empty questions dir does not false-trigger (boundary)" {
+  printf '{"task":"t1","phase":"done"}' > "$ORCH/status/t1.json"
+  run sh "$WS" "$ORCH/status" done 1 5 1
+  [ "$status" -eq 0 ]
+}
+
+@test "question: a malformed record still exits 6 with the '?' fallback (boundary)" {
+  printf '{"task":"t1","phase":"implementing"}' > "$ORCH/status/t1.json"
+  printf 'not-json' > "$ORCH/questions/t1.json"
+  run sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 6 ]
+  [[ "$output" == *"?"* ]]
+}
+
+# ---- stall detection (exit 7) -----------------------------------------------
+# tmux-worker-stalled.sh reporting 1 for a live non-terminal session surfaces
+# as exit 7. rc 0/2, a broken/missing script, missing tmux, and a missing
+# session field are all NOT stalled. Precedence: failed(3) and all-reached(0)
+# win over stall(7). Stubs are plain sh files (watch invokes them via `sh`, so
+# they need no execute bit).
+
+@test "stall: a stalled live worker exits 7 with task and session (normal)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  [[ "$output" == *"worker stalled"* ]]
+  [[ "$output" == *"t1"* ]]
+  [[ "$output" == *"lo-x"* ]]
+}
+
+@test "stall: unknown (rc 2) is not stalled — the wait continues to timeout (boundary)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 2\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [[ "$output" != *"worker stalled"* ]]
+}
+
+@test "stall: a missing stall script disables the check, never aborts (boundary)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT=/nonexistent/stall.sh \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+}
+
+@test "stall: a status record with no session field is not checked (boundary)" {
+  printf '{"task":"t1","phase":"implementing"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+}
+
+@test "stall: unresolvable tmux disables the stall check too (boundary)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=/nonexistent/tmux WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+}
+
+@test "stall: a crashing stall script (rc 127) never aborts the watch loop (error)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 127\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [[ "$output" != *"worker stalled"* ]]
+}
+
+@test "stall: all-reached wins over a stalled pane (precedence)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" implementing 1 2 1
+  [ "$status" -eq 0 ]
+}
+
+@test "stall: a dead session is a failed worker (3), never a stall (precedence)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=false WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"dead worker"* ]]
 }
