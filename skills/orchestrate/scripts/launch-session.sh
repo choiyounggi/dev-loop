@@ -41,6 +41,14 @@
 #   LO_READY_EXTRA / LO_TRUST_EXTRA        extra screen-match substrings
 #   LO_SUBMIT_TIMEOUT / LO_SUBMIT_INTERVAL submission-confirm budget (default
 #                      20 / 2); attempts = floor(timeout/interval), minimum 1
+#   LO_STATUS_DIR / LO_TASK_ID  when BOTH are set, pre-seed the status record
+#                      (phase=pending, via the sibling status-update.sh) once
+#                      the launch succeeds — on the reuse path and after the
+#                      prompt is confirmed submitted — so dead/stalled-worker
+#                      detection covers the session from launch, not from its
+#                      first self-report. A seeding failure warns on stderr
+#                      and never changes the exit code. Either var unset:
+#                      exactly the previous behavior, no new output.
 set -eu
 # NOT named TMUX: that is tmux's OWN variable (the server socket). Assigning it
 # here would overwrite the caller's exported value, and every tmux child would
@@ -69,6 +77,21 @@ esac
 # tmux/claude. Lets the orchestrator (and tests) learn the exact name.
 if [ -n "${LO_DRY_RUN:-}" ]; then echo "session=$session"; exit 0; fi
 
+# Pre-seed the status record so dead/stalled-worker detection covers this
+# worker from launch time, not from its first self-report (plan_ready).
+# Active only when the orchestrator sets BOTH LO_STATUS_DIR and LO_TASK_ID.
+# A seeding failure must never fail a launch that already succeeded: warn on
+# stderr, keep the exit code (the `if !` condition context suppresses set -e).
+# stdout of status-update is routed to stderr so this script's parsed stdout
+# (session=… / ok:…) stays unchanged.
+preseed_status() {
+  [ -n "${LO_STATUS_DIR:-}" ] && [ -n "${LO_TASK_ID:-}" ] || return 0
+  if ! STATUS_DIR="$LO_STATUS_DIR" STATUS_SESSION="$session" \
+      sh "$(dirname "$0")/status-update.sh" "$LO_TASK_ID" pending worktree="$wt" >&2; then
+    echo "launch-session: warning: status pre-seed failed for task '$LO_TASK_ID' (STATUS_DIR: $LO_STATUS_DIR) — launch unaffected" >&2
+  fi
+}
+
 # locate the claude binary (avoid nvm lazy wrappers / shell functions)
 CLAUDE="${LO_CLAUDE:-}"
 if [ -z "$CLAUDE" ]; then
@@ -84,6 +107,8 @@ if "$TMUX_BIN" has-session -t "$session" 2>/dev/null; then
   # With a unique LO_RUN_ID name this should not happen across runs; surface it
   # loudly (stderr) instead of a silent skip so a real collision is visible.
   echo "launch-session: session '$session' already exists — reusing it (set LO_RUN_ID for a unique per-run name)" >&2
+  # an existing session is still a live worker the watch should cover
+  preseed_status
   echo "session=$session"
   exit 0
 fi
@@ -219,6 +244,8 @@ if [ "$submitted" -ne 1 ]; then
   echo "$pane" | tail -8 >&2
   exit 5
 fi
+
+preseed_status
 
 if [ "$sent_extra" -gt 0 ]; then
   echo "ok: $session launched + prompt submitted (confirmed after $sent_extra extra Enter)"
