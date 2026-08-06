@@ -11,8 +11,8 @@ sources:
   - https://man7.org/linux/man-pages/man7/inode.7.html
   - https://docs.docker.com/engine/containers/run/
   - https://docs.docker.com/engine/storage/bind-mounts/
-last_verified: 2026-07-10
-related: [platforms-filesystems-paths-case-and-line-endings]
+last_verified: 2026-08-06
+related: [platforms-filesystems-paths-case-and-line-endings, testing-data-test-data-and-isolation]
 ---
 
 # Exec Bits and File Ownership Lost Across git, Archives, and Containers
@@ -40,6 +40,8 @@ channels that preserve modes.
 | Files a container created on a bind mount are root-owned on the host | Same numeric-uid rule in reverse — created files belong to the container process's uid (root by default). Set `--user` to your host uid before the container writes |
 | A later pipeline stage can't read artifacts an earlier stage produced | Created-file modes are `mode & ~umask` — a restrictive umask in the producing step yields group/other-unreadable files. Set `umask 022` (or the mode you need) explicitly at the top of steps that share files |
 | A directory is shared by several users/daemons | Group-own the directory, `chmod g+ws` it (setgid: files created inside inherit the directory's group), and put both users in the group |
+| Code creates a file that must be executable (a generated script, a test fixture) | Pass the mode at creation — `open`/`writeFileSync` with `mode: 0o755`, `install -m 755` — rather than creating then `chmod +x`. Creation-time modes are still masked by umask, and the mode argument applies only when the file is new: a rewrite of an existing path keeps the original mode |
+| The machine runs endpoint security (EDR/antivirus) | Create executables inside the project tree (a gitignored build-output directory) rather than under the system temp directory; "an executable bit set on a file under a temp dir" is a standard dropper heuristic, and a repo-local path also leaves no untracked residue in `git status` when a run crashes |
 
 ## Edge cases
 
@@ -49,6 +51,7 @@ channels that preserve modes.
 | You need a mode other than 755/644 tracked in git | git tracks only executable-or-not (`100755`/`100644`) — enforce fuller modes (setgid, 600 secrets) in a deploy/entrypoint step, not via git |
 | Exec bit committed but Windows-checkout users still can't run it | Windows doesn't consume the POSIX exec bit; invoke via the interpreter there. Line-ending/casing breakage on the same journey: [platforms-filesystems-paths-case-and-line-endings] |
 | Rootless Docker / userns-remap in play | uids are remapped, so host-uid matching arithmetic changes — verify with `ls -ln` on the host and `id` inside the container before choosing `--user` |
+| An endpoint-security agent (EDR, e.g. SentinelOne) flags `chmod +x` on temp or test-injected files, or tests must swap in stub scripts via an env var | Design the calling code to invoke the helper as `sh "$SCRIPT"` (POSIX: the command file "need not be executable") — stubs are then plain read-only files needing no `chmod`, and the same call keeps working when a distribution path (plugin cache, artifact store) strips modes |
 
 ## Instead of
 
@@ -56,6 +59,7 @@ channels that preserve modes.
 |---------------------|-----------------|-----|
 | `chmod 777` to make a permission error go away | Identify WHICH user/process needs WHICH access (`ls -ln` + the failing process's uid) and grant exactly that — owner change, group+setgid, or `--user` | 777 is an incident deferred: any local user/process can now modify or replace the file |
 | `chmod +x` locally and moving on | `git update-index --chmod=+x <file>` and commit | The local bit doesn't reach the repo; every fresh clone and CI run re-breaks |
+| `chmod +x` a test stub so the code under test can exec it | Have the code call helpers via `sh "$SCRIPT"` and inject the stub as a plain file | The exec-bit requirement is a property of the caller's invocation style; interpreter invocation removes it for stubs and deployed copies alike, and avoids EDR rules that treat `chmod +x` on fresh files as malicious |
 | Running the container as root because the mount "just works" that way | `--user` matching the host owner, or entrypoint `chown` | Root-in-container writes root-owned files onto the host and widens container-escape blast radius |
 
 ## Sources
@@ -66,3 +70,5 @@ channels that preserve modes.
 - https://man7.org/linux/man-pages/man7/inode.7.html — setgid on a directory: files created inside inherit the directory's group
 - https://docs.docker.com/engine/containers/run/ — container default user is root (uid 0); `--user`/`-u` overrides with `uid:gid`
 - https://docs.docker.com/engine/storage/bind-mounts/ — bind-mount mechanics (host uid/gid visibility rows are field practice, not stated on this page)
+- https://nodejs.org/api/fs.html — `fs.writeFileSync(file, data, { mode })` sets the mode when the file is created
+- Field measurement 2026-08-04 (Node v25.8.1, macOS, umask 022): `writeFileSync` with `mode: 0o755` produced mode `755`; a second write to the same path with `mode: 0o644` left it at `755`, confirming the creation-only semantics. The EDR row is operational practice, not vendor-documented — a 25-fixture suite was moved off `tmpdir()` + `chmod +x` to a gitignored build-output directory and ran green (59/59) with no alert

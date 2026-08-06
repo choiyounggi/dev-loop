@@ -10,8 +10,13 @@ sources:
   - https://testing.googleblog.com/2021/04/mutation-testing.html
   - https://martinfowler.com/bliki/TestCoverage.html
   - https://testing.googleblog.com/2013/05/testing-on-toilet-dont-overuse-mocks.html
-last_verified: 2026-07-10
-related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-checks-that-cannot-pass, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, testing-quality-schema-additions-under-a-golden-gate, qa-document-verification-spec-document-gates]
+  - https://pitest.org/quickstart/basic_concepts/
+  - https://man7.org/linux/man-pages/man2/execve.2.html
+  - https://www.gnu.org/software/sed/manual/html_node/Exit-status.html
+  - https://git-scm.com/docs/git-checkout
+  - https://git-scm.com/docs/git-restore
+last_verified: 2026-08-05
+related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-checks-that-cannot-pass, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, testing-quality-schema-additions-under-a-golden-gate, testing-quality-differential-run-agreement, testing-quality-completion-predicates, testing-quality-guard-shape-vs-consequence, testing-quality-injected-clock-duration-assertions, testing-quality-write-path-assertions, backend-common-change-impact-call-site-enumeration, platforms-shells-portable-shell-scripts, qa-document-verification-spec-document-gates]
 ---
 
 # Proving a Test Can Fail
@@ -29,7 +34,35 @@ suite reported as covered, or you are auditing a suspiciously green suite.
    it stays green, the test is decoration — locate its defect in the table
    below and fix the test, then re-verify red before restoring the code.
    This is manual mutation testing; run it whenever a test's value is in doubt.
-2. Fix each never-fails pattern with its replacement:
+2. **Seed one mutation per assertion, not one per file, and require exactly the
+   test that owns that assertion to redden.** Choose each mutation from what its
+   assertion actually reads. A file-level red proves the file executes and that
+   *some* assertion discriminates; mutation tools attribute a kill to the
+   covering test, not to the file. Read the outcome per assertion:
+
+| Mutation outcome | Read it as | Do |
+|------------------|------------|-----|
+| Exactly the expected test reddens | That assertion discriminates on that input | Record the pair (mutation → test) and move on |
+| The file reddens but the target test stays green | The target assertion is unproven; another one caught the mutation | Mutate what this assertion reads, not what its name suggests |
+| No test reddens | Nothing asserts that behavior | Add the assertion, then re-run the mutation |
+
+3. **Choose the restore mechanism by whether the work under test is committed,
+   before you mutate anything.** `git checkout -- <path>` replaces the file with
+   the version from the index and discards every unstaged change — when the fix
+   you are validating is itself unstaged, undoing the mutation and undoing the
+   fix are the same operation:
+
+| State of the work under test | Restore with |
+|------------------------------|--------------|
+| Committed (or already `git add`-ed) | `git checkout -- <path>` / `git restore <path>` — the index copy holds the fix |
+| Uncommitted and unstaged | Copy the file aside first, restore from the copy, and compare hashes (`shasum -a 256`) to prove the restore was exact |
+| Uncommitted, and you would rather use git | `git add <path>` before mutating — the index then holds the fix, and `git checkout --` reverts only the mutation |
+
+4. **Confirm the restore by count, not by appearance.** Re-run the full suite
+   and require the same number of tests as before the mutation — a restore that
+   silently dropped an import turns the module into a collection error, which
+   reads as a mostly-green run with a smaller total.
+5. Fix each never-fails pattern with its replacement:
 
 | Never-fails pattern | Fix |
 |---------------------|-----|
@@ -39,8 +72,9 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 | Always-true assertion (`toBeDefined`/`toBeTruthy` on a value that is always defined, `expect(arr.length).toBeGreaterThanOrEqual(0)`) | Assert the specific expected value or shape — the observable-outcome rule in [testing-quality-minimum-case-set] |
 | Testing the mock instead of the code (mock returns X, test asserts X came back) | Assert the unit's transformation of its inputs, not the pass-through; when no transformation exists at this layer, test the layer that has one ([testing-mocking-what-to-mock]) |
 | Copied test body with the name changed but identical inputs and expectation | Give each case distinct inputs and its own expectation; delete exact duplicates — a renamed copy re-proves the same fact and guards nothing new |
+| Assertion inherited from a shared base class, mixin, or parameterised harness, whose name announces the new subject's whole shape while its body pins the original narrow scope | Read the inherited body and list what it compares; add a subject-specific assertion for each part of the shape the name claims, then prove each one with its own mutation |
 
-3. **Coverage note:** a covered line is only an executed line. Use coverage to
+6. **Coverage note:** a covered line is only an executed line. Use coverage to
    find untested code; it cannot certify tested behavior. The proof a test
    works is the red run from step 1, not the coverage report.
 
@@ -53,6 +87,14 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 | The mutation run is your own script rather than PIT/Stryker | Prove the harness discriminates before citing its score — a semantics-preserving no-op must survive ([testing-quality-harness-reverse-controls]) |
 | A test intentionally has no outcome assertion (smoke test: module loads, page renders) | Keep it only when the regression it guards manifests as a throw; name it as a smoke test so reviewers do not count it as behavior coverage |
 | The always-green test is a snapshot approved without reading | Snapshot rules → [testing-quality-behavior-not-implementation] |
+| Assertions were just pulled into a shared contract (base class, mixin, parameterised suite) so several subjects now run them | Re-prove each assertion against each subject: the assertion's scope stayed where it was written while its name now speaks for every subject — one mutation per (assertion, subject) pair is the granularity |
+| The two implementations under comparison model different amounts of state | An agreement verdict on the default input cannot fail for the unmodelled dimension → [testing-quality-differential-run-agreement] |
+| Runner invokes the subject differently than production does (`bash script.sh` on a `#!/bin/sh` file, `node` on a file production runs under a different runtime/flags) | Invoke it the way production does, or add one job that does — a shebang is honoured only when the file is executed directly, so passing it to an interpreter silently swaps the interpreter and the suite becomes blind to that whole bug class ([platforms-shells-portable-shell-scripts]) |
+| The mutation is applied by a script (`sed`/`awk`) rather than by hand | Assert the edit landed — `diff` the file or grep for the injected text — and treat "mutation did not apply" as its own outcome: a pattern that matches nothing still exits 0, the code never changed, and the green run reads exactly like a blind test |
+| Mutating a guard that returns an error code (`if [ "$x" != "ok" ]; then exit 6; fi`) | Mutate it toward *unreachable* (make the condition impossible), not toward *always-firing* — an always-firing guard produces the asserted exit code more often, so the test stays green and proves nothing |
+| HTTP test of a write endpoint asserting only the response status | Read the persisted record back and assert the values sent — a request whose body never decoded still returns the success status ([testing-quality-write-path-assertions]) |
+| The suite total dropped after a restore but the run still looks green | Read it as a lost import or file, not a passing suite: a module that fails to import contributes one error and removes all of its tests from the total. Compare totals against the pre-mutation run, then restore from the copy again |
+| Several sessions or agents mutate the same working tree | Each one keeps its own hashed copy and restores before handing the tree on; a shared `git checkout --` discards whichever uncommitted work landed most recently |
 
 ## Instead of
 
@@ -62,11 +104,18 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 | Prove an error path with `try { await f() } catch (e) { expect(e.message)... }` alone | Use `rejects`/`assertThrows`-style assertion, or add `expect.assertions(1)` above the try | When `f()` succeeds, the catch never runs and the test passes with zero assertions |
 | Trust "green suite + high coverage" as proof an area is tested | Break the behavior once and require a red run | Coverage counts execution, not detection; high numbers are reachable with assertion-free tests |
 | Delete a suspicious always-green test to clean up | Fix it via the table above, then re-verify it can fail | The test names a behavior someone meant to guard; deletion drops the intent along with the defect |
+| Prove a test file can fail by seeding one mutation and watching the file go red | Seed one mutation per assertion and require exactly the owning test to redden | A file-level red is produced by whichever assertion happens to be strictest; the silent ones remain unproven |
+| Pick a mutation from what the test's name says it covers | Pick it from what the assertion body actually reads | An assertion inherited into a shared contract keeps its original narrow scope, so a reasonable-looking mutation sails past it |
+| Undo a red-run mutation with `git checkout -- <path>` while the fix under test is unstaged | Restore from a copy saved before mutating and compare hashes, or `git add` the fix first | The checkout restores the index copy and discards every unstaged change, so it removes the fix and the mutation together while reporting nothing |
 
 ## Sources
 
 - https://jestjs.io/docs/expect — `expect.assertions(n)` / `expect.hasAssertions()` guard callback assertions; `.rejects`, `.toThrow`
 - https://jestjs.io/docs/asynchronous — un-awaited promises let tests finish early; `.rejects`; `expect.assertions` with try/catch
 - https://testing.googleblog.com/2021/04/mutation-testing.html — inserting faults and requiring test failure measures whether tests detect bugs; coverage alone does not
+- https://pitest.org/quickstart/basic_concepts/ — a kill is attributed to the covering test, not the file: per-assertion granularity is the tool model
 - https://martinfowler.com/bliki/TestCoverage.html — coverage finds untested code; it is not a measure of test quality
 - https://testing.googleblog.com/2013/05/testing-on-toilet-dont-overuse-mocks.html — mock-heavy tests can pass while the real code is broken
+- https://man7.org/linux/man-pages/man2/execve.2.html — the shebang is honoured only on direct execution, not when a file is passed to an interpreter
+- https://www.gnu.org/software/sed/manual/html_node/Exit-status.html — a `sed` expression that matches nothing still exits 0
+- https://git-scm.com/docs/git-checkout, https://git-scm.com/docs/git-restore — `checkout -- <path>` restores the index copy, discarding unstaged changes; measured 2026-08-05: with the fix unstaged the checkout removed fix and mutation together, and the lost import surfaced as `Ran 1042 … errors=1` where the intact tree ran 1098

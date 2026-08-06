@@ -67,6 +67,25 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
       don't duplicate)? Does it conflict with an existing directive (→ flag,
       don't overwrite)? Which existing pages should it `related:`-link to?
 
+   b′. **Open-PR dedup check.** The merged wiki is not the whole layer — sibling
+      flushes may have PRs in flight. List them and diff each candidate against
+      their content before ingesting:
+      ```sh
+      gh pr list --repo choiyounggi/dev-loop --state open \
+        --json number,headRefName --search "head:knowledge/"
+      ```
+      For every open head that touches an overlapping trigger
+      (`git fetch origin <head>` then `git diff origin/main origin/<head> -- wiki/`),
+      give the candidate one of three verdicts, recorded in the report's
+      `## Open-PR check` section:
+      - **fold** — the open PR already carries this insight in better/equal form
+        → push your unique additions to THAT branch (or note them on its PR) and
+        do not re-ingest here;
+      - **drop** — pending duplicate with nothing new → retire the candidate;
+      - **new** — no overlap → ingest normally.
+      Two real pile-ups (#17–#40, then #42/#43 — see #39) came from skipping
+      exactly this step.
+
    c. **Routing decision.** State the target `domain/category` and page. If no
       category fits, decide whether to add one (and justify why the existing
       categories genuinely don't cover it) or place it under the closest fit.
@@ -89,7 +108,14 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
 
    ## Existing-layer check
    Pages you read, overlaps found, what you merged vs. created new, conflicts
-   flagged, and related-links added.
+   flagged, and related-links added. MUST include a line
+   `Pages read: <page-id>, <page-id>, …` naming the ids you actually opened —
+   the gate resolves each id against the checkout's `wiki/` and denies the PR
+   on any id that does not exist (fabricated evidence fails closed).
+
+   ## Open-PR check
+   The open `knowledge/*` heads you listed, which (if any) overlap each
+   candidate, and the per-candidate verdict: fold / drop / new (step 2b′).
 
    ## Routing decision
    Target domain/category/page for each insight; any new category + why existing
@@ -103,15 +129,26 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
    git -C "$REPO" push -u origin "$BR"
    gh pr create --repo choiyounggi/dev-loop --base main --head "$BR" \
      --title "knowledge: <short summary>" \
-     --body-file "$REPO/.dev-loop/INGEST_REPORT.md" \
+     --body-file "$HOME/.dev-loop/repo/.dev-loop/INGEST_REPORT.md" \
      --label dev-loop:knowledge
    ```
+   Write the `--body-file` path so the gate can resolve it as text: the
+   PreToolUse gate inspects the command string before execution and cannot
+   expand skill-local variables like `$REPO` (see
+   wiki/platforms/shells/command-text-inspected-before-execution.md) — use a
+   literal absolute path or `$HOME`/`~` (which the gate expands).
    Do NOT `gh pr merge`. The owner reviews open `dev-loop:knowledge` PRs and
    merges or rejects each one.
 
-5. **Retire processed candidates.** Move the flushed rows out of the active queue
-   (e.g. append them to `~/.dev-loop/queue/.processed.jsonl` and rewrite the
-   session file without them) so the next flush doesn't re-ingest them.
+5. **Retire processed candidates — every one you handled, not only the ingested.**
+   Move each handled row out of the active queue (append it to
+   `~/.dev-loop/queue/.processed.jsonl` and rewrite the session file without it):
+   rows you ingested, rows you merged into existing pages, AND rows you dropped
+   as unverifiable or duplicate. A dropped row left `pending` re-crosses the
+   auto-flush threshold forever — the headless flush would re-run hourly on
+   candidates that can never be promoted. When the rewrite leaves a session file
+   empty, delete the file — empty leftovers otherwise accumulate in the queue
+   directory (the harvester also removes its own empty file on later Stops).
 
 ## Guardrails
 - PR-only. Never auto-merge, never push to `main`, never force-push `main`.

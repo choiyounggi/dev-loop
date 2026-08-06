@@ -11,7 +11,7 @@ sources:
   - https://testing-library.com/docs/dom-testing-library/api-async/
   - https://martinfowler.com/articles/nonDeterminism.html
 last_verified: 2026-07-10
-related: [testing-quality-tests-that-cannot-fail, testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation]
+related: [testing-quality-tests-that-cannot-fail, testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-injected-clock-duration-assertions]
 ---
 
 # Testing Asynchronous Code Deterministically
@@ -38,6 +38,7 @@ un-awaited promises; or an async test intermittently interferes with the next te
 | UI or state that appears asynchronously | Poll the **condition** with a bounded-timeout wait (`waitFor`/`findBy`-style) and assert the final state; the test proceeds the moment the condition holds |
 | Event-emitter / callback API | Wrap the event in a promise (`once`-style helper) and `await` it, then assert |
 | Fire-and-forget side effect | Expose a completion handle (returned promise, flush/drain hook) and await it in the test; when no handle can exist, poll the durable outcome (row above) |
+| Code that consumes a stream record-by-record (readline prompts, a line-delimited protocol) driven from an in-memory test double | Write one record per macrotask turn — `input.write(line + '\n'); await new Promise(r => setImmediate(r))` — and share one reader instance across the whole interaction rather than constructing one per prompt |
 
 3. **Contain leaked work.** A promise or timer that outlives its test corrupts
    the next test's state and assertions. In each test's teardown, unsubscribe
@@ -59,6 +60,8 @@ un-awaited promises; or an async test intermittently interferes with the next te
 | A condition wait (`waitFor`) is needed while fake timers are active | Advance the fake clock explicitly before/while awaiting the condition, or use the wait utility's fake-timer-aware mode; otherwise the poll's own timers never fire |
 | Runner reports an unhandled rejection after the suite passes | A promise was created without `await`/`return` — find it and await it; do not silence the warning |
 | Assertions run inside a `.then`/callback the test never awaits | Add `expect.assertions(n)` / `expect.hasAssertions()` so the test fails when the callback is skipped, then restructure to await-then-assert |
+| A stream-fed test hangs after consuming the first record, with the later records never delivered | The records arrived in one chunk: a readable concatenates buffered writes, and a line-oriented consumer walks every delimiter in that chunk synchronously, discarding the lines no reader is waiting for. Write one record per turn (table row above) and re-run |
+| The consumer is rebuilt per prompt (a new interface inside a retry loop) | Construct it once per interaction and reuse it — a second instance attached to the same stream competes for the same buffered data, so records land in whichever instance reads first |
 
 ## Instead of
 
@@ -68,6 +71,7 @@ un-awaited promises; or an async test intermittently interferes with the next te
 | Assert inside `.then()` without returning the promise | `await` the promise, then assert on the main path | The test finishes before the callback runs; it passes with zero assertions executed |
 | Catch an expected rejection with `try/catch` and assert loosely in the catch | `await expect(...).rejects.toThrow(...)`-style API | The catch-block assert never runs when the code succeeds, and the test still passes |
 | Enable fake timers globally for the whole suite | Enable per test/suite that advances them; restore real timers in teardown | Frozen time deadlocks unrelated tests' timeouts, polling waits, and library internals |
+| Preload every scripted answer into the test's input stream in one write | Write one line per macrotask turn, awaiting `setImmediate` between them | The stream hands the consumer one concatenated chunk, and lines with no waiting reader are emitted and dropped — the test hangs on the second prompt |
 
 ## Sources
 
@@ -76,3 +80,5 @@ un-awaited promises; or an async test intermittently interferes with the next te
 - https://jestjs.io/docs/expect — `expect.assertions` / `expect.hasAssertions` verify callback assertions ran
 - https://testing-library.com/docs/dom-testing-library/api-async/ — `waitFor`/`findBy`: polling on a condition with interval and bounded timeout
 - https://martinfowler.com/articles/nonDeterminism.html — poll/callback on the completion condition instead of bare sleeps
+- https://nodejs.org/api/readline.html — `readline.createInterface` consumes an input stream and delivers a line per `question` callback, emitting `'line'` for input no callback is waiting on
+- Field reproduction 2026-08-04 (Node v25.8.1, `readline` over a `PassThrough`, three sequential `question` calls): a single `input.write('one\ntwo\nthree\n')` yielded `["one"]` and then hung; writing the same three lines one per `setImmediate` turn yielded `["one","two","three"]` and completed

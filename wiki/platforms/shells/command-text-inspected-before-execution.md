@@ -7,8 +7,8 @@ confidence: verified
 sources:
   - https://code.claude.com/docs/en/hooks
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
-last_verified: 2026-07-30
-related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution]
+last_verified: 2026-08-06
+related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-shells-escapes-in-shell-string-literals, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-harness-mediated-tool-results, platforms-processes-tool-diagnostics-without-a-failing-exit-code]
 ---
 
 # Commands Read as Text by a Gate Before the Shell Runs Them
@@ -58,6 +58,29 @@ on the first attempt.
    your exact command string before rewriting anything else — one run tells you
    whether you are in the missing-argument or nonexistent-file mode above.
 
+6. **Verify the artifact, never the silence.** A blocked command emits nothing on
+   stdout, which is byte-identical to a command that ran and printed nothing. When
+   the command's whole purpose is a side effect (writing a status file, touching a
+   marker, sending a signal), `ls`/`stat` that artifact before reporting the step
+   done. A gate that matches on a path blocks on the path text regardless of the
+   command's purpose — including the harness's own scripts, invoked exactly as the
+   harness documents them.
+
+7. **Hand a blocked signal back rather than routing around it.** When the gate
+   escalates, report the signal as *un-emitted* to whoever is waiting on it. A
+   consumer polling for a file that will never appear waits forever, and an
+   improvised workaround defeats a control the human put there deliberately.
+
+8. **When you author the gate, accept all three shell quoting forms and expand
+   only prefixes the gate can resolve from its own environment.** Correct shell
+   style quotes paths, so an extraction pattern that excludes quote characters
+   (`[^ '"]+`) denies exactly the well-formed commands, with a misleading
+   missing-argument error. Parse the argument bare, single-quoted, and
+   double-quoted (POSIX 2.2 defines only these three forms), expand `~`, `$HOME`,
+   and `${HOME}` against the gate's own environment, and state in the gate's
+   error message that any other variable must be written as a literal path.
+   Prove the parser with one regression test per form before relying on it.
+
 ## Edge cases
 
 | Case | Then |
@@ -67,6 +90,9 @@ on the first attempt.
 | Path contains a space, so quoting is unavoidable | Relocate or symlink the target to a space-free path for gated commands; a gate that excludes quote characters cannot receive a quoted path at all |
 | The gate needs `~` expanded | Write the absolute path; a gate that resolves `~` itself is doing so on the literal tilde, which only works if it implements the expansion |
 | The same command must also be portable/robust as a script | Keep the gate-read argument literal and leave the rest of the script quoted normally ([platforms-shells-portable-shell-scripts]) — this page narrows one argument, it does not license unquoted expansions elsewhere |
+| The blocked command was the one that emits your progress/status signal | A blocked command produces no side effect, so a consumer polling for that signal waits forever. `stat` the artifact the command was to write, and report the signal as un-emitted ([infrastructure-agent-orchestration-control-signals-vs-primary-artifacts]) |
+| A path-scoped gate blocks a script the harness itself told you to run | The gate matched the absolute path in the command text, not the script's role — the two are indistinguishable to a text rule. Report it to the human who owns the gate; do not rewrite the path to evade the match |
+| The same target is writable through a file-writing tool but not through the shell | The block is command-text-scoped, not a filesystem permission. That asymmetry is the diagnostic: use it to confirm the gate rather than to bypass it |
 
 ## Instead of
 
@@ -76,6 +102,9 @@ on the first attempt.
 | Assume a blocked command means the deliverable is wrong | Reproduce the gate's extraction pattern against your literal command string first | A quoting-level extraction failure and a genuinely incomplete deliverable produce the same refusal, so fixing content wastes the round |
 | Build the file the gate checks with a heredoc in the same command | Write it in a prior command and reference the path | The gate is evaluated before execution, so the file is absent at decision time |
 | Reword prose to get a dangerous-looking string past a scanner | Put the prose in a file and pass `--notes-file`/`--body-file` | Editing meaning to satisfy a text scanner degrades the artifact; a file is not scanned as a command |
+| Treat a side-effect command's empty output as success | `ls`/`stat` the artifact it should have produced | A blocked command and a silent successful one produce identical stdout; only the artifact distinguishes them |
+| Retry a gated status-emitting command with a reshaped path | Report the signal as un-emitted to its consumer | The consumer polls forever on a wrong assumption, and evading the gate removes a control the human installed |
+| Extract a gate's file argument with a bare-token pattern like `[^ '"]+` | Parse bare, single-quoted, and double-quoted forms and expand `~`/`$HOME`/`${HOME}` yourself (step 8) | The quote characters callers are taught to use land inside the match window, so the extractor returns empty and the gate reports a present argument as missing |
 
 ## Sources
 
@@ -92,3 +121,11 @@ missing), `--body-file $REPO/…` → literal `$REPO/…` (blocked as nonexisten
 `--body-file /abs/…` and `--body-file=/abs/…` extracted correctly. A same-command
 heredoc body-file was separately blocked as not-yet-existing until moved to a
 preceding call.
+
+2026-08-05/06, same repo: a `worktree_escape` guardrail blocked the
+orchestrator's own `status-update.sh` (path text match) — `ls` showed the status
+directory empty while a Write-tool call succeeded, proving a command-text-scoped
+block, and the consumer would have polled forever. Gate-author side: the
+bare-token extractor denied a double-quoted `--body-file` path as missing; after
+quoted-form parsing plus `~`/`$HOME`/`${HOME}` expansion, the bats regressions
+(`tests/pre-flush-pr-gate.bats` 12–13) went red-then-green and still pass.

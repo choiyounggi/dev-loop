@@ -9,7 +9,7 @@ sources:
   - https://12factor.net/build-release-run
   - https://12factor.net/dev-prod-parity
 last_verified: 2026-07-10
-related: [infrastructure-deploy-rollout-and-rollback, infrastructure-ci-cd-secrets-handling, backend-node-boundaries-runtime-validation, backend-python-boundaries-runtime-validation, backend-common-integrations-externally-owned-defaults]
+related: [infrastructure-deploy-rollout-and-rollback, infrastructure-ci-cd-secrets-handling, backend-node-boundaries-runtime-validation, backend-python-boundaries-runtime-validation, backend-common-integrations-externally-owned-defaults, infrastructure-config-path-valued-config, platforms-shells-env-var-off-switches]
 ---
 
 # Configuration That Differs Per Environment
@@ -64,6 +64,7 @@ files, and env vars; reviewing how a service gets its settings.
 | A required value names a resource the repo does not own (model alias, endpoint, bucket, queue) | Startup validation must resolve the name against the owner's catalog, not just check that the string is present — [backend-common-integrations-externally-owned-defaults] owns the review-time and startup checks |
 | Config service or mounted config unreachable at boot | Crash and let the orchestrator restart/retry; starting with fallback values means each instance runs config you cannot account for |
 | Legacy code full of `if (env === 'prod')` branches | On each touch, replace the branch you are editing with a named config value; record the remaining branches as inventory gaps |
+| The value is a filesystem path | Presence is not enough — a relative path passes every presence check and then resolves against a working directory the launcher owns ([infrastructure-config-path-valued-config]) |
 
 ## Instead of
 

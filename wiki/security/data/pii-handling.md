@@ -9,7 +9,7 @@ sources:
   - https://gdpr-info.eu/art-17-gdpr/
   - https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
 last_verified: 2026-07-10
-related: [databases-schema-design-soft-delete]
+related: [databases-schema-design-soft-delete, security-data-masking-verification]
 ---
 
 # Handling Personal Data (PII) in a Feature

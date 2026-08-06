@@ -7,11 +7,12 @@ confidence: verified
 sources:
   - https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html
   - https://man7.org/linux/man-pages/man5/systemd.service.5.html
+  - https://man7.org/linux/man-pages/man5/systemd.exec.5.html
   - https://man7.org/linux/man-pages/man5/crontab.5.html
   - https://man7.org/linux/man-pages/man1/nohup.1.html
   - https://man7.org/linux/man-pages/man1/loginctl.1.html
-last_verified: 2026-07-10
-related: [platforms-toolchains-version-management, platforms-shells-portable-shell-scripts, platforms-processes-non-interactive-cli-invocation]
+last_verified: 2026-08-04
+related: [platforms-toolchains-version-management, platforms-shells-portable-shell-scripts, platforms-processes-non-interactive-cli-invocation, infrastructure-config-path-valued-config]
 ---
 
 # Keeping a Process Running Beyond the Terminal Session
@@ -56,6 +57,7 @@ Then apply all four of these regardless of mechanism:
 | Case | Then |
 |------|------|
 | Job works in a terminal, fails under cron/launchd | Environment gap. Reproduce with `env -i /bin/sh -c '<command>'`; fix by absolute-pathing binaries and exporting env in the unit |
+| The job reads or writes a relative path | The working directory is the manager's, not the install directory: `/` for launchd and systemd **system** units, the user's home for systemd **user** units. Set `WorkingDirectory` in the unit/plist, or take absolute paths from config ([infrastructure-config-path-valued-config]) |
 | Service runs a version-manager-installed binary (nvm node, pyenv python) | Shims and lazy-loaders need rc files that services never load — invoke the real binary's absolute path (see platforms-toolchains-version-management) |
 | Process started as an agent-harness background task (e.g. run_in_background) must outlive the session | The harness kills its background tasks when the session ends — detach with `nohup … & disown` or promote to a service unit |
 | Linux user service must survive logout | `loginctl enable-linger <user>` — user units otherwise stop when the last session closes |
@@ -73,6 +75,7 @@ Then apply all four of these regardless of mechanism:
 
 - https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html — LaunchAgent plists, KeepAlive, StartCalendarInterval
 - https://man7.org/linux/man-pages/man5/systemd.service.5.html — `Restart=on-failure` semantics
+- https://man7.org/linux/man-pages/man5/systemd.exec.5.html — `WorkingDirectory=`: "If not set, defaults to the root directory when systemd is running as a system instance and the respective user's home directory if run as user"
 - https://man7.org/linux/man-pages/man5/crontab.5.html — cron-set environment (SHELL/HOME/LOGNAME), overridable in the crontab
 - https://man7.org/linux/man-pages/man1/nohup.1.html — run a command immune to hangups
 - https://man7.org/linux/man-pages/man1/loginctl.1.html — `enable-linger` keeps user services running while logged out
