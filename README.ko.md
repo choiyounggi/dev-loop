@@ -111,7 +111,9 @@ loop-orchestrator처럼 dev-loop은 설정 **없이도** 완전히 범용으로 
    domain / tags)을 방출하라.
 
 2. **하베스트 (자동, 오프라인).** Stop 훅이 세션 트랜스크립트에서 그 블록들을
-   긁어 로컬 큐(`~/.dev-loop/queue/`)에 넣습니다. 위키를 편집하지도 PR을
+   긁어 로컬 큐(`~/.dev-loop/queue/`)에 넣습니다. 세션 큐 파일과 이미 플러시된
+   저장소(`.processed.jsonl`) 양쪽에 대해 dedup하고, 세션당 10행 상한(폭주
+   백스톱)을 두며, 비워진 큐 파일은 정리합니다. 위키를 편집하지도 PR을
    열지도 않습니다 — 하베스트는 저렴하고 논블로킹입니다.
 
 3. **플러시 → 검증된 PR (자동 또는 온디맨드).** 큐는 `knowledge-flush`
@@ -119,7 +121,11 @@ loop-orchestrator처럼 dev-loop은 설정 **없이도** 완전히 범용으로 
    - 실제 출처(공식 문서, 1차 레퍼런스)에 대고 베스트프랙티스를 **조사·검증**
      하고 신뢰도를 부여합니다 (verified / field-tested / unverified — 지어낸
      인용은 절대 금지),
-   - 병합할 중복과 링크할 페이지를 찾아 **기존 레이어를 확인**하고,
+   - 병합할 중복과 링크할 페이지를 찾아 **기존 레이어를 확인**하고
+     (실제로 읽은 페이지 id를 명시),
+   - **열린 `knowledge/*` PR들을 확인**해 형제 플러시와 중복 PR이 쌓이지
+     않게 합니다 — 각 후보를 진행 중인 PR에 폴드하거나, 대기-중복으로
+     드롭하거나, 신규로 인제스트합니다,
    - **타깃 레이어/카테고리를 결정**(또는 새 카테고리를 정당화)한 뒤,
    - `wiki-ingest`를 실행하고 `INGEST_REPORT.md`를 씁니다.
 
@@ -141,10 +147,13 @@ loop-orchestrator처럼 dev-loop은 설정 **없이도** 완전히 범용으로 
 ### 이 순서는 훅으로 강제됩니다
 
 `hooks/pre-flush-pr-gate.sh`(PreToolUse)는 knowledge 브랜치에서
-`INGEST_REPORT.md`가 존재하고 세 섹션(`## Verified best-practice`,
-`## Existing-layer check`, `## Routing decision`)이 실제 내용으로 채워져
-있지 않으면 `gh pr create`를 **차단**합니다. 게이트는 knowledge-flush PR로
-좁게 스코프되어, 다른 레포의 일반 `gh pr create`에는 절대 간섭하지 않습니다.
+`INGEST_REPORT.md`가 존재하고 네 섹션(`## Verified best-practice`,
+`## Existing-layer check`, `## Open-PR check`, `## Routing decision`)이 실제
+내용으로 채워져 있지 않으면 `gh pr create`를 **차단**합니다. Existing-layer
+check에는 `Pages read: <id>, …` 라인이 필수이며, 각 id는 체크아웃의
+`wiki/`에 실물 대조됩니다 — 존재하지 않는 페이지를 인용한 리포트는
+fail-closed로 거부됩니다. 게이트는 knowledge-flush PR로 좁게 스코프되어,
+다른 레포의 일반 `gh pr create`에는 절대 간섭하지 않습니다.
 
 ---
 
@@ -180,6 +189,7 @@ dev-loop/
 │   ├── auto-flush.sh                 # Stop: knowledge-flush 자동 실행 (가드됨) → PR
 │   └── pre-flush-pr-gate.sh          # PreToolUse: 플러시 사전 PR 파이프라인 강제
 ├── scripts/resolve-tools.sh          # capability-role 프로파일 리졸버 (`plan` role 없음)
+├── tests/                            # bats 스위트 — 훅(하베스트, 플러시 게이트, 루프 게이트) + 오케스트레이션 스크립트; CI가 ubuntu + macos에서 실행
 ├── references/tool-profile.md
 └── docs/                             # 물려받은 설계 노트 (loop-orchestrator 계보)
 ```
