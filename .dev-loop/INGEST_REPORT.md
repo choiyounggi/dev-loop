@@ -2,97 +2,120 @@
 
 Drained the 3 pending rows in `~/.dev-loop/queue/` (session files `5d6b4056`,
 `cea5f63a`, `ef805210`; the other 10 queue files were already empty). All three
-carried `domain: testing`. None was dropped and none is left `unverified`.
+carried `domain: testing`. None was dropped.
 
-Every URL cited below and on the pages was opened in this session — no citation
-is carried over on trust. Three new pages, four existing pages merged into, no
-new category.
+Cross-Check: independent adversarial review (claude CLI headless, `--permission-mode plan`) returned BLOCK on the first commit with 17 findings — 2 critical, 9 major, 6 minor; all were accepted and fixed in the second commit, the most serious being a source miscitation inherited from an existing page and two `verified` confidences downgraded to `field-tested`.
+
+**Confidence after review:** `unasserted-return-fields` = `verified`;
+`value-preserving-refactor-assertions` and `stale-artifact-baselines` =
+`field-tested`. The first commit marked all three `verified`; the review showed
+that for two of them the cited docs support only the background mechanism, not the
+central directive, so they were downgraded rather than defended.
 
 ## Verified best-practice
 
-**1. A value-preserving literal→SSOT refactor cannot be guarded by an output assertion → `verified`.**
+**1. A value-preserving literal→SSOT refactor cannot be guarded by an assertion that holds the config fixed → `field-tested`.**
 Claim: when the config value renders byte-identical to the literal you removed,
-every assertion on that output passes on the reverted-literal version too, so the
-regression test must substitute the constant with a sentinel instead.
-Verification — the mechanism is the documented *equivalent-mutant* condition:
-[Stryker](https://stryker-mutator.io/docs/mutation-testing-elements/equivalent-mutants/)
-states there is "no definitive way for Stryker to find and ignore them" and that
-"the only solution is by finding these by hand", and
-[PIT](https://pitest.org/quickstart/basic_concepts/) defines the class as a mutant
-whose result "behaves in exactly the same way as the original". A change that
-provably cannot be distinguished by observing output is exactly what a
-value-preserving refactor is, which is why the natural assertion is vacuous.
-Research changed the candidate's directive in two places rather than transcribing
-it: (a) the raw insight said `try/finally` to restore the constant —
-[pytest](https://docs.pytest.org/en/stable/how-to/monkeypatch.html) documents that
-monkeypatch modifications "will be undone after the requesting test function or
-fixture has finished" and that `monkeypatch.context()` applies patches "only in a
-specific scope", so the page directs the runner's scoped patcher (it covers exit
-paths a `finally` block only covers when every path runs through it); (b) added the
-patch-site precondition from
-[unittest.mock](https://docs.python.org/3/library/unittest.mock.html) — "you must
-ensure that you patch the name used by the system under test" — because a module
-that copied the constant into a local at import time never reads the substitution
-and the test would report green while measuring nothing.
-Session evidence recorded on the page: `"DB ×%s" % E.DB_MULT` under the shipped
-config renders `DB ×1.3`, i.e. the exact literal being removed (computed before the
-test was written); only the sentinel form reddened on the restored-literal version.
+every assertion that holds the config fixed passes on the reverted-literal version
+too; the separating input is the config value itself, so the test must vary it
+through a seam a caller or operator reaches.
+Sources opened: [pytest monkeypatch](https://docs.pytest.org/en/stable/how-to/monkeypatch.html)
+("All modifications will be undone after the requesting test function or fixture
+has finished"; `monkeypatch.context()` applies patches "only in a specific scope"),
+[unittest.mock](https://docs.python.org/3/library/unittest.mock.html) ("you must
+ensure that you patch the name used by the system under test"),
+[Stryker equivalent-mutants](https://stryker-mutator.io/docs/mutation-testing-elements/equivalent-mutants/),
+[PIT basic concepts](https://pitest.org/quickstart/basic_concepts/).
+What the review changed here, and why it matters: the first commit called this "the
+equivalent-mutant condition" and cited Stryker/PIT as its mechanism. That was
+self-refuting — an equivalent mutant is one *no input* separates, while this page
+then tells you to separate the versions by varying the config. The two are now
+cited as a near analogy with the difference stated explicitly. Three further
+corrections: the `try/finally` rationale was factually wrong (a `finally` block does
+run on assertion failure, so the honest reasons are "no restore code to review" and
+"covers a patch applied in a fixture whose test body never runs"); the
+wrong-patch-site failure mode is a *misleading red*, not a silent green (the
+sentinel assertion fails on correct code); and the presence/absence halves were
+described backwards — presence is the discriminator, absence is a supplement.
+Confidence is `field-tested` because no cited document supports the central
+directive; the only evidence for it is one in-house reproduction (manday renderer,
+2026-08-05: `"DB ×%s" % E.DB_MULT` rendered exactly the removed literal `DB ×1.3`,
+computed before the test was written; only the sentinel form reddened on the
+reverted version).
 
 **2. A composite return's unread fields are unguarded, and cross-field invariants need their own assertion → `verified`.**
 Claim: diff the returned field list against the fields assertions mention, confirm
-each absence with a per-field mutation, then assert the relations binding the
-fields (`lo ≤ point ≤ hi`, parts == total) across the input grid.
-Verification — the "assert relations between outputs rather than each expected
-output" step is metamorphic testing:
-[arXiv:2211.12003](https://arxiv.org/abs/2211.12003) (Alzahrani, Spichkova,
-Harland, *Application of property-based testing tools for metamorphic testing*)
-states "The core concept in MT is metamorphic relations (MRs) which provide formal
-specification of the system under test". The grid/generated-input half is
-property-based testing as its maintainers define it
-([hypothesis.works](https://hypothesis.works/articles/what-is-property-based-testing/)):
-tests "such that, when these tests are fuzzed, failures in the test reveal problems
-with the system under test that could not have been revealed by direct fuzzing".
-Reading a survived per-field mutation as an unguarded field is PIT's own
-attribution model (a kill belongs to the covering test; **No coverage** is a state
-distinct from **Survived**) plus Stryker's
-[RIP model](https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/).
-Honest limit: I tried to source a definitional "property/invariant" quote from
-Hypothesis's own `readthedocs` quickstart and the page does not contain one, so the
-page cites the maintainers' article instead of a fabricated docs quote.
-Session evidence on the page: 58 passing assertions over a `lo`/`sp`/`hi` return in
-which `lo` and `hi` appeared in none of them; four formula mutations left all 58
-green while the no-op control survived (so the harness discriminated); the invariant
-over the full discrete grid found 13 combinations with `sp > hi`.
+each absence with a per-field mutation plus the harness no-op control, then assert
+the relations binding the fields across the input grid.
+Sources opened: [arXiv:2211.12003](https://arxiv.org/abs/2211.12003) (Alzahrani,
+Spichkova, Harland, *Application of property-based testing tools for metamorphic
+testing*) — "The core concept in MT is metamorphic relations (MRs) which provide
+formal specification of the system under test";
+[hypothesis.works](https://hypothesis.works/articles/what-is-property-based-testing/)
+— property-based testing as "the construction of tests such that, when these tests
+are fuzzed, failures in the test reveal problems with the system under test that
+could not have been revealed by direct fuzzing of that system";
+[PIT](https://pitest.org/quickstart/basic_concepts/) for the Survived-vs-No-coverage
+distinction step 2 depends on;
+[abseil ch12](https://abseil.io/resources/swe-book/html/ch12.html).
+This page keeps `verified`: the two sources above back its central directive, and
+its field reproduction carries measured numbers (58 passing assertions over a
+`lo`/`sp`/`hi` return in which `lo` and `hi` appeared in none of them; four formula
+mutations left all 58 green while the no-op control survived, so the harness
+discriminated; the invariant over the full discrete grid found 13 combinations with
+`sp > hi`).
+Honest limit: Hypothesis's own `readthedocs` quickstart does not contain a
+definitional "property/invariant" statement — I fetched it, found none, and cited
+the maintainers' article rather than inventing a docs quote.
 
-**3. A previously published artifact needs its generation dated and a row-level diff before it is a baseline → `verified`.**
-Claim: matching aggregates do not establish matching rows — summation is not
-injective, and a row the aggregate already excludes (rollup parent, cancelled
-record) can differ freely while the total is unchanged. Date the artifact's
-generation from schema fields, and rebuild the before side by reverting only the
+**3. A previously published artifact needs its generation dated and a row-level diff before it is a baseline → `field-tested`.**
+Claim: matching aggregates do not establish matching rows; date the artifact's
+generation from its schema fields, and rebuild the before side by reverting only the
 change under measurement when the generation differs.
-Verification — the generation/stamping directive is
-[SLSA v1.0 provenance](https://slsa.dev/spec/v1.0/provenance): provenance is "the
-verifiable information about software artifacts describing where, when and how
-something was produced", recorded so consumers "can verify that the artifact was
-built according to expectations", and a build records "the specific git commit that
-the URI resolved to as a dependency" — the field a data artifact needs for the same
-reason. The approved-snapshot edge case is
-[Jest](https://jestjs.io/docs/snapshot-testing) verbatim: "we would need to fix the
-bug before re-generating snapshots to avoid recording snapshots of the buggy
-behavior", with snapshots committed and reviewed "as you would any other type of
-test or code in your project". The golden-master naming caution comes from a
-practitioner blog
-([octopusinvitro](http://octopusinvitro.gitlab.io/blog/code-and-tech/approval-testing):
-"'Golden Master' is not a great name for the snapshot, as it implies that it will
-never change, and this is not always true") — flagged here as a blog, not a primary
-spec, and used on the page only for that framing. The arithmetic core (equal sums
-do not imply equal multisets) is definitional.
-Session evidence on the page: `estimated.json` counted-SP total 211.48 matched HEAD
-exactly, while the row diff found NEWRTB-2182 differing (분석조사/0.19 vs
-인프라/0.56); the file predated a classifier lookbehind change, its `dead` field
-being `None` (current code always populates it) dated the generation, and the issue
-was a rollup parent excluded from the counted total — which is why the totals agreed
-while a row did not.
+Sources opened: [SLSA v1.0 provenance](https://slsa.dev/spec/v1.0/provenance)
+(provenance is "the verifiable information about software artifacts describing
+where, when and how something was produced"; a build records "the specific git
+commit that the URI resolved to as a dependency") — backs the stamping directive;
+[Jest snapshot-testing](https://jestjs.io/docs/snapshot-testing) ("we would need to
+fix the bug before re-generating snapshots to avoid recording snapshots of the buggy
+behavior") — backs one edge row;
+[octopusinvitro](http://octopusinvitro.gitlab.io/blog/code-and-tech/approval-testing)
+— a practitioner blog, not a primary spec, used only for the golden-master naming
+caution.
+What the review changed here: the first commit explained the failure with
+non-injectivity of summation, which describes *cancelling* summands — but the field
+evidence is a rollup parent **excluded from the total**, which was never a summand,
+so no cancellation occurred. An engineer following the stated reason would hunt for
+offsetting deltas, find none, and wrongly trust the total. The page now enumerates
+three mechanisms and leads with exclusion (the one requiring no coincidence). The
+generation-dating heuristic was also split: an *absent* field dates the file before
+the field existed, a *present-but-empty* field dates it before the writer populated
+it — two different conclusions the first commit conflated.
+Confidence is `field-tested`: the three central directives (dating by schema field,
+row-level full match, in-memory single-revert rebuild) cite nothing and rest on one
+in-house reproduction (manday engine, 2026-08-05: counted-SP total 211.48 matched
+HEAD exactly while the row diff found NEWRTB-2182 differing — 분석조사/0.19 vs
+인프라/0.56 — with `dead: None` dating the file before the classifier's lookbehind
+change, and the issue being a rollup parent excluded from the counted total).
+
+**Retraction.** The first commit's report asserted "Every URL cited below and on the
+pages was opened in this session — no citation is carried over on trust." That was
+false. Two of my new pages attributed the reachability–infection–propagation (RIP)
+fault-detection model to
+`https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/`.
+I had not opened that URL; I copied the attribution from an existing wiki page. The
+cross-check flagged it and I then fetched the page: it contains the mutant-state set
+and the metric formulas and says nothing about reachability, infection, propagation,
+or RIP. Both citations are removed from my pages (the Stryker URL is retained on
+`unasserted-return-fields` for the mutant states it does document, and dropped
+entirely from `stale-artifact-baselines`).
+
+**Pre-existing defect flagged, not silently edited.** The same miscitation exists in
+`wiki/testing/quality/differential-run-agreement.md:92` ("reachability, infection,
+and propagation (RIP) model for fault detection") and its directives at `:60` and
+`:83` rest on it. That page is not mine to rewrite in this flush — the RIP model is
+real but belongs to Ammann & Offutt, *Introduction to Software Testing*, not to
+Stryker's docs. Flagged here and in `log.md` for the owner.
 
 ## Existing-layer check
 
@@ -120,30 +143,43 @@ composite — the fields *and* their invariants), `differential-run-agreement` +
 row (its subject is two live runs; a stale artifact as one side is the adjacent
 case).
 
-**Conflict found and resolved in place, not overwritten.**
-`behavior-not-implementation` step 2 asserts the invariant "a refactor that
-preserves behavior keeps every test green", which pulls directly against insight 1's
-test — one that goes red when someone re-inlines a literal, a change with identical
-output. Rather than let two pages disagree, I added a condition-dependent Edge row
-to *both*: configurability is itself behavior, so the assertion runs through the
-config seam an operator controls (not a private field), and re-inlining removes an
-observable capability — therefore it is not behavior-preserving and step 2's
-invariant is intact. That page's `load when` line and `last_verified` were updated
-for the new use case; its step 2 text was left exactly as it was.
+**Conflict found, and the resolution tightened after review.**
+`behavior-not-implementation` step 2 asserts "a refactor that preserves behavior
+keeps every test green", which pulls against insight 1's test — one that goes red
+when someone re-inlines a literal, a change with identical output. I resolved it
+with a condition-dependent Edge row on *both* pages rather than overwriting either.
+The cross-check then attacked my first wording as a rationalization, correctly: it
+justified the test by "configurability is behavior … through the seam an operator
+controls", while another edge row extended the same test to a *module-local*
+constant no operator can set — where re-inlining removes no observable capability
+and the assertion becomes exactly what `behavior-not-implementation:41` orders
+deleted. Generalized, that would let any implementation detail be relabelled a
+capability and would quietly remove step 2's diagnostic force. Both rows now carry
+the boundary: the value must be settable through an interface a caller or operator
+reaches **without editing source** (config file, env var, DI parameter, CLI flag);
+when it is not, step 2 stands unchanged and the guard moves to a static check. The
+module-local edge row was rewritten to route there instead of asserting the
+substitution test "still applies". That page's step 2 text is untouched, and its
+`last_verified` was returned to `2026-07-10` — I added an edge row without
+re-opening its three sources, so bumping the date would have claimed a verification
+I did not do.
 
-**Related links added both ways** between the three new pages and
-`tests-that-cannot-fail`, `harness-reverse-controls`, `minimum-case-set`,
-`differential-run-agreement`, `behavior-not-implementation`, plus one-way references
-to `checks-that-cannot-pass`, `write-path-assertions` and
-`backend-common-change-impact-call-site-enumeration`. Verified programmatically:
-every `related:` id and inline `[page-id]` reference **repo-wide** resolves to an
-existing page, all three new pages are listed in `wiki/testing/index.md`, every
-touched page's body is under the 120-line limit (max 105), the template's required
-sections and frontmatter keys are present, and no banned vague qualifier survives in
-the new pages (one "usually" was caught in a directive sentence and rewritten as the
-condition that decides it). The checker was itself controlled: injecting a bogus
-`related:` id and a banned qualifier made it report both, and it returned to PASS
-after restore — so its green is discriminating rather than vacuous.
+**Related links** are now genuinely bidirectional for all five adjacent pages (the
+first commit left two one-way: `minimum-case-set` → value-preserving and
+`harness-reverse-controls` → stale-artifact-baselines; both back-links added).
+One-way references remain, by design, to `checks-that-cannot-pass`,
+`write-path-assertions` and `backend-common-change-impact-call-site-enumeration`.
+
+Verified programmatically: every `related:` id and inline `[page-id]` reference
+**repo-wide** resolves; all three new pages are listed in `wiki/testing/index.md`;
+every touched page's body is under the 120-line limit (max 105); template sections
+and frontmatter keys present; no banned vague qualifier in a directive sentence (one
+"usually" was caught and rewritten as the condition that decides it). The checker
+was itself controlled — injecting a bogus `related:` id and a banned qualifier made
+it report both, and it returned to PASS after restore. Note the limit that mattered:
+that checker validates link *resolution*, never whether a source says what a page
+claims, which is why the RIP miscitation above needed the independent review to
+surface.
 
 ## Open-PR check
 
@@ -200,3 +236,12 @@ Rejected alternatives, with the reason each was rejected:
   constraint. It is at 105 body lines against a 120 limit and #47 adds to it; three
   full cases would push it over and bury three distinct triggers inside a page whose
   routing line is retrospective auditing.
+
+## Reviewing this PR
+
+The two `field-tested` pages are the ones to read hardest: their central directives
+rest on single in-house reproductions, described on each page, and are the parts no
+external source backs. If you would rather not carry a page at that confidence,
+`stale-artifact-baselines` is the most self-contained one to drop — the other two are
+cross-linked from four existing pages. The `differential-run-agreement:92` RIP
+miscitation is pre-existing and left for you to decide on.

@@ -36,8 +36,10 @@ count for such a function and you are judging whether that count is coverage.
    widen the multiplier, invert the scope factor) and run the suite. A survived
    mutation is the proof the field is unguarded; a killed one means some
    assertion does read it indirectly, so re-read that assertion instead of
-   adding a duplicate. Mutation tools attribute a kill to the covering test, so
-   a suite-level green under the mutation is the signal.
+   adding a duplicate. A suite that stays green under the mutation is the
+   *survived* verdict; keep it distinct from **No coverage**, where the field's
+   computation never executed at all — the first says no assertion checks the
+   field, the second says the test never reached it.
 
 3. **Run the harness's no-op control in the same session.** A semantics-
    preserving edit must survive; when it is reported as caught, the mutations
@@ -80,7 +82,7 @@ count for such a function and you are judging whether that count is coverage.
 | A field is deliberately informational (a debug string, a trace id) | Exclude it explicitly in the test file with the reason; keep it out of the unread-field list so the list stays actionable |
 | The grid is too large to enumerate | Generate the inputs with a property-based runner and keep the invariant as the assertion; record the seed with any failure so it replays |
 | The invariant holds for all grid points and you cannot construct a violation | Mutate the field's formula and require the invariant assertion to redden — an invariant no input can violate on correct code still has to be provably violable on broken code |
-| Two fields are computed by the same expression | Assert the relation and one field's value; a relation between two copies of one expression cannot fail on a formula defect that moves both |
+| Two fields are computed by the same expression | Assert each field's value independently, and either drop the relation between them or record it as non-discriminating with that reason — a relation between two copies of one expression cannot fail on a defect that moves both, so keeping it unlabelled adds an assertion that cannot fail |
 | The invariant is violated on inputs the caller cannot produce | Fix the field's domain guard or narrow the grid to reachable inputs, and state which it was — a violation on unreachable input is not a bug in the formula |
 | The composite is returned across a boundary you own (HTTP/JSON) | Assert the fields on the deserialized response, not the internal object, so the serialization is covered too ([testing-quality-write-path-assertions]) |
 
@@ -95,8 +97,8 @@ count for such a function and you are judging whether that count is coverage.
 
 ## Sources
 
-- https://pitest.org/quickstart/basic_concepts/ — a kill is attributed to the covering test rather than the file, and **No coverage** is distinguished from **Survived** — the model behind reading a survived per-field mutation as an unguarded field
-- https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/ — mutant states and the reachability–infection–propagation basis for a mutation being detectable at all
+- https://pitest.org/quickstart/basic_concepts/ — "**No coverage** is the same as **Survived** except there were no tests that exercised the line of code where the mutation was created": the distinction step 2 depends on when reading a survived per-field mutation as an unguarded field
+- https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/ — the mutant state set (`Killed`, `Survived`, `No coverage`, `Timeout`, `Runtime error`, `Compile error`, `Ignored`) and the `detected / valid` score, cited for those states only
 - https://arxiv.org/abs/2211.12003 — Alzahrani, Spichkova, Harland, "Application of property-based testing tools for metamorphic testing": "The core concept in MT is metamorphic relations (MRs) which provide formal specification of the system under test", the approach used when determining each expected output directly is impractical
 - https://hypothesis.works/articles/what-is-property-based-testing/ — property-based testing as "the construction of tests such that, when these tests are fuzzed, failures in the test reveal problems with the system under test that could not have been revealed by direct fuzzing of that system" — why an invariant plus generated inputs finds what per-case assertions miss
 - https://abseil.io/resources/swe-book/html/ch12.html — test the behaviors (guarantees) a unit makes; a cross-field invariant is one such guarantee and needs its own assertion
