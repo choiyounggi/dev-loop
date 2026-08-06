@@ -9,7 +9,7 @@ sources:
   - https://abseil.io/resources/swe-book/html/ch12.html
   - https://martinfowler.com/bliki/TestDrivenDevelopment.html
 last_verified: 2026-07-10
-related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-checks-that-cannot-pass, qa-exploratory-guard-true-path-coverage]
+related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-checks-that-cannot-pass, testing-quality-unasserted-return-fields, qa-exploratory-guard-true-path-coverage]
 ---
 
 # Selecting the Minimum Case Set for a Function or Endpoint
@@ -57,6 +57,7 @@ sufficient.
 | Inputs are combinatorial (many flags/fields) | Test each behavior's cases independently plus one representative combination — enumerate combinations only where behaviors interact |
 | The boundary is unreachable through the public interface (guarded upstream) | Test at the level that owns the guard; do not force unreachable inputs through the unit ([testing-quality-behavior-not-implementation]) |
 | Reviewing a change that only adds a case to existing behavior | Require the new case's test; the existing normal/error/boundary set stands |
+| The observable outcome is a composite of several computed fields | "The return value" is then a set of fields plus the invariants binding them — cover the fields and assert the relations ([testing-quality-unasserted-return-fields]) |
 
 ## Instead of
 

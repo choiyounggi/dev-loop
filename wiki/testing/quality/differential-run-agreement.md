@@ -10,7 +10,7 @@ sources:
   - https://pitest.org/quickstart/basic_concepts/
   - https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/
 last_verified: 2026-08-05
-related: [testing-strategy-differential-testing, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set]
+related: [testing-strategy-differential-testing, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-stale-artifact-baselines]
 ---
 
 # Citing an "Agree" Verdict from a Differential Run
@@ -73,6 +73,7 @@ session the other stubs out, omits, or hard-codes.
 | The forcing input makes both sides fail identically | Confirm they fail for the same reason before counting it as agreement; identical failure text from different causes is a coincidence, not a comparison |
 | Agreement is reported across a matrix of inputs, all of them defaults | The matrix size is not evidence; one forcing input per asymmetric dimension outranks a hundred default rows |
 | The harness reports agreement and the score has already been published | Re-run with the forcing inputs before defending the number, and correct the citation when a dimension turns out untested |
+| One side is not a run but a previously published output file | Date that file's generation before comparing, and compare row by row — an aggregate agreement between a live run and a stale artifact hides which revision produced the difference ([testing-quality-stale-artifact-baselines]) |
 
 ## Instead of
 

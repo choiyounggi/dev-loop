@@ -15,8 +15,8 @@ sources:
   - https://www.gnu.org/software/sed/manual/html_node/Exit-status.html
   - https://git-scm.com/docs/git-checkout
   - https://git-scm.com/docs/git-restore
-last_verified: 2026-08-05
-related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-checks-that-cannot-pass, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, testing-quality-schema-additions-under-a-golden-gate, testing-quality-differential-run-agreement, testing-quality-completion-predicates, testing-quality-guard-shape-vs-consequence, testing-quality-injected-clock-duration-assertions, testing-quality-write-path-assertions, backend-common-change-impact-call-site-enumeration, platforms-shells-portable-shell-scripts, qa-document-verification-spec-document-gates]
+last_verified: 2026-08-06
+related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-checks-that-cannot-pass, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, testing-quality-schema-additions-under-a-golden-gate, testing-quality-differential-run-agreement, testing-quality-completion-predicates, testing-quality-guard-shape-vs-consequence, testing-quality-injected-clock-duration-assertions, testing-quality-write-path-assertions, testing-quality-value-preserving-refactor-assertions, testing-quality-unasserted-return-fields, testing-quality-stale-artifact-baselines, backend-common-change-impact-call-site-enumeration, platforms-shells-portable-shell-scripts, qa-document-verification-spec-document-gates]
 ---
 
 # Proving a Test Can Fail
@@ -95,6 +95,9 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 | HTTP test of a write endpoint asserting only the response status | Read the persisted record back and assert the values sent — a request whose body never decoded still returns the success status ([testing-quality-write-path-assertions]) |
 | The suite total dropped after a restore but the run still looks green | Read it as a lost import or file, not a passing suite: a module that fails to import contributes one error and removes all of its tests from the total. Compare totals against the pre-mutation run, then restore from the copy again |
 | Several sessions or agents mutate the same working tree | Each one keeps its own hashed copy and restores before handing the tree on; a shared `git checkout --` discards whichever uncommitted work landed most recently |
+| The change under test moved a literal into config/SSOT without changing the value | No observation of the output can separate the two versions — assert the dependency by substituting the constant with a sentinel ([testing-quality-value-preserving-refactor-assertions]) |
+| The subject returns a composite and the assertions read one field | Diff the returned field list against the fields assertions mention, then mutate each unread field and add the invariant that binds them ([testing-quality-unasserted-return-fields]) |
+| The "before" side of a comparison is a previously published output file | Date its generation from its schema fields and compare row by row before citing it; matching totals do not establish matching rows ([testing-quality-stale-artifact-baselines]) |
 
 ## Instead of
 
