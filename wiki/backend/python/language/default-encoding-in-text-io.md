@@ -28,7 +28,7 @@ argument, or writing the regression test that keeps it there. Also when a
 file-writing bug reproduces on one machine (Windows, a `LANG=C` container, a
 cp949/cp932 desktop) and not on yours.
 
-Timezone and locale as hidden inputs generally →
+Timezone and locale as hidden inputs across dates and text →
 [platforms-environment-timezone-and-locale].
 
 ## Do this
@@ -61,14 +61,23 @@ Timezone and locale as hidden inputs generally →
    emitted at the call site regardless of what the locale happens to be, so it
    is the same verdict on your laptop and in CI.
 
-4. **Keep the flag on the test invocation only.** Without `-X
-warn_default_encoding` the warning is silent, so a suite that forgets the flag
-   passes on the reintroduced defect — assert the flag is present by requiring
-   the harness to redden on a deliberately unencoded `open()` before trusting it
-   ([testing-quality-tests-that-cannot-fail]).
+4. **Prove the check reddens before trusting it.** Without `-X
+   warn_default_encoding` the warning is silent, so a runner that drops the flag
+   reports green on the reintroduced defect and looks identical to a pass. Seed a
+   deliberately unencoded `open()` in the file under test, require red, then
+   restore ([testing-quality-tests-that-cannot-fail]).
 
-5. **Enable the flag repo-wide in CI once the call sites are clean**, so a new
-   omission is caught where it is written rather than at the next locale change.
+5. **Widen the flag from the one test invocation to the whole CI run once every
+   call site is clean**, so a new omission is caught where it is written rather
+   than at the next locale change. Until then the filter in step 2 is what keeps
+   the unfixed sites from reddening this test.
+
+6. **Keep a value assertion for the encodings you set explicitly.**
+   `EncodingWarning` fires only on an *omitted* argument, so it says nothing about
+   `encoding="latin-1"` or a deliberate `encoding=locale.getencoding()`. For those
+   call sites, assert the bytes the file should contain, and run that assertion
+   under a non-UTF-8 locale (`LANG=C`, or a cp949/cp932 job) where a wrong value
+   changes the output.
 
 ## Edge cases
 
@@ -85,7 +94,7 @@ warn_default_encoding` the warning is silent, so a suite that forgets the flag
 
 | If you are about to                                                                     | Do this instead                                                                       | Why                                                                                                                                                                                              |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Prove the fix with a round-trip assertion (write non-ASCII text, read it back, compare) | Assert zero `EncodingWarning` lines naming the file, under `-X warn_default_encoding` | On a UTF-8 locale the encoded bytes are identical with and without the argument, so the round-trip passes on the defect; it can only fail on a machine you are not testing on                    |
+| Prove an omitted-`encoding` fix with a round-trip assertion alone (write non-ASCII text, read it back, compare) | Assert zero `EncodingWarning` lines naming the file, under `-X warn_default_encoding`, and keep the round-trip for the explicitly-set encodings (step 6) | On a UTF-8 locale the encoded bytes are identical with and without the argument, so the round-trip is green on the defect — it discriminates only on a runner whose locale encoding is not UTF-8, which is not the default on macOS or on most Linux CI images |
 | Assert the output file's declared charset (`<meta charset>`, an XML declaration)        | Assert the warning count                                                              | A declaration is a literal in the template — it is written correctly by code that encoded the body wrongly                                                                                       |
 | Set `LANG`/`PYTHONUTF8` in the test environment to make the behavior deterministic      | Fix the call sites and assert the warning                                             | Pinning the environment makes the test pass by removing the input the defect depends on, so the defect ships and fails on the machines that do not inherit that environment                      |
 | Read "it works on macOS and Linux" as evidence the encoding is right                    | Run the warning check                                                                 | PEP 686: "many Python developers using Unix forget that the default encoding is platform dependent … Inconsistent default encoding causes many bugs"; "this change mostly affects Windows users" |

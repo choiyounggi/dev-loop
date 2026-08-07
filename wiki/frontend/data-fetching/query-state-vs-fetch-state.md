@@ -2,7 +2,7 @@
 id: frontend-data-fetching-query-state-vs-fetch-state
 domain: frontend
 category: data-fetching
-applies_to: [react, tanstack-query, general]
+applies_to: [react, tanstack-query]
 confidence: verified
 sources:
   - https://tanstack.com/query/latest/docs/framework/react/guides/queries
@@ -23,8 +23,8 @@ related:
 
 ## When this applies
 
-You are defining what a component receives from a server-state cache (TanStack
-Query and equivalents) and are about to treat `data === undefined` as "loading".
+You are defining what a component receives from a TanStack Query hook and are
+about to treat `data === undefined` as "loading".
 Also when a view shows a permanent spinner with no error and no retry, or the
 query it renders can be disabled (`enabled: false`, `skipToken`) or paused by
 the network mode.
@@ -34,8 +34,8 @@ Designing the loading / error / empty / data renderings themselves →
 
 ## Do this
 
-1. **Take two independent inputs, not one.** The cache exposes them as separate
-   fields for this reason: "The `status` gives information about the `data`: Do
+1. **Take two independent inputs, not one.** TanStack Query exposes them as
+   separate fields for this reason: "The `status` gives information about the `data`: Do
    we have any or not? The `fetchStatus` gives information about the `queryFn`:
    Is it running or not?" — and "all combinations for `status` and `fetchStatus`
    [are] possible". A component prop of `data | undefined` collapses both axes
@@ -48,8 +48,11 @@ Designing the loading / error / empty / data renderings themselves →
 | `pending` | `fetching`  | First fetch in flight — this is `isLoading`, defined as "`isFetching && isPending`"                                                                           | Skeleton                                                                              |
 | `pending` | `idle`      | Disabled/lazy query: "status === 'pending' and fetchStatus === 'idle'" with `enabled: false`                                                                  | The pre-request state — the prompt, the disabled form, the "select a row" placeholder |
 | `pending` | `paused`    | Wanted to fetch, has no connection: "state: 'pending', but fetchStatus: 'paused' if they are mounting for the first time, and you have no network connection" | Offline notice plus a retry affordance                                                |
-| `error`   | any         | The attempt failed                                                                                                                                            | Error message plus retry ([frontend-data-fetching-async-ui-states])                   |
+| `error`   | `idle`      | The attempt failed and nothing is retrying                                                                                                                    | Error message plus a retry affordance ([frontend-data-fetching-async-ui-states])      |
+| `error`   | `fetching`  | A retry is already running over the failed state                                                                                                              | Keep the error message, disable the retry affordance while it runs                    |
+| `error`   | `paused`    | Failed, and the retry is waiting for a connection                                                                                                             | Offline notice — a retry affordance here cannot run                                   |
 | `success` | `fetching`  | Background refresh over existing data                                                                                                                         | The data, plus a subtle refresh indicator                                             |
+| `success` | `paused`    | Data is on screen and a background refetch is waiting for a connection                                                                                        | The data, plus an offline/stale indicator instead of the refresh indicator            |
 | `success` | `idle`      | Settled                                                                                                                                                       | The data (or the empty state when it is an empty collection)                          |
 
 3. **Pass the discriminator down.** Give the presentational component either the
@@ -76,8 +79,9 @@ Designing the loading / error / empty / data renderings themselves →
 | The query has `initialData` or `placeholderData`                       | It starts at `status: 'success'`, so the pending rows never render — assert which data the user is seeing before treating success as authoritative                                                       |
 | A disabled query has cached data from an earlier mount                 | It initializes as "status === 'success' or isSuccess" rather than pending; the idle-pre-request rendering does not apply                                                                                 |
 | The component must trigger the fetch itself                            | Keep `enabled: false` rather than `skipToken`: "`refetch` from `useQuery` will not work with `skipToken`. Calling `refetch()` on a query that uses `skipToken` will result in a `Missing queryFn` error" |
-| `select` narrows the data and returns `undefined` for a valid response | That is `success` with `data === undefined` — the sixth combination the one-bit contract also loses; assert on `status`, not on the value                                                                |
+| `select` narrows the data and returns `undefined` for a valid response | That is `status: 'success'` with `data === undefined` — a case outside the status × fetchStatus grid that the one-bit contract also loses; assert on `status`, not on the value                                                                |
 | The paused state is unreachable because `networkMode: 'always'` is set | Drop the paused row for that query and state the mode in the component's contract, so a later mode change re-opens the row deliberately                                                                  |
+| The cache in use is SWR, RTK Query, or Apollo rather than TanStack Query | Map its fields onto the two axes before applying the table — where a cache exposes no separate fetch axis, build the explicit union of step 3 from the fields it does expose, and keep the pre-request case distinct from loading |
 | Several queries feed one view                                          | Combine on the axes, not the values: pending if any is pending, paused if any is paused — a merged `data === undefined` cannot distinguish them                                                          |
 
 ## Instead of

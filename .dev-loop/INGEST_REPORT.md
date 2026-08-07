@@ -18,8 +18,9 @@ comment that justified it, rather than adding a test.
   — "There is no definitive way for Stryker to find and ignore them"; the
   documented remedy is "by finding these by hand, which is time consuming and
   try to rewrite the code so it won't occur, or accept that you won't make
-  100%". This is the primary support: the docs prescribe _rewriting the code_,
-  not adding a test.
+  100%". This is the primary support, and both halves are load-bearing: the
+  docs name rewriting the code and accepting a classified survivor as the two
+  outcomes — neither of them is "add a test for it".
 - <https://pitest.org/quickstart/basic_concepts/> — "Not all mutations will
   behave differently than the unmutated class. These mutants are referred to as
   **equivalent mutations**"; "The resulting mutant behaves in exactly the same
@@ -33,45 +34,56 @@ comment that justified it, rather than adding a test.
   faults and requiring failure is the measurement.
 
 **How verified.** The mutation-testing docs substantiate the classification and
-the "rewrite the code" remedy directly. The comment-correction step is the
-session's field observation, recorded as a dated field-measurement line in the
-page's Sources rather than attributed to a doc.
+both remedies directly. The comment-correction step is the session's field
+observation, recorded as a dated field-measurement line in the page's Sources
+rather than attributed to a doc. After the adversarial pass, the page no longer
+lets one hand-run input establish equivalence: the same Stryker sentence that
+supports the remedy ("no definitive way … to find and ignore them") is what
+makes a domain argument the required evidence for deleting a branch.
 
-**Confidence: verified** (classification + remedy doc-backed; the
+**Confidence: verified** (classification + both remedies doc-backed; the
 comment-correction step carries its field measurement inline).
 
 ### 2. Anchor source-text wiring assertions per site instead of counting (`testing`)
 
 **Claim.** A guard that asserts by regex that a call is present, using
 `toHaveLength(n)` or `>= n` over match count, stays green when one of the N call
-sites is deleted. Bind each occurrence to its own context — a bounded lazy order
-anchor `A[\s\S]{0,N}?B`, or a function-body slice — and prove each by deleting
-only its own site.
+sites is deleted. Bind each occurrence to its own context — a bounded order
+anchor `A[\s\S]{0,N}B` whose anchor occurs **exactly once** in the file, or a
+function-body slice — and prove each by deleting only its own site.
 
 **Sources checked (all opened this session).**
 
 - <https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/>
-  — the Block Statement mutator "removes the content of every block statement",
-  so deleting one call site is a standard mutation operator, not an ad-hoc edit.
+  — the Block Statement mutator "removes the content of every block statement".
+  Corrected after the adversarial pass: this empties a whole block rather than
+  removing one call, so the per-site deletion is a **hand-seeded** mutation and
+  the page now says so instead of claiming tool support it does not have.
 - <https://pitest.org/quickstart/basic_concepts/> — "'Survived' means the
   mutation was not detected by the covering test": the per-site deletion that
   leaves the suite green is exactly this verdict.
 - <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Regular_expressions/Quantifier>
-  — `{min,max}` "repeats an atom a minimum of `min` times and a maximum of `max`
-  times"; adding `?` makes it non-greedy so "the quantifier will try to match as
-  few times as possible". This is what makes the bounded lazy form limit an
-  anchor's reach to one site.
+  — documents `{min,max}` as bounded repetition and `?` as the non-greedy form
+  that "will try to match as few times as possible". Corrected after the
+  adversarial pass: an earlier draft presented MDN's `{min,max}` **table** as a
+  prose quotation, and claimed the lazy form limits the anchor's reach. Neither
+  holds — see the Node measurement below.
 - <https://jestjs.io/docs/expect> — `toHaveLength` compares a `.length` value; on
   a match array it is a total and carries no per-site information.
 - <https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html>
-  — the refactor cost a source-text guard accepts, which is why the page scopes
-  it to wiring and routes behavior coverage elsewhere.
+  — cited for the change-detector category (the refactor cost a source-text
+  guard accepts), **without a quotation**: the sentence an earlier draft
+  attributed to this article is a reader comment, and the body was not
+  retrievable in full. See the cross-check table, row 1.
 
 **How verified.** The "a lower bound survives deleting one of N" property is
-arithmetic and is stated as such. The mutation-operator and regex-semantics
-claims are doc-quoted. The concrete red/green pair (count assertion green vs
-anchored assertion red on the same mutant, comment-only control green) is the
-session's field measurement, dated in the page's Sources.
+arithmetic and is stated as such. The regex mechanism was **measured**, not
+assumed: in Node, `/ANCHOR\([\s\S]{0,20}CALL\(/` and its lazy variant return
+identical verdicts on four inputs (in range, call-before-anchor only, beyond the
+bound, and call on both sides of the anchor), so the bound plus a once-occurring
+anchor is what constrains the match. The concrete red/green pair (count
+assertion green vs anchored assertion red on the same mutant, comment-only
+control green) is the session's field measurement, dated in the page's Sources.
 
 **Confidence: verified.**
 
@@ -119,7 +131,11 @@ code matches the reference, so `pending` + non-`fetching` yields
 **Claim.** On a UTF-8 locale, removing `encoding="utf-8"` from `open()` produces
 byte-identical output, so a round-trip regression test is green on the defect.
 Run the real entry point under `-X warn_default_encoding -W always::EncodingWarning`
-and assert zero warning lines naming the file under test.
+and assert zero warning lines naming the file under test. Scope correction from
+the adversarial pass: this replaces the round-trip only for an *omitted*
+argument — `EncodingWarning` never fires on an explicitly wrong value, so the
+page keeps a value assertion (run under a non-UTF-8 locale) for the encodings
+you set on purpose.
 
 **Sources checked (all opened this session).**
 
@@ -149,6 +165,25 @@ same run without the flag emitted nothing (which is why the page requires provin
 the harness reddens on a deliberately unencoded `open()`).
 
 **Confidence: verified.**
+
+## Adversarial cross-check (run before this PR was opened)
+
+Cross-Check: independent `claude` CLI (headless, `--permission-mode plan`) reviewed the wiki diff for fabricated citations, overreach, internal contradiction, bare prohibitions, and vague qualifiers — it returned 18 findings (4 critical, 9 warning, 5 info); every critical was re-verified by me against the primary source or by measurement, and all 18 were fixed before this PR was created.
+
+The four criticals were real, and two of them were citation defects:
+
+| # | Finding | Verified how | Fix |
+|---|---|---|---|
+| 1 | `source-text-wiring-assertions` quoted "you cannot safely refactor code if you know you need to adapt the tests afterwards…" as the Google Testing Blog article's own sentence | Re-fetched the page: the sentence is from a **reader comment dated 2015-02-04**, and its wording differs ("refactor **stuff**", "know **for sure**"). The article body was not retrievable in full, so no sentence from it is quotable | Quotation removed; the URL is now cited for the change-detector *category* only, with a note that nothing is quoted from it. **The same fabricated quote exists in the already-merged `testing-quality-guard-shape-vs-consequence`** — I inherited it from there rather than opening the source. That bullet is corrected in this PR with the correction stated inline |
+| 2 | Step 4 claimed deleting one call site is Stryker's Block Statement mutator | The doc says it "removes the content of every block statement" — it empties a whole block, not one call | Reworded: the per-site deletion is a hand-seeded mutation, and the doc is cited for why tools do not generate it |
+| 3 | The order-anchor rationale claimed a lazy quantifier limits the anchor's reach and that the call could "not [appear] anywhere else in the file" | Measured in Node: `{0,20}` and `{0,20}?` return identical verdicts on all four inputs, and a call appearing both before and after the anchor still matches | Rewritten around what actually constrains the match: the bound `N` **and an anchor that occurs exactly once**. Added an occurrence-count step, a "no unique anchor" row, and the measurement as a source. A separate MDN pseudo-quote (a table rendered as prose) was also removed |
+| 4 | `surviving-mutant-equivalence-triage` authorised **deleting production code** on the basis of one hand-run input, while its own cited source says "There is no definitive way for Stryker to find and ignore them" | Read against the cited Stryker page | Step 1 now starts from the tool's `No coverage` verdict; step 2 requires a stated argument over the branch's whole input domain and routes to the missing-test row when that argument cannot be written; step 5 splits a moved pass count into behavior-test vs implementation-test causes |
+
+Warnings fixed: selective half-quote of the Stryker remedy; the universal claim that any change in pass count means misclassification; the missing `success` + `paused` cell (with a `status: 'error'` row that had collapsed the fetch axis into `any`, contradicting the page's own premise) in a table that step 5 makes a coverage contract; `applies_to: general` on a page whose every field name is TanStack-specific (now `[react, tanstack-query]`, with an edge row for single-axis caches); the "keep the flag on the test invocation only" step contradicting the next step's "enable it repo-wide"; and the claim that a round-trip test "can only fail on a machine you are not testing on" — plus the gap it hid, that `EncodingWarning` fires only on an *omitted* argument and says nothing about an explicitly wrong one (new step 6 keeps a value assertion for those).
+
+Info fixed: banned qualifiers "usually", "commonly", "generally" removed from directive sentences; a "sixth combination" ordinal that did not match its own table.
+
+Re-checked after the fixes: 183 pages / 0 duplicate ids, 0 unresolved `[page-id]` refs in the new pages, 0 broken index links, all four sections present in each page, bodies 83–94 lines (limit 120).
 
 ## Existing-layer check
 
@@ -225,3 +260,29 @@ for proving the harness reddens.
 `wiki/frontend/index.md` (+1 row), `wiki/backend/python/index.md` (+1 row),
 `log.md` (+1 ingest entry). `INDEX.md` unchanged — no new domain, and every
 target domain's "route here when" line already covers these cases.
+
+## Decision Log (AI 생성)
+
+### 의도 — 무엇을 / 왜
+
+- `~/.dev-loop/queue` 에 쌓인 pending 후보 4건을 검증 통과시켜 wiki 에 편입하는 것이 목적. 각 후보를 1차 출처(공식 문서)로 확인하고, 2건은 로컬에서 재현(CPython 3.14.6 EncodingWarning, `@tanstack/query-core@5.100.14` queryObserver.js)해 `confidence: verified` 근거를 만들었다.
+- 4건 모두 **신규 페이지**로 라우팅했다. merge-before-create 를 먼저 적용했으나, 가장 가까운 기존 페이지(`tests-that-cannot-fail`)가 이미 ~100 body line 이라 절차를 덧붙이면 ≤120 규칙을 깬다. 대신 그 페이지의 "surviving mutant = missing test" edge 행을 **분류 우선**으로 정정하고 새 페이지로 라우팅하도록 고쳤다.
+- PR 직전 독립 적대검증을 1회 돌렸고, 18건 전건을 반영했다. 특히 위조 인용 1건은 **기존 wiki 페이지에서 물려받은 것**이라 그 원본(`guard-shape-vs-consequence`)까지 같은 PR 에서 정정했다 — 알면서 거짓 귀속을 남길 수 없다고 판단.
+
+### 배제한 대안 — 무엇을 안 했나 / 왜
+
+- **열려 있는 PR #50 에 fold 하지 않음.** #50 은 한 핸들러의 여러 success-return 지점을 *행위 테스트*로 덮는 내용이고, 이번 insight 2 는 행위 seam 이 없을 때 쓰는 *소스 텍스트* 가드의 count↔anchor 선택이다. 겹치는 것은 결함 형태("N개 중 하나가 조용히 빠짐")이지 기법이 아니라 별도 페이지로 두고 보고서에 근거를 남겼다.
+- **insight 4 를 `testing/` 이 아니라 `backend/python/language/` 로.** 지시가 바꾸는 산출물이 Python 소스이고 판별자가 그 언어 도구의 성질이라, 라우팅 프로토콜의 "바꿀 artifact 를 소유한 도메인" 규칙을 따랐다.
+- **round-trip 단정을 전면 금지하지 않음.** 적대검증이 짚은 대로 `EncodingWarning` 은 *인자 누락*만 잡는다 — 명시했지만 틀린 값(`encoding="latin-1"`)은 값 단정이 아니면 아무도 못 잡으므로 둘을 병행하게 했다.
+- **merge 하지 않음.** knowledge-flush 는 PR-only 이고 승인은 레포 오너 몫이다.
+- **[추정] 커밋 아이덴티티**: skill 지시(ambient git identity 상속)와 직전 flush(PR #49)의 선례에 맞춰 `최영기 <dch0202@rsquare.co.kr>` 로 커밋했다. 이 레포는 public 이고, 마침 열려 있는 PR #51 이 "public 레포에는 forge no-reply 주소를 쓰라"는 페이지를 추가하는 중이라 상충 소지가 있다 — 바꿀지는 작성자 판단.
+
+### 리뷰어가 볼 곳 — 신뢰성 판단 포인트
+
+- `wiki/testing/quality/surviving-mutant-equivalence-triage.md:49` (step 2) — 이 단계가 **운영 코드 분기 삭제**를 승인하는 게이트다. 도메인 논증 요구가 충분한 강도인지 봐 달라.
+- `wiki/testing/quality/source-text-wiring-assertions.md:39` (step 2~3) — anchor 유일성 + bound N. 적대검증 전 버전은 lazy quantifier 가 reach 를 제한한다고 **틀리게** 적었다가 실측으로 뒤집힌 자리다.
+- `wiki/testing/quality/guard-shape-vs-consequence.md` (Sources 마지막 bullet) — 이번 PR 범위 밖이지만 위조 인용을 정정한 out-of-band 수정. 되돌릴지 판단 필요.
+- `wiki/frontend/data-fetching/query-state-vs-fetch-state.md` (step 2 표) — step 5 가 이 표를 테스트 커버리지 계약으로 못박으므로 빠진 셀이 곧 커버리지 구멍이다. 8행이 status × fetchStatus 를 다 덮는지 확인해 달라.
+- `wiki/testing/index.md` — #50, #49 도 같은 파일에 행을 추가한다. 두 번째로 머지되는 쪽이 이 행을 rebase 해야 한다(페이지 파일 자체는 충돌 없음).
+
+> [추정] 표시 항목은 세션에 명시 근거가 없어 사후 재구성한 의도임 — 검증 필요
