@@ -142,3 +142,16 @@ setup() {
   # The template ships to users; it stays English-only like SKILL.md.
   [ "$(grep -c '[가-힣]' "$BRIEF")" -eq 0 ]
 }
+
+@test "SKILL.md: the split decision procedure is documented and always replies" {
+  SKILL="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
+  grep -qF 'scripts/graph-add.sh' "$SKILL"
+  # The overlap test is the decision; both branches must be spelled out or the
+  # coordinator has to invent one.
+  grep -qF 'overlap' "$SKILL"
+  grep -qF 'same worker' "$SKILL"
+  # A rejection that is never sent reproduces the v1.4.1 ask-timeout bug: the
+  # worker decides for itself.
+  grep -qF 'reply either way' "$SKILL"
+  [ "$(grep -c '[가-힣]' "$SKILL")" -eq 0 ]
+}
