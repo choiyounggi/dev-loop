@@ -73,6 +73,9 @@ setup() {
 # --- worker model pin (DEV_LOOP_WORKER_MODEL) ---------------------------------
 # orca-spawn takes positional args only, so the model arrives by env — the same
 # variable orca-worker-start.sh and launch-session.sh read.
+# The unset case uses `env -u`: DEV_LOOP_WORKER_MODEL is a real user setting,
+# so a developer with it exported would otherwise see this test pass vacuously
+# (or fail) depending on their shell rather than on the code.
 
 @test "model: DEV_LOOP_WORKER_MODEL reaches the claude command" {
   run env ORCA_SPAWN_DRYRUN=1 DEV_LOOP_WORKER_MODEL=claude-sonnet-5 \
@@ -82,7 +85,7 @@ setup() {
 }
 
 @test "model: unset adds no --model flag (boundary — unchanged behavior)" {
-  run env ORCA_SPAWN_DRYRUN=1 bash "$OS" "r::/wt" bypassPermissions "p"
+  run env -u DEV_LOOP_WORKER_MODEL ORCA_SPAWN_DRYRUN=1 bash "$OS" "r::/wt" bypassPermissions "p"
   [ "$status" -eq 0 ]
   [[ "$output" != *"--model"* ]]
 }
