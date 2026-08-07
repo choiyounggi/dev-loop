@@ -58,9 +58,14 @@ specific tags below as authority.
   <!-- scale effort to complexity; bound the retries -->
   <effort_level>complexity={simple|medium|complex}; loop-implement max 3 retries; stop exploring once DoD is met</effort_level>
 
-  <!-- output contract: where the plan goes + how to signal completion -->
+  <!-- the plan is an INPUT, not an output: the coordinator ran `wiki-plan` on the
+       planning model and wrote it before this session launched. Adopt it; report a
+       gap rather than re-planning (re-planning would move the decisions onto the
+       worker's tier). -->
+  <plan>.orchestration/plans/{TASK}.md — written by the coordinator; adopt, verify against this brief, do not re-author</plan>
+
+  <!-- output contract: how to signal completion -->
   <output_contract>
-    plan -> .orchestration/plans/{TASK}.md
     signal -> STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} <phase> worktree=$PWD
   </output_contract>
 

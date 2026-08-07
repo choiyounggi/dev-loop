@@ -349,3 +349,42 @@ pane_not_ready() { # matches none of the ready/trust patterns
   [ "$(jq -r .session "$st/t3.json")" = "lo-1" ]
   [ "$(jq -r .worktree "$st/t3.json")" = "$BATS_TEST_TMPDIR/wt" ]
 }
+
+# --- DEV_LOOP_WORKER_MODEL --------------------------------------------------
+# The worker may run a cheaper tier than the coordinator. Unset MUST stay
+# byte-identical to the previous behavior (no --model at all), or every existing
+# deployment silently changes model on upgrade.
+# The unset case uses `env -u`: DEV_LOOP_WORKER_MODEL is a real user setting,
+# so a developer with it exported would otherwise see this test pass vacuously
+# (or fail) depending on their shell rather than on the code.
+
+@test "MODEL: an invalid model is rejected before anything launches (injection guard)" {
+  run env LO_DRY_RUN=1 DEV_LOOP_WORKER_MODEL='bad; rm -rf ~' \
+      bash "$LS" lo-1 "${BATS_TEST_TMPDIR}/wt" bypassPermissions "prompt"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"invalid model"* ]]
+}
+
+@test "MODEL: unset adds no --model flag (boundary — unchanged behavior)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  # capture #1 is the readiness check, #2 the submission confirm
+  pane_ready_submitted > "$sd/pane-1"
+  pane_ready_submitted > "$sd/pane-2"
+  run env -u DEV_LOOP_WORKER_MODEL STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=4 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD p"
+  [ "$status" -eq 0 ]
+  ! grep -q -- '--model' "$sd/keys"
+}
+
+@test "MODEL: a set model reaches the launched claude command" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane-1"
+  pane_ready_submitted > "$sd/pane-2"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      DEV_LOOP_WORKER_MODEL=claude-sonnet-5 \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=4 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD p"
+  [ "$status" -eq 0 ]
+  grep -q -- "--model 'claude-sonnet-5'" "$sd/keys"
+}

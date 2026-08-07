@@ -13,6 +13,9 @@
 #   ORCA_BIN                     orca executable (default: orca)
 #   GROUNDWORK_ESCALATION_DIR    exported into the worker so an `ask` escalates
 #   GROUNDWORK_TASK_ID           worker task label
+#   DEV_LOOP_WORKER_MODEL        model the WORKER runs (e.g. claude-sonnet-5).
+#                                Unset = omit --model, so the worker inherits the
+#                                user's configured model (unchanged behavior).
 #   LO_READY_TIMEOUT             seconds to wait for TUI readiness (default 60)
 #   ORCA_SPAWN_DRYRUN=1          print the orca commands instead of running them
 #   ORCA_SPAWN_CREATE_JSON       canned `terminal create --json` (tests)
@@ -32,6 +35,15 @@ case "$perm" in
   *) echo "orca-spawn: invalid permission mode '$perm'" >&2; exit 2 ;;
 esac
 
+# Same for the model: ids/aliases are alphanumerics plus . _ - and the [1m]
+# context suffix. Reject anything else rather than sanitizing it.
+model="${DEV_LOOP_WORKER_MODEL:-}"
+if [ -n "$model" ]; then
+  case "$model" in
+    *[!A-Za-z0-9._\[\]-]*) echo "orca-spawn: invalid model '$model'" >&2; exit 2 ;;
+  esac
+fi
+
 rt="${LO_READY_TIMEOUT:-60}"; [ "$rt" -ge 1 ] 2>/dev/null || rt=60
 timeout_ms=$(( rt * 1000 ))
 
@@ -44,7 +56,9 @@ env_prefix=""
 if [ -n "${GROUNDWORK_ESCALATION_DIR:-}" ]; then
   env_prefix="export GROUNDWORK_ESCALATION_DIR='$(esc_sq "$GROUNDWORK_ESCALATION_DIR")' && export GROUNDWORK_TASK_ID='$(esc_sq "${GROUNDWORK_TASK_ID:-}")' && "
 fi
-worker_cmd="${env_prefix}claude --permission-mode ${perm}"
+model_arg=""
+[ -n "$model" ] && model_arg=" --model '$(esc_sq "$model")'"
+worker_cmd="${env_prefix}claude --permission-mode ${perm}${model_arg}"
 
 print_cmd() { printf 'orca'; for a in "$@"; do printf ' [%s]' "$a"; done; printf '\n'; }
 orca_run() {  # $1 = fatal flag (1 = return non-zero on failure); rest = orca args

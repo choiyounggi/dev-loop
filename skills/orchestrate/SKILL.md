@@ -336,6 +336,28 @@ reasoning-effort flags) that `worker-start` cannot express.
    tools (the plan step is fixed to `wiki-plan`, not a configurable role), and for
    a UI-facing task fill `<design_spec>` with the `design` role's pulled spec
    (Phase 2) — then
+
+   **2a. Plan it yourself, here, before launching.** Invoke the bundled `wiki-plan`
+   skill for this task and write the result to `plans/<task>.md`. Planning runs in
+   THIS coordinator session on purpose: a worker can be pinned to a cheaper tier
+   (`DEV_LOOP_WORKER_MODEL`), and a plan is where an unmade decision becomes the
+   implementer's guess — so the plan must come from the strongest model in the run,
+   not from whatever tier is executing. Every design decision must be made and
+   grounded in a `wiki/` page (record the decision->page map); leave nothing "as
+   appropriate". The worker then ADOPTS this plan (session-prompt §1 / O1) instead
+   of authoring one, and still signals `plan_ready` — so the phase sequence, the
+   `plan_ready` watch, and the ready-set scheduler are all unchanged.
+
+   Because planning happens here, **the planning model is whatever model this
+   coordinator session is running**. There is no separate setting to turn: to plan
+   on a stronger tier than you implement on, start the coordinator on that tier
+   (`claude --model <planning model>`) and leave `DEV_LOOP_WORKER_MODEL` pointed at
+   the cheaper implementer tier.
+
+   A worker that reports the plan is contradictory or under-decided is telling you
+   the planning pass was wrong: fix `plans/<task>.md` here and re-send §1. Do not
+   let the worker re-plan — that silently moves planning back onto the worker tier,
+   which is the thing this step exists to prevent. Then
    `LO_STATUS_DIR=<abs status dir> LO_TASK_ID=<task> scripts/launch-session.sh
    lo-<n> <worktree> bypassPermissions "<plan prompt>"`
    (plan prompt = templates/session-prompt.md §1 — the tmux set — with the
