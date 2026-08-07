@@ -69,3 +69,28 @@ setup() {
   # the POSIX single-quote escape '\'' must appear — proves the value was escaped
   [[ "$output" == *"/p'\\''q"* ]]
 }
+
+# --- worker model pin (DEV_LOOP_WORKER_MODEL) ---------------------------------
+# orca-spawn takes positional args only, so the model arrives by env — the same
+# variable orca-worker-start.sh and launch-session.sh read.
+
+@test "model: DEV_LOOP_WORKER_MODEL reaches the claude command" {
+  run env ORCA_SPAWN_DRYRUN=1 DEV_LOOP_WORKER_MODEL=claude-sonnet-5 \
+      bash "$OS" "r::/wt" bypassPermissions "p"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"claude --permission-mode bypassPermissions --model 'claude-sonnet-5'"* ]]
+}
+
+@test "model: unset adds no --model flag (boundary — unchanged behavior)" {
+  run env ORCA_SPAWN_DRYRUN=1 bash "$OS" "r::/wt" bypassPermissions "p"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"--model"* ]]
+}
+
+@test "model: a shell-metacharacter model is rejected, nothing is created" {
+  run env ORCA_SPAWN_DRYRUN=1 DEV_LOOP_WORKER_MODEL='x; rm -rf ~' \
+      bash "$OS" "r::/wt" bypassPermissions "p"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"invalid model"* ]]
+  [[ "$output" != *"[terminal] [create]"* ]]
+}

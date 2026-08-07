@@ -17,8 +17,9 @@ tasks in the plan's order, loading exactly the wiki pages each task names, and
 citing them — so every change traces back to a verified wiki page.
 
 It works the same whether it runs standalone (you produce the plan here in step 2)
-or as an orchestrated worker (the orchestrator hands you a task brief and you plan
-+ implement it here). Either path, one loop.
+or as an orchestrated worker (the orchestrator hands you a task brief *and* the
+plan it already produced, and you adopt and implement it here). Either path, one
+loop.
 
 ## When to use
 - Use: logic changes, new features, bug fixes, behavior-changing refactors.
