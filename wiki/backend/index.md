@@ -31,6 +31,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [corpus-sweep-before-a-rejection-rule](common/change-impact/corpus-sweep-before-a-rejection-rule.md) | Adding a rule to a compiler/linter/parser/schema validator/repo gate that will start rejecting input the tool accepted silently, and the existing corpus must keep passing; producing the evidence a plan needs before writing the rule (reject count + rejected-path list, enumeration method stated); such a rule landed and went red on inputs nobody had called defective; deciding between narrowing the rule, an opt-in strictness level, and an exemption (whether unimplemented declarative input should reject/warn/ignore at all → common/api-design/unenforced-declarations) |
 | [call-site-enumeration](common/change-impact/call-site-enumeration.md) | Changing the contract of a function/method/constructor other code calls — adding, removing, reordering or redefining a parameter — and you need the complete call-site list; scoping such a migration from a search; a migration scoped from recon came back green and then failed on call sites the search never listed; deciding whether to append a parameter or make it keyword-only (release-level re-test scope → qa/process/regression-scope) |
 
 ### reliability
