@@ -131,3 +131,14 @@ setup() {
   # Waves must no longer be described as an execution barrier.
   ! grep -qF 'A later Wave launches only after' "$SKILL"
 }
+
+@test "brief template: a split proposal must carry its file scope" {
+  BRIEF="${BATS_TEST_DIRNAME}/../skills/orchestrate/templates/brief.md"
+  grep -qF 'split proposal' "$BRIEF"
+  # Without the file list the coordinator cannot run the overlap test, so the
+  # requirement has to be stated where the worker reads it, not only in SKILL.md.
+  grep -qF 'files it would touch' "$BRIEF"
+  grep -qF 'split_of' "$BRIEF"
+  # The template ships to users; it stays English-only like SKILL.md.
+  [ "$(grep -c '[가-힣]' "$BRIEF")" -eq 0 ]
+}
