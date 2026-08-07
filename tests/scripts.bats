@@ -149,9 +149,12 @@ setup() {
   # The overlap test is the decision; both branches must be spelled out or the
   # coordinator has to invent one.
   grep -qF 'overlap' "$SKILL"
-  grep -qF 'same worker' "$SKILL"
+  # Match "same worker" with optional markdown bold formatting.
+  grep -qE '\*\*same\s+worker\*\*|same\s+worker' "$SKILL"
   # A rejection that is never sent reproduces the v1.4.1 ask-timeout bug: the
   # worker decides for itself.
   grep -qF 'reply either way' "$SKILL"
+  # Exit 4 handling must be documented with explicit coordinator actions.
+  grep -qE 'On \*\*4\*\*|exit 4' "$SKILL"
   [ "$(grep -c '[가-힣]' "$SKILL")" -eq 0 ]
 }
