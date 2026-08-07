@@ -132,10 +132,27 @@ detected Orca always asks — there is no default, no remembered choice, no
 environment override. Launch nothing until both the split and the substrate are
 answered.
 
-## Phase 3 — Launch + plan (per Wave)
-**Phases 3–4 repeat per Wave in `## Waves` order.** A later Wave launches only after
-the previous Wave is fully approved; `<N>` below = the *current* Wave's task count.
-Single-Wave splits run everyone in parallel (the original behavior).
+## Phase 3 — Launch + plan (dispatch loop)
+**Phases 3–4 are one dispatch loop, not a per-Wave repeat.** Each round:
+
+1. `scripts/ready-set.sh .orchestration/graph.json .orchestration/status <cap>`
+   → **0** dispatch the printed ids, **2** nothing dispatchable but work is in
+   flight (go wait for an event), **3** **DEADLOCK** — a failed dependency or a
+   cycle: **do not wait**, report it and get a human decision (with no worker
+   running, no event can ever arrive), **4** the graph or status could not be
+   read — refuse, do not guess, **5** every task is in a terminal state → go to Phase 5.
+2. For each dispatched task run steps 1–3 below (O1–O5 on Orca). `<N>` = the
+   number of tasks dispatched in THIS round.
+3. Wait for an event. tmux: `scripts/watch-status.sh --tasks <running ids>
+   <status-dir> impl_done 1` — without `--tasks` the tasks approved in earlier
+   rounds satisfy `expected=1` immediately and the wait spins. Orca:
+   `scripts/orca-wait.sh` unchanged; it is already event-driven.
+4. On wake, handle that task (review → approved, or inject rework), then return
+   to step 1.
+
+**Write each brief at dispatch time.** It only needs the preceding signatures
+that this task actually consumes, and by then those tasks are `approved`, so the
+signatures are settled.
 
 **Session knobs (tmux substrate, set once per run):** `export LO_RUN_ID=<short-run-id>`
 so every `launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reuse that
@@ -370,9 +387,9 @@ wait with `scripts/orca-wait.sh`. Rework rounds are further Tasks on the same
 worktree diff (`git -C <wt> diff <integ>...HEAD`); if a session's tests look weak,
 **cross-call `test-quality-auditor` yourself** (self-call + orchestrator cross-call).
 On shortfall, write `reviews/<task>-rN.md`, inject §3 (rework), repeat. After 3
-failed rounds, escalate. When this Wave's tasks are all approved, return to Phase 3
-step 0 for the next Wave (inject its preceding-interface signatures); once the last
-Wave is approved, go to Phase 5.
+failed rounds, escalate. When a task is approved, return to step 1 of the dispatch
+loop — whatever dependency it released shows up in the next `ready-set.sh` round and
+the freed slot is refilled immediately. When `ready-set.sh` returns **5**, go to Phase 5.
 
 ## Phase 5 — Integration test loop (max 3)
 Merge-preview onto the integration branch and run the integration tests (use the
@@ -405,7 +422,9 @@ worktree) still fire — a dry run never looks safer than the real one.
 On re-invocation with no context, measure real state first: `git worktree list`,
 each `.orchestration/status/*.json` phase, and which `briefs/plans/reviews/`
 artifacts exist. Resume from the earliest incomplete step (idempotently skip done
-steps). Check `tmux ls`, and run `scripts/tmux-worker-stalled.sh <session>` on each
+steps). There is no intermediate state such as a Wave index to restore. Reading
+`.orchestration/graph.json` plus `status/*.json` and running `ready-set.sh` IS
+the restored state — the same inputs always yield the same answer. Check `tmux ls`, and run `scripts/tmux-worker-stalled.sh <session>` on each
 live one — a session that exists is not a worker that moves. Relaunch dead sessions and
 re-deliver the right prompt with `scripts/send-prompt.sh send`. For leftovers of a
 run that already died, `scripts/safe-cleanup.sh list-orphans <root>` enumerates them

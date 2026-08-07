@@ -109,3 +109,14 @@ setup() {
   grep -qF 'coordinator attention' "$SKILL"
   ! grep -qF 'concurrent-session cap** (default 4)' "$SKILL"
 }
+
+@test "SKILL.md: the dispatch loop cites ready-set exit codes and --tasks" {
+  SKILL="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
+  grep -qF 'scripts/ready-set.sh' "$SKILL"
+  grep -q -- '--tasks' "$SKILL"
+  # exit 3 is the guard this design turns on; it must be spelled out as
+  # "do not wait", or it degrades into the silent stall it exists to prevent.
+  grep -qF 'DEADLOCK' "$SKILL"
+  # Waves must no longer be described as an execution barrier.
+  ! grep -qF 'A later Wave launches only after' "$SKILL"
+}
