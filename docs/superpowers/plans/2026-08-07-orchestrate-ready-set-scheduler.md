@@ -19,6 +19,7 @@
 - 기존 387개 bats는 전부 그린을 유지한다. PR 통과 조건이다.
 - 분할 경로(스펙 §3.5)는 PR 2다. 이 계획에서 구현하지 않는다.
 - 커밋 author는 `Younggi Choi <74581798+choiyounggi@users.noreply.github.com>` (공개 레포 관례).
+- **`skills/orchestrate/SKILL.md`에 넣는 모든 문장은 영어다.** 현재 이 파일은 한글이 0자이며, 배포되는 스킬 본문의 관례다(guardrails v1.2.0이 배포 메시지를 한국어→영어로 바꾼 것과 같은 이유). `docs/` 아래 스펙·계획 문서만 한국어를 쓴다. SKILL.md를 grep하는 테스트도 영어 문자열을 대상으로 한다.
 
 ---
 
@@ -491,7 +492,7 @@ argc는 옵션 파싱 뒤에 잡아 4번째 위치 인자 판정이 깨지지 �
   grep -qF 'LO_MAX_SESSIONS' "$SKILL"
   # The cap must never be a bare number again: the report has to name what it
   # protects, or "dynamic" degrades back into a hardcoded 4.
-  grep -qF '코디네이터 주의력' "$SKILL"
+  grep -qF 'coordinator attention' "$SKILL"
   ! grep -qF 'concurrent-session cap** (default 4)' "$SKILL"
 }
 ```
@@ -506,8 +507,9 @@ Expected: FAIL — `graph.json`이 SKILL.md에 없음.
 `## Phase 2 — Decompose`에서 `Apply a **concurrent-session cap** (default 4) — if a Wave exceeds it, split it or ask. Tasks in the same Wave are independent (parallel); a later Wave starts only after the previous Wave is approved.` 문장을 삭제하고, 그 자리에 넣는다:
 
 ```markdown
-그리고 두 산출물을 **함께** 쓴다: 사람용 `conflict-matrix.md`와 기계용
-`.orchestration/graph.json`. 마크다운 표는 스케줄러가 읽을 수 없다.
+Write BOTH artifacts: `conflict-matrix.md` for humans and
+`.orchestration/graph.json` for the scheduler. A markdown table is not machine
+readable.
 
 ```json
 { "tasks": [
@@ -516,23 +518,27 @@ Expected: FAIL — `graph.json`이 SKILL.md에 없음.
 ] }
 ```
 
-Wave는 **실행 단위가 아니라 Gate 1 보고서의 예시**다. 실행은 `ready-set.sh`가
-판정한다: 의존이 `approved` 이상인 task를 빈 슬롯만큼 흘려보낸다. 위상정렬은 여전히
-하되, 그 결과는 "이런 순서로 흐를 겁니다"를 보여주기 위한 것이다.
+Waves are **an illustration in the Gate 1 report, not an execution unit.**
+Execution is decided by `ready-set.sh`: a task runs as soon as its dependencies
+are `approved` and a slot is free. Still topologically sort — the result shows
+the user the expected flow — but nothing waits on a Wave boundary.
 
-**슬롯 수를 제안한다.** task 수·크기·위험도를 근거로 숫자를 정하고, **무엇을 보호하는
-값인지 함께 밝힌다** — 이 캡이 지키는 것은 머신 자원이 아니라 **코디네이터 주의력**과
-**API 사용량/예산**이다(둘 다 OS에서 조회할 수 없어 판단으로 정한다). 슬롯은 디스패치된
-순간부터 종료 상태까지 점유되며, `plan_ready`/`impl_done` 같은 리뷰 대기도 점유로 센다 —
-리뷰 안 된 task가 쌓인 채 새 task가 들어오면 캡이 무의미해지기 때문이다.
-`LO_MAX_SESSIONS`가 설정돼 있으면 그 값이 상한이며 제안을 덮어쓴다.
+**Propose the slot count.** Pick the number from the task count, their size, and
+their risk, and **say what the number protects**: this cap guards **coordinator
+attention** and **API usage/budget**, not machine resources. Neither is
+queryable, which is why it is a judgement rather than a computation. A slot is
+held from dispatch until the task reaches a terminal state — `plan_ready` and
+`impl_done` (review pending) count as held, because a pile of unreviewed tasks
+next to a stream of new ones makes the cap meaningless. When `LO_MAX_SESSIONS`
+is set it is an upper bound and overrides the proposal.
 ```
 
 `graph.json`을 쓴 직후 검증한다는 문장을 덧붙인다:
 
 ```markdown
-쓴 뒤 `scripts/ready-set.sh <graph> <status-dir> <cap>`를 한 번 돌려 **exit 4가 아닌지**
-확인한다 — 깨진 JSON·`.tasks` 누락·정의되지 않은 의존을 여기서 잡는다.
+After writing it, run `scripts/ready-set.sh <graph> <status-dir> <cap>` once and
+confirm it does **not** exit 4 — malformed JSON, a missing `.tasks` array, and a
+dependency naming an undefined task are all caught here.
 ```
 
 - [ ] **Step 4: Gate 1 보고 항목을 고친다**
@@ -540,8 +546,9 @@ Wave는 **실행 단위가 아니라 Gate 1 보고서의 예시**다. 실행은 
 `## 🚦 Gate 1` 의 `Report the task list, Waves, session count, and a rough cost note.` 를 다음으로 교체:
 
 ```markdown
-Report the task list, the dependency graph (예상 흐름을 Wave 형태로 보여줘도 좋다), the
-proposed **slot count with its rationale and what it protects**, and a rough cost note.
+Report the task list, the dependency graph (showing the expected flow as Waves is
+fine), the proposed **slot count with its rationale and what it protects**, and a
+rough cost note.
 ```
 
 - [ ] **Step 5: 테스트 통과 확인**
@@ -581,7 +588,7 @@ git -c user.name="Younggi Choi" -c user.email="74581798+choiyounggi@users.norepl
   grep -qF '--tasks' "$SKILL"
   # exit 3 is the guard this design turns on; it must be spelled out as
   # "do not wait", or it degrades into the silent stall it exists to prevent.
-  grep -qF '교착' "$SKILL"
+  grep -qF 'DEADLOCK' "$SKILL"
   # Waves must no longer be described as an execution barrier.
   ! grep -qF 'A later Wave launches only after' "$SKILL"
 }
@@ -596,23 +603,26 @@ Run: `npx bats tests/scripts.bats` → FAIL
 `**Phases 3–4 repeat per Wave in `## Waves` order.** A later Wave launches only after the previous Wave is fully approved; `<N>` below = the *current* Wave's task count. Single-Wave splits run everyone in parallel (the original behavior).` 를 다음으로 교체:
 
 ```markdown
-**Phase 3–4는 Wave가 아니라 하나의 디스패치 루프다.** 매 회차:
+**Phases 3–4 are one dispatch loop, not a per-Wave repeat.** Each round:
 
 1. `scripts/ready-set.sh .orchestration/graph.json .orchestration/status <cap>`
-   → **0** 출력된 id를 디스패치, **2** 던질 것 없고 실행 중인 게 있음(이벤트 대기로),
-   **3** **교착** — 실패한 의존 또는 사이클. **대기 금지**, 즉시 보고하고 사람 판단을
-   받는다(실행 중인 워커가 없으므로 어떤 이벤트도 오지 않는다), **4** 그래프/status를
-   못 읽음 — 추측 금지, **5** 전 task 종료 → Phase 5로.
-2. 디스패치할 각 task에 대해 아래 step 1–3(Orca는 O1–O5)을 수행한다. `<N>` = 이번
-   회차에 디스패치하는 task 수.
-3. 이벤트를 기다린다. tmux: `scripts/watch-status.sh --tasks <실행 중인 id들>
-   <status-dir> impl_done 1` — `--tasks`로 좁히지 않으면 이전 회차의 approved가
-   `expected=1`을 즉시 만족시켜 스핀한다. Orca: `scripts/orca-wait.sh`를 그대로 쓴다
-   (이미 이벤트 기반이다).
-4. 깨어나면 해당 task를 처리(리뷰 → approved 또는 rework)하고 1번으로 돌아간다.
+   → **0** dispatch the printed ids, **2** nothing dispatchable but work is in
+   flight (go wait for an event), **3** **DEADLOCK** — a failed dependency or a
+   cycle: **do not wait**, report it and get a human decision (with no worker
+   running, no event can ever arrive), **4** the graph or status could not be
+   read — refuse, do not guess, **5** every task is terminal → go to Phase 5.
+2. For each dispatched task run steps 1–3 below (O1–O5 on Orca). `<N>` = the
+   number of tasks dispatched in THIS round.
+3. Wait for an event. tmux: `scripts/watch-status.sh --tasks <running ids>
+   <status-dir> impl_done 1` — without `--tasks` the tasks approved in earlier
+   rounds satisfy `expected=1` immediately and the wait spins. Orca:
+   `scripts/orca-wait.sh` unchanged; it is already event-driven.
+4. On wake, handle that task (review → approved, or inject rework), then return
+   to step 1.
 
-**brief는 디스패치하는 순간 쓴다.** 그 task가 실제로 consume하는 선행 시그니처만 넣으면
-되고, 그 시점에 선행은 이미 `approved`라 시그니처가 확정돼 있다.
+**Write each brief at dispatch time.** It only needs the preceding signatures
+that this task actually consumes, and by then those tasks are `approved`, so the
+signatures are settled.
 ```
 
 - [ ] **Step 4: Phase 4의 Wave 문장을 고친다**
@@ -620,9 +630,9 @@ Run: `npx bats tests/scripts.bats` → FAIL
 `When this Wave's tasks are all approved, return to Phase 3 step 0 for the next Wave (inject its preceding-interface signatures); once the last Wave is approved, go to Phase 5.` 를 교체:
 
 ```markdown
-한 task가 approved되면 디스패치 루프 1번으로 돌아간다 — 그 task가 풀어준 의존이 있으면
-`ready-set.sh`가 다음 회차에 알려주고, 빈 슬롯이 즉시 채워진다. `ready-set.sh`가 **5**를
-반환하면 Phase 5로 간다.
+When a task is approved, return to step 1 of the dispatch loop — whatever
+dependency it released shows up in the next `ready-set.sh` round and the freed
+slot is refilled immediately. When `ready-set.sh` returns **5**, go to Phase 5.
 ```
 
 - [ ] **Step 5: 재진입 절을 고친다**
@@ -630,8 +640,9 @@ Run: `npx bats tests/scripts.bats` → FAIL
 `## Re-entry (resume)` 의 첫 문장 뒤에 추가:
 
 ```markdown
-Wave 인덱스 같은 중간 상태는 없다. `.orchestration/graph.json`과 `status/*.json`을 읽어
-`ready-set.sh`를 돌리면 그 자체가 복원된 상태다 — 같은 입력이면 같은 답이 나온다.
+There is no intermediate state such as a Wave index to restore. Reading
+`.orchestration/graph.json` plus `status/*.json` and running `ready-set.sh` IS
+the restored state — the same inputs always yield the same answer.
 ```
 
 - [ ] **Step 6: 테스트 + 전체 스위트**
