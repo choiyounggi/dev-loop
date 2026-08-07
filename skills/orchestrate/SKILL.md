@@ -81,9 +81,33 @@ creates — component/schema/endpoint/type), and **consumes** (another task's ou
 it depends on). Build a conflict/dependency matrix from those and topologically sort
 into Waves (`conflict-matrix.md`): a dependency edge `A → B` means B consumes A's
 output, so A's Wave precedes B's. Detect duplicate outputs and assign a single
-producer; others consume (add a dependency edge). Apply a **concurrent-session cap**
-(default 4) — if a Wave exceeds it, split it or ask. Tasks in the same Wave are
-independent (parallel); a later Wave starts only after the previous Wave is approved.
+producer; others consume (add a dependency edge). Write BOTH artifacts: `conflict-matrix.md` for humans and
+`.orchestration/graph.json` for the scheduler. A markdown table is not machine
+readable.
+
+```json
+{ "tasks": [
+    { "id": "t1", "deps": [],     "files": ["src/auth/**"], "outputs": ["AuthToken"] },
+    { "id": "t3", "deps": ["t1"], "files": ["src/api/**"],  "consumes": ["AuthToken"] }
+] }
+```
+
+Waves are **an illustration in the Gate 1 report, not an execution unit.**
+Execution is decided by `ready-set.sh`: a task runs as soon as its dependencies
+are `approved` and a slot is free. Still topologically sort — the result shows
+the user the expected flow — but nothing waits on a Wave boundary.
+
+**Propose the slot count.** Pick the number from the task count, their size, and
+their risk, and **say what the number protects**: this cap guards **coordinator attention** and **API usage/budget**, not machine resources. Neither is
+queryable, which is why it is a judgement rather than a computation. A slot is
+held from dispatch until the task reaches a terminal state — `plan_ready` and
+`impl_done` (review pending) count as held, because a pile of unreviewed tasks
+next to a stream of new ones makes the cap meaningless. When `LO_MAX_SESSIONS`
+is set it is an upper bound and overrides the proposal.
+
+After writing it, run `scripts/ready-set.sh <graph> <status-dir> <cap>` once and
+confirm it does **not** exit 4 — malformed JSON, a missing `.tasks` array, and a
+dependency naming an undefined task are all caught here.
 
 **Visual spec (`design` role).** While extracting the above, flag each task that is
 UI-facing *and* whose source issue references a design (e.g. a Figma link). If the
@@ -93,7 +117,9 @@ tasks, or any task with no design reference, skip this. With `design` unset, ign
 design links entirely — the original behavior.
 
 ## 🚦 Gate 1 — task-split approval (REQUIRED)
-Report the task list, Waves, session count, and a rough cost note. **Wait for the
+Report the task list, the dependency graph (showing the expected flow as Waves is
+fine), the proposed **slot count with its rationale and what it protects**, and a
+rough cost note. **Wait for the
 user's approval** before launching anything.
 
 **Substrate — ask here, in this same turn.** Before writing that report, run
@@ -106,10 +132,44 @@ detected Orca always asks — there is no default, no remembered choice, no
 environment override. Launch nothing until both the split and the substrate are
 answered.
 
-## Phase 3 — Launch + plan (per Wave)
-**Phases 3–4 repeat per Wave in `## Waves` order.** A later Wave launches only after
-the previous Wave is fully approved; `<N>` below = the *current* Wave's task count.
-Single-Wave splits run everyone in parallel (the original behavior).
+## Phase 3 — Launch + plan (dispatch loop)
+**Phases 3–4 are one dispatch loop, not a per-Wave repeat.** Each round:
+
+1. `scripts/ready-set.sh .orchestration/graph.json .orchestration/status <cap>`
+   → **0** dispatch the printed ids, **2** nothing dispatchable but work is in
+   flight (go wait for an event), **3** **DEADLOCK** — a failed dependency or a
+   cycle: **do not wait**, report it and get a human decision (with no worker
+   running, no event can ever arrive); after the human intervenes, return to
+   step 1 to re-run the check, **4** the graph or status could not be read —
+   refuse, do not guess; fix the error then re-run step 1, **5** every task is
+   in a terminal state → go to Phase 5.
+2. For each dispatched task (`<N>` = the number of tasks in this round):
+   - tmux: **0** (Preceding-interface injection) + steps **1–3** below (setup,
+     brief, launch, watch plan_ready). Orca: **O1–O5**.
+   - **1** `scripts/setup-worktrees.sh <integ> <root> <base> <branch>...` then
+     verify with `git worktree list`.
+   - **2** Per task: write `briefs/<task>.md` (templates/brief.md) — fill
+     `<tools_guidance>` and `<design_spec>` — then launch session and watch
+     until `plan_ready` (step 3 below). **Write the brief at dispatch time.**
+     It only needs the signatures this task consumes, and by then those are
+     `approved`, so they're settled.
+   - **3** Collect `plans/<task>.md` when each session reaches `plan_ready`.
+3. For each planned task, deliver §2 (implement) with `scripts/send-prompt.sh
+   send lo-<n> "<prompt>"` (tmux, see Phase 4 for exit-code branch logic), or
+   `orca orchestration task-create` the implement Task then
+   `scripts/orca-worker-start --task <impl_task> --terminal <handle>` (Orca).
+   On delivery failure, re-run step 3 after fixing the error.
+4. Wait for event. tmux: `scripts/watch-status.sh --tasks <running ids>
+   <status-dir> impl_done <N>` — without `--tasks` the tasks approved in
+   earlier rounds satisfy `expected=<N>` immediately and the wait spins. Orca:
+   `scripts/orca-wait.sh` with the implement Task ids, already event-driven.
+5. On wake, handle that task: review each worktree diff (`git -C <wt> diff
+   <integ>...HEAD`). If tests weak, audit with `test-quality-auditor`. On
+   approval, return to step 1 — whatever dependency it released shows up in the
+   next `ready-set.sh` round and the freed slot refills immediately. On rework
+   needed, write `reviews/<task>-rN.md` and re-deliver with `send-prompt.sh
+   send` (or new Orca Task on same terminal); after 3 failed rounds, escalate.
+   When `ready-set.sh` returns **5**, go to Phase 5.
 
 **Session knobs (tmux substrate, set once per run):** `export LO_RUN_ID=<short-run-id>`
 so every `launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reuse that
@@ -344,9 +404,9 @@ wait with `scripts/orca-wait.sh`. Rework rounds are further Tasks on the same
 worktree diff (`git -C <wt> diff <integ>...HEAD`); if a session's tests look weak,
 **cross-call `test-quality-auditor` yourself** (self-call + orchestrator cross-call).
 On shortfall, write `reviews/<task>-rN.md`, inject §3 (rework), repeat. After 3
-failed rounds, escalate. When this Wave's tasks are all approved, return to Phase 3
-step 0 for the next Wave (inject its preceding-interface signatures); once the last
-Wave is approved, go to Phase 5.
+failed rounds, escalate. When a task is approved, return to step 1 of the dispatch
+loop — whatever dependency it released shows up in the next `ready-set.sh` round and
+the freed slot is refilled immediately. When `ready-set.sh` returns **5**, go to Phase 5.
 
 ## Phase 5 — Integration test loop (max 3)
 Merge-preview onto the integration branch and run the integration tests (use the
@@ -379,7 +439,9 @@ worktree) still fire — a dry run never looks safer than the real one.
 On re-invocation with no context, measure real state first: `git worktree list`,
 each `.orchestration/status/*.json` phase, and which `briefs/plans/reviews/`
 artifacts exist. Resume from the earliest incomplete step (idempotently skip done
-steps). Check `tmux ls`, and run `scripts/tmux-worker-stalled.sh <session>` on each
+steps). There is no intermediate state such as a Wave index to restore. Reading
+`.orchestration/graph.json` plus `status/*.json` and running `ready-set.sh` IS
+the restored state — the same inputs always yield the same answer. Check `tmux ls`, and run `scripts/tmux-worker-stalled.sh <session>` on each
 live one — a session that exists is not a worker that moves. Relaunch dead sessions and
 re-deliver the right prompt with `scripts/send-prompt.sh send`. For leftovers of a
 run that already died, `scripts/safe-cleanup.sh list-orphans <root>` enumerates them
