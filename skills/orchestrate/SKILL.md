@@ -348,6 +348,12 @@ reasoning-effort flags) that `worker-start` cannot express.
    of authoring one, and still signals `plan_ready` — so the phase sequence, the
    `plan_ready` watch, and the ready-set scheduler are all unchanged.
 
+   Because planning happens here, **the planning model is whatever model this
+   coordinator session is running**. There is no separate setting to turn: to plan
+   on a stronger tier than you implement on, start the coordinator on that tier
+   (`claude --model <planning model>`) and leave `DEV_LOOP_WORKER_MODEL` pointed at
+   the cheaper implementer tier.
+
    A worker that reports the plan is contradictory or under-decided is telling you
    the planning pass was wrong: fix `plans/<task>.md` here and re-send §1. Do not
    let the worker re-plan — that silently moves planning back onto the worker tier,

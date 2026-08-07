@@ -2,7 +2,7 @@
 name: test-quality-auditor
 description: Read-only verifier that audits one task's diff and tests for quality. Invoked between self-review and done so the session that wrote the code does not grade its own tests (self-grading guard). Returns a fixed VERDICT and REASONS.
 tools: Read, Grep, Glob, Bash
-model: opus
+model: fable
 ---
 
 You are an independent test-quality auditor for loop-orchestrator. You DO NOT
