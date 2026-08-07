@@ -9,7 +9,8 @@
 # usage: orca-wait.sh [--until-all] <timeout-ms> [task_id,task_id,...]
 #   --until-all   keep consuming successful worker_done batches until every task
 #                 id listed below is completed, then exit 0 once. Requires the
-#                 task id list. Exit 3/5/6 still return immediately, unacked.
+#                 task id list. Exit 3/5/6 still return immediately, unacked, and
+#                 so does exit 4 (which never received a batch to leave unacked).
 #   <timeout-ms>  total budget for this call (real tasks run 15-60 min); with
 #                 --until-all it covers ALL batches and is never reset per batch
 #   [task ids]    if given, also report how many of exactly THOSE tasks are
@@ -26,6 +27,9 @@
 #         treat it as a checkpoint: check `orca status --json` first. The workers
 #         themselves may well still be alive; a dead runtime does not stop a
 #         worker session, so do not restart anything on this code alone.
+#         (--until-all: like exit 2, batches already acked in this call stay
+#         consumed; this window itself received nothing, so nothing is left
+#         unacked by it.)
 # exit 5  an escalation is pending — resolve it, then re-run
 # exit 6  a worker question is pending — `orchestration reply --id <msg>`, re-run
 #
@@ -153,7 +157,7 @@ while :; do
   if [ "$rc" -ne 0 ] || [ "$ok" = false ] || [ "$lost" = true ]; then
     ecode=$(printf '%s' "$out" | "$JQ" -r '.error.code // empty' 2>/dev/null) || ecode=""
     [ "$lost" = true ] && [ -z "$ecode" ] && ecode="connection_lost"
-    echo "[orca-wait] orca check failed (${ecode:-no response}, status $rc) — the runtime is not answering, not the workers being quiet; run \`orca status --json\` before waiting again" >&2
+    echo "[orca-wait] orca check failed (${ecode:-no response}, status $rc) — the runtime is not answering, not the workers being quiet; run \`orca status --json\` before waiting again"
     exit 4
   fi
 

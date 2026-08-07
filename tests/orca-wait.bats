@@ -173,6 +173,18 @@ teardown() { rm -f "$(REPO_TMP)/orca-stub-${BATS_TEST_NUMBER}"; }
   [ ! -f "$sd/acked" ]
 }
 
+# bats merges stdout and stderr into $output, so the stream has to be proven by
+# discarding stderr. It matters: every other exit-classification line here is on
+# stdout, and a coordinator reading only stdout would otherwise get a bare 4 with
+# no error code to act on.
+@test "the outage line is on stdout, like every other classification line" {
+  run sh -c "ORCA_WAIT_DRYRUN=1 ORCA_WAIT_CHECK_RC=1 \
+    ORCA_WAIT_CHECK_JSON='{\"ok\":false,\"error\":{\"code\":\"runtime_unavailable\"}}' \
+    bash '$OW' 60000 2>/dev/null"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"runtime_unavailable"* ]]
+}
+
 @test "connectionLost mid-wait exits 4 even though ok:true and count 0 (boundary)" {
   run env ORCA_WAIT_DRYRUN=1 \
       ORCA_WAIT_CHECK_JSON='{"ok":true,"result":{"count":0,"messages":[],"timedOut":false,"connectionLost":true}}' \

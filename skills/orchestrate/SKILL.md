@@ -205,7 +205,7 @@ you instead of making you poll. Replace steps 1–3 below with O1–O5:
   `worker_done` for one of your ids* and the `completed=<c>/<n>` line is scoped to
   this Wave. Add `--until-all` to keep consuming batches until every listed id is
   completed, so one Wave costs one coordinator turn instead of one per batch; it
-  still returns immediately on 3/5/6. Codes 3/5/6 leave the batch unread on
+  still returns immediately on 3/4/5/6. Codes 3/5/6 leave the batch unread on
   purpose, so an unhandled event is never silently dropped — which also means
   delivery is **at-least-once**: a replayed batch must be processed idempotently
   (key off `taskId`, never off a local counter). `ORCA_WAIT_RECHECK_MS` (default
