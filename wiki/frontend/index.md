@@ -34,6 +34,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [race-conditions](data-fetching/race-conditions.md) | Repeated fetches with changing params can overlap (search-as-you-type, rapid tab/filter switches); UI intermittently shows results for a previous input; mutations race refetches |
 | [async-ui-states](data-fetching/async-ui-states.md) | Building any view backed by async data; users see blank screens, eternal spinners, or dead-end errors; reviewing loading/error/empty handling in UI code; deciding on skeletons vs spinners, retry affordances, empty states, background-refresh indication, or optimistic updates |
+| [query-state-vs-fetch-state](data-fetching/query-state-vs-fetch-state.md) | Defining what a component receives from a server-state cache (TanStack Query and equivalents) and about to treat `data === undefined` as "loading"; a view shows a permanent spinner with no error and no retry; the query can be disabled (`enabled: false`, `skipToken`) or paused by the network mode; deciding what the presentational component's state prop should be |
 | [infinite-scroll](data-fetching/infinite-scroll.md) | Implementing infinite scroll or a load-more feed; an existing feed loses scroll position on back-navigation, duplicates/skips items, or spams page requests; choosing between infinite scroll and a load-more button |
 
 ## performance

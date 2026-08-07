@@ -9,7 +9,7 @@ sources:
   - https://peps.python.org/pep-0552/
   - https://docs.python.org/3/library/py_compile.html
 last_verified: 2026-08-04
-related: [testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, backend-python-language-mutable-state-traps]
+related: [backend-python-language-default-encoding-in-text-io, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, backend-python-language-mutable-state-traps]
 ---
 
 # Edited Python Source the Interpreter Keeps Ignoring

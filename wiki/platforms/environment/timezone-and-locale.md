@@ -14,7 +14,7 @@ sources:
   - https://unicode.org/faq/casemap_charprop.html
   - https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap07.html
 last_verified: 2026-07-10
-related: [databases-schema-design-column-data-types, platforms-processes-background-services, platforms-environment-unicode-text-matching]
+related: [backend-python-language-default-encoding-in-text-io, databases-schema-design-column-data-types, platforms-processes-background-services, platforms-environment-unicode-text-matching]
 ---
 
 # Timezone and Locale as Hidden Inputs to Date and Text Code

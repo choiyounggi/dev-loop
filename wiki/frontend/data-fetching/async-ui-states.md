@@ -11,7 +11,7 @@ sources:
   - https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates
   - https://react.dev/reference/react/Component
 last_verified: 2026-07-10
-related: [frontend-state-client-vs-server-state, frontend-data-fetching-race-conditions]
+related: [frontend-state-client-vs-server-state, frontend-data-fetching-race-conditions, frontend-data-fetching-query-state-vs-fetch-state]
 ---
 
 # Designing Loading, Error, Empty, and Data States for an Async View
@@ -59,6 +59,7 @@ Then apply these to the transitions between states:
 | List is empty because the user's filters excluded everything | Say so, and offer "clear filters" — the generic empty state ("add your first item") misleads |
 | Response resolves fast enough that the skeleton only flashes | Keep the reserved space but suppress indicator animation for sub-second responses — feedback that fast is distraction, not information |
 | Mutation has no inverse (send email, submit payment) | No optimistic update — render an explicit pending state until the server confirms |
+| The query can be disabled (`enabled: false`) or paused offline, so it has no data and is not fetching | The four states above do not cover it — branch on the cache's status/fetchStatus pair ([frontend-data-fetching-query-state-vs-fetch-state]) |
 
 ## Instead of
 

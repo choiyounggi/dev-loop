@@ -16,7 +16,7 @@ sources:
   - https://git-scm.com/docs/git-checkout
   - https://git-scm.com/docs/git-restore
 last_verified: 2026-08-05
-related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-checks-that-cannot-pass, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, testing-quality-schema-additions-under-a-golden-gate, testing-quality-differential-run-agreement, testing-quality-completion-predicates, testing-quality-guard-shape-vs-consequence, testing-quality-injected-clock-duration-assertions, testing-quality-write-path-assertions, backend-common-change-impact-call-site-enumeration, platforms-shells-portable-shell-scripts, qa-document-verification-spec-document-gates]
+related: [testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-async-async-testing, testing-quality-checks-that-cannot-pass, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, testing-quality-surviving-mutant-equivalence-triage, testing-quality-source-text-wiring-assertions, testing-quality-schema-additions-under-a-golden-gate, testing-quality-differential-run-agreement, testing-quality-completion-predicates, testing-quality-guard-shape-vs-consequence, testing-quality-injected-clock-duration-assertions, testing-quality-write-path-assertions, backend-common-change-impact-call-site-enumeration, platforms-shells-portable-shell-scripts, qa-document-verification-spec-document-gates]
 ---
 
 # Proving a Test Can Fail
@@ -83,7 +83,7 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 | Case | Then |
 |------|------|
 | Mutating the code under test is impractical right now (slow build, shared branch) | Invert the expected value in the assertion instead and require red — this proves the assertion executes and compares, though not which code defects it catches |
-| Auditing a whole suite, not one test | Run an automated mutation-testing tool (PIT, Stryker) and treat surviving mutants in changed code as missing or defective tests |
+| Auditing a whole suite, not one test | Run an automated mutation-testing tool (PIT, Stryker), then classify each surviving mutant in changed code before writing a test for it — a missing test, an equivalent mutant, or an uncovered line ([testing-quality-surviving-mutant-equivalence-triage]) |
 | The mutation run is your own script rather than PIT/Stryker | Prove the harness discriminates before citing its score — a semantics-preserving no-op must survive ([testing-quality-harness-reverse-controls]) |
 | A test intentionally has no outcome assertion (smoke test: module loads, page renders) | Keep it only when the regression it guards manifests as a throw; name it as a smoke test so reviewers do not count it as behavior coverage |
 | The always-green test is a snapshot approved without reading | Snapshot rules → [testing-quality-behavior-not-implementation] |

@@ -8,7 +8,7 @@ sources:
   - https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html
   - https://pitest.org/
 last_verified: 2026-08-04
-related: [testing-quality-tests-that-cannot-fail, testing-quality-behavior-not-implementation, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, qa-process-regression-scope]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-behavior-not-implementation, testing-quality-source-text-wiring-assertions, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, qa-process-regression-scope]
 ---
 
 # A Repo-Wide Guard That Fires on a Legitimate Artifact

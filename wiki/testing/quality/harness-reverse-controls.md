@@ -13,7 +13,7 @@ sources:
   - https://testing.googleblog.com/2021/04/mutation-testing.html
   - https://docs.python.org/3/library/unittest.mock.html
 last_verified: 2026-08-04
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-schema-additions-under-a-golden-gate, testing-quality-differential-run-agreement, testing-quality-completion-predicates, backend-python-language-bytecode-cache-staleness, qa-exploratory-override-control-pairs]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-surviving-mutant-equivalence-triage, testing-quality-minimum-case-set, testing-quality-schema-additions-under-a-golden-gate, testing-quality-differential-run-agreement, testing-quality-completion-predicates, backend-python-language-bytecode-cache-staleness, qa-exploratory-override-control-pairs]
 ---
 
 # Citing a Verification Harness's Own Score
