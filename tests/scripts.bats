@@ -99,3 +99,13 @@ setup() {
   run bash "$WS" "$STATUS_DIR" impl_done 2 5 1
   [ "$status" -eq 0 ]
 }
+
+@test "SKILL.md Phase 2: graph.json artifact and the slot proposal are documented" {
+  SKILL="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
+  grep -qF '.orchestration/graph.json' "$SKILL"
+  grep -qF 'LO_MAX_SESSIONS' "$SKILL"
+  # The cap must never be a bare number again: the report has to name what it
+  # protects, or "dynamic" degrades back into a hardcoded 4.
+  grep -qF 'coordinator attention' "$SKILL"
+  ! grep -qF 'concurrent-session cap** (default 4)' "$SKILL"
+}

@@ -81,9 +81,33 @@ creates — component/schema/endpoint/type), and **consumes** (another task's ou
 it depends on). Build a conflict/dependency matrix from those and topologically sort
 into Waves (`conflict-matrix.md`): a dependency edge `A → B` means B consumes A's
 output, so A's Wave precedes B's. Detect duplicate outputs and assign a single
-producer; others consume (add a dependency edge). Apply a **concurrent-session cap**
-(default 4) — if a Wave exceeds it, split it or ask. Tasks in the same Wave are
-independent (parallel); a later Wave starts only after the previous Wave is approved.
+producer; others consume (add a dependency edge). Write BOTH artifacts: `conflict-matrix.md` for humans and
+`.orchestration/graph.json` for the scheduler. A markdown table is not machine
+readable.
+
+```json
+{ "tasks": [
+    { "id": "t1", "deps": [],     "files": ["src/auth/**"], "outputs": ["AuthToken"] },
+    { "id": "t3", "deps": ["t1"], "files": ["src/api/**"],  "consumes": ["AuthToken"] }
+] }
+```
+
+Waves are **an illustration in the Gate 1 report, not an execution unit.**
+Execution is decided by `ready-set.sh`: a task runs as soon as its dependencies
+are `approved` and a slot is free. Still topologically sort — the result shows
+the user the expected flow — but nothing waits on a Wave boundary.
+
+**Propose the slot count.** Pick the number from the task count, their size, and
+their risk, and **say what the number protects**: this cap guards **coordinator attention** and **API usage/budget**, not machine resources. Neither is
+queryable, which is why it is a judgement rather than a computation. A slot is
+held from dispatch until the task reaches a terminal state — `plan_ready` and
+`impl_done` (review pending) count as held, because a pile of unreviewed tasks
+next to a stream of new ones makes the cap meaningless. When `LO_MAX_SESSIONS`
+is set it is an upper bound and overrides the proposal.
+
+After writing it, run `scripts/ready-set.sh <graph> <status-dir> <cap>` once and
+confirm it does **not** exit 4 — malformed JSON, a missing `.tasks` array, and a
+dependency naming an undefined task are all caught here.
 
 **Visual spec (`design` role).** While extracting the above, flag each task that is
 UI-facing *and* whose source issue references a design (e.g. a Figma link). If the
@@ -93,7 +117,9 @@ tasks, or any task with no design reference, skip this. With `design` unset, ign
 design links entirely — the original behavior.
 
 ## 🚦 Gate 1 — task-split approval (REQUIRED)
-Report the task list, Waves, session count, and a rough cost note. **Wait for the
+Report the task list, the dependency graph (showing the expected flow as Waves is
+fine), the proposed **slot count with its rationale and what it protects**, and a
+rough cost note. **Wait for the
 user's approval** before launching anything.
 
 **Substrate — ask here, in this same turn.** Before writing that report, run
