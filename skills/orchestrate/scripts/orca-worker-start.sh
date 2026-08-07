@@ -32,17 +32,26 @@
 #
 # When GROUNDWORK_ESCALATION_DIR is NOT set, worker mode falls back to Orca's
 # composed agent-first `worker-start --agent`, which also accepts new-child /
-# new-top-level and adds no fallback shell.
+# new-top-level and adds no fallback shell. `--model` is inert on that path for
+# the same reason `--permission-mode` is: Orca builds the agent command itself,
+# so there is nothing of ours to append to. Set the escalation dir (which
+# orchestrate always does) to get a model-pinned worker.
 #
 # usage:
 #   orca-worker-start.sh --task <task_id> --worktree <selector> --agent <agent>
-#                        [--name <name>] [--perm <permission-mode>]
+#                        [--name <name>] [--perm <permission-mode>] [--model <model>]
 #   orca-worker-start.sh --task <task_id> --terminal <handle>
 #
 # env (also test hooks):
 #   GROUNDWORK_ESCALATION_DIR  exported into the worker so a guardrails `ask`
 #                              escalates instead of blocking (activates worker mode)
 #   GROUNDWORK_TASK_ID         worker task label
+#   DEV_LOOP_WORKER_MODEL      default for --model — the model the WORKER runs
+#                              (e.g. claude-sonnet-5). Unset = omit the flag, so
+#                              the worker inherits the user's configured model.
+#                              Lets the implementer run a cheaper tier than the
+#                              coordinator; the auditor is pinned separately in
+#                              agents/test-quality-auditor.md.
 #   LO_READY_TIMEOUT           seconds to wait for TUI readiness (default 60)
 #   ORCA_BIN                   orca executable (default: orca)
 #   ORCA_WORKER_START_DRYRUN   print the orca commands instead of running them
@@ -63,11 +72,12 @@ ORCA="${ORCA_BIN:-orca}"
 JQ=$(command -v jq) || { echo "orca-worker-start: jq not found" >&2; exit 127; }
 
 usage() {
-  echo "usage: orca-worker-start.sh --task <task_id> (--worktree <selector> --agent <agent> [--name <name>] [--perm <mode>] | --terminal <handle>)" >&2
+  echo "usage: orca-worker-start.sh --task <task_id> (--worktree <selector> --agent <agent> [--name <name>] [--perm <mode>] [--model <model>] | --terminal <handle>)" >&2
   exit 1
 }
 
 task=""; wt=""; agent=""; name=""; term=""; perm="bypassPermissions"
+model="${DEV_LOOP_WORKER_MODEL:-}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --task)     task="${2:-}";  shift 2 || usage ;;
@@ -76,6 +86,7 @@ while [ $# -gt 0 ]; do
     --name)     name="${2:-}";  shift 2 || usage ;;
     --terminal) term="${2:-}";  shift 2 || usage ;;
     --perm)     perm="${2:-}";  shift 2 || usage ;;
+    --model)    model="${2:-}"; shift 2 || usage ;;
     *) echo "orca-worker-start: unknown argument '$1'" >&2; usage ;;
   esac
 done
@@ -96,6 +107,17 @@ if [ -n "$agent" ]; then
   case "$agent" in
     claude|codex|opencode|gemini|droid|grok|cursor|omp|pi) : ;;
     *) echo "orca-worker-start: unsupported agent '$agent'" >&2; exit 2 ;;
+  esac
+fi
+
+# The model is interpolated into the same command line. Model ids and aliases are
+# alphanumerics plus . _ - and the [1m] context suffix (e.g. opus[1m]); anything
+# else — spaces, quotes, $, ;, backticks — is a command-injection vector, so
+# reject the whole value rather than trying to sanitize it.
+if [ -n "$model" ]; then
+  case "$model" in
+    *[!A-Za-z0-9._\[\]-]*)
+      echo "orca-worker-start: invalid model '$model'" >&2; exit 2 ;;
   esac
 fi
 case "$perm" in
@@ -213,7 +235,9 @@ if [ "$worker_mode" = 1 ] && [ -z "$reused" ]; then
   # Single-quote the values with embedded quotes escaped (`'\''`) so a path with
   # any metacharacter — including a quote — cannot break out of the command.
   esc_sq() { printf '%s' "$1" | sed "s/'/'\\\\''/g"; }
-  worker_cmd="export GROUNDWORK_ESCALATION_DIR='$(esc_sq "$esc_dir")' && export GROUNDWORK_TASK_ID='$(esc_sq "${GROUNDWORK_TASK_ID:-}")' && claude --permission-mode ${perm}"
+  model_arg=""
+  [ -n "$model" ] && model_arg=" --model '$(esc_sq "$model")'"
+  worker_cmd="export GROUNDWORK_ESCALATION_DIR='$(esc_sq "$esc_dir")' && export GROUNDWORK_TASK_ID='$(esc_sq "${GROUNDWORK_TASK_ID:-}")' && claude --permission-mode ${perm}${model_arg}"
 
   set -- terminal create --worktree "$wt" --command "$worker_cmd" --json
   [ -n "$name" ] && set -- "$@" --title "$name"

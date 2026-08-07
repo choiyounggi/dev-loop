@@ -36,6 +36,8 @@
 #   LO_DRY_RUN         print the resolved session name and exit
 #   LO_TMUX            tmux binary (default: the one on PATH)
 #   LO_CLAUDE          claude binary (default: the search below)
+#   DEV_LOOP_WORKER_MODEL  model the WORKER runs (e.g. claude-sonnet-5). Unset =
+#                      omit --model, so the worker inherits the configured model.
 #   LO_READY_TIMEOUT / LO_READY_INTERVAL   REPL-ready budget (default 60 / 2);
 #                      attempts = floor(timeout/interval), minimum 1
 #   LO_READY_EXTRA / LO_TRUST_EXTRA        extra screen-match substrings
@@ -72,6 +74,16 @@ case "$perm" in
   bypassPermissions|acceptEdits|plan|default) : ;;
   *) echo "launch-session: invalid permission mode '$perm'" >&2; exit 2 ;;
 esac
+
+# Same guard for the worker model: ids/aliases are alphanumerics plus . _ - and
+# the [1m] context suffix (e.g. opus[1m]). Unset = omit --model entirely, so the
+# worker inherits the user's configured model.
+model="${DEV_LOOP_WORKER_MODEL:-}"
+if [ -n "$model" ]; then
+  case "$model" in
+    *[!A-Za-z0-9._\[\]-]*) echo "launch-session: invalid model '$model'" >&2; exit 2 ;;
+  esac
+fi
 
 # Resolve-only mode: print the effective session name and exit before touching
 # tmux/claude. Lets the orchestrator (and tests) learn the exact name.
@@ -125,6 +137,7 @@ if [ -n "$esc" ]; then
   launchcmd="$launchcmd && export GROUNDWORK_ESCALATION_DIR='$esc' && export GROUNDWORK_TASK_ID='$session'"
 fi
 launchcmd="$launchcmd && \"$CLAUDE\" --permission-mode $perm"
+[ -n "$model" ] && launchcmd="$launchcmd --model '$model'"
 "$TMUX_BIN" send-keys -t "$session" "$launchcmd" Enter
 
 # Pass trust screen + permission warning, wait for REPL ready (~60s).
