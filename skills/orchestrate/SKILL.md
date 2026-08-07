@@ -408,6 +408,51 @@ failed rounds, escalate. When a task is approved, return to step 1 of the dispat
 loop — whatever dependency it released shows up in the next `ready-set.sh` round and
 the freed slot is refilled immediately. When `ready-set.sh` returns **5**, go to Phase 5.
 
+## Splitting a task mid-run
+
+A worker may report that its task is much larger than the brief assumed. It
+proposes; **you decide**, and you reply either way — a rejection that is never
+sent is indistinguishable from silence, and a worker that hears nothing decides
+for itself.
+
+The proposal must carry, per piece, the `files` it would touch and the `outputs`
+it would newly produce. Without them there is nothing to judge; ask for them
+rather than guessing, and say the worker should hold.
+
+**The decision is one overlap test.** Compare the proposed pieces' `files`
+against every task that is currently dispatched and every task still pending in
+`graph.json`:
+
+- **No overlap** — add it as an independent node. `scripts/graph-add.sh
+  .orchestration/graph.json '<node-json>'` with `split_of` naming the parent and
+  `deps` carrying whatever the piece genuinely consumes. It enters the ready set
+  and the next free slot picks it up, so the split buys real parallelism.
+- **Overlap** — add it with `deps: ["<parent>"]` and give it to the **same worker**
+  in the **same worktree** when the parent settles (Orca:
+  `worker-start --task <new> --terminal <handle>`; tmux: `send-prompt.sh send
+  lo-<n>`). Do **not** create a second worktree: the parent's code is not on the
+  integration branch until Phase 6, so a second checkout would be editing files
+  it cannot see. This split buys a smaller review and rework unit, not
+  parallelism — say so when you report it.
+
+`graph-add.sh` returns **0** added, **3** REJECTED with the reason and the file
+untouched, **4** the graph or the node could not be read. On **3**, reply to the
+worker with the reason; do not retry the same node. A rejection for `depth 1`
+means the proposal came from a piece that was itself a split — that is a signal
+Phase 2's decomposition was wrong, so bring it to the user rather than working
+around it.
+
+On **4**, the graph file is unreadable (I/O error or corruption) — a failure
+class different from validation. This blocks all dispatch. Reply to the worker:
+"Split on hold — orchestrator cannot read its graph state. Escalating to user
+immediately." Do not add the node. Report immediately to the user: "Graph I/O
+error at `.orchestration/graph.json` — resolve and resubmit the proposal. Run is
+blocked until `.orchestration/graph.json` is accessible."
+
+You decide this without a user gate, but **report it immediately** — the task
+list the user approved at Gate 1 just grew, and they need the overlap verdict
+and the schedule change to intervene if they disagree.
+
 ## Phase 5 — Integration test loop (max 3)
 Merge-preview onto the integration branch and run the integration tests (use the
 `verify` role's command if configured). On failure, route back to the responsible
