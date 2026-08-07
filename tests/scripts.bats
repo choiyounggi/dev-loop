@@ -54,3 +54,80 @@ setup() {
   [ "$(jq -r 'has("notakeyvalue")' "$STATUS_DIR/task-x.json")" = "false" ]
   [ "$(jq -r '.worktree | type' "$STATUS_DIR/task-x.json")" = "string" ]
 }
+
+@test "watch-status --tasks: only the named tasks are counted" {
+  mkdir -p "$STATUS_DIR"
+  printf '{"task":"old","phase":"approved"}' > "$STATUS_DIR/old.json"
+  printf '{"task":"a","phase":"implementing"}' > "$STATUS_DIR/a.json"
+  # `old` already passed the target, but it is not being tracked: without
+  # scoping, expected=1 would be satisfied instantly and the wait would spin.
+  run bash "$WS" --tasks a "$STATUS_DIR" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+}
+
+@test "watch-status --tasks: returns as soon as ANY tracked task reaches target" {
+  mkdir -p "$STATUS_DIR"
+  printf '{"task":"a","phase":"impl_done"}'    > "$STATUS_DIR/a.json"
+  printf '{"task":"b","phase":"implementing"}' > "$STATUS_DIR/b.json"
+  run bash "$WS" --tasks a,b "$STATUS_DIR" impl_done 1 5 1
+  [ "$status" -eq 0 ]
+}
+
+@test "watch-status --tasks: an untracked failed task does not abort the wait" {
+  mkdir -p "$STATUS_DIR"
+  printf '{"task":"old","phase":"failed"}'     > "$STATUS_DIR/old.json"
+  printf '{"task":"a","phase":"implementing"}' > "$STATUS_DIR/a.json"
+  run bash "$WS" --tasks a "$STATUS_DIR" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+}
+
+@test "watch-status --tasks: an explicit timeout argument still outranks the env" {
+  # --tasks is consumed before the positional count is taken; if argc were
+  # captured before that, the 4th positional would stop being recognised and
+  # LO_PHASE_TIMEOUTS would silently win.
+  mkdir -p "$STATUS_DIR"
+  printf '{"task":"a","phase":"implementing"}' > "$STATUS_DIR/a.json"
+  run env LO_PHASE_TIMEOUTS="impl_done=999" bash "$WS" --tasks a "$STATUS_DIR" impl_done 1 2 1
+  [[ "$output" == *"budget=2s"* ]]
+  [[ "$output" == *"source=arg"* ]]
+}
+
+@test "watch-status: without --tasks every status file is still counted (no regression)" {
+  mkdir -p "$STATUS_DIR"
+  printf '{"task":"a","phase":"done"}' > "$STATUS_DIR/a.json"
+  printf '{"task":"b","phase":"done"}' > "$STATUS_DIR/b.json"
+  run bash "$WS" "$STATUS_DIR" impl_done 2 5 1
+  [ "$status" -eq 0 ]
+}
+
+@test "SKILL.md Phase 2: graph.json artifact and the slot proposal are documented" {
+  SKILL="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
+  grep -qF '.orchestration/graph.json' "$SKILL"
+  grep -qF 'LO_MAX_SESSIONS' "$SKILL"
+  # The cap must never be a bare number again: the report has to name what it
+  # protects, or "dynamic" degrades back into a hardcoded 4.
+  grep -qF 'coordinator attention' "$SKILL"
+  ! grep -qF 'concurrent-session cap** (default 4)' "$SKILL"
+}
+
+@test "SKILL.md: the dispatch loop structure pins step order and error handling" {
+  SKILL="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
+  # Step 1 must run ready-set.sh first to decide what is dispatchable.
+  grep -qF '1. `scripts/ready-set.sh' "$SKILL"
+  # Step 1 exit codes 3 and 4 must explicitly return to step 1, not just report
+  # errors. Look for phrases showing re-entry after human intervention or fix.
+  grep -q 'return to' "$SKILL" && grep -q 'step 1' "$SKILL"
+  grep -q 're-run step' "$SKILL"
+  # Step 3 must deliver the implement prompt (was missing in v1); check that
+  # both tmux and Orca paths are mentioned.
+  grep -qF 'deliver §2 (implement)' "$SKILL"
+  grep -qF 'send-prompt.sh send' "$SKILL"
+  # Step 4 must wait, scoped to running ids via --tasks to avoid spin.
+  grep -qF 'watch-status.sh --tasks' "$SKILL"
+  # Step 5 must close the loop by returning to step 1 on approval.
+  grep -q 'approval' "$SKILL" && grep -q 'return to' "$SKILL"
+  # Exit code 3 must be DEADLOCK and documented as "do not wait".
+  grep -qF 'DEADLOCK' "$SKILL"
+  # Waves must no longer be described as an execution barrier.
+  ! grep -qF 'A later Wave launches only after' "$SKILL"
+}

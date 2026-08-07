@@ -3,7 +3,11 @@
 # phase, then exit 0. The orchestrator launches this with run_in_background; on
 # exit the harness re-invokes the orchestrator.
 #
-# usage: watch-status.sh <status-dir> <target-phase> <expected-count> [timeout-sec] [interval-sec]
+# usage: watch-status.sh [--tasks <csv>] <status-dir> <target-phase> <expected-count> [timeout-sec] [interval-sec]
+#   --tasks: scope the scan to only the given comma-separated task ids. The slot
+#   scheduler needs to wake as soon as ANY currently-running task reaches the target;
+#   without scoping, the full status dir would count tasks approved in earlier rounds
+#   and the wait would spin on stale data.
 #   exit 0: all reached target (or higher)
 #   exit 2: timeout
 #   exit 3: a failed session detected (abort → orchestrator intervenes)
@@ -32,6 +36,20 @@
 set -eu
 JQ=$(command -v jq) || { echo "watch-status: jq not found" >&2; exit 127; }
 
+# --tasks scopes the scan to the given ids. The slot scheduler needs "any ONE of
+# the tasks I am currently running reached the target"; counting the whole status
+# dir would satisfy expected=1 from tasks approved in earlier rounds and spin.
+only=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tasks) shift; only="${1:-}"; [ -n "$only" ] || { echo "watch-status: --tasks needs a comma-separated id list" >&2; exit 4; }; shift ;;
+    --) shift; break ;;
+    -*) echo "watch-status: unknown option '$1'" >&2; exit 4 ;;
+    *) break ;;
+  esac
+done
+# Captured AFTER option parsing: argc decides whether the 4th POSITIONAL was
+# given, and options must not be counted toward it.
 argc=$#
 dir="$1"; target="$2"; expected="$3"; timeout="${4:-3600}"; interval="${5:-15}"
 
@@ -128,6 +146,12 @@ while [ "$elapsed" -lt "$budget" ]; do
   done_count=0; failed=0; summary=""; stalled=""
   for f in "$dir"/*.json; do
     [ -f "$f" ] || continue
+    if [ -n "$only" ]; then
+      base=${f##*/}; base=${base%.json}
+      # Exact membership on a comma-delimited list: the commas around both sides
+      # keep `t1` from matching `t12`.
+      case ",$only," in *",$base,"*) : ;; *) continue ;; esac
+    fi
     ph=$("$JQ" -r '.phase // "pending"' "$f" 2>/dev/null || echo "pending")
     tk=$("$JQ" -r '.task // "?"' "$f" 2>/dev/null || echo "?")
     summary="$summary $tk:$ph"
