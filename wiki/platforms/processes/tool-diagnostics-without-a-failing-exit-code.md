@@ -9,8 +9,10 @@ sources:
   - https://clang.llvm.org/docs/UsersManual.html
   - https://www.gnu.org/software/bash/manual/bash.html#Redirections
   - https://code.claude.com/docs/en/hooks
-last_verified: 2026-08-06
-related: [platforms-processes-non-interactive-cli-invocation, platforms-shells-command-text-inspected-before-execution, testing-quality-checks-that-cannot-pass]
+  - https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html
+  - https://rust-unofficial.github.io/patterns/anti_patterns/deny-warnings.html
+last_verified: 2026-08-07
+related: [platforms-processes-non-interactive-cli-invocation, platforms-shells-command-text-inspected-before-execution, testing-quality-checks-that-cannot-pass, backend-common-api-design-unenforced-declarations]
 ---
 
 # Feeding a Tool's Warnings Back When It Exits 0
@@ -61,11 +63,16 @@ OUT=$(tool "$FILE" 2>&1 >/dev/null)
    a hard gate**: `-Werror` (clang/gcc), `--max-warnings 0` (ESLint), `--strict`
    equivalents. Then the exit code carries the decision again and the wrapper
    stays a one-liner. Use stream capture when you must keep warnings non-fatal
-   for humans while still surfacing them to the loop.
+   for humans while still surfacing them to the loop. Before promoting, check
+   the tool has per-diagnostic severity control (`-Werror=<w>`/`-Wno-error=<w>`,
+   explicit lint selection) — a blanket promotion also converts *intentional*
+   warnings (deprecations, accepted-but-unenforced declarations) into failures.
 
-6. **Prove all three states before adopting the gate.** Run it on a file with a
-   warning, a clean file, and a file with a real error, and require the three
-   distinct outcomes above. Keep the control inputs in the repo so contributors
+6. **Prove all the states before adopting the gate.** Run it on a file with a
+   warning it should catch, a clean file, a file with a real error — and a
+   **valid file that legitimately warns** (a deprecation, a documented
+   declaration the runtime accepts-and-warns on), requiring a distinct decided
+   outcome for each. Keep the control inputs in the repo so contributors
    cannot drift the gate ([testing-quality-checks-that-cannot-pass]).
 
 ## Edge cases
@@ -79,6 +86,7 @@ OUT=$(tool "$FILE" 2>&1 >/dev/null)
 | The tool offers `-Werror` / `--max-warnings 0` | Use it **in addition** — it converts the status, and the captured text is still what names which warning fired |
 | The wrapper runs under `set -e` | Command substitution failure inside `OUT=$(…)` is not suppressed by a condition context — assign first, test after, as above |
 | Warnings must not repeat on every run of an unchanged file | Hash `$OUT` per file and forward only on change; an unconditional exit 2 re-feeds the same text each time |
+| The platform warns on valid, intended usage (deprecations, declarations it accepts but does not enforce) and offers **no per-diagnostic severity control** | The promotion switch and that feature are mutually exclusive — every legitimate use fails the gate, so adopting the feature means turning the gate off. Keep warnings non-fatal via stream capture with shape-matching, and record the missing severity tiers as a platform defect in its own right |
 
 ## Instead of
 
@@ -89,6 +97,7 @@ OUT=$(tool "$FILE" 2>&1 >/dev/null)
 | Trust "the gate stayed quiet" as proof the file is clean | Run the gate once against a file you know produces a warning and require it to fire | A gate keyed on exit status is silent for both the clean case and the warning case |
 | Exit 1 with the diagnostics on stderr | Exit 2 | For `PostToolUse` only exit 2 shows stderr to Claude; other codes surface one line to the user as a hook error |
 | Put diagnostics on stdout and exit 0 | Print to stderr and exit 2 | On exit 0 `PostToolUse` stdout goes to the debug log, not the transcript — the model never sees it |
+| Adopt `-Werror`/`--strict` after proving only "catches a bad file, passes a clean file" | Also run a valid file that legitimately warns | The two-way check cannot see the third input class; without diagnostic severity tiers, a typo-shaped no-op and an intentional declaration both return the same failing status |
 
 ## Sources
 
@@ -98,3 +107,6 @@ OUT=$(tool "$FILE" 2>&1 >/dev/null)
 - https://code.claude.com/docs/en/hooks — exit 2: "stderr text is fed back to Claude as an error message"; `PostToolUse` cannot block ("the tool already ran") but shows stderr to Claude
 - Field reproduction 2026-08-05: compiler with warning input → exit 0 with 3 warnings on stderr; clean input → exit 0 with empty stderr; error → non-zero exit with errors; the three outcomes observed directly when the gate was tested
 - Local reproduction 2026-08-06 (macOS, Apple clang): `cc -Wall` on a snippet with an unused variable → exit 0, 157 bytes on stderr; `OUT=$(cc … 2>&1 >/dev/null)` captured the diagnostic while the reversed redirection order captured 0 chars
+- https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html — `-Werror=<warning>` / `-Wno-error=<warning>`: per-warning error promotion and exemption; "more specific options have priority over less specific ones"
+- https://rust-unofficial.github.io/patterns/anti_patterns/deny-warnings.html — blanket `#![deny(warnings)]` is an anti-pattern because "APIs get deprecated, so their use will emit a warning where before there was none"; recommends explicit lint selection that deliberately excludes `deprecated`
+- Field reproduction 2026-08-05→07 (lnpl 0.2.0 QA re-measurement, `--strict`): unknown-verb file → rc=2 (caught), clean file → rc=0 (no false positive), and a legitimate `on schedule` declaration → rc=2 anyway, because the runtime's accept-and-warn "declared, not enforced" diagnostic has no severity class below the gate's threshold — the two-way check alone would have missed the collision

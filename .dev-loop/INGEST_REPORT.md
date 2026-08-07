@@ -1,53 +1,93 @@
-# Knowledge consolidation — 15 open PRs (#17–#40) → one reconciled state
-
-The 15 open `knowledge/*` PRs (created 2026-08-04 → 2026-08-05, before the
-harvest processed-store dedupe fix in #41) contained 123 file-versions of ~75
-unique pages, with the same insight landing at up to 3 different paths across
-up to 8 PRs. Per-PR review would re-import those duplicates, so — as with the
-#6–#13 consolidation — this branch carries the reconciled end-state and the 15
-PRs are closed in its favor.
+# Knowledge flush — 3 insight(s): 1 ingested, 2 dropped as in-flight duplicates
 
 ## Verified best-practice
 
-Every adopted page's sources were carried from its originating PR's flush, where
-they were live-verified at flush time; no new URLs were introduced during
-consolidation (checked mechanically: every `http(s)` URL in every merged page
-appears in a source PR's diff; every added body line in amended pages traces to
-a source PR hunk — orphan-line verification). Confidence fields were kept as the
-originating flushes set them, except client-side-rate-limiting where the union
-of provider-doc citations (Okta, Auth0, GitHub, OpenAI, RFC 6585) supports
-`verified` for the load-bearing claims. One subagent's fabricated content (12
-files matching neither main nor any PR, with invented source URLs) was detected
-by the same verification and replaced with true PR content.
+**1. Warnings-as-errors gates vs intentional-warning features (INGESTED, confidence: verified).**
+Claim: before adopting a `-Werror`/`--strict`-style promotion, run the gate against a
+*valid* input that legitimately warns (deprecation, accept-and-warn declaration) — the
+usual two-way check (catches a bad file / passes a clean file) cannot see this third
+input class, and when the platform's diagnostics have no severity tiers the gate and
+the feature are mutually exclusive; record that as a platform defect.
+Sources checked:
+- https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html — fetched this session;
+  `-Werror=<w>`/`-Wno-error=<w>` per-warning promotion/exemption exists precisely so
+  specific warnings can be exempted from a blanket error gate ("more specific options
+  have priority over less specific ones").
+- https://rust-unofficial.github.io/patterns/anti_patterns/deny-warnings.html — fetched
+  this session; blanket `#![deny(warnings)]` is an anti-pattern because "APIs get
+  deprecated, so their use will emit a warning where before there was none"; the
+  recommended alternative is explicit lint selection deliberately excluding `deprecated`.
+- Field reproduction (lnpl 0.2.0 QA re-measurement, 2026-08-05→07, evidence file
+  `qa/rerun/cases/batch-report/evidence/08-diag-channel.log` in the linkly repo):
+  unknown-verb → `--strict` rc=2 (caught); clean file → rc=0 (no false positive);
+  legitimate `on schedule` declaration → rc=2 anyway, via the accept-and-warn
+  "declared, not enforced" diagnostic. Mechanism doc-verified + locally reproduced →
+  **verified**.
+
+**2. worktree_escape read-only escalation round-trip (DROPPED — pending duplicate).**
+Not re-verified here; the identical insight *with the same session evidence* (Wave 2
+worker's upstream-FINDINGS `awk`/`grep` verification and `git status` check each raising
+`ask`/exit 5) is already carried by open PRs #47 and #51 on
+`worktree-isolated-workers` — #51's version is strictly better (it names the actual rule
+mechanism: main-root mention and write-verb/redirect matched independently over the
+whole command string). Nothing unique remained to fold.
+
+**3. Orca dispatch-binding stage taxonomy (DROPPED — pending duplicate).**
+Idle-prompt check before binding; `runtime_unavailable` → wait and bind a fresh unit;
+`agent_unconfigured` → replace the agent; always pass `--worktree` with `--terminal`.
+Open PR #51 already carries all four rows on `pane-delivery-confirmation`, including the
+same three field observations (busy-bind pending→failed, dead-agent recovery, worktree
+mismatch). Nothing unique remained to fold.
 
 ## Existing-layer check
 
-- Merged-main near-dup scan before consolidation: pairwise Jaccard over
-  title + "When this applies" across all 141 merged pages → **0 flagged pairs**;
-  previously merged content carries no duplication.
-- Cross-PR dedup during consolidation: 10 duplicate clusters collapsed to one
-  canonical page each (rate limiting 8→1, call-site enumeration 7→folded into
-  the canonical merged in #20, stderr/exit-0 diagnostics 4→1, sysroot 2→1,
-  env-off-switch 2→1, completion predicates 2→1, robots.txt 2→1,
-  harness-mediated results 2→1, leaked artifacts 2→1, orchestration category
-  naming unified). Three near-pairs kept distinct after trigger comparison,
-  with mutual `related:` links (differential setup vs interpretation; expansion
-  semantics vs off-switch design; import-time tactics vs level choice).
-- 24 existing pages received union-merged amendments; additions already present
-  in main (from #16/#20) were skipped, and all non-canonical `related:` ids
-  were remapped to canonical page ids (post-merge broken-link scan: 0).
+Pages read: platforms-processes-tool-diagnostics-without-a-failing-exit-code, backend-common-api-design-unenforced-declarations, qa-process-release-gates, infrastructure-ci-cd-pipeline-structure, qa-exploratory-lowered-declaration-survival, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-pane-delivery-confirmation
+
+- Routing candidates for insight 1 were qa/process (release-gates: release checklists —
+  wrong altitude), infrastructure/ci-cd (pipeline-structure: stage ordering — wrong
+  concern), and platforms/processes. `tool-diagnostics-without-a-failing-exit-code`
+  already owns this exact gate: its Do-5 recommends the `-Werror`/`--strict` promotion
+  and Do-6 proves three states (warning/clean/error). The insight is the missing fourth
+  state of that same adoption check → **merged** there (Do-5 caution + Do-6 fourth
+  control input + 1 edge-case row + 1 Instead-of row + 3 sources), no new page.
+- No conflicts: the page's existing directives stand; the merge narrows when the
+  promotion switch is safe rather than contradicting it.
+- Related-links added both ways with `backend-common-api-design-unenforced-declarations`
+  — its "accept and warn" shape is exactly the intentional diagnostic that collides
+  with a blanket gate. Platforms domain index "load when" line extended accordingly.
+- Insights 2 and 3 were checked against `worktree-isolated-workers` and
+  `pane-delivery-confirmation` (merged state + open-PR diffs) — covered there, see
+  Open-PR check.
+
+## Open-PR check
+
+Open `knowledge/*` heads listed via `gh pr list` at flush time:
+#55 (choiyounggi-20260807-144058), #52 (dch0202-rsquare-20260807-100149),
+#51 (dch0202-20260806-183029), #50 (dch0202-20260806-172420),
+#49 (dch0202-rsquare-20260806-142309), #47 (dch0202-20260806-130040).
+
+- Insight 1 (warnings-as-errors): diffed #51 and #47 fully; file lists of #55/#52/#50/#49
+  checked via `git diff --name-only` / `gh api pulls/N/files` — none touches
+  `wiki/platforms/processes/tool-diagnostics-without-a-failing-exit-code.md` or carries
+  an overlapping trigger. Verdict: **new** (ingested).
+- Insight 2 (worktree_escape read-only escalation): #47 adds the same directive and the
+  same session evidence to `worktree-isolated-workers`; #51 adds a refined version (rule
+  mechanism + budget-the-round-trip row). Verdict: **drop**.
+- Insight 3 (dispatch-binding taxonomy): #51 adds all four rows + the same three field
+  observations to `pane-delivery-confirmation`. Verdict: **drop**.
+
+Note for review ordering: #47 and #51 both amend `worktree-isolated-workers`'s Do-this
+table near the same rows — whichever merges second will need a trivial conflict
+resolution (both versions are compatible; #51's is the more precise).
 
 ## Routing decision
 
-- New categories: `infrastructure/agent-orchestration` (5 pages; unified the
-  competing `orchestration`/`agent-orchestration` names), `databases/data-survey`
-  (1), `qa/deliverables` (1). All other pages route into existing categories.
-- Canonical-path decisions: rate limiting → `backend/common/reliability/`
-  (sits beside timeouts-and-retries; 6 of 8 variants chose it); stderr
-  diagnostics → `platforms/processes/` (concern spans beyond shells); leaked
-  artifacts → `testing/data/artifact-leakage-from-a-suite`; call-site
-  enumeration → the existing `backend/common/change-impact/` page.
-- All 38 new pages listed in their domain indexes (nearest-index rule; backend
-  routes via its python sub-index for bytecode-cache-staleness); INDEX.md domain
-  summaries updated for infrastructure/qa/databases. Full-wiki lint: frontmatter,
-  ids, related-links, index coverage, size, qualifiers, staleness → 0 findings.
+- Insight 1 → `platforms/processes/tool-diagnostics-without-a-failing-exit-code`
+  (merge, no new page, no new category). The harvested `domain: qa` hint was re-routed:
+  the merged wiki already holds the owning page for this gate under platforms/processes,
+  and merge-before-create outranks the hint (precedent: 2026-08-04 keg-only re-route in
+  log.md). qa/process/release-gates covers release checklists, not diagnostic-gate
+  adoption mechanics, so no qa page was created.
+- Insights 2, 3 → no target; retired from the queue as pending duplicates of open PRs
+  #47/#51 (their would-have-been targets are the two agent-orchestration pages named
+  above, where the content already sits).
