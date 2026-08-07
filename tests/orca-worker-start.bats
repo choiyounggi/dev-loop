@@ -385,3 +385,53 @@ setup() {
       --task task_1 --worktree "id:r::/wt" --agent claude --perm "bad; rm -rf ~"
   [ "$status" -eq 2 ]
 }
+
+# --- worker model pin (DEV_LOOP_WORKER_MODEL / --model) -----------------------
+# Lets the implementer run a cheaper tier than the coordinator. Unset MUST stay
+# byte-identical to the previous command, or an upgrade silently switches model.
+
+@test "model: --model reaches the created terminal's claude command" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude --model claude-sonnet-5
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"claude --permission-mode bypassPermissions --model 'claude-sonnet-5'"* ]]
+}
+
+@test "model: DEV_LOOP_WORKER_MODEL is the default when --model is absent" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      DEV_LOOP_WORKER_MODEL=claude-sonnet-5 \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--model 'claude-sonnet-5'"* ]]
+}
+
+@test "model: --model overrides the env default" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      DEV_LOOP_WORKER_MODEL=claude-sonnet-5 \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude --model opus
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--model 'opus'"* ]]
+  [[ "$output" != *"claude-sonnet-5"* ]]
+}
+
+@test "model: the [1m] context suffix is accepted (boundary)" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude --model 'opus[1m]'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--model 'opus[1m]'"* ]]
+}
+
+@test "model: unset adds no --model flag (boundary — unchanged behavior)" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"--model"* ]]
+}
+
+@test "model: a shell-metacharacter model is rejected, nothing is created" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude --model 'x; rm -rf ~'
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"invalid model"* ]]
+  [[ "$output" != *"[terminal] [create]"* ]]
+}

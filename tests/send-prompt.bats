@@ -423,9 +423,12 @@ tpl_sections_single_line() {
   # Bumped from 1714004932/4937 when rule [4] gained the ask-timeout contract:
   # a timeout leaves the question pending, so the worker resumes it instead of
   # deciding it. Update in the SAME commit as any intentional edit, as above.
+  # Bumped from 3932390147/5667 when O1 became adopt-the-coordinator's-plan
+  # instead of author-your-own: planning moved to the coordinator so it runs on
+  # the planning model, not on whatever tier the worker is pinned to.
   run sh -c "sed -n '/^\*\*Orca substrate\.\*\*/,/^## Subagent usage protocol/p' '$TPL' | cksum"
   [ "$status" -eq 0 ]
-  [ "$output" = "3932390147 5667" ]
+  [ "$output" = "4060540920 6077" ]
 }
 
 @test "template: the Orca ask rule forbids deciding a timed-out question" {

@@ -68,7 +68,7 @@ block — to every §1–§4 prompt, flattened into the single sent line.
 
 ## (1) Plan — injected at session launch
 
-You are the session for {TASK}. Treat .orchestration/briefs/{TASK}.md `<task_brief>` as authority — especially `<scope_boundaries>`, `<dependencies>`, and `<definition_of_done>`. Use the loop-implement skill but STOP after planning: run its step 2 with the bundled `wiki-plan` skill (make every design decision grounded in a `wiki/` page — record the decision->page map; leave nothing "as appropriate"), write the resulting implementation plan to .orchestration/plans/{TASK}.md, then run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} plan_ready worktree=$PWD` and wait for an approval message. Do NOT write implementation code yet.
+You are the session for {TASK}. Treat .orchestration/briefs/{TASK}.md `<task_brief>` as authority — especially `<scope_boundaries>`, `<dependencies>`, and `<definition_of_done>`. Use the loop-implement skill but STOP after planning. The coordinator has ALREADY run `wiki-plan` and written the plan to .orchestration/plans/{TASK}.md, so take loop-implement step 2's "a plan already exists" path: ADOPT that plan, do not re-plan it. Check it against the brief — every decision actually made (nothing left "as appropriate"), each with its decision->page map entry, and no contradiction with `<scope_boundaries>`, `<dependencies>`, or `<definition_of_done>`. If it fails any of those, do NOT quietly rewrite it: report the specific gap as a failure and stop, so the coordinator re-plans on the planning model. Otherwise run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} plan_ready worktree=$PWD` and wait for an approval message. Do NOT write implementation code yet.
 
 ## (2) Implement — injected after plan approval
 
@@ -104,13 +104,19 @@ prompt here says "wait" — the worker reports and ends its turn.
 
 You are the worker session for {TASK}. Treat .orchestration/briefs/{TASK}.md
 `<task_brief>` as authority — especially `<scope_boundaries>`, `<dependencies>`, and
-`<definition_of_done>`. Use the loop-implement skill but STOP after planning: run its
-step 2 with the bundled `wiki-plan` skill (make every design decision grounded in a
-`wiki/` page — record the decision->page map; leave nothing "as appropriate"), write the
-resulting implementation plan to .orchestration/plans/{TASK}.md, then run
+`<definition_of_done>`. Use the loop-implement skill but STOP after planning. The
+coordinator has ALREADY run `wiki-plan` and written the plan to
+.orchestration/plans/{TASK}.md, so take loop-implement step 2's "a plan already exists"
+path: ADOPT that plan, do not re-plan it. Read it against the brief and check it is
+executable — every design decision actually made (nothing left "as appropriate"), each
+one carrying its decision->page map entry, and no contradiction with
+`<scope_boundaries>`, `<dependencies>`, or `<definition_of_done>`. If it fails any of
+those, do NOT quietly rewrite it: report the specific gap as a failure and stop, so the
+coordinator re-plans on the planning model. Otherwise run
 `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} plan_ready worktree=$PWD`
 and report exactly once:
-`orca orchestration send --type worker_done --subject "plan_ready: {TASK}" --body "<what the plan decides, what remains>" --task-id {ORCA_TASK_ID} --dispatch-id {ORCA_DISPATCH_ID} --outcome succeeded --files-modified ".orchestration/plans/{TASK}.md" --json`
+`orca orchestration send --type worker_done --subject "plan_ready: {TASK}" --body "<what the adopted plan decides, what remains>" --task-id {ORCA_TASK_ID} --dispatch-id {ORCA_DISPATCH_ID} --outcome succeeded --json`
+(no `--files-modified`: you adopted the coordinator's plan and wrote nothing.)
 (a failure is `--outcome failed`, never failure encoded only in prose).
 Then END YOUR TURN. Do NOT write implementation code yet.
 
