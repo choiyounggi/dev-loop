@@ -161,6 +161,15 @@ and report exactly once:
 [4] Blocking question — `orca orchestration ask --question "<q>" --timeout-ms <n> --json`,
     then end your turn. Never open a local interactive prompt: no human is attached to
     this session, so it blocks until the window expires with nothing to show for it.
+    **A timeout is not an answer.** The window expiring leaves the question *pending*,
+    so resume that exact question — `orca orchestration ask --resume <message_id>
+    --timeout-ms <n> --json` — and end your turn again. Do NOT decide it yourself, and
+    do NOT ask it again: a second `--question` creates a second question, and the
+    coordinator cannot tell which thread it is answering. Measured on a 3-worker run:
+    at 600s and 900s the workers chose "proceed on a conservative assumption" instead
+    and reported the guess only afterwards. One guess happened to match the human
+    decision — that is luck, not a protocol; the other would have cost a rollback.
+    If you are blocked, stay blocked and resume.
 
 [5] `{ORCA_DISPATCH_ID}` is created by `orca-worker-start.sh`, after `task-create`. If the
     orchestrator left it unsubstituted, use the dispatch id Orca gave you in this
