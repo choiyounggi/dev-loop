@@ -189,7 +189,12 @@ you instead of making you poll. Replace steps 1–3 below with O1–O5:
   `GROUNDWORK_ESCALATION_DIR=<abs> scripts/orca-wait.sh [--until-all] <timeout-ms>
   [<task_id,task_id,...>]` → **0** completions arrived (acked — process them),
   **2** window elapsed *or* the ack did not land (checkpoint, just re-run), **3** a
-  worker reported failure, **5** escalation pending (approve/deny, **clear
+  worker reported failure, **4** the runtime itself did not answer (`ok:false`, a
+  nonzero status, or a connection lost mid-wait) — an **outage, not a checkpoint**:
+  run `orca status --json` before waiting again, and restart nothing on this code
+  alone, because a dead runtime does not stop a worker session (measured: workers
+  kept committing and pushing while the runtime was down), **5** escalation
+  pending (approve/deny, **clear
   `.orchestration/escalations/`**, then re-run — like watch-status, code 5 recurs
   while a record is still on disk, by design), **6** question pending
   (`orca orchestration reply --id <msg_id> --body "<answer>" --json`, re-run).
@@ -237,7 +242,11 @@ durable re-entry state); on top of that it must:
    --subject "guardrails <rule>" --body "<command + why>" --task-id <task_id>
    --dispatch-id <dispatch_id> --json`;
 3. use `orca orchestration ask --question "<q>" --timeout-ms <n> --json` for a
-   blocking question, and then end its turn.
+   blocking question, and then end its turn — and if that window expires, resume the
+   same question with `ask --resume <message_id>` rather than deciding it or asking
+   it again. A timeout leaves the question pending; it is not an answer. Measured on
+   a 3-worker run: at 600s and 900s both workers instead "proceeded on a conservative
+   assumption" and reported the guess after the fact.
 
 Step 2 is the *fast* path for a guardrails block — it arrives with the worker's own
 context. It is not the only one: `orca-wait.sh` pre-checks

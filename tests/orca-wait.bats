@@ -30,6 +30,7 @@ mk_stub() { # -> path of an executable `orca` test double
   cat > "$stub" <<'STUBEOF'
 #!/bin/sh
 # Test double for the `orca` CLI. All state under $STUB_DIR:
+#   rc-fail            if present, every `check --wait` prints this file and exits 1
 #   calls              window counter for `check --wait`
 #   windows            the --timeout-ms value of each window, one per line
 #   <n>.json           canned Delivery returned by the nth window (absent -> empty)
@@ -52,6 +53,7 @@ case "${2:-}" in
           printf '{"taskId":"%s","rule":"%s","reason":"blocked"}' \
             "${STUB_ESC_TASK:-t_esc}" "${STUB_ESC_RULE:-sql_drop}" > "${STUB_ESC_DIR:?}/esc-$n.json"
         fi
+        if [ -f "$d/rc-fail" ]; then cat "$d/rc-fail"; exit 1; fi
         if [ -f "$d/$n.json" ]; then cat "$d/$n.json"
         else echo '{"result":{"count":0,"messages":[]}}'; fi ;;
       --ack)
@@ -136,6 +138,57 @@ teardown() { rm -f "$(REPO_TMP)/orca-stub-${BATS_TEST_NUMBER}"; }
 @test "malformed check output fails to the checkpoint code, not to success" {
   run env ORCA_WAIT_DRYRUN=1 ORCA_WAIT_CHECK_JSON='}{ not json' bash "$OW" 1000
   [ "$status" -eq 2 ]
+}
+
+# --- a dead runtime is exit 4, never a quiet window ----------------------------
+# Measured against the live CLI: an ordinary timeout answers ok:true / count 0 /
+# timedOut:true with status 0, and a runtime fault answers ok:false with status 1.
+# Before this split, every one of these read as "no message yet".
+
+@test "the real timeout envelope is still a checkpoint, not an outage (regression)" {
+  run env ORCA_WAIT_DRYRUN=1 \
+      ORCA_WAIT_CHECK_JSON='{"ok":true,"result":{"runId":"run_1","deliveryId":null,"messages":[],"count":0,"timedOut":true,"connectionLost":false}}' \
+      bash "$OW" 1000
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"checkpoint"* ]]
+}
+
+@test "an ok:false runtime error exits 4 and names the error code" {
+  run env ORCA_WAIT_DRYRUN=1 ORCA_WAIT_CHECK_RC=1 \
+      ORCA_WAIT_CHECK_JSON='{"ok":false,"error":{"code":"runtime_unavailable","message":"The Orca runtime closed the connection before responding."}}' \
+      bash "$OW" 60000
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"runtime_unavailable"* ]]
+  [[ "$output" != *"checkpoint"* ]]
+}
+
+# An empty ORCA_WAIT_CHECK_JSON cannot express this case — it deselects the canned
+# branch — so a killed CLI is only observable through the real orca path.
+@test "a killed CLI (no output at all, nonzero status) exits 4, not 2 (error path)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  : > "$sd/rc-fail"
+  run env STUB_DIR="$sd" ORCA_BIN="$(mk_stub)" bash "$OW" 60000
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"no response"* ]]
+  [ ! -f "$sd/acked" ]
+}
+
+@test "connectionLost mid-wait exits 4 even though ok:true and count 0 (boundary)" {
+  run env ORCA_WAIT_DRYRUN=1 \
+      ORCA_WAIT_CHECK_JSON='{"ok":true,"result":{"count":0,"messages":[],"timedOut":false,"connectionLost":true}}' \
+      bash "$OW" 60000
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"connection_lost"* ]]
+}
+
+@test "a nonzero check through the live orca path exits 4 without acking anything" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  printf '{"ok":false,"error":{"code":"runtime_timeout","message":"Timed out waiting for the Orca runtime."}}' > "$sd/rc-fail"
+  run env STUB_DIR="$sd" ORCA_BIN="$(mk_stub)" bash "$OW" 60000 task_1
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"runtime_timeout"* ]]
+  [ ! -f "$sd/acked" ]
+  [ "$(cat "$sd/calls")" = "1" ]
 }
 
 @test "a payload delivered as an object (not a JSON string) is still classified" {

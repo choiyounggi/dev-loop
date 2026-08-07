@@ -21,6 +21,11 @@
 #         (--until-all: some tasks are still running; batches already acked in
 #         this call are consumed and are not replayed)
 # exit 3  a worker reported outcome=failed (or an unprovable worker_done)
+# exit 4  the Orca runtime did not answer the check (ok:false / nonzero status /
+#         a connection lost mid-wait) — an OUTAGE, not a quiet window. Never
+#         treat it as a checkpoint: check `orca status --json` first. The workers
+#         themselves may well still be alive; a dead runtime does not stop a
+#         worker session, so do not restart anything on this code alone.
 # exit 5  an escalation is pending — resolve it, then re-run
 # exit 6  a worker question is pending — `orchestration reply --id <msg>`, re-run
 #
@@ -51,6 +56,7 @@
 #   ORCA_BIN                   orca executable (default: orca)
 #   ORCA_WAIT_DRYRUN           print the ack instead of sending it
 #   ORCA_WAIT_CHECK_JSON       canned `check --wait --json` Delivery (tests)
+#   ORCA_WAIT_CHECK_RC         exit status to pair with that canned Delivery (tests)
 #   ORCA_WAIT_ACK_FAIL         force the ack to fail (tests)
 #   ORCA_WAIT_TASKLIST_JSON    canned `task-list --status completed --json` (tests)
 set -u
@@ -125,12 +131,31 @@ while :; do
   [ "$slice" -gt "$remaining" ] && slice="$remaining"
 
   if [ -n "${ORCA_WAIT_CHECK_JSON:-}" ]; then
-    out="$ORCA_WAIT_CHECK_JSON"
+    out="$ORCA_WAIT_CHECK_JSON"; rc="${ORCA_WAIT_CHECK_RC:-0}"
   else
     out=$("$ORCA" orchestration check --wait \
-          --types worker_done,escalation,question --timeout-ms "$slice" --json 2>/dev/null) || out=""
+          --types worker_done,escalation,question --timeout-ms "$slice" --json 2>/dev/null); rc=$?
   fi
   remaining=$((remaining - slice))
+
+  # A dead runtime is not a quiet window. Measured envelopes: an ordinary timeout
+  # is `{"ok":true,"result":{"count":0,"timedOut":true,"connectionLost":false}}`
+  # with status 0, while a runtime fault is `{"ok":false,"error":{"code":...}}`
+  # with status 1 (`runtime_timeout`, `runtime_unavailable`) and a killed CLI
+  # answers nothing at all. All three used to fall through `.result.count // 0`
+  # and read as "no message yet", so an outage burned the whole budget one silent
+  # checkpoint at a time and then reported "keep waiting" — the coordinator never
+  # learned the runtime was gone. Only an EXPLICIT fault signal exits 4: a missing
+  # `ok` stays a checkpoint so a partial or replayed payload can never be reported
+  # as an outage.
+  lost=$(printf '%s' "$out" | "$JQ" -r '.result.connectionLost // false' 2>/dev/null) || lost=false
+  ok=$(printf '%s' "$out" | "$JQ" -r '.ok // true' 2>/dev/null) || ok=true
+  if [ "$rc" -ne 0 ] || [ "$ok" = false ] || [ "$lost" = true ]; then
+    ecode=$(printf '%s' "$out" | "$JQ" -r '.error.code // empty' 2>/dev/null) || ecode=""
+    [ "$lost" = true ] && [ -z "$ecode" ] && ecode="connection_lost"
+    echo "[orca-wait] orca check failed (${ecode:-no response}, status $rc) — the runtime is not answering, not the workers being quiet; run \`orca status --json\` before waiting again" >&2
+    exit 4
+  fi
 
   count=$(printf '%s' "$out" | "$JQ" -r '.result.count // 0' 2>/dev/null) || count=0
   case "$count" in ''|*[!0-9]*) count=0 ;; esac

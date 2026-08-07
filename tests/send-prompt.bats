@@ -419,10 +419,21 @@ tpl_sections_single_line() {
   [ "$output" != "2594177116 1010" ]
 }
 
-@test "template: the Orca prompt set is byte-identical (out of scope for this change)" {
+@test "template: the Orca prompt set is byte-identical" {
+  # Bumped from 1714004932/4937 when rule [4] gained the ask-timeout contract:
+  # a timeout leaves the question pending, so the worker resumes it instead of
+  # deciding it. Update in the SAME commit as any intentional edit, as above.
   run sh -c "sed -n '/^\*\*Orca substrate\.\*\*/,/^## Subagent usage protocol/p' '$TPL' | cksum"
   [ "$status" -eq 0 ]
-  [ "$output" = "1714004932 4937" ]
+  [ "$output" = "3932390147 5667" ]
+}
+
+@test "template: the Orca ask rule forbids deciding a timed-out question" {
+  # Names the rule the checksum above only pins, so a reword that keeps the
+  # command but drops the obligation is visible in this test's diff.
+  grep -qF 'A timeout is not an answer.' "$TPL"
+  grep -qF 'ask --resume <message_id>' "$TPL"
+  grep -qF 'Do NOT decide it yourself' "$TPL"
 }
 
 @test "template: the REQUIRED block still states its three rules" {
