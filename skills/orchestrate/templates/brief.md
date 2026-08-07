@@ -64,5 +64,16 @@ specific tags below as authority.
     signal -> STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} <phase> worktree=$PWD
   </output_contract>
 
+  <!-- If this task turns out to be much larger than the brief assumed, you may
+       propose splitting it instead of silently running long. A split proposal
+       MUST carry, for each proposed piece, the files it would touch and the
+       outputs it would newly produce — the coordinator decides by testing those
+       files for overlap against every other running task, and a proposal
+       without them cannot be judged at all. Name the parent as `split_of`.
+       Propose once, then wait: the coordinator replies either way, and a
+       rejection is an answer, not silence. A piece that came from a split can
+       never itself be split. -->
+  <split_proposal_rule>propose a split with per-piece `files`, `outputs`, and `split_of`; wait for the reply</split_proposal_rule>
+
 </task_brief>
 ```

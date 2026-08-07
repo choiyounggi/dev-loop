@@ -51,8 +51,12 @@ Claude Code 플러그인 마켓플레이스로 설치되므로, 스킬과 훅이
   (명시된 페이지만 로드, 결정 우선, 공백은 BLOCKED)이 이 루프에 흡수돼
   있습니다.
 - **하나의 목표를 병렬 워커 세션들로 분할** → `orchestrate` 스킬:
-  인테이크 → 분해(승인 게이트) → 웨이브별 계획(wiki-plan) → 구현 + 리뷰
+  인테이크 → 분해(승인 게이트) → 디스패치 루프: 계획(wiki-plan) → 구현 + 리뷰
   (각 세션이 `loop-implement` 실행) → 통합 테스트 → 머지 전 게이트 → 머지.
+  웨이브 배리어는 없다: 의존 그래프 + 슬롯 회계가 각 task를 그 task의 의존이
+  승인되고 슬롯이 비는 순간 시작시키므로, 끝난 워커는 배치에서 가장 느린 task를
+  기다리지 않고 바로 다음 일을 받는다. 워커는 자기 task가 브리프의 가정보다
+  훨씬 크다고 판단되면 실행 중에 분할을 제안할 수 있다.
   **substrate는 자동: Orca가 감지되면 스폰 *과 감독*을 Orca가 담당, 아니면 raw
   tmux.** Orca 위에서는 각 페이즈가 추적되는 Task + Dispatch가 되고, 코디네이터는
   상태 파일을 타이머로 폴링하는 대신 푸시되는 `worker_done` / `escalation` /
@@ -162,7 +166,7 @@ fail-closed로 거부됩니다. 게이트는 knowledge-flush PR로 좁게 스코
 | 스킬 | 역할 |
 |-------|------|
 | `loop-implement` | **단일 구현자** — wiki-plan을 소비해 태스크를 순서대로 (각 태스크가 명시한 위키 페이지를 로드하며) 검증 루프로 실행. 계획 단계 = wiki-plan. |
-| `orchestrate` | 하나의 목표를 병렬 워커 세션들로 분할, 각 세션은 loop-implement 실행 — 감지되면 **Orca 위에서**(Task/Dispatch 추적, `worker_done`/`ask`/`escalation` 이벤트 대기, 네이티브 liveness), 아니면 tmux 상태 파일 폴링. 워커는 guardrails `ask`에서 멈추지 않고 에스컬레이션; 죽은 워커 감지. |
+| `orchestrate` | 하나의 목표를 병렬 워커 세션들로 분할, 각 세션은 loop-implement 실행 — 감지되면 **Orca 위에서**(Task/Dispatch 추적, `worker_done`/`ask`/`escalation` 이벤트 대기, 네이티브 liveness), 아니면 tmux 상태 파일 폴링. 스케줄링은 웨이브 배리어가 아니라 의존 그래프 + 슬롯 회계: `ready-set.sh`가 지금 시작해도 되는 task를 판정하고, 슬롯 수는 Gate 1에서 제안·승인되며 `LO_MAX_SESSIONS`가 상한이고, 실패한 의존은 조용한 대기가 아니라 보고되는 교착으로 드러난다. 워커는 guardrails `ask`에서 멈추지 않고 에스컬레이션하며, 실행 중 task 분할을 제안할 수 있고, 죽은 워커는 감지된다. |
 | `wiki-plan` | **고정된 계획 방법론** — 각 결정을 위키 페이지로 라우팅, 순서 있는 페이지-내비게이션 태스크로 분해. |
 | `wiki-ingest` | 검증된 지식을 올바른 시맨틱 레이어에 추가 (knowledge-flush가 사용). |
 | `wiki-query` | 위키에서 인용과 함께 질문에 답변. |

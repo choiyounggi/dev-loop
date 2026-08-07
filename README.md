@@ -51,9 +51,13 @@ Run it two ways:
   executor — the wiki-executor discipline (load only named pages, decisions win,
   BLOCKED-on-gap) is folded into this loop.
 - **A whole goal, split across parallel worker sessions** → the `orchestrate`
-  skill: intake → decompose (approval gate) → per-wave plan (wiki-plan) →
+  skill: intake → decompose (approval gate) → dispatch loop: plan (wiki-plan) →
   implement + review (each session runs `loop-implement`) → integration test →
-  pre-merge gate → merge. **Substrate is automatic: if Orca is detected it drives
+  pre-merge gate → merge. There is no wave barrier: a dependency graph plus slot
+  accounting starts each task the moment its own dependencies are approved and a
+  slot is free, so a finished worker is refilled instead of waiting out its
+  batch's slowest member. A worker that finds its task far larger than the brief
+  assumed can propose splitting it mid-run. **Substrate is automatic: if Orca is detected it drives
   spawn *and supervision*; otherwise raw tmux.** On Orca each phase is a tracked
   Task + Dispatch, and the coordinator blocks on pushed `worker_done` /
   `escalation` / `question` mail instead of polling status files on a timer — so
@@ -164,7 +168,7 @@ ordinary `gh pr create` in any repo.
 | Skill | Role |
 |-------|------|
 | `loop-implement` | **The single implementer** — consumes the wiki-plan and executes its tasks in order (loading each task's named wiki pages) through the verification loop. Plan step = wiki-plan. |
-| `orchestrate` | Split one goal into parallel worker sessions, each running loop-implement — over **Orca when detected** (Task/Dispatch tracking, event-driven `worker_done`/`ask`/`escalation` waits, native liveness), else tmux status-file polling. Workers escalate guardrails `ask`s instead of blocking; dead workers are detected. |
+| `orchestrate` | Split one goal into parallel worker sessions, each running loop-implement — over **Orca when detected** (Task/Dispatch tracking, event-driven `worker_done`/`ask`/`escalation` waits, native liveness), else tmux status-file polling. Scheduling is a dependency graph plus slot accounting, not wave barriers: `ready-set.sh` says what may start now, the slot count is proposed at Gate 1 and bounded by `LO_MAX_SESSIONS`, and a failed dependency surfaces as a reported deadlock rather than a silent wait. Workers escalate guardrails `ask`s instead of blocking, may propose splitting an over-large task mid-run, and dead workers are detected. |
 | `wiki-plan` | **The fixed plan methodology** — route each decision to a wiki page, decompose into ordered, page-navigated tasks. |
 | `wiki-ingest` | Add verified knowledge to the right semantic layer (used by knowledge-flush). |
 | `wiki-query` | Answer a question from the wiki with citations. |

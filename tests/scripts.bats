@@ -131,3 +131,54 @@ setup() {
   # Waves must no longer be described as an execution barrier.
   ! grep -qF 'A later Wave launches only after' "$SKILL"
 }
+
+# Shipped skill content is English-only, and this is how we check it — NOT with
+# a `[가-힣]` character range, which is not portable and produced a green macOS
+# run beside a red Linux one. Measured 2026-08-07 on GNU grep 3.12: in the C
+# locale that range is read as a range of BYTES, so it matches the continuation
+# bytes of ordinary UTF-8 punctuation — every em-dash in the file counts (136
+# lines in SKILL.md), and under C.UTF-8 grep refuses it outright with "Invalid
+# collation character". BSD grep matches nothing at all, which is why the broken
+# assertion still passed locally.
+#
+# Count UTF-8 lead bytes EA-ED instead. The Hangul syllable block U+AC00-U+D7A3
+# encodes with exactly those lead bytes, and nothing in Latin text or its
+# punctuation does. Verified byte-identical on macOS and Ubuntu: 0 for the two
+# English files, 2782 for README.ko.md.
+hangul_bytes() { LC_ALL=C od -An -tx1 "$1" | tr ' ' '\n' | grep -c '^e[a-d]$'; }
+
+@test "negative control: the Hangul check actually detects Hangul" {
+  # The assertion this guards is `== 0`, which any detector that finds nothing
+  # satisfies. That is precisely how the previous version shipped green on macOS
+  # and red on Linux, so pin the other direction too: a file that IS Korean must
+  # come back non-zero, on whatever platform is running.
+  KO="${BATS_TEST_DIRNAME}/../README.ko.md"
+  [ "$(hangul_bytes "$KO")" -gt 0 ]
+}
+
+@test "brief template: a split proposal must carry its file scope" {
+  BRIEF="${BATS_TEST_DIRNAME}/../skills/orchestrate/templates/brief.md"
+  grep -qF 'split proposal' "$BRIEF"
+  # Without the file list the coordinator cannot run the overlap test, so the
+  # requirement has to be stated where the worker reads it, not only in SKILL.md.
+  grep -qF 'files it would touch' "$BRIEF"
+  grep -qF 'split_of' "$BRIEF"
+  # The template ships to users; it stays English-only like SKILL.md.
+  [ "$(hangul_bytes "$BRIEF")" -eq 0 ]
+}
+
+@test "SKILL.md: the split decision procedure is documented and always replies" {
+  SKILL="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
+  grep -qF 'scripts/graph-add.sh' "$SKILL"
+  # The overlap test is the decision; both branches must be spelled out or the
+  # coordinator has to invent one.
+  grep -qF 'overlap' "$SKILL"
+  # Match "same worker" with optional markdown bold formatting.
+  grep -qE '\*\*same\s+worker\*\*|same\s+worker' "$SKILL"
+  # A rejection that is never sent reproduces the v1.4.1 ask-timeout bug: the
+  # worker decides for itself.
+  grep -qF 'reply either way' "$SKILL"
+  # Exit 4 handling must be documented with explicit coordinator actions.
+  grep -qE 'On \*\*4\*\*|exit 4' "$SKILL"
+  [ "$(hangul_bytes "$SKILL")" -eq 0 ]
+}
