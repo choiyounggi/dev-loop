@@ -110,12 +110,23 @@ setup() {
   ! grep -qF 'concurrent-session cap** (default 4)' "$SKILL"
 }
 
-@test "SKILL.md: the dispatch loop cites ready-set exit codes and --tasks" {
+@test "SKILL.md: the dispatch loop structure pins step order and error handling" {
   SKILL="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
-  grep -qF 'scripts/ready-set.sh' "$SKILL"
-  grep -q -- '--tasks' "$SKILL"
-  # exit 3 is the guard this design turns on; it must be spelled out as
-  # "do not wait", or it degrades into the silent stall it exists to prevent.
+  # Step 1 must run ready-set.sh first to decide what is dispatchable.
+  grep -qF '1. `scripts/ready-set.sh' "$SKILL"
+  # Step 1 exit codes 3 and 4 must explicitly return to step 1, not just report
+  # errors. Look for phrases showing re-entry after human intervention or fix.
+  grep -q 'return to' "$SKILL" && grep -q 'step 1' "$SKILL"
+  grep -q 're-run step' "$SKILL"
+  # Step 3 must deliver the implement prompt (was missing in v1); check that
+  # both tmux and Orca paths are mentioned.
+  grep -qF 'deliver §2 (implement)' "$SKILL"
+  grep -qF 'send-prompt.sh send' "$SKILL"
+  # Step 4 must wait, scoped to running ids via --tasks to avoid spin.
+  grep -qF 'watch-status.sh --tasks' "$SKILL"
+  # Step 5 must close the loop by returning to step 1 on approval.
+  grep -q 'approval' "$SKILL" && grep -q 'return to' "$SKILL"
+  # Exit code 3 must be DEADLOCK and documented as "do not wait".
   grep -qF 'DEADLOCK' "$SKILL"
   # Waves must no longer be described as an execution barrier.
   ! grep -qF 'A later Wave launches only after' "$SKILL"

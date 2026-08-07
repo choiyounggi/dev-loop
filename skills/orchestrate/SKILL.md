@@ -139,20 +139,37 @@ answered.
    → **0** dispatch the printed ids, **2** nothing dispatchable but work is in
    flight (go wait for an event), **3** **DEADLOCK** — a failed dependency or a
    cycle: **do not wait**, report it and get a human decision (with no worker
-   running, no event can ever arrive), **4** the graph or status could not be
-   read — refuse, do not guess, **5** every task is in a terminal state → go to Phase 5.
-2. For each dispatched task run steps 1–3 below (O1–O5 on Orca). `<N>` = the
-   number of tasks dispatched in THIS round.
-3. Wait for an event. tmux: `scripts/watch-status.sh --tasks <running ids>
-   <status-dir> impl_done 1` — without `--tasks` the tasks approved in earlier
-   rounds satisfy `expected=1` immediately and the wait spins. Orca:
-   `scripts/orca-wait.sh` unchanged; it is already event-driven.
-4. On wake, handle that task (review → approved, or inject rework), then return
-   to step 1.
-
-**Write each brief at dispatch time.** It only needs the preceding signatures
-that this task actually consumes, and by then those tasks are `approved`, so the
-signatures are settled.
+   running, no event can ever arrive); after the human intervenes, return to
+   step 1 to re-run the check, **4** the graph or status could not be read —
+   refuse, do not guess; fix the error then re-run step 1, **5** every task is
+   in a terminal state → go to Phase 5.
+2. For each dispatched task (`<N>` = the number of tasks in this round):
+   - tmux: **0** (Preceding-interface injection) + steps **1–3** below (setup,
+     brief, launch, watch plan_ready). Orca: **O1–O5**.
+   - **1** `scripts/setup-worktrees.sh <integ> <root> <base> <branch>...` then
+     verify with `git worktree list`.
+   - **2** Per task: write `briefs/<task>.md` (templates/brief.md) — fill
+     `<tools_guidance>` and `<design_spec>` — then launch session and watch
+     until `plan_ready` (step 3 below). **Write the brief at dispatch time.**
+     It only needs the signatures this task consumes, and by then those are
+     `approved`, so they're settled.
+   - **3** Collect `plans/<task>.md` when each session reaches `plan_ready`.
+3. For each planned task, deliver §2 (implement) with `scripts/send-prompt.sh
+   send lo-<n> "<prompt>"` (tmux, see Phase 4 for exit-code branch logic), or
+   `orca orchestration task-create` the implement Task then
+   `scripts/orca-worker-start --task <impl_task> --terminal <handle>` (Orca).
+   On delivery failure, re-run step 3 after fixing the error.
+4. Wait for event. tmux: `scripts/watch-status.sh --tasks <running ids>
+   <status-dir> impl_done <N>` — without `--tasks` the tasks approved in
+   earlier rounds satisfy `expected=<N>` immediately and the wait spins. Orca:
+   `scripts/orca-wait.sh` with the implement Task ids, already event-driven.
+5. On wake, handle that task: review each worktree diff (`git -C <wt> diff
+   <integ>...HEAD`). If tests weak, audit with `test-quality-auditor`. On
+   approval, return to step 1 — whatever dependency it released shows up in the
+   next `ready-set.sh` round and the freed slot refills immediately. On rework
+   needed, write `reviews/<task>-rN.md` and re-deliver with `send-prompt.sh
+   send` (or new Orca Task on same terminal); after 3 failed rounds, escalate.
+   When `ready-set.sh` returns **5**, go to Phase 5.
 
 **Session knobs (tmux substrate, set once per run):** `export LO_RUN_ID=<short-run-id>`
 so every `launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reuse that

@@ -598,9 +598,9 @@ git -c user.name="Younggi Choi" -c user.email="74581798+choiyounggi@users.norepl
 
 Run: `npx bats tests/scripts.bats` → FAIL
 
-- [ ] **Step 3: Phase 3 서두를 디스패치 루프로 바꾼다**
+- [ ] **Step 3: Phase 3+4을 하나의 디스패치 루프로 통합한다**
 
-`**Phases 3–4 repeat per Wave in `## Waves` order.** A later Wave launches only after the previous Wave is fully approved; `<N>` below = the *current* Wave's task count. Single-Wave splits run everyone in parallel (the original behavior).` 를 다음으로 교체:
+`**Phases 3–4 repeat per Wave in `## Waves` order.** A later Wave launches only after the previous Wave is fully approved; `<N>` below = the *current* Wave's task count. Single-Wave splits run everyone in parallel (the original behavior).` 를 삭제하고, 그 자리에 다음을 넣는다:
 
 ```markdown
 **Phases 3–4 are one dispatch loop, not a per-Wave repeat.** Each round:
@@ -609,33 +609,40 @@ Run: `npx bats tests/scripts.bats` → FAIL
    → **0** dispatch the printed ids, **2** nothing dispatchable but work is in
    flight (go wait for an event), **3** **DEADLOCK** — a failed dependency or a
    cycle: **do not wait**, report it and get a human decision (with no worker
-   running, no event can ever arrive), **4** the graph or status could not be
-   read — refuse, do not guess, **5** every task is terminal → go to Phase 5.
-2. For each dispatched task run steps 1–3 below (O1–O5 on Orca). `<N>` = the
-   number of tasks dispatched in THIS round.
-3. Wait for an event. tmux: `scripts/watch-status.sh --tasks <running ids>
-   <status-dir> impl_done 1` — without `--tasks` the tasks approved in earlier
-   rounds satisfy `expected=1` immediately and the wait spins. Orca:
-   `scripts/orca-wait.sh` unchanged; it is already event-driven.
-4. On wake, handle that task (review → approved, or inject rework), then return
-   to step 1.
-
-**Write each brief at dispatch time.** It only needs the preceding signatures
-that this task actually consumes, and by then those tasks are `approved`, so the
-signatures are settled.
+   running, no event can ever arrive); after the human intervenes, return to
+   step 1 to re-run the check, **4** the graph or status could not be read —
+   refuse, do not guess; fix the error then re-run step 1, **5** every task is
+   in a terminal state → go to Phase 5.
+2. For each dispatched task (`<N>` = the number of tasks in this round):
+   - tmux: **0** (Preceding-interface injection) + steps **1–3** below (setup,
+     brief, launch, watch plan_ready). Orca: **O1–O5**.
+   - **1** `scripts/setup-worktrees.sh <integ> <root> <base> <branch>...` then
+     verify with `git worktree list`.
+   - **2** Per task: write `briefs/<task>.md` (templates/brief.md) — fill
+     `<tools_guidance>` and `<design_spec>` — then launch session and watch
+     until `plan_ready` (step 3 below). **Write the brief at dispatch time.**
+     It only needs the signatures this task consumes, and by then those are
+     `approved`, so they're settled.
+   - **3** Collect `plans/<task>.md` when each session reaches `plan_ready`.
+3. For each planned task, deliver §2 (implement) with `scripts/send-prompt.sh
+   send lo-<n> "<prompt>"` (tmux, see Phase 4 for exit-code branch logic), or
+   `orca orchestration task-create` the implement Task then
+   `scripts/orca-worker-start --task <impl_task> --terminal <handle>` (Orca).
+   On delivery failure, re-run step 3 after fixing the error.
+4. Wait for event. tmux: `scripts/watch-status.sh --tasks <running ids>
+   <status-dir> impl_done <N>` — without `--tasks` the tasks approved in
+   earlier rounds satisfy `expected=<N>` immediately and the wait spins. Orca:
+   `scripts/orca-wait.sh` with the implement Task ids, already event-driven.
+5. On wake, handle that task: review each worktree diff (`git -C <wt> diff
+   <integ>...HEAD`). If tests weak, audit with `test-quality-auditor`. On
+   approval, return to step 1 — whatever dependency it released shows up in the
+   next `ready-set.sh` round and the freed slot refills immediately. On rework
+   needed, write `reviews/<task>-rN.md` and re-deliver with `send-prompt.sh
+   send` (or new Orca Task on same terminal); after 3 failed rounds, escalate.
+   When `ready-set.sh` returns **5**, go to Phase 5.
 ```
 
-- [ ] **Step 4: Phase 4의 Wave 문장을 고친다**
-
-`When this Wave's tasks are all approved, return to Phase 3 step 0 for the next Wave (inject its preceding-interface signatures); once the last Wave is approved, go to Phase 5.` 를 교체:
-
-```markdown
-When a task is approved, return to step 1 of the dispatch loop — whatever
-dependency it released shows up in the next `ready-set.sh` round and the freed
-slot is refilled immediately. When `ready-set.sh` returns **5**, go to Phase 5.
-```
-
-- [ ] **Step 5: 재진입 절을 고친다**
+- [ ] **Step 4: 재진입 절을 고친다**
 
 `## Re-entry (resume)` 의 첫 문장 뒤에 추가:
 
@@ -645,9 +652,37 @@ There is no intermediate state such as a Wave index to restore. Reading
 the restored state — the same inputs always yield the same answer.
 ```
 
+- [ ] **Step 5: 강화된 테스트를 작성한다**
+
+`tests/scripts.bats` 의 contract test를 다음으로 교체해서 루프 구조를 검증한다:
+
+```bash
+@test "SKILL.md: the dispatch loop structure pins step order and error handling" {
+  SKILL="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
+  # Step 1 must run ready-set.sh first to decide what is dispatchable.
+  grep -qF '1. `scripts/ready-set.sh' "$SKILL"
+  # Step 1 exit codes must document what happens: exit 3/4 return to step 1,
+  # not "get a human decision" and vanish.
+  grep -qF 'after the human intervenes, return to step 1' "$SKILL"
+  grep -qF 'fix the error then re-run step 1' "$SKILL"
+  # Step 3 must deliver the implement prompt (was missing in v1); it is keyed
+  # off `send-prompt.sh send` on tmux or `task-create` on Orca.
+  grep -qF 'deliver §2 (implement)' "$SKILL"
+  grep -qF 'send-prompt.sh send' "$SKILL"
+  # Step 4 must wait, scoped to running ids via --tasks to avoid spin.
+  grep -qF 'watch-status.sh --tasks' "$SKILL"
+  # Step 5 must return to step 1 on approval, closing the loop.
+  grep -qF 'return to step 1' "$SKILL"
+  # Exit code 3 must be DEADLOCK and documented as "do not wait".
+  grep -qF 'DEADLOCK' "$SKILL"
+  # Waves must no longer be described as an execution barrier.
+  ! grep -qF 'A later Wave launches only after' "$SKILL"
+}
+```
+
 - [ ] **Step 6: 테스트 + 전체 스위트**
 
-Run: `npx bats tests/`
+Run: `npx bats tests/scripts.bats` + `npx bats tests/`
 Expected: 실패 0.
 
 - [ ] **Step 7: 커밋**
