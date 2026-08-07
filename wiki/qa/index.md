@@ -24,12 +24,13 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [generated-artifacts-as-deliverable-source](deliverables/generated-artifacts-as-deliverable-source.md) | Asked to produce a document (ERD, schema reference, API surface list, dependency inventory) for a hand-off, review, or external partner when the repo already generates that content from code; deciding whether to re-run a stale generator or hand-write the deliverable; a hand-written reference document disagrees with the live system (checks that gate a document → document-verification) |
+| [command-transcripts-in-a-document](deliverables/command-transcripts-in-a-document.md) | Pasting a captured CLI run into an RFC, README, or design doc as a worked example; the transcript shows program output and diagnostics together; a reviewer re-running a documented example gets a different order or extra lines; a documented example is being used to argue that one line appears before another |
 
 ## document-verification
 
 | Page | Load when |
 |------|-----------|
-| [spec-document-gates](document-verification/spec-document-gates.md) | Writing or reviewing automated checks (grep/script) that decide whether a spec/RFC/schema document meets its requirements; a document passed its checklist but the requirement is still unmet; choosing what a doc gate must assert beyond keyword presence (table structure, MUST-vs-SHOULD demotion, closed-set completeness, cross-section consistency); validating a gate pattern for a document that does not exist yet |
+| [spec-document-gates](document-verification/spec-document-gates.md) | Writing or reviewing automated checks (grep/script) that decide whether a spec/RFC/schema document meets its requirements; a document passed its checklist but the requirement is still unmet; choosing what a doc gate must assert beyond keyword presence (table structure, MUST-vs-SHOULD demotion, closed-set completeness, cross-section consistency, agreement with a code constant the document copies); a gate over a table asserts the property the table itself claims; validating a gate pattern for a document that does not exist yet |
 | [editing-a-gated-document](document-verification/editing-a-gated-document.md) | Editing or rewording a document that grep/regex gates or a lint config check; a gate fails on wording whose meaning did not change; describing what an upstream spec says without tripping a "do not redefine it" gate; a check matches the pattern your own document quotes; recording an audit verdict inside the document that was audited; deciding which checks to re-run after editing a gated document |
 
 ## environments

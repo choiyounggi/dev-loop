@@ -10,7 +10,7 @@ sources:
   - https://www.gnu.org/software/bash/manual/bash.html#Redirections
   - https://code.claude.com/docs/en/hooks
 last_verified: 2026-08-06
-related: [platforms-processes-non-interactive-cli-invocation, platforms-shells-command-text-inspected-before-execution, testing-quality-checks-that-cannot-pass]
+related: [platforms-processes-non-interactive-cli-invocation, platforms-shells-command-text-inspected-before-execution, testing-quality-checks-that-cannot-pass, qa-deliverables-command-transcripts-in-a-document]
 ---
 
 # Feeding a Tool's Warnings Back When It Exits 0

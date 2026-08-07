@@ -12,7 +12,7 @@ sources:
   - https://man7.org/linux/man-pages/man1/timeout.1.html
   - https://en.wikipedia.org/wiki/Bracketed-paste
 last_verified: 2026-08-04
-related: [platforms-processes-background-services, platforms-tools-bsd-vs-gnu-cli, platforms-shells-portable-shell-scripts, debugging-methodology-hypothesis-testing, platforms-processes-parsing-cli-structured-output, platforms-shells-env-var-off-switches, infrastructure-agent-orchestration-pane-delivery-confirmation]
+related: [platforms-processes-background-services, platforms-tools-bsd-vs-gnu-cli, platforms-shells-portable-shell-scripts, debugging-methodology-hypothesis-testing, platforms-processes-parsing-cli-structured-output, platforms-shells-env-var-off-switches, infrastructure-agent-orchestration-pane-delivery-confirmation, qa-deliverables-command-transcripts-in-a-document]
 ---
 
 # Invoking a Prompt-Capable CLI from a Script or Agent Harness
