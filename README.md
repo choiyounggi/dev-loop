@@ -10,6 +10,12 @@ A Claude Code plugin that merges two things into one self-contained tool:
   best-practices and edge cases, plus a planning methodology that grounds every
   design decision in it.
 
+And it scales past one session: the `orchestrate` skill is a **multi-session
+orchestrator** over the same loop — it decomposes a goal into a dependency
+graph, schedules parallel workers with a ready-set scheduler, and supervises
+them **Orca-natively** when the Orca CLI is installed (raw tmux otherwise).
+See [Orca integration](#orca-integration--supervision-not-just-spawning).
+
 **The one change from upstream loop-orchestrator:** the plan step is no longer an
 optional, pluggable role. It is **fixed to the bundled `wiki-plan` methodology** —
 every non-trivial task plans by routing each design decision to a page in the
@@ -57,8 +63,9 @@ Run it two ways:
   accounting starts each task the moment its own dependencies are approved and a
   slot is free, so a finished worker is refilled instead of waiting out its
   batch's slowest member. A worker that finds its task far larger than the brief
-  assumed can propose splitting it mid-run. **Substrate is automatic: if Orca is detected it drives
-  spawn *and supervision*; otherwise raw tmux.** On Orca each phase is a tracked
+  assumed can propose splitting it mid-run. **Substrate: Orca when detected —
+  offered at the task-split gate — drives spawn *and supervision*; otherwise raw
+  tmux.** On Orca each phase is a tracked
   Task + Dispatch, and the coordinator blocks on pushed `worker_done` /
   `escalation` / `question` mail instead of polling status files on a timer — so
   a worker's blocking question reaches you in seconds. On tmux the original
@@ -102,6 +109,40 @@ A SessionStart hook nudges you (at most weekly, then never) if you haven't
 configured anything — silence it with `DEV_LOOP_CONFIG_NUDGE=0`. Legacy
 `loop-orchestrator` config paths are still read as a fallback. See
 `references/tool-profile.md` and `examples/tools.example.json`.
+
+---
+
+## Orca integration — supervision, not just spawning
+
+`orchestrate` treats Orca as a first-class substrate, not a terminal spawner.
+When the `orca` CLI is on your PATH the coordinator offers it at the task-split
+gate, and from then on the whole run flows through Orca orchestration:
+
+- **Provenance** — one Run per orchestration; every task *phase* (plan /
+  implement / rework / merge-prep) is a tracked Task + Dispatch, so "who is
+  doing what, and did it settle" is queryable state, not a guess.
+- **Event-driven waits** — the coordinator blocks on pushed `worker_done` /
+  `escalation` / `question` mail (`orca-wait.sh`) instead of polling status
+  files on a timer. A worker's blocking `ask` reaches the coordinator in
+  seconds and is answered with `orchestration reply`; a dead Orca runtime is a
+  distinct exit, never a silent timeout.
+- **Env-carrying worker start** — `orca-worker-start.sh` composes the worktree,
+  an agent terminal that carries the guardrails escalation contract
+  (`GROUNDWORK_ESCALATION_DIR` / `GROUNDWORK_TASK_ID`), and the Dispatch
+  binding; on re-entry it probes for a live agent first, so one worktree never
+  ends up with two agents.
+- **Liveness is two questions** — `orca-worktree-alive.sh` (is the terminal
+  there?) *and* `orca-worker-stalled.sh` (is the pane actually moving?) —
+  because a wedged worker passes the first check for hours.
+
+Without Orca, the same run gets the same protections over **raw tmux**,
+file-based: a worker writes a blocking question with `ask-coordinator.sh` and
+the watch surfaces it (exit 6); a silent pane surfaces as a stall (exit 7) with
+a classify-then-act playbook (chooser / usage-limit / finished-but-silent); an
+on-screen chooser is answered with allowlisted key events
+(`send-prompt.sh keys`); and every launch pre-seeds the status record, so a
+worker that dies during planning is caught instead of waited out. The
+guardrails escalation contract is identical on both substrates.
 
 ---
 
@@ -168,7 +209,7 @@ ordinary `gh pr create` in any repo.
 | Skill | Role |
 |-------|------|
 | `loop-implement` | **The single implementer** — consumes the wiki-plan and executes its tasks in order (loading each task's named wiki pages) through the verification loop. Plan step = wiki-plan. |
-| `orchestrate` | Split one goal into parallel worker sessions, each running loop-implement — over **Orca when detected** (Task/Dispatch tracking, event-driven `worker_done`/`ask`/`escalation` waits, native liveness), else tmux status-file polling. Scheduling is a dependency graph plus slot accounting, not wave barriers: `ready-set.sh` says what may start now, the slot count is proposed at Gate 1 and bounded by `LO_MAX_SESSIONS`, and a failed dependency surfaces as a reported deadlock rather than a silent wait. Workers escalate guardrails `ask`s instead of blocking, may propose splitting an over-large task mid-run, and dead workers are detected. |
+| `orchestrate` | **The multi-session orchestrator** — split one goal into parallel worker sessions, each running loop-implement — over **Orca when detected** (Task/Dispatch tracking, event-driven `worker_done`/`ask`/`escalation` waits, native liveness), else tmux with a hardened watch (worker question channel, stall surfacing, allowlisted chooser keys). Scheduling is a dependency graph plus slot accounting, not wave barriers: `ready-set.sh` says what may start now, the slot count is proposed at Gate 1 and bounded by `LO_MAX_SESSIONS`, and a failed dependency surfaces as a reported deadlock rather than a silent wait. Per-role model selection: a cheap worker model, a strong planner/auditor. Workers escalate guardrails `ask`s instead of blocking, may propose splitting an over-large task mid-run, and dead workers are detected. |
 | `wiki-plan` | **The fixed plan methodology** — route each decision to a wiki page, decompose into ordered, page-navigated tasks. |
 | `wiki-ingest` | Add verified knowledge to the right semantic layer (used by knowledge-flush). |
 | `wiki-query` | Answer a question from the wiki with citations. |
