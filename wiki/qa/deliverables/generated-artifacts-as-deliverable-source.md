@@ -10,7 +10,7 @@ sources:
   - https://google.github.io/styleguide/docguide/best_practices.html — keep documentation sources close to the code they describe so they change together
 last_verified: 2026-08-04
 related:
-  [frontend-state-derived-state, qa-document-verification-spec-document-gates]
+  [frontend-state-derived-state, qa-document-verification-spec-document-gates, qa-deliverables-exclusivity-and-absence-claims]
 ---
 
 # A Requested Deliverable Duplicating an Artifact the Repo Already Generates

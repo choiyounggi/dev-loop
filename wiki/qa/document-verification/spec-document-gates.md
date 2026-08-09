@@ -20,6 +20,7 @@ related:
     testing-quality-tests-that-cannot-fail,
     platforms-environment-unicode-text-matching,
     qa-deliverables-generated-artifacts-as-deliverable-source,
+    qa-deliverables-exclusivity-and-absence-claims,
   ]
 ---
 

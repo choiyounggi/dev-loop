@@ -58,6 +58,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [exception-handling](common/errors/exception-handling.md) | Writing a catch block or deciding where errors are handled/logged/translated in a service — catch placement, log-once, wrapping with cause preserved, typed results for expected outcomes; one fault producing duplicate alerts |
+| [diagnostics-from-a-shared-code-path](common/errors/diagnostics-from-a-shared-code-path.md) | Writing or reviewing a rejection/validation message emitted by one function several callers reach (a check shared by two syntaxes, request and response, two config blocks) — especially when the message names a construct in literal text or tells the author what to write instead; a user reports a rejection naming a construct they did not write |
 | [async-failure-handling](common/errors/async-failure-handling.md) | Handing work to in-process async (@Async, unawaited futures/promises) — deciding fire-and-forget vs consumed future vs durable job; side effects silently never happening with no error logs; unobserved futures; async work enqueued inside a transaction |
 
 ### auth

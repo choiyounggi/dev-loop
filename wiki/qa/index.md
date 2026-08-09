@@ -24,6 +24,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [generated-artifacts-as-deliverable-source](deliverables/generated-artifacts-as-deliverable-source.md) | Asked to produce a document (ERD, schema reference, API surface list, dependency inventory) for a hand-off, review, or external partner when the repo already generates that content from code; deciding whether to re-run a stale generator or hand-write the deliverable; a hand-written reference document disagrees with the live system (checks that gate a document → document-verification) |
+| [exclusivity-and-absence-claims](deliverables/exclusivity-and-absence-claims.md) | About to write or review a sentence claiming exclusivity or absence in a spec/RFC/README ("the only way is Y", "exactly two forms", "this cannot be expressed", "no path produces Z"); a reader reports a case the document calls impossible; deciding whether to enumerate forms or state the rule that generates them |
 
 ## document-verification
 

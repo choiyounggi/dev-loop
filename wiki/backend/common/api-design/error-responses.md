@@ -9,7 +9,7 @@ sources:
   - https://www.rfc-editor.org/rfc/rfc9110
   - https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status
 last_verified: 2026-07-10
-related: [backend-common-errors-exception-handling]
+related: [backend-common-errors-exception-handling, backend-common-errors-diagnostics-from-a-shared-code-path]
 ---
 
 # Choosing Status Codes and an Error Body Shape for an API
