@@ -45,12 +45,33 @@ auto-mode permission classifier hard-flags as privilege escalation. It cannot
 see the context that makes this safe (each worker worktree carries a guardrails
 deny-net that still blocks dangerous commands in bypass mode and escalates
 `ask` rules to you), so under an auto-mode coordinator the launch may be
-DENIED. If that happens: do **not** work around the block — an agent widening
-its own permissions is itself classifier-blocked, by design, so only the user
-can clear it. Show them this snippet for the project's
-`.claude/settings.local.json`, then stop until it is added (substitute the real
-plugin cache path; `safe-cleanup.sh` is deliberately absent so destructive
-verbs keep their normal review):
+DENIED. Handle this at onboarding, not at the first failure:
+
+1. **Probe once, read-only**, during Preflight:
+   `sh {SKILL}/scripts/install-permission-rules.sh --check` — exit 0 rules
+   present (nothing to do), **4** absent, 3 the settings file is malformed
+   (surface that to the user; fix before anything else).
+2. **On 4, ask the user — never install silently.** One question: "orchestrate's
+   tmux workers launch with permission prompts off (guardrails-sandboxed);
+   pre-approve the three worker-management scripts in ~/.claude/settings.json?"
+   Show what it adds (the snippet below). A plugin that widens permissions
+   without a fresh explicit yes is the supply-chain pattern guardrails exists
+   to stop — and the fresh consent is also what lets the classifier pass the
+   write at all.
+3. **On an explicit yes**, run `sh {SKILL}/scripts/install-permission-rules.sh`
+   (idempotent; backs up, refuses a malformed target, atomic write). On no —
+   or if the installer itself is classifier-blocked — fall back to showing the
+   snippet for the user to paste themselves, then continue; the launch will
+   simply prompt (default mode) or deny (auto mode) until it lands.
+4. If a launch is DENIED later anyway: do **not** work around the block — an
+   agent widening its own permissions on its own initiative is itself
+   classifier-blocked, by design. Re-offer step 2 and stop until the user
+   decides.
+
+What the installer adds (equivalently pasteable into
+`.claude/settings.local.json` per-project, or `~/.claude/settings.json`
+globally; `safe-cleanup.sh` is deliberately absent so destructive verbs keep
+their normal review):
 
 ```json
 {
