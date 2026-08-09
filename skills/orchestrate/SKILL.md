@@ -39,6 +39,39 @@ advisory only; this skill must hard-require them). For a missing tmux: with the
 user's consent, install it (macOS: `brew install tmux`; otherwise advise) before
 launching sessions. Never auto-install without consent.
 
+**Coordinator permissions (tmux substrate).** `launch-session.sh` starts each
+worker as `claude --permission-mode bypassPermissions` — the exact surface an
+auto-mode permission classifier hard-flags as privilege escalation. It cannot
+see the context that makes this safe (each worker worktree carries a guardrails
+deny-net that still blocks dangerous commands in bypass mode and escalates
+`ask` rules to you), so under an auto-mode coordinator the launch may be
+DENIED. If that happens: do **not** work around the block — an agent widening
+its own permissions is itself classifier-blocked, by design, so only the user
+can clear it. Show them this snippet for the project's
+`.claude/settings.local.json`, then stop until it is added (substitute the real
+plugin cache path; `safe-cleanup.sh` is deliberately absent so destructive
+verbs keep their normal review):
+
+```json
+{
+  "permissions": { "allow": [
+    "Bash(sh /Users/<you>/.claude/plugins/cache/*/dev-loop/*/skills/orchestrate/scripts/launch-session.sh *)",
+    "Bash(sh /Users/<you>/.claude/plugins/cache/*/dev-loop/*/skills/orchestrate/scripts/send-prompt.sh *)",
+    "Bash(sh /Users/<you>/.claude/plugins/cache/*/dev-loop/*/skills/orchestrate/scripts/watch-status.sh *)"
+  ]},
+  "autoMode": { "allow": [
+    "$defaults",
+    "Running the dev-loop orchestrate plugin's worker-management scripts (launch-session.sh, send-prompt.sh, watch-status.sh) is allowed, including launch-session.sh starting a tmux worker with `claude --permission-mode bypassPermissions`: the user sanctioned this orchestration workflow, and each worker worktree is sandboxed by groundwork guardrails, which still blocks dangerous commands in bypass mode and escalates `ask` rules to the coordinator. This does NOT extend to safe-cleanup.sh or other destructive commands, which keep their normal review."
+  ]}
+}
+```
+
+The path rules cover full-path invocations; the `autoMode.allow` rule teaches
+the classifier the context so variable-form invocations (`sh $SKILL/scripts/…`)
+pass too. The Orca substrate does not spawn through `launch-session.sh`, but
+its worker terminals embed the same flag — if a classifier flags those, the
+same `autoMode.allow` rule is the fix.
+
 ## Phase 0 — Intake + Clarify
 Two ways the work-list arrives:
 - **`intake` role configured** (e.g. an issue tracker) → if the user names a parent

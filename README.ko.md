@@ -143,6 +143,17 @@ Orca가 없어도 같은 런이 **raw tmux** 위에서 같은 보호를 파일 �
 플래닝 중에 죽은 워커도 기다리지 않고 잡습니다. guardrails 에스컬레이션 규약은
 두 기판에서 동일합니다.
 
+**auto 모드 코디네이터를 위한 셋업 노트 (tmux):** 런처는 각 워커를
+`claude --permission-mode bypassPermissions`로 띄우는데, auto 모드 권한
+분류기는 이를 권한 상승으로 플래그합니다 — 이를 안전하게 만드는 guardrails
+deny-net을 분류기는 볼 수 없기 때문입니다. 코디네이터 세션이 auto 모드로
+돌아간다면 워커 관리 스크립트 3개(`launch-session.sh`, `send-prompt.sh`,
+`watch-status.sh`)를 프로젝트의 `.claude/settings.local.json`에 사전
+승인하세요 — 정확한 `permissions.allow` + `autoMode.allow` 스니펫은
+orchestrate SKILL.md의 Preflight 섹션에 있습니다. `safe-cleanup.sh`는 파괴적
+verb가 일반 검토를 계속 받도록 의도적으로 제외했고, 차단당한 코디네이터는
+분류기를 우회하는 대신 스니펫을 보여주고 멈춥니다.
+
 ---
 
 ## 지식 수집 루프
