@@ -10,6 +10,12 @@
   베스트프랙티스·엣지케이스 지식 베이스, 그리고 모든 설계 결정을 거기에
   근거시키는 계획 방법론.
 
+그리고 세션 하나를 넘어 확장됩니다: `orchestrate` 스킬은 같은 루프 위의
+**멀티 세션 오케스트레이터**입니다 — 목표를 의존 그래프로 분해하고, ready-set
+스케줄러로 병렬 워커들을 스케줄하며, Orca CLI가 설치돼 있으면 **Orca
+네이티브**로 감독합니다(없으면 raw tmux).
+[Orca 연동](#orca-연동--스폰이-아니라-감독) 참고.
+
 **업스트림 loop-orchestrator에서 바뀐 단 한 가지:** 계획 단계가 더 이상
 선택적·플러거블 role이 아닙니다. **번들된 `wiki-plan` 방법론에 고정**되어 —
 비단순 태스크는 코드를 쓰기 전에 모든 설계 결정을 번들 `wiki/`의 페이지로
@@ -57,8 +63,9 @@ Claude Code 플러그인 마켓플레이스로 설치되므로, 스킬과 훅이
   승인되고 슬롯이 비는 순간 시작시키므로, 끝난 워커는 배치에서 가장 느린 task를
   기다리지 않고 바로 다음 일을 받는다. 워커는 자기 task가 브리프의 가정보다
   훨씬 크다고 판단되면 실행 중에 분할을 제안할 수 있다.
-  **substrate는 자동: Orca가 감지되면 스폰 *과 감독*을 Orca가 담당, 아니면 raw
-  tmux.** Orca 위에서는 각 페이즈가 추적되는 Task + Dispatch가 되고, 코디네이터는
+  **substrate: Orca가 감지되면 — 태스크 분할 게이트에서 제안됨 — 스폰 *과
+  감독*을 Orca가 담당, 아니면 raw tmux.** Orca 위에서는 각 페이즈가 추적되는
+  Task + Dispatch가 되고, 코디네이터는
   상태 파일을 타이머로 폴링하는 대신 푸시되는 `worker_done` / `escalation` /
   `question` 메일에 블로킹합니다 — 워커의 질문이 수 초 안에 도달합니다. tmux에서는
   기존 상태 파일 폴링이 그대로입니다. 어느 쪽이든 워커 세션은 guardrails `ask`에서
@@ -102,6 +109,39 @@ loop-orchestrator처럼 dev-loop은 설정 **없이도** 완전히 범용으로 
 넛지합니다(최대 주 1회, 이후 없음) — `DEV_LOOP_CONFIG_NUDGE=0`으로 끌 수
 있습니다. 레거시 `loop-orchestrator` 설정 경로도 fallback으로 읽습니다.
 `references/tool-profile.md`와 `examples/tools.example.json`을 보세요.
+
+---
+
+## Orca 연동 — 스폰이 아니라 감독
+
+`orchestrate`는 Orca를 터미널 스포너가 아니라 **1급 기판**으로 다룹니다.
+`orca` CLI가 PATH에 있으면 코디네이터가 태스크 분할 게이트에서 Orca를 제안하고,
+그때부터 런 전체가 Orca 오케스트레이션 위로 흐릅니다:
+
+- **계보(Provenance)** — 오케스트레이션 런당 하나의 Run; 모든 태스크 *페이즈*
+  (plan / implement / rework / merge-prep)가 추적되는 Task + Dispatch가 되어,
+  "누가 무엇을 하고 있고, 정산됐는가"가 추측이 아니라 조회 가능한 상태입니다.
+- **이벤트 기반 대기** — 코디네이터는 상태 파일을 타이머로 폴링하는 대신
+  푸시되는 `worker_done` / `escalation` / `question` 메일(`orca-wait.sh`)에
+  블로킹합니다. 워커의 블로킹 `ask`는 몇 초 안에 코디네이터에 도달하고
+  `orchestration reply`로 응답됩니다. 죽은 Orca 런타임은 조용한 타임아웃이
+  아니라 구분되는 exit로 드러납니다.
+- **환경변수를 실어 나르는 워커 기동** — `orca-worker-start.sh`가 워크트리,
+  guardrails 에스컬레이션 규약(`GROUNDWORK_ESCALATION_DIR` /
+  `GROUNDWORK_TASK_ID`)을 실은 에이전트 터미널, Dispatch 바인딩을 한 번에
+  구성합니다. 재진입 시에는 살아 있는 에이전트를 먼저 탐침하므로 하나의
+  워크트리에 에이전트가 둘 생기지 않습니다.
+- **생존 감지는 두 가지 질문** — `orca-worktree-alive.sh`(터미널이 있는가?)
+  **그리고** `orca-worker-stalled.sh`(pane이 실제로 움직이는가?) — 멈춘 워커는
+  첫 번째 검사를 몇 시간이고 통과하기 때문입니다.
+
+Orca가 없어도 같은 런이 **raw tmux** 위에서 같은 보호를 파일 기반으로 받습니다:
+워커는 `ask-coordinator.sh`로 블로킹 질문을 기록하고 감시가 이를 표면화하며
+(exit 6), 조용해진 pane은 스톨로 표면화되고(exit 7, 분류 후 대응 플레이북:
+선택 UI / 사용량 한도 / 완료했지만 무보고), 화면에 뜬 선택 UI는 허용목록 키
+이벤트(`send-prompt.sh keys`)로 응답하고, 모든 런치가 status 레코드를 선기록해
+플래닝 중에 죽은 워커도 기다리지 않고 잡습니다. guardrails 에스컬레이션 규약은
+두 기판에서 동일합니다.
 
 ---
 
@@ -166,7 +206,7 @@ fail-closed로 거부됩니다. 게이트는 knowledge-flush PR로 좁게 스코
 | 스킬 | 역할 |
 |-------|------|
 | `loop-implement` | **단일 구현자** — wiki-plan을 소비해 태스크를 순서대로 (각 태스크가 명시한 위키 페이지를 로드하며) 검증 루프로 실행. 계획 단계 = wiki-plan. |
-| `orchestrate` | 하나의 목표를 병렬 워커 세션들로 분할, 각 세션은 loop-implement 실행 — 감지되면 **Orca 위에서**(Task/Dispatch 추적, `worker_done`/`ask`/`escalation` 이벤트 대기, 네이티브 liveness), 아니면 tmux 상태 파일 폴링. 스케줄링은 웨이브 배리어가 아니라 의존 그래프 + 슬롯 회계: `ready-set.sh`가 지금 시작해도 되는 task를 판정하고, 슬롯 수는 Gate 1에서 제안·승인되며 `LO_MAX_SESSIONS`가 상한이고, 실패한 의존은 조용한 대기가 아니라 보고되는 교착으로 드러난다. 워커는 guardrails `ask`에서 멈추지 않고 에스컬레이션하며, 실행 중 task 분할을 제안할 수 있고, 죽은 워커는 감지된다. |
+| `orchestrate` | **멀티 세션 오케스트레이터** — 하나의 목표를 병렬 워커 세션들로 분할, 각 세션은 loop-implement 실행 — 감지되면 **Orca 위에서**(Task/Dispatch 추적, `worker_done`/`ask`/`escalation` 이벤트 대기, 네이티브 liveness), 아니면 강화된 감시의 tmux(워커 질문 채널, 스톨 표면화, 허용목록 선택 UI 키). 스케줄링은 웨이브 배리어가 아니라 의존 그래프 + 슬롯 회계: `ready-set.sh`가 지금 시작해도 되는 task를 판정하고, 슬롯 수는 Gate 1에서 제안·승인되며 `LO_MAX_SESSIONS`가 상한이고, 실패한 의존은 조용한 대기가 아니라 보고되는 교착으로 드러난다. 역할별 모델 선택: 워커는 저렴한 모델, 플래너/감사자는 강한 모델. 워커는 guardrails `ask`에서 멈추지 않고 에스컬레이션하며, 실행 중 task 분할을 제안할 수 있고, 죽은 워커는 감지된다. |
 | `wiki-plan` | **고정된 계획 방법론** — 각 결정을 위키 페이지로 라우팅, 순서 있는 페이지-내비게이션 태스크로 분해. |
 | `wiki-ingest` | 검증된 지식을 올바른 시맨틱 레이어에 추가 (knowledge-flush가 사용). |
 | `wiki-query` | 위키에서 인용과 함께 질문에 답변. |
