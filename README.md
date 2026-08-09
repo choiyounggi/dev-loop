@@ -144,6 +144,18 @@ on-screen chooser is answered with allowlisted key events
 worker that dies during planning is caught instead of waited out. The
 guardrails escalation contract is identical on both substrates.
 
+**One setup note for auto-mode coordinators (tmux):** the launcher starts each
+worker as `claude --permission-mode bypassPermissions`, which an auto-mode
+permission classifier flags as privilege escalation — it cannot see the
+guardrails deny-net that makes it safe. If your coordinator session runs in
+auto mode, pre-approve the three worker-management scripts
+(`launch-session.sh`, `send-prompt.sh`, `watch-status.sh`) in the project's
+`.claude/settings.local.json` — the exact `permissions.allow` +
+`autoMode.allow` snippet is in the orchestrate SKILL.md's Preflight section.
+`safe-cleanup.sh` is deliberately excluded so destructive verbs keep their
+normal review, and a blocked coordinator will show you the snippet and stop
+rather than work around the classifier.
+
 ---
 
 ## The knowledge-capture loop
