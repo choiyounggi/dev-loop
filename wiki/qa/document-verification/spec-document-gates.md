@@ -13,13 +13,14 @@ sources:
   - https://docs.vale.sh/checks/occurrence
   - https://github.com/DavidAnson/markdownlint/blob/main/doc/md056.md
   - https://github.com/DavidAnson/markdownlint/issues/1206
-last_verified: 2026-07-30
+last_verified: 2026-08-09
 related:
   [
     qa-process-acceptance-criteria,
     testing-quality-tests-that-cannot-fail,
     platforms-environment-unicode-text-matching,
     qa-deliverables-generated-artifacts-as-deliverable-source,
+    qa-document-verification-generated-reference-drift-gates,
   ]
 ---
 

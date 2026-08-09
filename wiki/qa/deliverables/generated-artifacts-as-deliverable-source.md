@@ -8,9 +8,9 @@ sources:
   - https://www.writethedocs.org/guide/writing/docs-principles/ — "Eliminate content overlap between separate sources"; sources must be "clearly defined and disjoint" to prevent parallel maintenance of the same information
   - https://learn.openapis.org/best-practices.html — a single OpenAPI description acts as the single source of truth for both the product and its docs
   - https://google.github.io/styleguide/docguide/best_practices.html — keep documentation sources close to the code they describe so they change together
-last_verified: 2026-08-04
+last_verified: 2026-08-09
 related:
-  [frontend-state-derived-state, qa-document-verification-spec-document-gates]
+  [frontend-state-derived-state, qa-document-verification-spec-document-gates, qa-document-verification-generated-reference-drift-gates]
 ---
 
 # A Requested Deliverable Duplicating an Artifact the Repo Already Generates
