@@ -148,13 +148,15 @@ guardrails escalation contract is identical on both substrates.
 worker as `claude --permission-mode bypassPermissions`, which an auto-mode
 permission classifier flags as privilege escalation — it cannot see the
 guardrails deny-net that makes it safe. If your coordinator session runs in
-auto mode, pre-approve the three worker-management scripts
-(`launch-session.sh`, `send-prompt.sh`, `watch-status.sh`) in the project's
-`.claude/settings.local.json` — the exact `permissions.allow` +
-`autoMode.allow` snippet is in the orchestrate SKILL.md's Preflight section.
-`safe-cleanup.sh` is deliberately excluded so destructive verbs keep their
-normal review, and a blocked coordinator will show you the snippet and stop
-rather than work around the classifier.
+auto mode, the three worker-management scripts (`launch-session.sh`,
+`send-prompt.sh`, `watch-status.sh`) need pre-approval. The coordinator
+handles this at onboarding: it probes read-only
+(`install-permission-rules.sh --check`), and if the rules are missing it asks
+you **once** — on your explicit yes it runs the bundled installer (idempotent,
+backed-up, atomic; never silent), otherwise it shows you the snippet to paste
+yourself. `safe-cleanup.sh` is deliberately excluded so destructive verbs keep
+their normal review, and a blocked coordinator stops and re-asks rather than
+working around the classifier.
 
 ---
 
