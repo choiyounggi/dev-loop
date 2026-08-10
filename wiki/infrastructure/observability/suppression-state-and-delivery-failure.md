@@ -27,30 +27,41 @@ You are adding notification suppression to a script or service — a cooldown
 file, a "last alerted at" timestamp, a sent-marker key — so a repeating
 condition does not notify on every tick. Also when the code has such a marker
 and you are choosing where its write goes, or writing the tests for it against
-a stub whose send always fails.
+a stub whose send always fails. Also when a condition stayed live while the
+channel went quiet for the whole cooldown window.
 
 Choosing *whether* a condition notifies at all →
 [infrastructure-observability-alerting].
 
 ## Do this
 
-1. **Write the suppression mark only on a send that reported success**, and
-   return the send's failure to the caller so the next tick retries. Alertmanager
-   orders its pipeline this way: `RetryStage` "notifies via passed integration
-   with exponential backoff until it succeeds", and only then `SetNotifiesStage`
-   "sets the notification information about passed alerts. The passed alerts
-   should have already been sent to the receivers."
+1. **Write the suppression mark only on a send that reported success**, so a
+   failed send leaves the condition unmarked and the next tick sends again. Alertmanager
+   states the same precondition on the stage that records delivery:
+   `SetNotifiesStage` "sets the notification information about passed alerts. The
+   passed alerts should have already been sent to the receivers", while
+   `RetryStage` "notifies via passed integration with exponential backoff until it
+   succeeds". The package docs describe the stages without stating an order; the
+   ordering follows from that precondition, and from `DedupStage` filtering
+   "based on a notification log" that only a delivered notification writes.
 
-2. **Give the send its own exit status.** In a shell notifier, that is
-   `notify "$@" || return 1` before the marker line; in a service, a send that
-   returns an error rather than logging and continuing. A notifier that always
-   succeeds gives the marker nothing to condition on.
+2. **Give the send its own exit status, and put the marker write inside the
+   success branch.** In a shell notifier that is `if notify "$@"; then <write
+   mark>; fi`; in a service, a send that returns an error instead of logging and
+   continuing. A notifier that always succeeds gives the marker nothing to
+   condition on.
+
+| Shell shape | Behaviour |
+|---|---|
+| `if notify "$@"; then <write mark>; fi` | The marker is unreachable on failure, at top level and inside a function alike, and the caller's status is unchanged |
+| `notify "$@" \|\| return 1` inside a function whose caller checks the status | Equivalent, and it also stops the rest of that function — under `set -e` the nonzero status propagates and aborts the caller, so use it only where aborting is the intent |
+| `notify "$@" \|\| return 1` at the top level of a script | `return` outside a function is an error; execution falls through to the marker line and the script still exits 0 — the defect this page is about, hidden behind a success code |
 
 3. **Make the send path injectable** — a command name, a function reference, or
    an interface the test substitutes — so the suppression logic can be exercised
    against both a succeeding and a failing sender.
 
-4. **Assert both worlds, as two tests:**
+4. **Assert both worlds, as the three tests below:**
 
 | Test world | Assert |
 |---|---|
@@ -86,13 +97,13 @@ Choosing *whether* a condition notifies at all →
 | If you are about to | Do this instead | Why |
 |---------------------|-----------------|-----|
 | Write the cooldown mark before calling the notifier | Call the notifier, check its status, write the mark on success | A delivery failure then buys silence for the whole window, at the moment the condition is live |
-| Let the notifier swallow its own error and always return 0 | Propagate the send's status and condition the mark on it | With no status there is no way to distinguish "sent" from "attempted" |
+| Let the notifier swallow its own error and always return 0 | Return the send's status and put the mark inside `if notify "$@"; then … fi` | With no status there is no way to distinguish "sent" from "attempted" |
 | Accept a suite that only ever runs the always-failing stub | Add the succeeding-sender world as a second harness fixture | A single-world harness reports the same verdict for correct and defective ordering ([testing-quality-harness-reverse-controls]) |
 | Widen the cooldown window because the channel is noisy | Group or route at the alert level and keep the window short | A long window and a lost send compound: the first failure hides the condition for the full window |
 
 ## Sources
 
-- https://pkg.go.dev/github.com/prometheus/alertmanager/notify — pipeline stage ordering: `RetryStage` "notifies via passed integration with exponential backoff until it succeeds. It aborts if the context is canceled or timed out."; `SetNotifiesStage` "sets the notification information about passed alerts. The passed alerts should have already been sent to the receivers."; `DedupStage` "filters alerts. Filtering happens based on a notification log." — dedup reads the log that is written only after delivery
+- https://pkg.go.dev/github.com/prometheus/alertmanager/notify — stage contracts: `RetryStage` "notifies via passed integration with exponential backoff until it succeeds. It aborts if the context is canceled or timed out."; `SetNotifiesStage` "sets the notification information about passed alerts. The passed alerts should have already been sent to the receivers."; `DedupStage` "filters alerts. Filtering happens based on a notification log." — dedup reads the log that is written only after delivery
 - https://runbooks.prometheus-operator.dev/runbooks/general/watchdog/ — the Watchdog is "an alert meant to ensure that the entire alerting pipeline is functional", "always firing", and "if not firing then it should alert external systems that this alerting system is no longer working" — the external heartbeat of step 5
-- https://prometheus.io/docs/alerting/latest/configuration/ — `repeat_interval` as the interval before a notification is repeated, i.e. suppression state keyed to a prior *notification*, not to a prior attempt
-- Field measurement 2026-08-07 (rtb-mac-server-k8s, `bin/gitops-deploy.sh`): the `alert-main-fetch` marker was written after a send whose webhook lookup had failed, so the following invocation suppressed the alert as "in cooldown". Applying `notify "$@" || return 1` before the marker, in a copy outside the repo, turned three existing tests red — the suite's always-failing stub had fixed the pre-send ordering as the expected contract
+- https://prometheus.io/docs/alerting/latest/configuration/ — `repeat_interval` is "How long to wait before repeating the last notification"; the suppression clock is described in terms of a notification, and the page states nothing about delivery attempts (so the attempt-vs-delivery distinction rests on the notify-package citation above, not on this one)
+- Field measurement 2026-08-07 (rtb-mac-server-k8s, `bin/gitops-deploy.sh`): the `alert-main-fetch` marker was written after a send whose webhook lookup had failed, so the following invocation suppressed the alert as "in cooldown". Moving the marker inside `if slack "$@"; then printf '%s' "$now" > "$f"; fi`, in a copy outside the repo, turned three existing tests red — the suite's always-failing stub had fixed the pre-send ordering as the expected contract
