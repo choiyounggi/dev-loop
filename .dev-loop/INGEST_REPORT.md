@@ -206,3 +206,49 @@ Plumbing updated: `wiki/backend/index.md` (+1 row), `wiki/infrastructure/index.m
 Checked before commit: both new pages are under the 120-line body limit (76 and 78),
 carry no banned vague qualifiers, and every `related:` id and inline `[page-id]`
 reference resolves to a file in `wiki/`.
+
+## Decision Log
+
+Cross-Check: independent adversarial review (claude CLI headless, `--permission-mode plan`,
+prompted to refute and to re-fetch every cited URL) returned 1 Critical + 11 Warnings +
+4 Info; all were reproduced locally and fixed before this PR was opened — see below.
+
+**Intent.** Drain the 3 pending `~/.dev-loop/queue` candidates into reviewed wiki
+content: 2 as new pages here, 1 folded into open PR #52 because that PR already owns
+the trigger. No sibling duplicate PR was opened, and nothing is auto-merged.
+
+**What the cross-check changed (nothing here is the queued text as harvested).**
+
+| # | Finding | Fix applied |
+|---|---------|-------------|
+| Critical 1 | The suppression page prescribed `notify "$@" \|\| return 1` before the marker. Reproduced: at a script's top level `return` errors, execution **falls through to the marker write**, and the script exits 0 — the page's own snippet reproduced the defect the page exists to prevent. The cited repo ships `if slack "$@"; then …; fi` (`bin/gitops-deploy.sh:91`) | Prescribe the shipped shape; add a 3-row table covering top-level, in-function, and `set -e` propagation |
+| Warning 3 | The notify package docs state the stages' **contracts**, not their order | Present the ordering as following from `SetNotifiesStage`'s precondition + `DedupStage`'s notification log, not as stated by the page |
+| Warning 4 | Current `repeat_interval` docs no longer carry the attempt-vs-delivery wording | Dropped that clause; the distinction now rests only on the notify citation |
+| Warning 6 | `ts.createSourceFile` was named as the stripper. Verified against TypeScript 5: `sourceFile.comments === undefined`, no comment node in the AST — a silent no-op, the exact failure class the page is about | Name `ts.getLeadingCommentRanges`, `espree.parse(…, {comment:true})`, `@babel/parser` `parse(src).comments` |
+| Warning 8 | "green by construction" was claimed for the whole step-6 control, but its reformat half still reddens a bounded pattern with no comment involved (reproduced) | Scoped to the comment-only half; the reformat half tests N |
+| Warning 9 | The no-parser fallback filtered whole comment lines, which misses **trailing** comments — the leak that motivates the page (reproduced: count 2 vs 1) | Cut each line to EOL |
+| Warning 11 | The two-run differ assertion passes vacuously on a non-deterministic consumer (LLM scorer, sampling) — a class the page explicitly invites | Added the edge row: pin seed/temperature or stub before comparing |
+| Warnings 2, 5, 10, 12; Info 13–15 | prose/table count mismatch; a measurement labelled "parser-equivalent" when a regex was run; N's subject unstated; index "load when" clauses absent from "When this applies"; unverifiable line-count and version pins; one prohibition outside `Instead of` | All applied |
+
+**Where the reviewer was wrong, and how I checked.** Info 14 claimed the loud/silent
+split was not reproducible because a sibling copy reads `it["desc"]` by subscript. I
+opened the actual engine: `manday-sp/engine.py:399` is `d = it.get("desc") or ""`
+(silent) and `check_assignee_ids` at 511 enforces key presence (loud). The measurement
+stands; the reviewer's underlying point — that the split is a property of the read
+site, so pin file:line — was right and is now in the page.
+
+**Alternatives rejected.** (a) Ingesting I3 as its own page — rejected: #52 owns the
+trigger, and a sibling page is the pile-up this skill exists to prevent (#39). (b)
+Only commenting on #52 instead of pushing — rejected: the change is a new step plus
+six table rows, which is a diff to review, not a note. (c) Shipping the queued
+strip-regex directive verbatim — rejected: measured, it corrupts string and regex
+literals, so it would have traded a false-positive class for a silent-corruption one.
+(d) Adding the reciprocal `related:` id to `call-site-enumeration` — rejected: five
+open PRs already edit that file and the backlink would be a pure conflict.
+
+**Where a reviewer should look.** The suppression page's step-2 shell table (the
+Critical); the folded page's step 2 API list (a wrong API there is undetectable at
+runtime); and whether `backend/common/integrations` is the right home for I1 versus a
+`change-impact` sibling — that routing call is the least certain thing in this PR.
+
+**Not done deliberately.** No `gh pr merge`; both branches are pushed for your review.
