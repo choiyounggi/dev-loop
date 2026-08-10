@@ -193,12 +193,15 @@ occurs only inside an `Instead of` row or a quoted source.
 
 ## Open-PR check
 
-Listed all 17 open `knowledge/*` heads. Three of them (**#72, #52, #49**) have had
-their head branches **deleted on the remote** — `git fetch` of the branch name
-404s, which first showed up as three suspiciously empty `wiki/` diffs. I re-read
-those via `refs/pull/<n>/head` rather than treating an empty diff as "no overlap".
-Consequence: for those three, folding by pushing to their branch is not possible;
-the fold path would be a note on the PR.
+Listed all 17 open `knowledge/*` heads. Three of them (**#72, #52, #49**) produced
+suspiciously **empty** `wiki/` diffs on a first pass, because `git fetch origin
+<branch>` and `repos/choiyounggi/dev-loop/git/refs/heads/<branch>` both 404 for
+them. Rather than read an empty diff as "no overlap", I re-read all three through
+`refs/pull/<n>/head`, and then established the actual cause: those heads live on
+the contributor fork `dch0202-rsquare/dev-loop` (this flush's own account), not on
+upstream — all three refs resolve there (`6a3ff08`, `bd03fbe`, `346dd95`). They are
+alive and pushable, so `fold` was a genuinely available verdict for them; it was
+not taken for the content reasons below. This PR is likewise opened from the fork.
 
 Files touched by each open head, matched against the three candidates:
 
