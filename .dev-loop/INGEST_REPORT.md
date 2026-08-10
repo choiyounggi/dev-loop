@@ -75,11 +75,15 @@ cost moves into the heap recheck — while the plan still reads `Bitmap Index Sc
   index scan instead of trigrams being used." This is what lets the page state the
   rule per wildcard-delimited segment rather than per pattern.
 - https://github.com/pgbigm/pg_bigm/blob/master/docs/pg_bigm_en.md — 2-gram index;
-  its comparison table rates 1–2 character keyword search "Fast" vs pg_trgm's
-  "slow", **and** lists pg_bigm's operators as "LIKE only" vs pg_trgm's "LIKE
-  (~~), ILIKE (~~*), ~, ~*". That constraint corrects the candidate, which
-  suggested pg_bigm without noting it is not a drop-in for an `ILIKE` workload;
-  the page splits those into two decision rows.
+  its comparison table rates "Full text search with 1-2 characters keyword" as
+  "Fast" vs pg_trgm's "Slow (\*2)", **and** lists pg_bigm's operators as "LIKE
+  only" vs pg_trgm's "LIKE (~~), ILIKE (~~*), ~, ~*". That constraint corrects the
+  candidate, which suggested pg_bigm without noting it is not a drop-in for an
+  `ILIKE` workload; the page splits those into two decision rows. Footnote (\*2)
+  turned out to state the mechanism independently of the PostgreSQL docs —
+  "Because, in this search, only sequential scan or index full scan (not normal
+  index scan) can run" — so the central claim now has two unrelated primary
+  sources.
 
 **How verified.** Doc quotes fetched and read this session. The quantitative half
 is the candidate's own field `EXPLAIN (ANALYZE, BUFFERS)` on a 4.64M-row table
@@ -240,6 +244,22 @@ merge first, the reciprocal links to `testing-quality-source-text-wiring-asserti
 resolvable and are worth adding to the new page then — they are intentionally
 omitted now because AGENTS.md invariant 4 requires every `related:` id to resolve,
 and those pages do not exist on `main`.
+
+## Citation audit (post-write)
+
+Cross-Check: mechanical citation audit rather than an LLM second opinion — every
+source-derived claim in the three new pages was re-grepped against the bytes
+actually fetched this session (21 checks: Spring at 9 tags, Hibernate
+`PostgreSQLDialect`, `HibernateJpaDialect`, PgJDBC `PSQLException`/`PSQLState`,
+Mockito `ArgumentMatchers`, pg_bigm docs). 19 confirmed; one intended-absence check
+confirmed absent (`"57014".equals` not in v6.2.8); **one failed and was fixed** —
+the pg_bigm sentence had been taken from a fetch summary and did not match the raw
+file byte-for-byte (the source reads `**2-gram**` with a line break and
+`[PostgreSQL](…)` link, and the comparison cell is "Slow (\*2)", not "slow"). The
+quote and the table cells were re-derived from the raw file cell by cell, which
+also surfaced footnote (\*2) — a second independent statement of the mechanism —
+and footnote (\*1), now recorded as an edge case. No claim was left resting on a
+summarizer's paraphrase.
 
 ## Routing decision
 
