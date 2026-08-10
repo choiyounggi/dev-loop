@@ -9,7 +9,7 @@ sources:
   - https://abseil.io/resources/swe-book/html/ch12.html
   - https://martinfowler.com/bliki/TestDrivenDevelopment.html
 last_verified: 2026-07-10
-related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-checks-that-cannot-pass, qa-exploratory-guard-true-path-coverage]
+related: [testing-quality-default-values-under-test, testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-checks-that-cannot-pass, qa-exploratory-guard-true-path-coverage]
 ---
 
 # Selecting the Minimum Case Set for a Function or Endpoint

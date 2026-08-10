@@ -13,6 +13,7 @@ last_verified: 2026-08-10
 related:
   [
     testing-mocking-what-to-mock,
+    testing-quality-default-values-under-test,
     testing-quality-tests-that-cannot-fail,
     testing-quality-behavior-not-implementation,
     backend-common-change-impact-call-site-enumeration,

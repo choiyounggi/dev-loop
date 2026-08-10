@@ -1,7 +1,16 @@
-# Knowledge flush — 3 insight(s)
+# Knowledge flush — 4 insight(s)
 
-Queue drained: `1717316a-…jsonl` (1 row), `ab5516dc-…jsonl` (2 rows). All three
-ingested as new pages; none dropped.
+Queue drained: `1717316a-…jsonl` (2 rows), `ab5516dc-…jsonl` (2 rows) — **4**
+candidates, all ingested as new pages, none dropped.
+
+> Correction, recorded because it nearly cost a candidate: the first three sections
+> of this report were written for 3 insights. I had counted the queue with
+> `wc -l`, which reported 3 because one file's final line carried no trailing
+> newline. The 4th row surfaced only when the retirement step parsed the files as
+> JSON and moved 4. It had been marked `ingested` by that step while never having
+> been researched or routed; it was then processed in full (insight 4 below) and
+> folded into this same PR rather than left with a false status. Row counts now
+> come from a JSON parse, not from `wc -l`.
 
 ## Verified best-practice
 
@@ -157,6 +166,47 @@ such.
 **Confidence: verified** (framework behaviour read from pinned source + javadoc;
 production magnitudes field-measured).
 
+### 4. A constructor default is unasserted by both usual test shapes
+
+**Claim.** A default named as a number in a spec (`ttl_s=600`, `max_tokens=256`) is
+guarded by neither a mechanism test that passes the value in nor a test that
+constructs with defaults without exercising them. Push the default to its
+observable point and require red in **both** mutation directions.
+
+**Sources checked.**
+
+- https://pitest.org/quickstart/basic_concepts/ — "'Survived' means the mutation
+  was not detected by the covering test"; a green suite under a changed default is
+  that verdict for the default.
+- https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/ —
+  the published mutator set is operator/literal/block based, so a tool generates
+  one variant of a literal rather than both directions; the page states both
+  directions explicitly instead of relying on the tool.
+- https://docs.python.org/3/reference/compound_stmts.html — "Default parameter
+  values are evaluated from left to right when the function definition is
+  executed", the basis for the shared-mutable-default edge case.
+
+**How verified.** Reproduced (Python 3, a TTL + cap store with four existing tests:
+two constructing with defaults, two passing values in explicitly):
+
+| Mutant | Existing suite | With the added default tests |
+|---|---|---|
+| baseline (`ttl 600`, `cap 256`) | GREEN | GREEN *(control)* |
+| `ttl_s 600 → 1` | **GREEN** | RED |
+| `max_tokens 256 → 1` | RED *(incidental)* | RED |
+| `ttl_s → 6000`, `max_tokens → 9999` | **GREEN** | RED |
+
+This **sharpened the candidate**, which stated the survival as a flat property. It
+is direction-dependent: shrinking a cap below what an existing test happens to
+exercise is caught incidentally (row 3), while the **grow** direction was
+uncatchable by the existing suite in every configuration tried — a test that issues
+N items passes for every cap ≥ N, and one that consumes immediately passes for every
+TTL > 0. The page leads with that asymmetry, and the baseline-GREEN row is the
+control showing the added boundary cases are not simply always-failing.
+
+**Confidence: verified** (mutation semantics + language behaviour doc-sourced;
+mechanism reproduced locally; the CSRF-store magnitudes kept as field measurement).
+
 ## Existing-layer check
 
 Routed via `INDEX.md` → the three domain indexes, then read every page whose "load
@@ -165,13 +215,15 @@ when" line overlapped. Full-body reads: `testing-quality-tests-that-cannot-fail`
 reads (grep for timeout/JdbcTemplate/trigram/LIKE/arg-capture terms, to establish
 absence of coverage): the remaining ids below.
 
-Pages read: testing-quality-tests-that-cannot-fail, testing-mocking-what-to-mock, testing-quality-behavior-not-implementation, backend-common-change-impact-call-site-enumeration, databases-indexing-index-selection, databases-query-optimization-reading-execution-plans, databases-indexing-partial-and-expression-indexes, databases-indexing-covering-indexes, backend-common-orm-transaction-boundaries, backend-common-reliability-timeouts-and-retries, backend-common-errors-exception-handling, backend-java-jpa-persistence-context, backend-java-spring-proxy-pitfalls
+Pages read: testing-quality-minimum-case-set, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, testing-mocking-what-to-mock, testing-quality-behavior-not-implementation, backend-common-change-impact-call-site-enumeration, databases-indexing-index-selection, databases-query-optimization-reading-execution-plans, databases-indexing-partial-and-expression-indexes, databases-indexing-covering-indexes, backend-common-orm-transaction-boundaries, backend-common-reliability-timeouts-and-retries, backend-common-errors-exception-handling, backend-java-jpa-persistence-context, backend-java-spring-proxy-pitfalls
 
 **Overlaps found, and why each is composition rather than duplication.**
 
 | Existing page | Overlap | Resolution |
 |---|---|---|
 | `testing-mocking-what-to-mock` | Its step 1 last row and step 2 already say to "assert the **outbound contract**: which command, with what arguments", and one edge row says to "deep-equal the full stub-recorded call sequence" | Closest neighbour, but its subject is *whether* to replace a dependency — folding assertion-completeness in would break "one case per page". Kept separate; added the new id to its `related:` and a pointer on the outbound-contract row |
+| `testing-quality-minimum-case-set` | Owns boundary-value selection for a function's inputs (60 body lines, room to merge) | Kept separate: its subject is the case set for the *behaviour*, while insight 4's is a shipped **default** whose trigger is a spec-named number plus an existing suite, with its own bidirectional procedure. Reciprocal `related:` added |
+| `testing-quality-harness-reverse-controls` | Owns "prove the harness discriminates" | Cited from insight 4's step 5 — boundary cases one unit from a limit are where a test-side off-by-one imitates a caught mutant |
 | `testing-quality-tests-that-cannot-fail` | Owns per-assertion mutation granularity and the "testing the mock instead of the code" row | The new page cites it for the mutation step instead of restating it; added the new id to its `related:` |
 | `databases-indexing-index-selection` | Line 51 routes `LIKE '%term%'` to "a trigram or full-text index type" | That advice has an unstated precondition — exactly the new page. Extended the row to carry the minimum-keyword-length pointer, plus a `related:` link |
 | `databases-query-optimization-reading-execution-plans` | Owns plan reading generally | Cited from "When this applies"; the new page adds only the trigram-specific counter to read (`Rows Removed by Index Recheck`) |
@@ -186,7 +238,10 @@ Pages read: testing-quality-tests-that-cannot-fail, testing-mocking-what-to-mock
 exactly one file in the whole wiki (`index-selection.md`, the one row above);
 `call_args|assert_called_with|toHaveBeenCalledWith|argument captor` matches exactly
 one (`what-to-mock.md`); no page mentions `statement_timeout`, `JdbcTemplate`, or
-`QueryTimeout`.
+`QueryTimeout`. For insight 4, `default value|defaults|default argument` across
+`wiki/testing/**` returned six hits, every one incidental (a factory filling
+fixture defaults, a permissive-schema note, a `f(x=None)` trap) — no page states a
+directive about a shipped default's own test.
 
 **Format invariants checked mechanically after writing:** body lines 94 / 75 / 90
 (limit 120); every `related:` id and inline `[page-id]` reference resolves to a
@@ -212,6 +267,7 @@ Files touched by each open head, matched against the three candidates:
 | Candidate | Overlapping open PRs | Verdict |
 |---|---|---|
 | 1 — captured call arguments (testing/mocking) | #52 adds `testing/quality/source-text-wiring-assertions.md`; #49 adds `testing/quality/value-preserving-refactor-assertions.md` + `unasserted-return-fields.md`; #47/#52 modify `tests-that-cannot-fail.md` | **new** |
+| 4 — default values under test (testing/quality) | Same three heads as candidate 1, plus #49's `unasserted-return-fields` and #47/#52's edits to `tests-that-cannot-fail.md` | **new** |
 | 2 — pg_trgm short patterns (databases/indexing) | none — zero open heads touch `wiki/databases/**` | **new** |
 | 3 — raw JDBC in a JPA transaction (backend/java/jpa) | none — the backend-touching heads (#68, #58, #56, #55, #51, #50, #72) are all under `backend/common/**` or `backend/python/**`; zero touch `wiki/backend/java/**` | **new** |
 
@@ -232,6 +288,16 @@ in full or in relevant part:
 - `#49 unasserted-return-fields` — the mirror direction (fields a function
   **returns** that no assertion reads). The new page is the call/argument
   direction. Deliberately kept as siblings.
+
+**Why candidate 4 is `new`:** `#49 unasserted-return-fields` is the closest
+in-flight page — it also turns on "a value no assertion reads" — but its subject is
+fields a function **returns** on a given call, and its remedy is per-field
+assertions plus cross-field relations. Candidate 4's subject is a **default that is
+never supplied**, and its remedy is bidirectional mutation at the default's
+observable point; the grow-direction asymmetry has no counterpart there.
+`#49 value-preserving-refactor-assertions` covers a literal moved behind a config
+read, the opposite direction of travel (the value is already asserted; the question
+is whether the caller reads it).
 
 No candidate is a pending duplicate, so nothing was dropped and no sibling
 duplicate PR is opened here.
@@ -259,7 +325,12 @@ file byte-for-byte (the source reads `**2-gram**` with a line break and
 quote and the table cells were re-derived from the raw file cell by cell, which
 also surfaced footnote (\*2) — a second independent statement of the mechanism —
 and footnote (\*1), now recorded as an edge case. No claim was left resting on a
-summarizer's paraphrase.
+summarizer's paraphrase. Structural re-validation after insight 4 landed: all
+`related:`/inline ids across the whole wiki resolve (the only two regex hits were a
+literal `[a-z0-9]` character class in two pre-existing pages); the four new pages
+are 94 / 75 / 90 / 77 body lines against the 120 limit; every page appears in its
+domain index; and no index table row is malformed — one row was caught missing its
+closing pipe and fixed.
 
 ## Routing decision
 
@@ -269,7 +340,10 @@ summarizer's paraphrase.
 | 2 | `databases` / `indexing` | `wiki/databases/indexing/trigram-index-short-patterns.md` (`databases-indexing-trigram-index-short-patterns`) | No — `indexing` owns index-type suitability; the case is a precondition on one index type, and `query-optimization/reading-execution-plans` stays the owner of plan reading |
 | 3 | `backend` / `java` → `jpa` | `wiki/backend/java/jpa/raw-jdbc-inside-a-jpa-transaction.md` (`backend-java-jpa-raw-jdbc-inside-a-jpa-transaction`) | No — the mechanism is `JpaTransactionManager`/`JpaDialect`, so it belongs in the `jpa` category rather than `spring` (which owns proxy-level "the annotation did nothing") or `backend/common` (language-agnostic principles; this is stack-specific source behaviour) |
 
+| 4 | `testing` / `quality` | `wiki/testing/quality/default-values-under-test.md` (`testing-quality-default-values-under-test`) | No — `quality` owns assertion sufficiency and mutation proof, which is what the case is about; `mocking` owns doubles and would misfile a page whose subject needs no double |
+
 Plumbing updated: `wiki/testing/index.md`, `wiki/databases/index.md`,
-`wiki/backend/java/index.md` each +1 "load when" row; `log.md` +1 ingest entry.
+`wiki/backend/java/index.md` each +1 "load when" row (testing +2 — one per testing
+page); `log.md` +1 ingest entry.
 `INDEX.md` unchanged — all three domains are already listed and their "route here
 when" lines already cover these cases.
