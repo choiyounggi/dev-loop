@@ -47,16 +47,17 @@ artifact for a structural shape → [testing-quality-guard-shape-vs-consequence]
    subject ([backend-common-change-impact-call-site-enumeration]). Write the list
    down: the assertion count comes from it, and step 7 re-runs against it.
 
-2. **Make the assertion's subject the file with comments removed, using the
-   language's own tokenizer or parser.** Comments carry the same tokens the guard
-   searches for — a JSDoc naming the component, a `// guard: never use X here`
-   note — and text search cannot tell prose from code. ESLint states the split
-   directly: "While comments are not technically part of the AST", so a rule must
-   reach them through `sourceCode.getAllComments()` rather than by traversing
-   nodes. Strip with the parser (`sourceCode.getAllComments()` ranges, Babel/TS
-   `ts.createSourceFile`, Python `tokenize.COMMENT`) and keep the stripper honest
-   with its own fixture: comment-only text removed, every string and regex literal
-   byte-identical afterwards.
+2. **Make the assertion's subject the file with comments removed, taken from a
+   tokenizer.** Comments carry the same tokens the guard searches for — a JSDoc
+   naming the component, a `// guard: never use X here` note — and text search
+   cannot tell prose from code; ESLint states the split, "While comments are not
+   technically part of the AST". From a test, call an API that actually yields
+   them: `espree.parse(src, {comment: true, range: true}).comments`, `@babel/parser`
+   `parse(src).comments`, TS `ts.getLeadingCommentRanges`, Python
+   `tokenize.COMMENT`. Measured 2026-08-10: `ts.createSourceFile(...)` leaves
+   `sourceFile.comments` undefined and emits no comment nodes, so it strips nothing
+   and the guard silently keeps its raw subject. Fixture-test the stripper: comment
+   text gone, every string and regex literal byte-identical afterwards.
 
 3. **Give each site an anchor that occurs exactly once in the file, and assert
    one pattern per site.** A regex is satisfied by _any_ anchor–call pair that
@@ -70,8 +71,9 @@ artifact for a structural shape → [testing-quality-guard-shape-vs-consequence]
 | Sites share the callee and differ only by argument                               | Assert the full call text including the argument, inside the slice or after the unique anchor — the callee name alone is satisfied by any site                                                       |
 | No anchor is unique and the sites are not separable into slices                  | The file gives the guard nothing to bind to: extract the sites into named functions first, or test the behavior at a level that reaches it                                                           |
 
-4. **Set the bound N from the distance the anchor and call actually have in the
-   current source, plus the length of one statement**, so a legitimately inserted
+4. **Set the bound N from the distance the anchor and call have in the stripped
+   subject from step 2 — the same text the assertion runs against — plus the
+   length of one statement**, so a legitimately inserted
    line does not redden the guard. The bound is what limits the anchor's reach:
    measured 2026-08-07 in Node, `{0,20}` and `{0,20}?` return the same verdict on
    every input — greedy versus lazy changes which match is reported, not whether
@@ -87,10 +89,9 @@ artifact for a structural shape → [testing-quality-guard-shape-vs-consequence]
    reformat the file. A source-text pattern is one whitespace assumption away
    from asserting formatting, and the control is what separates "the guard reads
    the wiring" from "the guard reads the layout"
-   ([testing-quality-harness-reverse-controls]). With step 2 in place this
-   control is green by construction, so a red comment-only edit means the
-   stripper leaked, not that the wiring moved — fix the stripper before touching
-   the pattern.
+   ([testing-quality-harness-reverse-controls]). Run the halves separately: with
+   step 2 in place a red comment-only edit indicts the stripper, while a red
+   reformat means N from step 4 is too small.
 
 7. **Re-run step 1 whenever the enclosing function grows a branch.** A per-site
    guard has no signal for a site that was never enumerated, so the site list —
@@ -112,7 +113,7 @@ artifact for a structural shape → [testing-quality-guard-shape-vs-consequence]
 | A site's mutant survives despite the assertion                    | Classify it before strengthening the pattern ([testing-quality-surviving-mutant-equivalence-triage]) — the call may be redundant at that site                           |
 | The guard reddens on a change that only added a comment           | The comment contains the searched token; apply step 2 rather than loosening the pattern, which would also stop catching the deleted site                                |
 | The assertion is negative (`not.toMatch`) or a count              | These are the shapes comments flip: a `// never use X here` note satisfies the negative, and a doc comment naming the component inflates the count — step 2 is required, not optional, for both |
-| No parser is available for the file's language                    | Assert per line with comment lines filtered by the language's line-comment prefix, and record in the test that block comments and comment-shaped text inside strings are out of scope |
+| No parser is available for the file's language                    | Cut each line from its first line-comment prefix to end of line — dropping whole comment lines leaves trailing comments, the shape that actually leaks (measured: a trailing `// renders <BlockDetailPanel />` keeps the count at 2, cutting to EOL gives 1). Record block comments and comment-shaped text inside strings as out of scope |
 | The code under test is itself about comments (a doc gate, a lint rule) | Comments are the subject, so keep the raw source — and assert on the raw and stripped forms as two separate named tests so a reader knows which one each claim is about |
 
 ## Instead of
@@ -125,7 +126,7 @@ artifact for a structural shape → [testing-quality-guard-shape-vs-consequence]
 | Add `?` to the quantifier to keep the anchor from reaching a later site                    | Set the bound N, and confirm the anchor occurs once                                               | Laziness changes which match is reported, not whether the pattern matches; the reach is decided by N and by the anchor's uniqueness                                         |
 | Ship the anchored guard because the suite is green                                         | Delete each site once and require its own assertion red                                           | Narrowing a pattern is the easiest way to narrow it to nothing; a pattern that matches nothing and one that matches everything both read as green                           |
 | Use a source-text guard as the primary coverage for the handler's logic                    | Keep it as a wiring check and test the behavior at the level that can reach it                    | Text guards fail on refactors that preserve behavior and pass on a call whose implementation broke                                                                          |
-| Strip comments with `src.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\/\/.*$/gm,'')`          | Take the comment ranges from the parser (step 2), and fixture-test the stripper                   | Measured 2026-08-10 in Node: that pair truncates `"https://api.example.com//v2/items"` to `"https:` — the `//` inside a string literal is read as a comment start, so the guard then searches a corrupted subject and its verdict means nothing |
+| Strip comments with `src.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\/\/.*$/gm,'')`          | Take the comment ranges from the parser (step 2), and fixture-test the stripper                   | Measured 2026-08-10 in Node: that pair truncates `"https://api.example.com//v2/items"` to `"https:` — the `//` inside a string literal is read as a comment start, so from that point on the guard searches a truncated subject and its verdict no longer describes the file |
 | Add string-literal handling to the stripping regex and ship it                             | Take the comment ranges from the parser (step 2)                                                  | Measured the same session: a string-aware alternation keeps the URL intact and still truncates `const re = /a//b/` to `const re = /a` — each regex fix leaves the next literal form, which is the case the tokenizer already handles |
 | Delete the comment that explains the guard so the guard stops firing on it                 | Apply step 2 and keep the comment                                                                 | A guard that has to be kept comment-free trades its own documentation for its verdict, and the next author restores the comment without knowing why it was gone            |
 
@@ -138,6 +139,6 @@ artifact for a structural shape → [testing-quality-guard-shape-vs-consequence]
 - https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html — Alex Eagle, "Testing on the Toilet: Change-Detector Tests Considered Harmful" (2015-01-27), cited for the change-detector category itself: a test coupled to source shape fails on behavior-preserving edits. The article body was not retrievable in full on 2026-08-07, so nothing here is quoted from it
 - Measurement 2026-08-07 (Node): `/ANCHOR\([\s\S]{0,20}CALL\(/` and its lazy form `{0,20}?` returned identical verdicts on four inputs (anchor-then-call in range, call-before-anchor only, call beyond the bound, call both before and after the anchor) — the bound decides reach, and a call elsewhere in the file neither blocks nor is excluded by the pattern
 - https://eslint.org/docs/latest/extend/custom-rules — "While comments are not technically part of the AST, ESLint provides the `sourceCode.getAllComments()`, `sourceCode.getCommentsBefore()`, `sourceCode.getCommentsAfter()`, and `sourceCode.getCommentsInside()` to access them"; rules visit "nodes while traversing the abstract syntax tree (AST as defined by ESTree)". This is the split step 2 relies on: a structural check runs over a tree comments do not appear in, a text check runs over the file where they do
-- Measurement 2026-08-10 (Node, fixture with a JSDoc block, a line comment, a URL string literal and a regex literal): on the raw source, `<BlockDetailPanel` matched 2 times where the code has 1 site, and `/Number\.isFinite/` tested true from a `// guard: never use Number.isFinite here` comment. After parser-equivalent comment removal both returned the code's own values (1, false). The regex stripper in the same run corrupted a string literal (`"https://…//v2/items"` → `"https:`), and a string-aware variant still corrupted a regex literal (`/a//b/` → `/a`) — the basis for the two `Instead of` rows
+- Measurement 2026-08-10 (Node + TypeScript 5, fixture with a JSDoc block, a line comment, a trailing comment, a URL string literal and a regex literal): on the raw source, `<BlockDetailPanel` matched 2 times where the code has 1 site, and `/Number\.isFinite/` tested true from a `// guard: never use Number.isFinite here` comment. After comment removal both returned the code's own values (1, false) — removal by the regex pair below, which on this fixture selects the same spans a parser would; the parser is what step 2 requires for arbitrary input. The regex stripper in the same run corrupted a string literal (`"https://…//v2/items"` → `"https:`), and a string-aware variant still corrupted a regex literal (`/a//b/` → `/a`) — the basis for the two `Instead of` rows. Same session: `ts.createSourceFile('a.ts', src, ts.ScriptTarget.Latest, true)` returned `comments === undefined` with AST kinds `SourceFile,FunctionDeclaration,…,EndOfFileToken` and no comment node, while `ts.getLeadingCommentRanges(src, 0)` returned the range — the basis for step 2 naming the range/scanner APIs. A reformat control reddened a `{0,20}`-bounded pattern with no comment involved, and a trailing comment left a line-filtering stripper's count at 2 against 1 for cut-to-EOL
 - Field measurement 2026-08-10 (rtb-unified, `feat-NEWRTB-2451-detail-entry-rule`): three source-text guards in one PR reddened on correct code, each from a comment — a JSDoc mentioning `<BlockDetailPanel` (mount-count assertion), a comment naming `Number.isFinite` (negative assertion), and a comment containing `SOURCE.slice(...)` (a self-check forbidding a raw slice). All three were resolved by asserting on comment-stripped code, and a comment-only control edit stayed green afterwards
 - Field measurement 2026-08-07 (rtb-unified, `apps/web` building-detail panel): `setPendingEntry(null)` appears at four sites (close, list-select, post-resolve, error branch). A `>= 3` count assertion stayed green after a mutant deleted the post-resolve site. Binding it to the once-occurring anchor `resolveBuildingDetailEntry\(` within a 200-character bound produced red on that same mutant, and a comment-only edit kept it green
