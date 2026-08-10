@@ -9,7 +9,7 @@ sources:
   - https://sre.google/sre-book/addressing-cascading-failures/
   - https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
 last_verified: 2026-08-05
-related: [backend-common-api-design-idempotency, backend-common-llm-completion-response-validation, backend-common-reliability-client-side-rate-limiting, debugging-concurrency-intermittent-failures]
+related: [backend-java-jpa-raw-jdbc-inside-a-jpa-transaction, backend-common-api-design-idempotency, backend-common-llm-completion-response-validation, backend-common-reliability-client-side-rate-limiting, debugging-concurrency-intermittent-failures]
 ---
 
 # Calling Another Service over the Network: Timeouts, Retries, Backoff
