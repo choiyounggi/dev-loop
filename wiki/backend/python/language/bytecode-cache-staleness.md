@@ -8,7 +8,8 @@ sources:
   - https://docs.python.org/3/reference/import.html
   - https://peps.python.org/pep-0552/
   - https://docs.python.org/3/library/py_compile.html
-last_verified: 2026-08-04
+  - https://docs.python.org/3/library/shutil.html
+last_verified: 2026-08-11
 related: [backend-python-language-default-encoding-in-text-io, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, backend-python-language-mutable-state-traps]
 ---
 
@@ -55,6 +56,7 @@ no effect at all.
 | The mutation is the thing that vanished (injected change has no effect) and the revert looks fine | Same mechanism, opposite direction: the cache predates both writes. Clear `__pycache__` and re-inject, then confirm the mutation *does* change behavior before scoring it as "caught" ([testing-quality-harness-reverse-controls]) |
 | The harness reports every mutant caught | Verify one mutation reaches the interpreter by hand first — a stale cache that pins the *original* bytecode makes every mutant look survived, and one that pins a *mutant* makes every later case look caught |
 | Writes are driven by a tool that preserves mtime (`rsync -t`, archive extraction, `git checkout` of an unchanged blob, `touch -t` in a script) | The second-granularity race becomes a certainty rather than a race; use hash-based `.pyc` or clear the cache unconditionally |
+| The harness backs the file up and restores it with `shutil.copy2` | `copy2` "also attempts to preserve file metadata" via `copystat`, so the restore stamps the *original* mtime back — the same certainty as the row above, arriving through the idiomatic backup/restore call. Restore with `shutil.copyfile` (contents only, "no metadata") or follow the restore with `os.utime(path, None)`; `shutil.copy` also works, since it copies the permission mode but "the file's creation and modification times, is not preserved" |
 | The tree is read-only or `PYTHONDONTWRITEBYTECODE` is set | No `.pyc` is written, so this failure cannot occur — and the harness pays a recompile per run |
 | The stale module was already imported in a long-lived process | Clearing `__pycache__` does not help; the module object is in `sys.modules` and only a fresh process (or an explicit reload) picks the change up |
 | An installed package ships `.pyc` files without sources | The unchecked-hash variant is assumed valid whenever it exists; edits to a co-located source are never consulted |
@@ -73,4 +75,6 @@ no effect at all.
 - https://docs.python.org/3/reference/import.html — "By default, Python does this by storing the source's last-modified timestamp and size in the cache file when writing it"; "At runtime, the import system then validates the cache file by checking the stored metadata in the cache file against the source's metadata"; hash-based `.pyc` files store "a hash of the source file's contents rather than its metadata", in checked and unchecked variants, overridable with `--check-hash-based-pycs`
 - https://peps.python.org/pep-0552/ — hash-based `.pyc` invalidation, added in Python 3.7, as the deterministic alternative to timestamp+size
 - https://docs.python.org/3/library/py_compile.html — `PycInvalidationMode` selects timestamp, checked-hash, or unchecked-hash invalidation when compiling
+- https://docs.python.org/3/library/shutil.html — `copyfile` copies "the contents (no metadata)"; `copy` copies data and permission mode and "Other metadata, like the file's creation and modification times, is not preserved"; `copy2` is "Identical to `copy()` except that `copy2()` also attempts to preserve file metadata" and "uses `copystat()` to copy the file metadata" — so `copy2` is the mtime-restoring member of the family
+- Field reproduction 2026-08-11 (batch mutation harness, one process, byte-length-preserving mutation of a numeric literal, restore via `shutil.copy2`): three consecutive mutants scored GREEN in the batch and the third scored RED when run alone; printing the mutated constant from a fresh subprocess showed all three runs loading the *first* mutant's value. Purging `__pycache__` and calling `os.utime(path, None)` between iterations flipped the third to RED while a no-op control mutation stayed GREEN
 - Field reproduction 2026-08-04 (Python 3.14.6, macOS): with `mod.py` pinned to a fixed mtime via `touch -t` and every revision exactly 18 bytes, compiling `VERSION = "3.1.1"` and then reverting the file to `VERSION = "3.1.0"` left `import mod` reporting `3.1.1` — reverted source, mutant bytecode. Deleting `__pycache__` returned `3.1.0`; a bare `touch mod.py` (mtime bumped, cache left in place) also returned `3.1.0`. The `.pyc` header decoded to `flags=0` (timestamp invalidation) with the source's exact mtime and `size=18`
