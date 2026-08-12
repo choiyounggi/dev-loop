@@ -148,3 +148,20 @@ prose, which was corrected on two points (`/8192`, unbounded applicability);
 verified: no reproduction of the catalog staleness was run locally — no `psql` and
 no running Docker daemon in this environment — so that mechanism rests on the
 official docs plus the recorded field observation, and the page says so.
+
+## Decision Log
+
+**의도**
+- 큐의 3건을 각각 다른 결말로 보냈다 — 신규 페이지 1, 인플라이트 PR 폴드 1, 폐기 1. 형제 중복 PR을 만들지 않는 것이 이 플러시의 1순위 제약이었다.
+- 신규 페이지를 `databases/data-survey`에 둔 이유: "살아있는 테이블을 조사해 사실을 확정한다"가 그 카테고리의 소유 영역이고, 기존 `surveying-live-data-for-a-rule`(빈 결과 해석)과는 트리거가 다르다. 양방향 `related` 링크로 연결했다.
+- 후보 원문을 그대로 싣지 않고 문서 검증 중 2곳을 교정했다: `/8192` 하드코딩 → `current_setting('block_size')`(BLCKSZ는 빌드타임), 그리고 무조건 적용 → append-mostly + PG14+ 전제를 edge case로 명시.
+
+**배제한 대안**
+- 후보 3(파이썬 bytecode 캐시)로 페이지를 만들거나 머지된 페이지에 append하는 안 → 배제. 열린 PR #52가 `-B`는 쓰기만 막고 기존 `.pyc`는 계속 읽힌다는 핵심 뉘앙스까지 이미 담고 있어 새로 추가할 델타가 0이었다(브랜치 diff로 확인, PR 제목이 아니라).
+- 후보 2를 이 PR에 신규 페이지로 넣는 안 → 배제. 대상 페이지(`default-values-under-test`)가 PR #73에 인플라이트라 트리거가 인접한 페이지가 두 개 생긴다. #73 브랜치에 커밋 `74215dc`로 폴드하고 PR에 코멘트를 남겼다.
+- 신규 페이지를 `databases/operations`에 두는 안 → 배제. 그 카테고리는 VACUUM/ANALYZE를 *운영*하는 쪽이고, 이 페이지는 그 산물을 *증거로 읽는* 쪽이다.
+
+**리뷰어가 볼 곳**
+- `wiki/databases/data-survey/catalog-statistics-as-current-state.md` — 인용문이 실제 PostgreSQL 문서 문장과 일치하는지(8개 URL 전부 이 세션에서 fetch), 그리고 `ctid` 꼬리 스캔의 전제(append-mostly, PG14+)가 edge case로 충분히 좁혀졌는지.
+- 로컬 재현은 없다 — 이 환경에 `psql`이 없고 Docker 데몬이 죽어 있어 문서 검증 + 현장 관측(PRD read-only)으로만 뒷받침했고, 페이지와 리포트 양쪽에 그렇게 적었다. [추정] 아님, 미실행 사실 그대로.
+- `wiki/databases/index.md`의 load-when 줄이 페이지의 "When this applies"와 어긋나지 않는지(drift 방지).
