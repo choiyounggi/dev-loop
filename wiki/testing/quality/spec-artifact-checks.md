@@ -17,10 +17,12 @@ related: [testing-quality-tests-that-cannot-fail, testing-quality-schema-additio
 
 ## When this applies
 
-You are writing or reviewing an automated check that an artifact conforms to a
-source of truth: a mapping table that must hold a row per rule, a key per field,
-or a case per enum; ids that must resolve across documents; required sections in
-an RFC. Includes doc-as-spec repos where the artifact is Markdown.
+You are authoring or reviewing **the check itself** that an artifact conforms
+to a source of truth: a mapping table that must hold a row per rule, a key per
+field, or a case per enum; ids that must resolve across documents; required
+sections in an RFC. Includes doc-as-spec repos where the artifact is Markdown.
+Whether a passing check is enough to accept the deliverable is a release
+decision owned by wiki/qa/document-verification/spec-document-gates.md.
 
 ## Do this
 
