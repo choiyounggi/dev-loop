@@ -8,16 +8,18 @@ sources:
   - https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html
   - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html
 last_verified: 2026-07-10
-related: [debugging-methodology-isolate-by-bisection, debugging-methodology-reproduce-first]
+related: [debugging-methodology-isolate-by-bisection, debugging-methodology-reproduce-first, testing-flaky-diagnosing-flaky-tests]
 ---
 
 # Making an Intermittent Failure Reproducible
 
 ## When this applies
 
-A failure happens only sometimes: the test passes on retry, the bug appears only
-under load, only in CI, only occasionally in prod. You cannot debug it because
-you cannot trigger it on demand.
+The intermittent failure is in the system itself: an occasional prod error, a
+bug that appears only under load, or behaviour you can trigger only
+sometimes. You cannot debug it because you cannot trigger it on demand — the
+job is to amplify it into a reproduction. If the unreliable thing is a test in
+your suite, go to wiki/testing/flaky/diagnosing-flaky-tests.md.
 
 ## Do this
 
