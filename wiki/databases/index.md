@@ -50,6 +50,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [catalog-statistics-as-current-state](data-survey/catalog-statistics-as-current-state.md) | Finding a large PostgreSQL table's newest rows when the column has no index, so you reach for `pg_class.relpages`/`reltuples`, `pg_stats` most-common values, or a `ctid` range scan of the last blocks; about to conclude "no recent data" from a cheap catalog probe; choosing the scan's starting block or how to bound a `ctid` range |
 | [surveying-live-data-for-a-rule](data-survey/surveying-live-data-for-a-rule.md) | A task says to sample real data to decide a mapping table, normalization/canonicalization rule, enum value set, or parsing rule; a `GROUP BY`/`DISTINCT` survey came back with zero rows; deciding what evidence replaces the data when the table is empty; recording in the deliverable which evidence a rule was actually derived from |
 
 ## sqlite
