@@ -9,7 +9,7 @@ sources:
   - https://github.com/anthropics/claude-code/issues/29530
   - https://man7.org/linux/man-pages/man1/tmux.1.html
 last_verified: 2026-08-08
-related: [infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-session-completion-gates, platforms-processes-non-interactive-cli-invocation]
+related: [infrastructure-agent-orchestration-usage-limit-paused-workers, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-session-completion-gates, platforms-processes-non-interactive-cli-invocation]
 ---
 
 # A Worker Agent Asks a Question With No Human at Its Terminal
@@ -47,7 +47,7 @@ worker reports a decision it "assumed" that nobody was asked about.
 | A question UI with selectable options | Unblock it by key (step 5), then re-drive the interrupted work (step 6) |
 | The idle prompt, work visibly complete | Ask for the completion signal; the worker finished and skipped its report |
 | The busy/working indicator | Not a stall — keep waiting ([infrastructure-agent-orchestration-pane-delivery-confirmation]) |
-| A usage-limit or re-auth notice | Idle waiting, not a crash; resume after the stated reset |
+| A usage-limit or re-auth notice | Idle waiting, not a crash; resume after the stated reset, following [infrastructure-agent-orchestration-usage-limit-paused-workers] |
 
 5. **Unblock a question UI with an allowlisted key sequence, validated whole
    before any key is sent.** Restrict the allowlist to navigation and answer keys
