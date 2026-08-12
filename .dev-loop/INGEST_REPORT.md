@@ -233,3 +233,40 @@ script carrying its own negative control. The five page bodies were drafted by a
 interrupted 2026-08-11 flush and were reviewed and re-sourced in this session rather
 than trusted; their field-reproduction paragraphs report that session's measurements
 and are not independently re-runnable here.
+
+## Decision Log
+
+**Intent**
+- Drain all 6 queued candidates in one PR: ingest 5 as new pages, drop 1 to an
+  existing open PR. One PR per flush keeps review to a single pass.
+- Verify every citation first-hand in this session rather than inheriting the
+  quotes from the interrupted 2026-08-11 drafts these page bodies came from.
+- Route candidate 2 to `backend/common/change-impact` rather than its harvested
+  `testing` hint, because the artifact examined is application source, not a test.
+
+**Alternatives rejected**
+- *Amend `bytecode-cache-staleness.md` with candidate 6's `-B` remedy* — rejected:
+  open PR #52 already adds that row and additionally corrects it (`-B` governs
+  writing only, so a stale `.pyc` is still reused). Amending would have conflicted
+  with #52 for content #52 states better.
+- *Open a PR from either interrupted branch (`…-151241`, `…-160220`)* — rejected:
+  their slugs are earlier, weaker drafts of the same five insights, and shipping
+  both would create the sibling-duplicate pile-up the skill warns about.
+- *Add reciprocal `related:` ids to `call-site-enumeration`, `regression-scope`,
+  `non-interactive-cli-invocation`* — rejected: open PRs #68/#58/#51/#50/#66/#57
+  already modify those files; invariant 4 requires ids to resolve, not reciprocity,
+  so the conflict buys nothing.
+- *Cite the ACM DOI as read* — rejected: it was not opened. It is disclosed above
+  as a locator for the abstract page that was opened and quote-checked.
+
+**Where a reviewer should look**
+- `.dev-loop/INGEST_REPORT.md` "Verified best-practice" — each quote is reproduced
+  as checked; spot-check any one against its URL.
+- The `Open-PR check` table, specifically the candidate-6 **drop** row against
+  PR #52's diff on `wiki/backend/python/language/bytecode-cache-staleness.md`.
+- Field-reproduction paragraphs in all five pages: these report the 2026-08-11
+  session's measurements and were **not** re-run here. [추정] their numbers are
+  accurate as recorded; they are the one class of claim in this PR that this
+  session could not independently reproduce.
+- `wiki/*/index.md` "load when" lines for the five new rows — invariant 1 requires
+  they enumerate the page's distinct use cases without contradicting its trigger.
