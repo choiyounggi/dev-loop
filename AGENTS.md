@@ -72,11 +72,16 @@ Every page uses `templates/page.md`. Non-negotiable rules:
 1. **One case per page.** A page answers one situation. If you are writing "and also…",
    split the page and cross-link under `related`.
 2. **≤ 120 lines of body.** Precision beats coverage. Link, don't inline.
-3. **Positive guidance only.** Every directive is "In situation X, do Y".
-   Anti-patterns may only appear in the `Instead of` table, where each row MUST pair
-   the anti-pattern with its replacement action. A "don't" without an "instead" is a
-   lint failure — a prohibition with no replacement invites the reader to improvise,
-   which is how hallucinations happen.
+3. **Positive guidance; a prohibition must pair.** Every directive is "In situation X,
+   do Y". A prohibition (`don't` / `do not` / `never` / `avoid` / `must not`) may
+   appear anywhere in a page, as long as the same directive item also carries its
+   replacement action or the mechanism that makes the prohibition true. The
+   `Instead of` table remains the place for anti-pattern/replacement pairs; each row
+   there MUST still pair the anti-pattern with its replacement action. The unit of
+   pairing is the directive item — a table cell or a bullet — not the page as a
+   whole. A bare prohibition, alone in its item, is a lint failure: a prohibition
+   with no replacement invites the reader to improvise, which is how hallucinations
+   happen. Enforced by `node scripts/wiki-lint-prohibitions.js`.
 4. **No vague qualifiers.** Words like "usually", "consider", "might want to",
    "generally", "as appropriate" are banned in directive sentences. State the
    condition that decides it: "When X, do A. When Y, do B." If you cannot state the
@@ -126,8 +131,8 @@ Run these via the skill files, which contain the full step-by-step workflows:
   merge into existing pages before creating new ones, cite sources, update indexes and `log.md`.
 - **Query** (`skills/wiki-query/SKILL.md`) — answer a question from the wiki with citations;
   if the answer required synthesis across pages and is re-askable, file it as a new page.
-- **Lint** (`skills/wiki-lint/SKILL.md`) — health check: unsourced claims, "don't"s without
-  "instead"s, banned vague qualifiers, orphan pages, broken links, stale `last_verified`.
+- **Lint** (`skills/wiki-lint/SKILL.md`) — health check: unsourced claims, unpaired
+  prohibitions, banned vague qualifiers, orphan pages, broken links, stale `last_verified`.
 
 Two further skills use the wiki to run development work (rather than maintain the wiki):
 

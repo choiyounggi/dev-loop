@@ -21,7 +21,7 @@ Run all of these; report findings grouped by severity.
 | # | Check | Severity |
 |---|-------|----------|
 | 1 | Page with `confidence: verified` but empty/unverifiable `sources:` | error |
-| 2 | "Don't/never/avoid" directive outside an `Instead of` table, or an `Instead of` row missing its replacement | error |
+| 2 | A prohibition (`don't`/`do not`/`never`/`avoid`/`must not`) alone in its directive item (table cell or bullet), carrying no replacement action or mechanism — checked via `node scripts/wiki-lint-prohibitions.js`; `Instead of` rows must still pair the anti-pattern with its replacement | error |
 | 3 | Broken `related:` id or inline link | error |
 | 4 | Page not listed in its domain `index.md`, or index entry whose "load when" line no longer matches the page trigger | error |
 | 5 | Vague qualifiers in directive sentences (usually, consider, might, generally, as appropriate) | warn |
@@ -30,13 +30,16 @@ Run all of these; report findings grouped by severity.
 | 8 | `last_verified` older than 12 months on `verified` pages (docs move, defaults change) | warn |
 | 9 | `contradiction` entries in `log.md` still unresolved | warn |
 | 10 | `gap` entries in `log.md` with no page created after 30 days | info |
+| 11 | Bare 2-word prohibition cell (e.g. `Never read`) — undecidable by shape between a state value and a real directive, so it is surfaced rather than judged; reported by `node scripts/wiki-lint-prohibitions.js` | info |
 
 ## Fix protocol
 
 - Fix mechanical findings (3, 4, 6 splits, index lines) directly.
-- For 1 and 2: fix when the correct source/replacement is known with certainty;
-  otherwise downgrade to `unverified` / move the prohibition into `Instead of` with a
-  `TODO replacement` marker and report it — do not invent sources or replacements.
+- For 1: fix when the correct source is known with certainty; otherwise downgrade
+  to `unverified` and report it — do not invent sources.
+- For 2: add the replacement action or the mechanism in place, in the same
+  directive item; moving the row into `Instead of` is one option, not the required
+  one. Do not invent a replacement — report it if none is known with certainty.
 - For 5: rewrite the sentence as a conditional ("When X, do A") only when the
   condition is stated elsewhere in the page; otherwise report it.
 - Append `## [YYYY-MM-DD] lint | <n> errors fixed, <m> reported` to `log.md`.
