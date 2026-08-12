@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://code.claude.com/docs/en/hooks
 last_verified: 2026-08-05
-related: [infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-worktree-isolated-workers, platforms-processes-tool-diagnostics-without-a-failing-exit-code]
+related: [infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-worktree-isolated-workers, platforms-processes-tool-diagnostics-without-a-failing-exit-code, infrastructure-agent-orchestration-dispatching-after-a-completion-report]
 ---
 
 # A Gate That Blocks a Worker Session from Ending Mid-Workflow

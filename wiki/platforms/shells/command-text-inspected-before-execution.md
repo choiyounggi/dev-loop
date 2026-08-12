@@ -8,7 +8,7 @@ sources:
   - https://code.claude.com/docs/en/hooks
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
 last_verified: 2026-08-06
-related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-shells-escapes-in-shell-string-literals, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-harness-mediated-tool-results, platforms-processes-tool-diagnostics-without-a-failing-exit-code]
+related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-shells-escapes-in-shell-string-literals, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-harness-mediated-tool-results, platforms-processes-tool-diagnostics-without-a-failing-exit-code, platforms-tools-agent-permission-classifier-denials]
 ---
 
 # Commands Read as Text by a Gate Before the Shell Runs Them
