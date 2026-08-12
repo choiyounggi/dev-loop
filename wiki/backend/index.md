@@ -32,6 +32,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [call-site-enumeration](common/change-impact/call-site-enumeration.md) | Changing the contract of a function/method/constructor other code calls — adding, removing, reordering or redefining a parameter — and you need the complete call-site list; scoping such a migration from a search; a migration scoped from recon came back green and then failed on call sites the search never listed; deciding whether to append a parameter or make it keyword-only (release-level re-test scope → qa/process/regression-scope) |
+| [cross-module-consumer-census](common/change-impact/cross-module-consumer-census.md) | Your task added a public function, endpoint, export, or hook whose consumer belongs to a *different* task (parallel work split by file ownership, a backend change whose UI wiring is another ticket); deciding whether that task is done; a feature typed, tested, reviewed and merged changes nothing at runtime; separating same-module helpers and entry points from genuine orphans in a zero-consumer list |
 
 ### reliability
 

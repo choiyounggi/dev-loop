@@ -18,6 +18,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [severity-and-priority](process/severity-and-priority.md) | Triaging a bug — deciding how bad it is and when it gets fixed; a triage stalled on a severity debate |
 | [post-release-verification](process/post-release-verification.md) | A release just deployed to production; defining what "released safely" means; an incident revealed a release was broken for hours before anyone noticed |
 | [scope-purity-checks](process/scope-purity-checks.md) | Proving a change/session/agent run touched nothing outside an allowed path set by filtering `git status --porcelain` output; a purity gate flags `?? dir/` for a directory that is wholly in scope; writing such a gate for an orchestration/CI workflow |
+| [defect-class-resweep-after-review](process/defect-class-resweep-after-review.md) | Addressing review findings when the remediation itself adds code (a new function, branch, call site, formatter); about to hand that diff to a verifier, an audit, or CI as "review comments addressed"; deciding whether a bot's acknowledged/resolved thread means the class is closed; reporting fix completeness as a class-with-method count rather than a per-finding list |
 
 ## deliverables
 
