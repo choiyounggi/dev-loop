@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://man7.org/linux/man-pages/man3/termios.3.html
   - https://man7.org/linux/man-pages/man1/tmux.1.html
-last_verified: 2026-08-05
+last_verified: 2026-08-12
 related: [platforms-shells-option-like-argument-values, infrastructure-agent-orchestration-session-completion-gates, platforms-processes-non-interactive-cli-invocation]
 ---
 
@@ -60,6 +60,8 @@ or escalate.
 | The send is a multi-line prompt | Send the body and the submit key as separate calls and check the indicator between them; a single blob can be consumed partially |
 | Several sends are in flight to one pane | Serialize them — one outstanding send per pane, confirmed before the next; interleaved input is reordered by the tty buffer, not by your script |
 | No busy indicator exists in the target | Require the artifact check from the table; without either, the harness cannot distinguish queued from consumed |
+| The pane shows the prompt collapsed into a paste placeholder (`❯ [Pasted text #3]`) with no busy marker | The body arrived as one bracketed-paste block and the submit key was consumed with it — send `Enter` as its own `send-keys` call and re-read; [platforms-processes-non-interactive-cli-invocation] owns the paste mechanism |
+| A send helper reports a queued outcome and its own follow-up wait then reports pick-up | That pair is a confirmation: the wait observed the target take the input. A helper that reports delivery without a wait has observed only the write |
 
 ## Instead of
 
@@ -67,10 +69,12 @@ or escalate.
 |---------------------|-----------------|-----|
 | Diff `capture-pane` before/after and call a difference "delivered" | Check the busy/queued indicator first and use the diff only when it is absent | The tty echoes typed characters while the program is busy, so the diff reports success for the queued case the check exists to catch |
 | Sleep a fixed interval after `send-keys` and continue | Poll the indicator (or the artifact) until it clears, with a deadline | The right interval is the target's work time, which is what you are trying to measure |
+| Read a send wrapper's success word or exit 0 as "the prompt is running" | Read it as "the keys reached the pane", then confirm submission from the pane: an empty input line plus the target's working indicator | The wrapper checks its own write, which succeeds whether the target submitted the input or parked it as an unsubmitted paste; the gap surfaces only as a phase timeout much later |
 | Resend on the first unchanged capture | Distinguish "busy" from "not delivered" before resending | Resending into a busy pane queues a duplicate that runs when the pane drains |
 
 ## Sources
 
 - https://man7.org/linux/man-pages/man3/termios.3.html — `ECHO` in `c_lflag`: "Echo input characters." The terminal driver echoes independently of when the program calls `read()`
 - https://man7.org/linux/man-pages/man1/tmux.1.html — `send-keys` writes keys into a pane's input; `capture-pane` copies the pane's visible contents — neither reports whether the foreground process consumed the input
+- Field observation 2026-08-12 (dev-loop orchestrate, 3 tmux worker sessions): `send-prompt.sh` returned 0/"delivered" for two workers whose panes both sat at `❯ [Pasted text #3]`/`#4` with the prompt unsubmitted, while the third returned "queued" and its follow-up `wait` reported pick-up — that one had actually submitted. Sending `Enter` as a separate key event to each stuck pane started both workers immediately
 - Field reproduction 2026-08-05 (tmux 3.7b, macOS): a pane running `sleep 6` received `echo SECOND_PROMPT_MARKER`. Pane content changed (diff = YES) and the marker appeared once as echoed text, while the command's own output line count stayed 0; after the sleep drained, the command ran and the output line appeared
