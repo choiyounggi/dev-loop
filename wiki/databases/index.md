@@ -1,7 +1,8 @@
 # databases — Domain Index
 
 Route here for: schema/table/key design, index decisions, query writing and
-optimization, transaction/concurrency behavior.
+optimization, transaction/concurrency behavior. Datastore backup/restore and
+data-loss planning → wiki/infrastructure/data/backup-and-restore.md.
 
 Match your situation to a "load when" line; load only matching pages.
 
