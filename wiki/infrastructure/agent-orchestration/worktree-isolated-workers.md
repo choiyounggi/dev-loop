@@ -6,8 +6,8 @@ applies_to: [git, general]
 confidence: verified
 sources:
   - https://git-scm.com/docs/git-worktree
-last_verified: 2026-08-05
-related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, platforms-shells-command-text-inspected-before-execution]
+last_verified: 2026-08-13
+related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-shared-run-state, platforms-shells-command-text-inspected-before-execution]
 ---
 
 # Writing the Brief for a Worker Confined to Its Own Worktree
@@ -56,6 +56,7 @@ wait loop keeps escalating with no error from the task itself.
 | The brief names the main checkout only as a read source | It works, and it still couples the brief to one machine's layout — pass it as a named variable so the brief stays portable |
 | The guardrail is heuristic and matches on absolute paths | A relative path inside the worktree cannot trip it at all; that is the second reason to write paths relative |
 | A worker writes to a path under the main root that is a *sibling* string (`<main_root>-backup/…`) | The guardrail does not fire — the match requires a path separator after the main root — but the write is still outside the worktree; keep it out of the brief |
+| The brief points the worker at a coordinator-state directory that is gitignored (`.orchestration/`, `.state/`) via a repo-relative path | The path resolves only in the main checkout: `git worktree add` checks out tracked files, so an ignored directory never materializes in a worktree. Substitute the absolute main-checkout path into the brief and state that the directory is gitignored and absent from the worktree — a capable worker otherwise hides the miss by searching for the file instead of failing |
 
 ## Instead of
 
@@ -64,9 +65,11 @@ wait loop keeps escalating with no error from the task itself.
 | Put the main checkout's absolute path in a worker's `<output_contract>` | Give a worktree-relative path and collect the artifact from the worktree | One absolute write path halts every worker at the same phase, and the coordinator sees only a wait-loop timeout |
 | Disable the escape guardrail so the workers proceed | Rewrite the paths in the brief | The guardrail is what makes parallel workers safe to run against one repo |
 | Designate a shared scratch directory inside the repo for worker output | Place it outside the repo and pass its path as one named variable | A shared in-repo directory is both a guardrail trip and a write race between workers |
+| Reuse the coordinator's repo-relative path to a gitignored state directory in a worker's prompt template | Expand it to the absolute path at substitution time and note the directory is absent from the worktree | Ignored files exist only where they were created; the relative form silently resolves to a nonexistent path in every worker, and reads of absolute main-root paths pass the guardrail |
 
 ## Sources
 
 - https://git-scm.com/docs/git-worktree — linked worktrees are separate checkouts sharing one repository; each has its own working directory
 - Field reproduction 2026-08-05 (groundwork guardrails 1.0.0 `hooks/bash-guard.sh`, `worktree_escape` rule, macOS): from a linked worktree, `cp ./a <main_root>/b` and `echo z > <main_root>/f` were both stopped; `cat <main_root>/f`, `ls <main_root>/.orchestration`, and `grep -n x <main_root>/f` all passed. The rule matches an absolute main-root mention together with a write verb (`rm|mv|cp|tee|mkdir|touch|install|dd`) or a redirect to an absolute path
 - Field context: a parallel run stalled at the same phase for two workers whose brief's `<output_contract>` named a main-checkout absolute path; the coordinator's wait loop returned its escalation status repeatedly. Rewriting the contract to worktree-relative paths let the remaining workers record their plans locally
+- Local reproduction 2026-08-13 (git 2.x, macOS): in a repo with `.gitignore` containing `.orchestration/` and a populated `.orchestration/status/`, `git worktree add ../wt1 -b wt1` produced a worktree where `ls ../wt1/.orchestration` → No such file or directory and `cat .orchestration/status/run.json` from the worktree cwd failed; `git ls-files .orchestration` → 0 tracked files. Field context: dev-loop's own `templates/session-prompt.md` handed workers `.orchestration/…` relative paths, and workers located the files by searching the main checkout rather than failing
