@@ -32,4 +32,4 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
-| [intermittent-failures](concurrency/intermittent-failures.md) | A failure happens only sometimes: passes on retry, fails under load, fails only in CI, flaky test, occasional prod-only error — amplifying it into an on-demand reproduction |
+| [intermittent-failures](concurrency/intermittent-failures.md) | The intermittent failure is in the system itself — an occasional prod error, a bug that appears only under load, behaviour you can trigger only sometimes — and you need to amplify it into an on-demand reproduction by finding the hidden variable (the unreliable thing is a test in your suite → wiki/testing/flaky/diagnosing-flaky-tests.md) |

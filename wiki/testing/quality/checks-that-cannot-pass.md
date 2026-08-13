@@ -18,10 +18,9 @@ related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-s
 ## When this applies
 
 You are authoring a check that will decide pass/fail for work not yet done —
-a grep/regex gate on an unwritten file or doc section, a lint/scan rule, a
-schema assertion against an unbuilt endpoint, a plan's verification command —
-and the only run you have observed is a failing one. Also applies when
-reviewing a plan whose gates have never been seen to pass.
+a grep/regex gate on an unwritten file or doc section (including an unwritten spec, RFC, or schema document), a lint/scan rule, a schema assertion against
+an unbuilt endpoint, a plan's verification command — and the only run you have observed is a failing one. Also applies when reviewing a plan whose gates
+have never been seen to pass. This owns unwritten-target gate patterns for spec, RFC, and schema documents too; wiki/qa/document-verification/spec-document-gates.md does not.
 
 ## Do this
 

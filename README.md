@@ -200,9 +200,13 @@ The wiki is meant to grow from what you actually learn. Three moving parts:
      rate-limit window has elapsed, so PRs appear without you doing anything.
      Guarded: kill switch `DEV_LOOP_AUTOFLUSH=0`, once per
      `DEV_LOOP_AUTOFLUSH_INTERVAL` (default 3600s), only at
-     `DEV_LOOP_AUTOFLUSH_MIN` (default 3) pending items, single-flight lock, and
-     recursion-safe. Needs `claude` + `gh` on PATH and gh authenticated; if either
-     is missing it silently no-ops and you fall back to manual.
+     `DEV_LOOP_AUTOFLUSH_MIN` (default 3) pending items, an owner-token
+     single-flight lock shared with the manual flush below
+     (`DEV_LOOP_FLUSH_LOCK_TTL`, default 900s, before a crashed holder's lock
+     is reclaimable) plus a per-run queue claim (`DEV_LOOP_CLAIM_TTL`, default
+     3600s) so the two entry points never ingest the same candidate, and
+     recursion-safe. Needs `claude` + `gh` on PATH and gh authenticated; if
+     either is missing it silently no-ops and you fall back to manual.
    - **Manual** — invoke `/dev-loop:knowledge-flush` any time to drain the queue now.
 
 ### This ordering is enforced by a hook
