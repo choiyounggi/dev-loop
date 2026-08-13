@@ -16,6 +16,7 @@ load it alongside the stack page here — these pages link the exact ids.
 |------|-----------|
 | [entity-mapping](jpa/entity-mapping.md) | Writing or reviewing JPA entity classes/associations — fetch types (to-one EAGER default), bidirectional sync helpers, entity equals/hashCode; debugging `LazyInitializationException`, `MultipleBagFetchException`, entities vanishing from Sets, or unexpected joins/queries traced to mappings; deciding DTO projection vs entity for read-only endpoints; evaluating Open Session in View |
 | [persistence-context](jpa/persistence-context.md) | Debugging changes saved without calling save (dirty checking), stale reads within one transaction (first-level cache), flush timing surprises around queries, detached-entity errors (merge vs persist, lost updates after merge); designing or fixing slow/memory-hungry JPA batch inserts; choosing IDENTITY vs SEQUENCE id generation for batch-heavy tables |
+| [not-null-check-and-lifecycle-callbacks](jpa/not-null-check-and-lifecycle-callbacks.md) | A write fails with `PropertyValueException: not-null property references a null or transient value` and you must attribute it to an attribute/path (dotted path vs plain name, embeddables, nulled transient references); about to fix such a failure in a `@PreUpdate` listener; asking why an entity's `nullable = false` is (or stopped being) enforced at runtime — `hibernate.check_nullability` vs Bean Validation on the classpath; deciding between `@Column(nullable = false)`, `@NotNull`, and the DB constraint as the enforcing layer |
 
 ## spring
 
