@@ -15,7 +15,14 @@
 #                    and inside the flush checkout (~/.dev-loop/repo)
 #   - rate limit:    at most once per DEV_LOOP_AUTOFLUSH_INTERVAL sec (default 3600)
 #   - threshold:     only when >= DEV_LOOP_AUTOFLUSH_MIN pending items (default 3)
-#   - single-flight: a TTL lock dir
+#   - single-flight: scripts/flush-lock.sh, an owner-token mkdir lock shared
+#                    with skills/knowledge-flush/SKILL.md step 0 (issue #77).
+#                    DEV_LOOP_FLUSH_LOCK_TTL sec before a crashed holder's lock
+#                    is reclaimable (default 900). DEV_LOOP_CLAIM_TTL sec before
+#                    a claimed-but-unfinished queue row (hooks/queue-claim.js)
+#                    is reclaimable by another run (default 3600).
+#                    DEV_LOOP_FLUSH_LOCK (lock path) and DEV_LOOP_FLUSH_RUN_ID
+#                    (this run's id) are test/override seams, not user knobs.
 #   - fail-safe:     if `claude`/`gh` are missing it silently no-ops; the manual
 #                    /dev-loop:knowledge-flush skill still works.
 set +e
@@ -42,6 +49,9 @@ QUEUE="$DIR/queue"
 [ -d "$QUEUE" ] || exit 0
 
 # --- threshold: count PENDING rows (exclude the retired .processed.jsonl) --
+# The literal '"status":"pending"' match already excludes "claimed" rows
+# (hooks/queue-claim.js), so a live sibling run's in-flight claims cannot
+# re-trip this threshold.
 PENDING=0
 for f in "$QUEUE"/*.jsonl; do
   case "$f" in *"/.processed.jsonl") continue ;; esac
@@ -59,13 +69,14 @@ if [ -f "$STAMP" ] && [ -n "$(find "$STAMP" -mmin "-$INTERVAL_MIN" 2>/dev/null)"
   exit 0
 fi
 
-# --- single-flight lock (TTL ~15 min via mkdir atomicity) -----------------
-LOCK="$DIR/.autoflush.lock"
-if ! mkdir "$LOCK" 2>/dev/null; then
-  # stale lock older than 15 min → reclaim
-  [ -n "$(find "$LOCK" -mmin -15 2>/dev/null)" ] && exit 0
-  rmdir "$LOCK" 2>/dev/null; mkdir "$LOCK" 2>/dev/null || exit 0
-fi
+# --- single-flight lock (shared with skills/knowledge-flush/SKILL.md step 0
+#     via scripts/flush-lock.sh — see issue #77) ---------------------------
+# One run id for both the acquire below and the release in the backgrounded
+# subshell, so release's owner-token check matches this run (DEV_LOOP_FLUSH_RUN_ID
+# is exported here and inherited by the "(...) &" subshell further down).
+RUNID="${DEV_LOOP_FLUSH_RUN_ID:-$(date +%Y%m%d-%H%M%S)-$$}"
+export DEV_LOOP_FLUSH_RUN_ID="$RUNID"
+sh "$(dirname "$0")/../scripts/flush-lock.sh" acquire >/dev/null 2>&1 || exit 0
 touch "$STAMP" 2>/dev/null
 
 # --- spawn the detached headless flush ------------------------------------
@@ -76,7 +87,7 @@ PROMPT='Run the dev-loop:knowledge-flush skill now. Drain ~/.dev-loop/queue: for
   DEV_LOOP_FLUSHING=1 nohup "$CLAUDE_BIN" -p "$PROMPT" \
     --permission-mode bypassPermissions \
     > "$DIR/autoflush.log" 2>&1
-  rmdir "$LOCK" 2>/dev/null
+  sh "$(dirname "$0")/../scripts/flush-lock.sh" release >/dev/null 2>&1
 ) &
 disown 2>/dev/null
 

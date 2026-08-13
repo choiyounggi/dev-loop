@@ -19,6 +19,38 @@ row is a candidate: `trigger, directive, why, evidence, domain, tags, content`.
 `hooks/pre-flush-pr-gate.sh` blocks `gh pr create` on a knowledge branch unless
 an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
 
+0. **Acquire the shared flush lock — before anything else, including the
+   checkout reset in step 1.** This skill and the `hooks/auto-flush.sh` Stop
+   hook are the two entry points that drain the same queue; both serialize
+   through the same lock (`scripts/flush-lock.sh`, issue #77).
+
+   Generate this run's id **once, here**, and record it — **every** later
+   `flush-lock.sh` call in this flush (the abort-path release below, and
+   step 5's release) must be prefixed with it. This is mandatory, not a
+   style choice: each step in this skill runs in its own fresh shell, so
+   nothing carries between them on its own — an unprefixed call computes a
+   brand-new run id that no longer matches the one that acquired the lock,
+   so `release` is refused as a foreign caller and the lock leaks for the
+   full TTL.
+   ```sh
+   RUNID="flush-$(date +%Y%m%d-%H%M%S)-$$"
+   echo "$RUNID"          # record this — every later flush-lock.sh call needs it
+   DEV_LOOP_FLUSH_RUN_ID="$RUNID" sh "${CLAUDE_PLUGIN_ROOT}/scripts/flush-lock.sh" acquire
+   ```
+   - Exit 0 → proceed to step 1.
+   - Non-zero exit → **do not touch `~/.dev-loop/repo`.** Read the failure
+     line (`held <holder-runid> <age>s` on stderr) and tell the user: "a
+     flush is already running (holder `<holder-runid>`, started `<age>s`
+     ago) — stopping." Then stop. Do not retry, poll, or wait for the lock.
+   The lock is released once, at the very end of step 5 on a successful
+   flush. If you abort or hit an unrecoverable error at any point after
+   acquiring it, release it before stopping — **prefixed with the same
+   `$RUNID`** recorded above — so the next run does not wait out the TTL:
+   ```sh
+   DEV_LOOP_FLUSH_RUN_ID="<the run id you recorded above>" \
+     sh "${CLAUDE_PLUGIN_ROOT}/scripts/flush-lock.sh" release
+   ```
+
 1. **Prepare a writable checkout** of the dev-loop repo (never edit the installed
    plugin dir — it is read-only and untracked):
    ```sh
@@ -48,8 +80,18 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
    `AGENTS.md`), NOT `${CLAUDE_PLUGIN_ROOT}`. The push + PR use the ambient `gh`
    auth, so the PR is opened by whichever account this user is logged in as.
 
-2. **For each queued candidate, run the pre-PR pipeline** (this is the whole point
-   — a raw harvested block is a *candidate*, not vetted knowledge):
+2. **Claim your candidates, then for each one run the pre-PR pipeline** (this is
+   the whole point — a raw harvested block is a *candidate*, not vetted
+   knowledge):
+
+   **Claim first, before reading or ingesting anything:**
+   ```sh
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/queue-claim.js" claim
+   ```
+   Work only the ids this command prints — those are the rows this run now
+   owns. A row already claimed by another (live or not-yet-TTL-expired) run,
+   or claimed by a sibling run that raced past the lock, is not printed;
+   skip it — do not read or ingest a row this command did not print.
 
    a. **Research & verify the best-practice.** Do a real search — official docs,
       primary sources, reputable references (use WebSearch / context7 / the
@@ -140,17 +182,37 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
    Do NOT `gh pr merge`. The owner reviews open `dev-loop:knowledge` PRs and
    merges or rejects each one.
 
-5. **Retire processed candidates — every one you handled, not only the ingested.**
-   Move each handled row out of the active queue (append it to
+5. **Retire processed candidates — every claimed row you handled, not only the
+   ingested.** Move each handled row out of the active queue (append it to
    `~/.dev-loop/queue/.processed.jsonl` and rewrite the session file without it):
    rows you ingested, rows you merged into existing pages, AND rows you dropped
-   as unverifiable or duplicate. A dropped row left `pending` re-crosses the
-   auto-flush threshold forever — the headless flush would re-run hourly on
+   as unverifiable or duplicate. Retire only rows step 2 claimed for **this**
+   run — never a row you did not claim. A dropped row left `pending` re-crosses
+   the auto-flush threshold forever — the headless flush would re-run hourly on
    candidates that can never be promoted. When the rewrite leaves a session file
    empty, delete the file — empty leftovers otherwise accumulate in the queue
    directory (the harvester also removes its own empty file on later Stops).
 
+   If step 2 claimed a row you did not end up handling (the run is aborting,
+   or the candidate is being left for a retry), release it instead of retiring
+   it, so a later run does not wait out the claim TTL to see it again:
+   ```sh
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/queue-claim.js" release <id>...
+   ```
+
+   Once every claimed row is retired or released, release the flush lock —
+   this is the normal end of a successful flush. Prefix with the **same**
+   `$RUNID` recorded in step 0: this step runs in its own fresh shell, so an
+   unprefixed call computes a new run id and `release` is refused as a
+   foreign caller, leaking the lock for the full TTL:
+   ```sh
+   DEV_LOOP_FLUSH_RUN_ID="<the run id you recorded in step 0>" \
+     sh "${CLAUDE_PLUGIN_ROOT}/scripts/flush-lock.sh" release
+   ```
+
 ## Guardrails
+- Never run two flushes at once — step 0's lock is the only serialization
+  point, and it is shared with `hooks/auto-flush.sh`.
 - PR-only. Never auto-merge, never push to `main`, never force-push `main`.
 - Commit under the **user's own ambient git/gh identity** — never hardcode an
   account, never commit as an assistant, never add a `Co-Authored-By` trailer.
