@@ -20,6 +20,8 @@ related:
     testing-quality-tests-that-cannot-fail,
     platforms-environment-unicode-text-matching,
     qa-deliverables-generated-artifacts-as-deliverable-source,
+    testing-quality-spec-artifact-checks,
+    testing-quality-checks-that-cannot-pass,
   ]
 ---
 
@@ -27,10 +29,13 @@ related:
 
 ## When this applies
 
-You are writing or reviewing automated checks (grep/script) that decide whether a
-written deliverable — RFC, API spec, schema doc, design doc — satisfies its stated
-requirements; a document passed its checklist but a reviewer still found the
-requirement unmet; you are fixing gate patterns for a document that is not written yet.
+A document passed its checklist but a reviewer still found the requirement
+unmet: you are deciding whether a doc gate's assertions are sufficient to
+accept the deliverable — table structure, MUST-vs-SHOULD demotion, closed-set
+completeness, cross-section consistency — and what release policy the gate's
+verdict feeds. Authoring or validating the check code itself belongs to
+wiki/testing/quality/spec-artifact-checks.md and
+wiki/testing/quality/checks-that-cannot-pass.md.
 
 ## Do this
 
@@ -58,6 +63,11 @@ requirement unmet; you are fixing gate patterns for a document that is not writt
    keyed on.
 5. **Write patterns against the literal text in the document**, not a remembered
    stem — for non-ASCII text apply [platforms-environment-unicode-text-matching].
+
+Items 1, 2, 4, and 5 above validate the check's own mechanism; the general
+technique lives in wiki/testing/quality/spec-artifact-checks.md and
+wiki/testing/quality/checks-that-cannot-pass.md. Item 3 (the four axes) states
+what this gate must assert about the document and stays here.
 
 ## Edge cases
 

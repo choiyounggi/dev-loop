@@ -9,17 +9,20 @@ sources:
   - https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html
   - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html
 last_verified: 2026-07-10
-related: [testing-data-test-data-and-isolation, testing-mocking-what-to-mock]
+related: [testing-data-test-data-and-isolation, testing-mocking-what-to-mock, debugging-concurrency-intermittent-failures]
 ---
 
 # Fixing a Test That Fails Intermittently
 
 ## When this applies
 
-A test sometimes fails and sometimes passes with no code change: it fails in CI
-but passes locally, fails only when run with other tests, or passes on retry.
-This page covers test-specific causes and fixes; for general root-cause
-methodology on the intermittent failure itself, see wiki/debugging/.
+The unreliable thing is a test in your suite: it fails in CI but passes
+locally, fails only when run with other tests, or passes on retry. You are
+hunting its test-level cause (order dependence, shared fixture state,
+time/timezone, async waits) or setting quarantine-vs-retry policy for it. If
+the same intermittency also appears outside the suite, or the test-level
+causes are exhausted and it still will not reproduce on demand, see
+wiki/debugging/concurrency/intermittent-failures.md.
 
 ## Do this
 
