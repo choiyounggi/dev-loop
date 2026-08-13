@@ -53,6 +53,17 @@ Choosing what to *re-test* for the release around it →
    incorrect", with 27% of the incorrect fixes made by developers who "have never
    touched the source code files associated with the fix".
 
+6. **Sweep the classes the remediation's *own* shape opens**, which the review
+   never named because the code did not exist when it was read. Match the edit
+   against its shape and run that class's check before handing the diff on:
+
+| The remediation… | Opens the class | Check before handing it on |
+|------------------|-----------------|----------------------------|
+| Widens a fetch (adds a child/related lookup, drops a filter) | Unbounded result set | The new call paginates or caps, on the path that returns many |
+| Adds an output line (log, stderr warning, message) | Unguarded path | Every branch reaching it has the values it formats, including the early-return one |
+| Persists something new (id, marker, join row) | Orphaned record | The delete/rollback path clears it too |
+| Replaces a literal with a parameter or placeholder | Unvalidated assembly | The assembled string is syntax-checked, not only the substitution |
+
 ## Edge cases
 
 | Case | Then |
@@ -77,4 +88,5 @@ Choosing what to *re-test* for the release around it →
 
 - https://www.eecg.utoronto.ca/~yuan/papers/incorrect_fix_abstract.html — "at least 14.8% to 24.4% of sampled fixes for post-release bugs in these large OSes are incorrect" (Linux, OpenSolaris, FreeBSD, and a 12-year-old commercial OS); "Developers and reviewers for incorrect fixes usually do not have enough knowledge about the involved code. For example, 27% of the incorrect fixes are made by developers who have never touched the source code files associated with the fix"
 - https://dl.acm.org/doi/10.1145/2025113.2025121 — Yin et al., "How do fixes become bugs?", ESEC/FSE 2011: the published record for the study above
+- Field observation 2026-08-12 (PR #327, bot review rounds 13→14): 4 of round 14's 7 warnings were defects in round 13's remediation itself, one per shape in the step-6 table — a widened child re-query with no pagination, an added stderr warning on an unguarded path, a newly recorded `comment_id` that the delete path left orphaned, and a placeholderized JQL string whose assembly was never syntax-checked
 - Field incident 2026-08-11 (Python validation engine, review round 1 → remediation): the finding was that a checker echoed a raw external string into its error message. The remediation closed that checker and, in the same round, added a sibling checker that echoed the same untrusted field. An independent audit reproduced it by passing a key containing a carriage return and reading the leaked original in the message; a grep for the class over the module after the edit would have listed both sites
