@@ -197,8 +197,12 @@ deny-net을 분류기는 볼 수 없기 때문입니다. 코디네이터 세션�
      발화합니다. 아무것도 하지 않아도 PR이 나타납니다. 가드:
      킬 스위치 `DEV_LOOP_AUTOFLUSH=0`, `DEV_LOOP_AUTOFLUSH_INTERVAL`(기본
      3600초)당 1회, 대기 항목 `DEV_LOOP_AUTOFLUSH_MIN`(기본 3)개 이상일 때만,
-     single-flight 잠금, 재귀 안전. `claude` + `gh`가 PATH에 있고 gh 인증이
-     필요합니다. 하나라도 없으면 조용히 no-op — 수동으로 fallback.
+     아래 수동 플러시와 공유하는 owner-token single-flight 잠금
+     (`DEV_LOOP_FLUSH_LOCK_TTL`, 기본 900초 — 이 시간이 지나면 죽은 홀더의
+     잠금을 재점유 가능), 그리고 두 진입점이 같은 후보를 동시에 인제스트하지
+     않도록 하는 런당 큐 클레임(`DEV_LOOP_CLAIM_TTL`, 기본 3600초), 재귀
+     안전. `claude` + `gh`가 PATH에 있고 gh 인증이 필요합니다. 하나라도
+     없으면 조용히 no-op — 수동으로 fallback.
    - **수동** — 언제든 `/dev-loop:knowledge-flush`로 큐를 지금 비웁니다.
 
 ### 이 순서는 훅으로 강제됩니다
