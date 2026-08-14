@@ -476,9 +476,28 @@ until the worker picks it up (**0** picked-up, **5** deadline expired). Then
 substrate: `task-create` the implement Task, then `scripts/orca-worker-start.sh
 --task <impl_task> --terminal <handle>` to reuse that task's existing session, and
 wait with `scripts/orca-wait.sh`. Rework rounds are further Tasks on the same
-`--terminal`.)* Review each
-worktree diff (`git -C <wt> diff <integ>...HEAD`); if a session's tests look weak,
-**cross-call `test-quality-auditor` yourself** (self-call + orchestrator cross-call).
+`--terminal`.)*
+
+Run the fixed four-lens pass on each worktree diff (`git -C <wt> diff
+<integ>...HEAD`) — write the result to `reviews/<task>-rN.md` from
+`templates/review-report.md`:
+
+1. **Plan conformance** — diff vs. the plan's decision→page map and the
+   brief's `<scope_boundaries>` / `<out_of_scope>`; a decision silently made
+   differently at implement time is a defect even when the code works.
+2. **Wiki re-route from the diff** — run AGENTS.md routing protocol step 7 on
+   the diff itself; report any page reached that the plan never named.
+3. **Execution-environment reality** — any new flag/subcommand/API/dependency:
+   confirm it exists in the version present where the code actually runs
+   (`wiki/platforms/toolchains/flag-availability-at-the-execution-site.md`).
+4. **Multi-object write ordering** — 2+ files/objects/rows written without a
+   transaction; any ordering a concurrent reader could observe mid-flight
+   (`wiki/backend/common/storage/multi-object-write-ordering.md`). You are the
+   only reviewer who sees every worktree at once, so cross-task ordering
+   hazards are your job alone.
+
+Alongside the pass, if a session's tests look weak, **cross-call
+`test-quality-auditor` yourself** (self-call + orchestrator cross-call).
 On shortfall, write `reviews/<task>-rN.md`, inject §3 (rework), repeat. After 3
 failed rounds, escalate. When a task is approved, return to step 1 of the dispatch
 loop — whatever dependency it released shows up in the next `ready-set.sh` round and
