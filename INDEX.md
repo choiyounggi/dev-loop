@@ -1,7 +1,9 @@
 # Root Index — Domain Map
 
-Route by matching your current task to a "route here when" line, then open that
-domain's `index.md`. Load nothing else at this level.
+Route by matching a "route here when" line, then open that domain's `index.md`.
+Load nothing else at this level. What you match is your current **task** when
+planning, and the **diff in front of you** when reviewing — one table, two inputs
+(routing protocol step 7, `AGENTS.md`).
 
 `scaffold` domains have **no pages yet** — do not route into them expecting answers;
 follow the cross-pointers in their index or take the next matching seeded domain

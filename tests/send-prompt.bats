@@ -426,9 +426,12 @@ tpl_sections_single_line() {
   # Bumped from 3932390147/5667 when O1 became adopt-the-coordinator's-plan
   # instead of author-your-own: planning moved to the coordinator so it runs on
   # the planning model, not on whatever tier the worker is pinned to.
+  # Bumped from 4060540920/6077 when §O3 gained the fix-or-answer obligation:
+  # per finding, fix it or answer its Question and leave it, recorded via an
+  # Answer (r{N}) line in the review file; silence is not a valid resolution.
   run sh -c "sed -n '/^\*\*Orca substrate\.\*\*/,/^## Subagent usage protocol/p' '$TPL' | cksum"
   [ "$status" -eq 0 ]
-  [ "$output" = "4060540920 6077" ]
+  [ "$output" = "3269123258 6531" ]
 }
 
 @test "template: the Orca ask rule forbids deciding a timed-out question" {

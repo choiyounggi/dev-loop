@@ -32,7 +32,10 @@ skills/ingest|query|lint/    # the three operations
 
 ## Routing protocol (how to consume)
 
-When working on a task and you need guidance from this wiki:
+Routing takes one of two inputs. **Planning** routes from the *intent* — the task
+you are about to do. **Review** routes from the *diff* — what the code in front of
+you actually does. Steps 1-6 are the same for both; the review entry then adds
+step 7.
 
 1. Read `INDEX.md`. Match your task to a domain by its "route here when" line.
    - **Several domains match**: route to the domain that owns the artifact you will
@@ -61,6 +64,24 @@ When working on a task and you need guidance from this wiki:
      row** (rows are ordered general → specific); when a general row and a
      precondition-bearing row both fit, take the one that preserves the stated
      invariant.
+7. **Review entry — route from the diff, then compare the page sets.** When your
+   input is a change rather than a task, derive the match from what the diff does,
+   not from what its plan said it would do:
+
+   | Signal in the diff | Route on |
+   |--------------------|----------|
+   | A new or changed CLI flag, subcommand, SDK call, or dependency version | the owning toolchain/platform domain — resolve it against the version present where the code runs |
+   | Two or more writes with no transaction around them | the owning data or storage domain — establish what a concurrent reader sees between them |
+   | A new lock, queue, pool, background job, or shared file | the concurrency category of the owning domain |
+   | A new parameter reaching a query, path, template, or permission check | security, trust-boundary category |
+   | A changed schema, index, or migration | databases |
+   | A new or changed test file, assertion, or fixture | testing |
+
+   Then compare the page set you reached against the page set the plan named. The
+   pages you reached that the plan never named are the change's unplanned risk
+   surface; report that list as a review finding in its own right. When the two
+   sets match, record "no unplanned pages reached" — a stated null result and an
+   omitted one read the same to the next reviewer, so state it.
 
 Hard rule: never load a whole domain "for background". The index lines exist so you
 can decide relevance without opening pages.
