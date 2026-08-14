@@ -391,6 +391,16 @@ reasoning-effort flags) that `worker-start` cannot express.
    a UI-facing task fill `<design_spec>` with the `design` role's pulled spec
    (Phase 2) — then
 
+   The brief and plan are what the worker reads, not what it writes, so every
+   reference to them inside a composed prompt uses the `{ORCH_DIR}` token
+   (absolute path to this run's `.orchestration` dir, substituted like
+   `{STATUS_DIR}`) — the worker's cwd is its own worktree, which does not
+   contain `.orchestration/`. Repo files (source, tests, tracked docs) stay
+   relative to that cwd instead: an absolute repo path would make the worker
+   edit the main worktree rather than its own. This coordinator's own
+   `briefs/<task>.md` / `plans/<task>.md` references above stay relative — the
+   coordinator's cwd is the main repo root.
+
    **2a. Plan it yourself, here, before launching.** Invoke the bundled `wiki-plan`
    skill for this task and write the result to `plans/<task>.md`. Planning runs in
    THIS coordinator session on purpose: a worker can be pinned to a cheaper tier
