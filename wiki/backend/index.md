@@ -31,6 +31,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [aggregation-layer-of-a-shared-helper](common/change-impact/aggregation-layer-of-a-shared-helper.md) | A plan, brief, or review comment says to unify or replace "the N call sites" of a helper and names them by line number rather than by what the code does; one site feeds a set-level SQL aggregate while another returns a per-row value that application code reduces later; a "shared helper" landed with one consumer adopting it and the other keeping its old semantics; deciding which layer owns a missing-value rule and whether the plan's grep-count acceptance criterion is reachable at all |
 | [call-site-enumeration](common/change-impact/call-site-enumeration.md) | Changing the contract of a function/method/constructor other code calls — adding, removing, reordering or redefining a parameter — and you need the complete call-site list; scoping such a migration from a search; a migration scoped from recon came back green and then failed on call sites the search never listed; deciding whether to append a parameter or make it keyword-only (release-level re-test scope → qa/process/regression-scope) |
 
 ### reliability
