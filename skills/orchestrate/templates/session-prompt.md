@@ -76,7 +76,7 @@ Approved. Implement .orchestration/plans/{TASK}.md via the loop-implement skill:
 
 ## (3) Rework — injected when review requests changes
 
-Address the issues in .orchestration/reviews/{TASK}-r{N}.md via the loop-implement skill (re-run step 6.5 audit; never weaken or skip tests). Then run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD` and wait.
+Address the issues in .orchestration/reviews/{TASK}-r{N}.md via the loop-implement skill (re-run step 6.5 audit; never weaken or skip tests). Per finding: fix it, or answer its Question with the concrete reason and leave it — either way, append `- **Answer (r{N})** — fixed` or `- **Answer (r{N})** — stands: <reason>` under that finding in the absolute file $(dirname {STATUS_DIR})/reviews/{TASK}-r{N}.md; silence on any finding is not a valid resolution. This obligation binds blocking findings only — answering Non-blocking findings is encouraged, not required. Then run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD` and wait.
 
 ## (4) Merge-prep — injected after final approval
 
@@ -135,10 +135,15 @@ Then END YOUR TURN. Do not commit, push, or PR — the orchestrator merges.
 ## (O3) Rework — `--spec` of the rework Task
 
 Address the issues in .orchestration/reviews/{TASK}-r{N}.md via the loop-implement skill
-(re-run step 6.5 audit; never weaken or skip tests). Then run
+(re-run step 6.5 audit; never weaken or skip tests). Per finding: fix it, or answer its
+Question with the concrete reason and leave it — either way, append `- **Answer (r{N})**
+— fixed` or `- **Answer (r{N})** — stands: <reason>` under that finding in the absolute
+file $(dirname {STATUS_DIR})/reviews/{TASK}-r{N}.md; silence on any finding is not a
+valid resolution. This obligation binds blocking findings only — answering Non-blocking
+findings is encouraged, not required. Then run
 `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD`
 and report exactly once:
-`orca orchestration send --type worker_done --subject "impl_done: {TASK} r{N}" --body "<what changed since r{N}, what remains>" --task-id {ORCA_TASK_ID} --dispatch-id {ORCA_DISPATCH_ID} --outcome succeeded --files-modified "<csv>" --json`
+`orca orchestration send --type worker_done --subject "impl_done: {TASK} r{N}" --body "<per-finding outcomes, e.g. F1 fixed, F2 stands: short reason>" --task-id {ORCA_TASK_ID} --dispatch-id {ORCA_DISPATCH_ID} --outcome succeeded --files-modified "<csv>" --json`
 (a failure is `--outcome failed`, never failure encoded only in prose). Then END YOUR TURN.
 
 ## (O4) Merge-prep — `--spec` of the merge-prep Task
