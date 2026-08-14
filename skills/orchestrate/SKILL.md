@@ -534,8 +534,8 @@ Alongside the pass, if a session's tests look weak, **cross-call
 `test-quality-auditor` yourself** (self-call + orchestrator cross-call).
 On shortfall, write `reviews/<task>-rN.md`, inject §3 (rework), repeat. After 3
 failed rounds, escalate. When a task is approved, merge it into the integration
-branch first (Phase 3 step 5's merge-on-approval rule) before you return to step 1
-of the dispatch loop — whatever dependency it released shows up in the next
+branch first (Phase 3 step 5's merge-on-approval rule) before you
+return to step 1 of the dispatch loop — whatever dependency it released shows up in the next
 `ready-set.sh` round already merged, and the freed slot is refilled immediately.
 When `ready-set.sh` returns **5**, go to Phase 5.
 
