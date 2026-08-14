@@ -1,53 +1,45 @@
-# Knowledge consolidation — 15 open PRs (#17–#40) → one reconciled state
-
-The 15 open `knowledge/*` PRs (created 2026-08-04 → 2026-08-05, before the
-harvest processed-store dedupe fix in #41) contained 123 file-versions of ~75
-unique pages, with the same insight landing at up to 3 different paths across
-up to 8 PRs. Per-PR review would re-import those duplicates, so — as with the
-#6–#13 consolidation — this branch carries the reconciled end-state and the 15
-PRs are closed in its favor.
+# Knowledge flush — 3 insight(s)
 
 ## Verified best-practice
 
-Every adopted page's sources were carried from its originating PR's flush, where
-they were live-verified at flush time; no new URLs were introduced during
-consolidation (checked mechanically: every `http(s)` URL in every merged page
-appears in a source PR's diff; every added body line in amended pages traces to
-a source PR hunk — orphan-line verification). Confidence fields were kept as the
-originating flushes set them, except client-side-rate-limiting where the union
-of provider-doc citations (Okta, Auth0, GitHub, OpenAI, RFC 6585) supports
-`verified` for the load-bearing claims. One subagent's fabricated content (12
-files matching neither main nor any PR, with invented source URLs) was detected
-by the same verification and replaced with true PR content.
+**1. `__file__`-relative data files break after non-editable install → package data + `importlib.resources`** (hash `a9e3db01b9b1ceb1`, linkly session)
+- Claim: a Python package locating runtime data files via `__file__`-relative paths works in editable/`PYTHONPATH` runs but fails after `pip install .`; data files must be declared as package data and resolved via `importlib.resources`.
+- Sources checked (fetched this flush): https://setuptools.pypa.io/en/latest/userguide/datafiles.html — "It is strongly recommended that, if you are using data files, you should use `importlib.resources` to access them"; `__file__` manipulation "isn't compatible with PEP 302-based import hooks, including importing from zip files"; `include_package_data`/`package_data` control wheel contents. https://docs.python.org/3/library/importlib.resources.html — resources "do not have to exist as physical files and directories"; `as_file()` yields a real path and cleans up extractions.
+- Field evidence: linkly v0.4.0 `lnpl build` rc=4, grammar path resolved to `.venv/lib/python3.13/mlir/lnpl.irdl.mlir` (absent from the wheel) while `PYTHONPATH=impl` built fine.
+- **Confidence: verified** (official docs + field reproduction).
+
+**2. Orchestrator-injected coordination env leaks into harness test suites** (hash `03b0983bb4a5d9d8`, dev-loop session)
+- Claim: when an orchestration worker runs the harness's own test suite, injected `LO_*`/`GROUNDWORK_*` vars leak into the scripts under test — tests fail against the unset-env baseline AND test writes land in the live run's shared state (watcher then monitors the wrong session). Unset injected vars in setup; pass tempdir state paths explicitly.
+- Sources checked: dev-loop issue #100 (OPEN, root cause section marked "verified 2026-08-14") — 6 deterministic `launch-session.bats` failures reproduced with `env LO_RUN_ID=… bats` on a clean checkout; live `t90.json` found rewritten with bats tempdir paths and a foreign session name. The env-merge mechanism (`env` merges into the inherited environment unless `-i`) is already sourced on the target page (pubs.opengroup.org env spec).
+- **Confidence: field-tested** (reproducible in-repo evidence; no additional external doc needed beyond what the page already cites).
+
+**3. Reflowing prose that tests assert as a single-line substring** (hash `4b8d97490dc0ed5e`, dev-loop session)
+- Claim as harvested: "macOS bash 3.2 matches a newline-split phrase in `[[ ]]`, so only ubuntu CI fails."
+- **Mechanism correction — the harvested claim is false.** Measured this flush on bash 3.2.57: `[[ "$s" == *"return to step 1"* ]]` does NOT match a newline-split phrase (NOMATCH on both old and new bash). What actually differs by platform: `set -e; [[ 1 -eq 2 ]]; echo REACHED` prints REACHED on bash 3.2 — under bash ≤4.0 a failing mid-test `[[ ]]` doesn't abort, so the broken assertion passes silently on macOS while bash ≥4.2 CI fails it. `tests/orchestrate-review-pass.bats:81` uses exactly this mid-test `[[ ]]` form.
+- Field evidence: two reproductions (dev-loop PR #94 §O3; PR #102 'return to step 1 of the dispatch', fixed by reflow commit 9cbc065).
+- **Confidence: verified** (directive verified with the corrected mechanism; the wrong mechanism was NOT ingested).
 
 ## Existing-layer check
 
-- Merged-main near-dup scan before consolidation: pairwise Jaccard over
-  title + "When this applies" across all 141 merged pages → **0 flagged pairs**;
-  previously merged content carries no duplication.
-- Cross-PR dedup during consolidation: 10 duplicate clusters collapsed to one
-  canonical page each (rate limiting 8→1, call-site enumeration 7→folded into
-  the canonical merged in #20, stderr/exit-0 diagnostics 4→1, sysroot 2→1,
-  env-off-switch 2→1, completion predicates 2→1, robots.txt 2→1,
-  harness-mediated results 2→1, leaked artifacts 2→1, orchestration category
-  naming unified). Three near-pairs kept distinct after trigger comparison,
-  with mutual `related:` links (differential setup vs interpretation; expansion
-  semantics vs off-switch design; import-time tactics vs level choice).
-- 24 existing pages received union-merged amendments; additions already present
-  in main (from #16/#20) were skipped, and all non-canonical `related:` ids
-  were remapped to canonical page ids (post-merge broken-link scan: 0).
+Pages read: qa-document-verification-editing-a-gated-document, testing-data-test-data-and-isolation, infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-worktree-isolated-workers
+
+- Grepped main's `wiki/` for `__file__`/`importlib`: zero hits → insight 1 is not covered anywhere; **created new page** (a stale local-only branch `knowledge/dch0202-20260805-144711` once drafted a related page but has no PR and is not in main — not an open-PR obligation).
+- `testing-data-test-data-and-isolation` already carries the generic absent-variable `unset` row and the env-derived-write-path row; insight 2's *injected-orchestration-env → live-state corruption* angle was missing → **merged** (+1 Do row, +1 edge case, +1 field-incident source), related-links added both ways with `infrastructure-agent-orchestration-shared-run-state`. No conflict with existing directives.
+- `qa-document-verification-editing-a-gated-document` covers anchor inventory before editing; its Substring anchor row lacked the reflow/line-wrap breakage mode and the platform-invisible-failure twist → **merged** (extended Substring row, +1 edge case, +1 Instead-of row, +2 sources), cross-linking existing `testing-quality-tests-that-cannot-fail`. No conflict.
+- `node scripts/wiki-lint-prohibitions.js`: 61 directives, 0 violations after edits.
+
+## Open-PR check
+
+Listed 27 open `knowledge/*` heads (gh pr list, head:knowledge/) and grepped `git diff origin/main...<head> -- wiki/` across all fetched knowledge branches for `importlib|__file__|package data|LO_|GROUNDWORK_|ambient env|unset|bats|bash 3.2|normalize_ws|line-wrap|whitespace`.
+
+- Insight 1: no open head touches Python packaging/`__file__` → **new**.
+- Insight 2: no open head touches injected-env test isolation (the generic absent-var row in old branch `dch0202-20260805-103148` / closed PR #28 is already in main) → **new**.
+- Insight 3: **partial fold into PR #47** (`knowledge/dch0202-20260806-130040`) — #47 already carries the runtime mechanism (bats mid-test `[[ ]]` trap under bash ≤4.0, tests-that-cannot-fail row, COMPAT + bats-gotchas sources). That part is NOT re-ingested here; a comment noting the two additional field reproductions (PR #94/#102) is left on #47. The document-editing side (reflow breaks single-line substring anchors; whitespace-normalize new phrase gates) is absent from #47 and from main → merged into `editing-a-gated-document` here as **new**.
 
 ## Routing decision
 
-- New categories: `infrastructure/agent-orchestration` (5 pages; unified the
-  competing `orchestration`/`agent-orchestration` names), `databases/data-survey`
-  (1), `qa/deliverables` (1). All other pages route into existing categories.
-- Canonical-path decisions: rate limiting → `backend/common/reliability/`
-  (sits beside timeouts-and-retries; 6 of 8 variants chose it); stderr
-  diagnostics → `platforms/processes/` (concern spans beyond shells); leaked
-  artifacts → `testing/data/artifact-leakage-from-a-suite`; call-site
-  enumeration → the existing `backend/common/change-impact/` page.
-- All 38 new pages listed in their domain indexes (nearest-index rule; backend
-  routes via its python sub-index for bytecode-cache-staleness); INDEX.md domain
-  summaries updated for infrastructure/qa/databases. Full-wiki lint: frontmatter,
-  ids, related-links, index coverage, size, qualifiers, staleness → 0 findings.
+| Insight | Target | Decision |
+|---------|--------|----------|
+| 1 — data files & install paths | `backend/python/packaging/data-files-and-install-paths.md` | **New page, NEW category `packaging`** — existing backend/python categories (concurrency, boundaries, serving, language) cover runtime behavior, not distribution/wheel contents; harvested "platforms" hint rejected (platforms = OS-level differences, this is install-mode-level). backend/python index + backend index + root INDEX updated |
+| 2 — injected coordination env | `testing/data/test-data-and-isolation.md` | **Merge** — trigger is "how a suite isolates state", same page that owns the absent-var and env-write-path rows; orchestration cross-link to shared-run-state rather than a new agent-orchestration page (the actor is the test author, not the brief author) |
+| 3 — reflow vs substring anchors | `qa/document-verification/editing-a-gated-document.md` | **Merge** — exact trigger match ("editing a document automated text gates check"); gate-authoring half folded as guidance pointing at whitespace-normalized comparison; runtime-mechanism half deferred to open PR #47 (fold) |

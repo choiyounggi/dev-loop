@@ -24,6 +24,12 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [app-servers-and-workers](serving/app-servers-and-workers.md) | Deploying a Python web app behind gunicorn/uvicorn; choosing worker count, worker class (sync/gthread/ASGI), or worker timeout; requests queue or time out while CPU sits idle; workers killed mid-request; worker memory growth and preload/max_requests recycling decisions |
 
+## packaging
+
+| Page | Load when |
+|------|-----------|
+| [data-files-and-install-paths](packaging/data-files-and-install-paths.md) | A Python package reads non-code files (grammars, templates, KBs) located via `__file__`-relative paths; an installed console script cannot find a data file that exists in the repo; deciding how data files get into the wheel and how code resolves them after `pip install .` |
+
 ## language
 
 | Page | Load when |

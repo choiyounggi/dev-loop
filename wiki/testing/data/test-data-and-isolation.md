@@ -10,8 +10,8 @@ sources:
   - https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html
   - https://nodejs.org/api/fs.html
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/env.html
-last_verified: 2026-08-05
-related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-strategy-import-time-side-effects, testing-data-artifact-leakage-from-a-suite, testing-quality-behavior-not-implementation, platforms-filesystems-permissions-and-exec-bits, backend-common-change-impact-call-site-enumeration]
+last_verified: 2026-08-14
+related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-strategy-import-time-side-effects, testing-data-artifact-leakage-from-a-suite, testing-quality-behavior-not-implementation, platforms-filesystems-permissions-and-exec-bits, backend-common-change-impact-call-site-enumeration, infrastructure-agent-orchestration-shared-run-state]
 ---
 
 # Owning Test Data and Isolating Test State
@@ -47,6 +47,7 @@ state-leak symptom.
 | Code under test derives a write path from the environment (`~/...`, `$HOME`, `$XDG_CONFIG_HOME`, `%APPDATA%`) and would touch the real machine | Point that environment variable at a per-test scratch directory in setup and restore it in `finally`; the production path expression then resolves inside the scratch tree with no signature change. Assert afterwards that the real location gained no files |
 | A case whose behavior depends on a variable being **absent** (`run env VAR=x cmd`, `subprocess(env={...})`) | `unset` it in setup — `env` merges into the inherited environment unless given `-i`, so running the suite from a session that exports it silently flips that case to the opposite branch; CI's clean environment stays green and hides it |
 | A fixture file must carry the executable bit (permission checks, PATH/binary-resolution code) | Create it with the mode set at creation time (`writeFileSync(p, body, { mode: 0o755 })`, `open` with a mode) inside a per-test directory under an already-gitignored build-output path of the repo, and remove it in teardown |
+| The suite runs inside a session that a harness/orchestrator injected coordination variables into (run id, status-directory path, task id), and the code under test reads them | `unset` every injected variable in setup and pass state paths to the code under test explicitly as per-test tempdir arguments — the inherited values both flip env-dependent branches against the unset-env baseline and point the tests' writes at the live run's shared state |
 
 4. Keep fixture data **minimal**: create only the entities the behavior under
    test reads. Every extra row is a value a reader must rule out and a
@@ -64,6 +65,7 @@ state-leak symptom.
 | The executable fixture is rewritten between tests | Delete and recreate it: a write to an existing path keeps the original mode, so a second write with a different mode leaves the first one in place (measured on Node v25.8.1) |
 | The machine runs endpoint security (EDR) that flags an executable created under the system temp directory | Keep the fixture inside the repo's gitignored build-output tree and set the bit at creation; that path is what a "+x file dropped in a temp dir" heuristic looks for, and the fixture only needs the bit, not the location ([platforms-filesystems-permissions-and-exec-bits]) |
 | Leftover test artifacts (temp dirs/files) accumulate in the repo and the producers look diffuse | Count leftovers by name prefix (`ls \| sed 's/-[a-z0-9]*$//' \| sort \| uniq -c`) and match the distribution against the sites that create such files — a match closes the attribution; fix those sites, then enforce the cleanup convention with a static check proven red against the unfixed code first |
+| The code under test is the harness that spawned the session now running its suite (an orchestration worker runs the orchestrator's own tests in its worktree) | Treat the leak as two failures: reproduce the test failures with `env VAR=… bats <file>` on a clean checkout to confirm the mechanism, then check the live run's state files for writes stamped with test-fixture values — a leaked state path corrupts the running orchestration ([infrastructure-agent-orchestration-shared-run-state]), which surfaces later as a watcher monitoring the wrong session |
 
 ## Instead of
 
@@ -83,3 +85,4 @@ state-leak symptom.
 - https://abseil.io/resources/swe-book/html/ch12.html — a test is complete when "its body contains all of the information a reader needs in order to understand how it arrives at its result"; prefer DAMP over DRY, and where a helper is used, give it "descriptive parameters that make dependencies explicit" rather than reusing shared constants
 - https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html — keep the inputs a test's result depends on visible in the test method instead of in shared setup, so the cause-and-effect relationship is readable without jumping elsewhere
 - Field incident 2026-08-04 (`linkly-t1-repo-policy`, Python): `rows_for(doc)` seeded its rows from the module constant `PAYLOAD` while its tests ran payload `{}`; a shape-only migration of the helper fixed 1 of 11 failures, and moving the payload into the helper's signature fixed 11 of 11
+- Field incident 2026-08-14 (dev-loop issue #100): `launch-session.sh` exports `LO_RUN_ID`/`LO_STATUS_DIR`/`LO_TASK_ID` into every worker session; a worker running `bats tests/launch-session.bats` inherited them — 6 deterministic failures absent on a clean shell, reproduced with `env LO_RUN_ID=… bats`, and the live run's `t90.json` status file was found rewritten with bats tempdir paths and a foreign session name

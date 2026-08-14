@@ -40,7 +40,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [artifact-leakage-from-a-suite](data/artifact-leakage-from-a-suite.md) | Temp directories, build outputs, or scratch files pile up in the repo or system temp after a suite runs; a clone grows with no obvious owner; you suspect the leak comes from everywhere and need a way to locate it; deciding between per-site cleanup, the runner's owned-temp API, and a static rule that enforces the convention |
-| [test-data-and-isolation](data/test-data-and-isolation.md) | Tests need fixture data and you are choosing how to create it; tests pass alone but fail together (or vice versa); DB cleanup, shared fixtures, time-dependent logic, or unique-value collisions |
+| [test-data-and-isolation](data/test-data-and-isolation.md) | Tests need fixture data and you are choosing how to create it; tests pass alone but fail together (or vice versa); DB cleanup, shared fixtures, time-dependent logic, or unique-value collisions; a suite behaves differently inside a harness-spawned session that injects env vars |
 
 ## mocking
 

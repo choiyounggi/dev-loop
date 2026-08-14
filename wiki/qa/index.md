@@ -30,7 +30,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [spec-document-gates](document-verification/spec-document-gates.md) | Deciding whether passing a doc gate is enough to accept the deliverable: a document passed its checklist but the requirement is still unmet; choosing what the gate must assert beyond keyword presence (table structure, MUST-vs-SHOULD demotion, closed-set completeness, cross-section consistency); setting the release policy a gate verdict feeds (authoring or validating the check code itself → wiki/testing/quality/spec-artifact-checks.md, wiki/testing/quality/checks-that-cannot-pass.md) |
-| [editing-a-gated-document](document-verification/editing-a-gated-document.md) | Editing or rewording a document that grep/regex gates or a lint config check; a gate fails on wording whose meaning did not change; describing what an upstream spec says without tripping a "do not redefine it" gate; a check matches the pattern your own document quotes; recording an audit verdict inside the document that was audited; deciding which checks to re-run after editing a gated document |
+| [editing-a-gated-document](document-verification/editing-a-gated-document.md) | Editing or rewording a document that grep/regex gates or a lint config check; a gate fails on wording whose meaning did not change; reflowing prose a test asserts as a verbatim phrase (CI red on one platform only); describing what an upstream spec says without tripping a "do not redefine it" gate; a check matches the pattern your own document quotes; recording an audit verdict inside the document that was audited; deciding which checks to re-run after editing a gated document |
 
 ## environments
 
