@@ -97,4 +97,5 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [multi-object-write-ordering](common/storage/multi-object-write-ordering.md) | A diff writes two or more related objects (payload + checksum, data file + index entry, new version + the pointer that marks it current) with no transaction around the writes; reviewing such a diff for what a concurrent reader observes between the writes, or what a crash between them leaves behind |
 | [object-key-persistence](common/storage/object-key-persistence.md) | Persisting the result of an object-storage upload (`s3.upload()`, `lib-storage` `Upload`, a transfer manager) — choosing which response field goes in the DB column; building the read/signing path from a stored reference; migrating a column that holds URLs to keys; only large uploads 404 on read |
