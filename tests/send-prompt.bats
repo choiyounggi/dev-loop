@@ -429,9 +429,13 @@ tpl_sections_single_line() {
   # Bumped from 4060540920/6077 when §O3 gained the fix-or-answer obligation:
   # per finding, fix it or answer its Question and leave it, recorded via an
   # Answer (r{N}) line in the review file; silence is not a valid resolution.
+  # Bumped from 3269123258/6531 when every `.orchestration/briefs|plans|reviews/`
+  # reference became `{ORCH_DIR}/...` (issue #87): a worker's cwd is its own
+  # worktree, which does not contain `.orchestration/`, so the bare relative
+  # form resolved to nothing.
   run sh -c "sed -n '/^\*\*Orca substrate\.\*\*/,/^## Subagent usage protocol/p' '$TPL' | cksum"
   [ "$status" -eq 0 ]
-  [ "$output" = "3269123258 6531" ]
+  [ "$output" = "2521059482 6502" ]
 }
 
 @test "template: the Orca ask rule forbids deciding a timed-out question" {
