@@ -47,8 +47,9 @@ for br in "$@"; do
       echo "-> $br exists but is NOT based on $integ (possibly stale from a previous run) — verify before relying on it" >&2
     fi
   else
+    base_hash=$("$GIT" rev-parse --short "$integ")
     "$GIT" worktree add -b "$br" "$path" "$integ"
-    echo "ok: worktree $path ($br)"
+    echo "ok: worktree $path ($br) base=$base_hash"
   fi
   # Scope guardrails inside this worktree (single source: worker-guardrails.sh —
   # the Orca substrate calls the same script for an orca-created worktree).
