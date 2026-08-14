@@ -155,13 +155,32 @@ lens_order() {
 
 # --- boundary: no other test file was touched by this task -----------------
 
-@test "no BATS file other than this one is new or modified in the working tree" {
+@test "the commit that added this file touched no other BATS file" {
+  # A working-tree `git status` version of this check false-positives on any
+  # uncommitted, unrelated .bats file a later task in the same worktree adds
+  # (e.g. a sequential sibling task on this branch) — the tree it would
+  # inspect is someone else's in-progress state, not this commit's diff
+  # (wiki/qa/process/scope-purity-checks.md: prove purity from the change
+  # itself, not from ambient state). Anchor to the commit that introduced
+  # this file instead: that diff is permanent, so the check passes
+  # regardless of what else is uncommitted right now, and still fails for
+  # real if that commit ever touched a second .bats file.
   cd "$REPO_ROOT" || return 1
-  run git status --porcelain -- 'tests/*.bats'
+  # A shallow clone (actions/checkout@v4 defaults to fetch-depth 1) has no
+  # ancestor history: `git log --diff-filter=A` resolves to the shallow
+  # boundary commit for every path, and that commit has no parent to diff
+  # against, so it reports EVERY tracked file as "added" — a depth-1 clone
+  # cannot answer "which commit added this file" truthfully. Skip rather than
+  # assert something the checkout cannot honestly prove; the check still runs
+  # for real on any full clone (local dev, release workflows).
+  if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+    skip "shallow clone (no full history) — cannot resolve the true adding commit, see wiki/qa/process/scope-purity-checks.md"
+  fi
+  commit="$(git log --diff-filter=A --format=%H -- tests/orchestrate-review-pass.bats | tail -1)"
+  [ -n "$commit" ]
+  run git show --stat --format= "$commit" -- 'tests/*.bats'
   [ "$status" -eq 0 ]
-  while IFS= read -r line; do
-    [ -z "$line" ] && continue
-    f="${line:3}"
-    [ "$f" = "tests/orchestrate-review-pass.bats" ]
-  done <<< "$output"
+  file_lines="$(printf '%s\n' "$output" | grep -c ' | ' || true)"
+  [ "$file_lines" -eq 1 ]
+  [[ "$output" == *"tests/orchestrate-review-pass.bats"* ]]
 }

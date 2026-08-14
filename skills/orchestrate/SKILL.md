@@ -503,6 +503,28 @@ failed rounds, escalate. When a task is approved, return to step 1 of the dispat
 loop — whatever dependency it released shows up in the next `ready-set.sh` round and
 the freed slot is refilled immediately. When `ready-set.sh` returns **5**, go to Phase 5.
 
+**Insight emission.** After a rework round's fix is confirmed by re-review,
+emit one ★ Insight candidate per finding that was fixed and confirmed —
+**only** for findings that sat in `## Findings` (they carried a failure
+scenario: a real defect). `## Non-blocking` items never emit — they lack a
+failure scenario, so they are style/preference, not the near-miss lesson this
+rule captures. Both conditions must hold: the finding was a `## Findings`
+item AND the following re-review round confirmed the fix — a finding that is
+caught but not yet fixed is not a near-miss lesson yet. Use the frozen block
+format from `hooks/insight-instruction.sh` verbatim (`trigger`/`directive`
+required, `why`/`evidence` expected); the 0–3-per-session cap still applies,
+so if a round confirms more fixes than the remaining budget, prioritize the
+highest-signal finding. Map the fields like this:
+
+```
+★ Insight ─────────────────────────────────────
+trigger: <diff signal in lens vocabulary — e.g. "new CLI flag, no version check">
+directive: <reviewer's action on that signal — e.g. "confirm the flag exists in the deployed toolchain version">
+why: <why the miss happened — e.g. "lens 3 exists for exactly this, the first pass skipped it">
+evidence: reviews/<task>-rN.md + the fixing commit
+─────────────────────────────────────────────
+```
+
 ## Splitting a task mid-run
 
 A worker may report that its task is much larger than the brief assumed. It
