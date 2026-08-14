@@ -108,6 +108,47 @@ command -v "$TMUX_BIN" >/dev/null 2>&1 || TMUX_BIN=""
 # script DISABLES the check (empty), mirroring the TMUX_BIN treatment above.
 STALL_SCRIPT="${WATCH_STALL_SCRIPT:-$(dirname "$0")/tmux-worker-stalled.sh}"
 [ -f "$STALL_SCRIPT" ] || STALL_SCRIPT=""
+
+# classify_stall <session> — read the pane SCROLLBACK (not just the visible
+# region) for a stalled session and print an annotation for the exit-7
+# message, or nothing if no known pattern matches. Never fails the watch:
+# every step degrades to "no annotation" on any capture/parse failure.
+# Precedence: usage-limit wins over chooser (the chooser IS the limit
+# chooser in the case this was built from).
+classify_stall() {
+  [ -n "$TMUX_BIN" ] || return 0
+  cs_pane=$("$TMUX_BIN" capture-pane -t "=$1:" -p -S -1000 2>/dev/null) || cs_pane=""
+  [ -n "$cs_pane" ] || return 0
+
+  # ASCII-only ERE on purpose: the real message's "·" and curly quote are
+  # multibyte, and BSD/GNU grep + locale differences make matching them
+  # fragile. LO_LIMIT_EXTRA is an ADDITIVE fixed-string match, checked only
+  # when the default pattern misses — unset/empty means default-only, never
+  # an off switch.
+  cs_line=$(printf '%s\n' "$cs_pane" | grep -E "hit your (session|weekly) limit" | tail -n 1)
+  if [ -z "$cs_line" ] && [ -n "${LO_LIMIT_EXTRA:-}" ]; then
+    cs_line=$(printf '%s\n' "$cs_pane" | grep -F "$LO_LIMIT_EXTRA" | tail -n 1)
+  fi
+  if [ -n "$cs_line" ]; then
+    cs_tail=$(printf '%s\n' "$cs_line" | sed -n 's/.*resets \(.*\)/\1/p')
+    if [ -n "$cs_tail" ]; then
+      printf 'usage limit \302\267 resets %s' "$cs_tail"
+    else
+      printf 'usage limit'
+    fi
+    return 0
+  fi
+
+  # Chooser: last 30 lines only — it is live UI at the bottom, so a confirm
+  # hint deep in scrollback history is stale, not a pending chooser.
+  cs_last30=$(printf '%s\n' "$cs_pane" | tail -n 30)
+  if printf '%s\n' "$cs_last30" | grep -qF "Enter to confirm"; then
+    printf 'chooser pending \342\200\224 answer with send-prompt.sh keys'
+    return 0
+  fi
+  return 0
+}
+
 while [ "$elapsed" -lt "$budget" ]; do
   # A worker's guardrails `ask`, recorded as an escalation, wakes the coordinator
   # immediately rather than waiting out the timeout. The coordinator MUST resolve
@@ -153,12 +194,16 @@ while [ "$elapsed" -lt "$budget" ]; do
       case ",$only," in *",$base,"*) : ;; *) continue ;; esac
     fi
     ph=$("$JQ" -r '.phase // "pending"' "$f" 2>/dev/null || echo "pending")
+    r=$(rank "$ph")
     tk=$("$JQ" -r '.task // "?"' "$f" 2>/dev/null || echo "?")
     summary="$summary $tk:$ph"
     [ "$ph" = "failed" ] && { failed=$((failed+1)); continue; }
     # dead-worker (zombie) detection: a non-terminal task whose tmux session is
     # gone is treated as a failure, so the run aborts fast instead of waiting the
     # whole timeout. Terminal phases are skipped (the session may legitimately end).
+    # This gate is UNCHANGED by the stall-skip gate below (#88): a vanished
+    # session at a reached-but-non-terminal phase (e.g. impl_done) is still
+    # reportable — reached-target only silences the STALL check, not liveness.
     case "$ph" in
       done|merged|approved) : ;;
       *)
@@ -170,20 +215,35 @@ while [ "$elapsed" -lt "$budget" ]; do
         # Per-session stall check: only rc 1 marks a stall. rc 0 (progressing),
         # rc 2 (unknown), or a broken script are all NOT stalled — the explicit
         # rc capture means no failure here can abort the watch loop.
-        if [ -n "$STALL_SCRIPT" ] && [ -n "$TMUX_BIN" ] && [ -n "$sess" ]; then
+        # Extra gate vs. the dead-worker check above: a task at/above the
+        # target is never stall-checked (#88) — its silence is exactly what
+        # the session prompt ordered ("signal and wait"), not a wedged worker.
+        if [ "$r" -lt "$target_rank" ] && [ -n "$STALL_SCRIPT" ] && [ -n "$TMUX_BIN" ] && [ -n "$sess" ]; then
           src=0; sh "$STALL_SCRIPT" "$sess" >/dev/null 2>&1 || src=$?
           if [ "$src" -eq 1 ]; then stalled="$stalled $tk:$sess"; fi
         fi
         ;;
     esac
-    r=$(rank "$ph")
     [ "$r" -ge "$target_rank" ] && done_count=$((done_count+1))
   done
   echo "[watch ->$target] $done_count/$expected |$summary"
   [ "$failed" -gt 0 ] && { echo "[watch] failed session detected — abort"; exit 3; }
   [ "$done_count" -ge "$expected" ] && { echo "[watch] all reached $target"; exit 0; }
   # Stall is the weakest signal: failed(3) and all-reached(0) above win over it.
-  if [ -n "$stalled" ]; then echo "[watch] worker stalled —$stalled"; exit 7; fi
+  if [ -n "$stalled" ]; then
+    stmsg=""
+    for se in $stalled; do
+      setk=${se%%:*}; sesess=${se#*:}
+      reason=$(classify_stall "$sesess")
+      if [ -n "$reason" ]; then
+        stmsg="$stmsg $setk:$sesess ($reason)"
+      else
+        stmsg="$stmsg $setk:$sesess"
+      fi
+    done
+    echo "[watch] worker stalled —$stmsg"
+    exit 7
+  fi
   sleep "$interval"; elapsed=$((elapsed+interval))
 done
 echo "[watch] TIMEOUT (${budget}s, source=${budget_src}):$summary"; exit 2
