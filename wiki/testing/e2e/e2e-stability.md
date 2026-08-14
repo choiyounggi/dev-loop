@@ -11,7 +11,7 @@ sources:
   - https://playwright.dev/docs/auth
   - https://testing-library.com/docs/queries/about/
 last_verified: 2026-07-10
-related: [testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-minimum-case-set, testing-mocking-what-to-mock]
+related: [testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-minimum-case-set, testing-mocking-what-to-mock, qa-environments-headless-browser-bot-blocking]
 ---
 
 # Keeping Browser E2E Tests Stable and Fast

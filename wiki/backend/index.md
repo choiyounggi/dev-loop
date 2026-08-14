@@ -92,6 +92,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [externally-owned-defaults](common/integrations/externally-owned-defaults.md) | A code/config default names a resource the repo does not own (model alias, endpoint, bucket, queue, index) — reviewing or merging a PR that claims that default works, adding a startup check that the name still resolves, or diagnosing a default path that broke with no code change |
 | [robots-txt-and-source-selection](common/integrations/robots-txt-and-source-selection.md) | Choosing which site to fetch a published dataset from and reading its robots.txt to decide whether your client may crawl it; the file contains a `Disallow: /` and you are deciding whose group it belongs to; setting the crawler's User-Agent and checking that token against the file; robots.txt returned a non-200 status; the origin restricts your token and you are looking for a portal that republishes the same records |
+| [estimate-derived-thresholds](common/integrations/estimate-derived-thresholds.md) | Submitting an action to an external system whose actual outcome can differ from the decision-time estimate (market order fill vs quote) while persisting absolute trigger values derived from that estimate (SL/TP prices, alert thresholds); derived triggers fire immediately or at the wrong level right after the action confirms; choosing where to recompute them from the actual outcome |
 
 ### storage
 
