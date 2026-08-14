@@ -285,3 +285,287 @@ setup() {
   [ "$status" -eq 3 ]
   [[ "$output" == *"dead worker"* ]]
 }
+
+# Substring assertions below use grep, not `[[ "$output" == *"..."* ]]`: BATS
+# executes test bodies via eval in its own parent bash process (not a fresh
+# `bash -c`), and on this machine's bash 3.2.57 that context's `[[ ]]` glob
+# matching has been observed to report a false MATCH for a substring that is
+# genuinely absent from $output (verified 2026-08-14: `[[ "$output" ==
+# *"(usage limit)"* ]]` passed against output containing no such text, while
+# `grep -qF` on the same value correctly failed). This is the same
+# bash-version/platform pitfall PR #94 hit — the tools_guidance note "prefer
+# grep for pattern matching" exists for exactly this reason.
+assert_output_has() { printf '%s\n' "$output" | grep -qF -- "$1"; }
+refute_output_has() { ! printf '%s\n' "$output" | grep -qF -- "$1"; }
+
+# ---- reached-target skip (issue #88) -----------------------------------------
+# A task whose phase already satisfies the watch target must never be
+# stall-checked — its silence is exactly what the session prompt ordered
+# ("signal and wait"), not a wedged worker. This is a pure boolean gate
+# (r < target_rank) with no error path by construction, so per
+# testing-quality-minimum-case-set's edge-case allowance the trio below is
+# normal (above target) + two boundaries (exactly at target; the differential
+# dead-worker gate) + one contrast case proving the gate does not over-fire.
+
+
+# The two tests below need a SECOND task that never reaches target, so the
+# "all reached" exit-0 branch (which runs before the stall check on every
+# poll) can't short-circuit the result and mask whether the stall-skip gate
+# actually fired. The stub branches per-session ($1) so only t1 reports
+# stalled — t2 is deliberately never-reaching and never-stalled filler.
+
+@test "reached-target: a task ABOVE the target with a stalled pane exits 0, not 7 (normal)" {
+  printf '{"task":"t1","phase":"impl_done","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"pending","session":"lo-y"}' > "$ORCH/status/t2.json"
+  printf 'case "$1" in lo-x) exit 1 ;; *) exit 0 ;; esac\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" implementing 2 2 1
+  [ "$status" -eq 2 ]
+  refute_output_has "worker stalled"
+}
+
+@test "reached-target: a task EXACTLY AT the target with a stalled pane exits 0, not 7 (boundary)" {
+  printf '{"task":"t1","phase":"impl_done","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","session":"lo-y"}' > "$ORCH/status/t2.json"
+  printf 'case "$1" in lo-x) exit 1 ;; *) exit 0 ;; esac\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 2 2 1
+  [ "$status" -eq 2 ]
+  refute_output_has "worker stalled"
+}
+
+@test "reached-target: a task ONE RANK BELOW the target is still stall-checked (contrast)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "worker stalled"
+}
+
+@test "reached-target: a task AT target whose session VANISHED still reports dead worker (differential gate, boundary)" {
+  printf '{"task":"t1","phase":"impl_done","session":"lo-x"}' > "$ORCH/status/t1.json"
+  run env WATCH_TMUX=false sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 3 ]
+  assert_output_has "dead worker"
+}
+
+# ---- stall reason surfacing (issue #89) --------------------------------------
+# When a genuine stall IS reported, enrich the bare message with the
+# machine-readable reason read from the pane SCROLLBACK (capture-pane -S,
+# not the visible region). fake_tmux's capture-pane only returns the full
+# fixture (with the limit line near the top) when the invocation includes
+# "-S -1000"; without it, only the last 24 lines come back — so a test that
+# omits -S would fail here exactly the way it would against real tmux.
+
+fake_tmux() {
+  path="$1"; outfile="${2:-/dev/null}"; caprc="${3:-0}"; hsrc="${4:-0}"
+  cat > "$path" <<SCRIPT
+#!/bin/sh
+case "\$1" in
+  has-session) exit $hsrc ;;
+  capture-pane)
+    printf '%s\n' "\$*" >> "\${FAKE_TMUX_LOG:-/dev/null}"
+    [ "$caprc" = "0" ] || exit $caprc
+    case " \$* " in
+      *" -S -1000 "*) cat "$outfile" 2>/dev/null ;;
+      *) tail -n 24 "$outfile" 2>/dev/null ;;
+    esac
+    exit 0
+    ;;
+  *) exit 0 ;;
+esac
+SCRIPT
+  chmod +x "$path"
+}
+
+@test "limit: scrollback-only reset line is surfaced with the reset time (normal, scrollback proof)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  pane="$BATS_TEST_TMPDIR/pane.txt"
+  printf "You've hit your session limit \xc2\xb7 resets 2:50pm Asia/Seoul\n" > "$pane"
+  i=2; while [ "$i" -le 50 ]; do printf 'filler line %d\n' "$i" >> "$pane"; i=$((i+1)); done
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "$pane"
+  log="$BATS_TEST_TMPDIR/tmux.log"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" FAKE_TMUX_LOG="$log" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "usage limit"
+  assert_output_has "resets 2:50pm Asia/Seoul"
+  grep -q -- "-S -1000" "$log"
+}
+
+# review r1/F1: the script is `#!/bin/sh` and invoked via `sh` on ubuntu CI,
+# where /bin/sh is dash — dash's printf does not implement `\xNN` hex escapes
+# (verified 2026-08-14: `dash -c "printf 'A\xc2\xb7B\n'"` prints the literal
+# 9-byte text `A\xc2\xb7B`, not the middle-dot character), so classify_stall's
+# annotations must use octal escapes (`\302\267`, `\342\200\224`), which dash
+# and macOS sh both decode correctly. These two tests invoke dash directly —
+# not the generic `sh` this suite otherwise uses — because on THIS machine
+# /bin/sh is bash-in-POSIX-mode and already decodes `\xNN` fine, so a test
+# run via plain `sh` cannot locally reproduce (or guard) the dash-specific
+# regression; only an explicit dash invocation can prove it red/green here.
+
+@test "portability: the usage-limit annotation is dash-decodable, not raw \\xNN (regression, F1)" {
+  command -v dash >/dev/null 2>&1 || skip "dash not available on this runner"
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  pane="$BATS_TEST_TMPDIR/pane.txt"
+  printf "You've hit your session limit \xc2\xb7 resets 2:50pm Asia/Seoul\n" > "$pane"
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "$pane"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      dash "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "usage limit"
+  refute_output_has '\xc2'
+  refute_output_has '\xb7'
+}
+
+@test "portability: the chooser annotation is dash-decodable, not raw \\xNN (regression, F1)" {
+  command -v dash >/dev/null 2>&1 || skip "dash not available on this runner"
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  pane="$BATS_TEST_TMPDIR/pane.txt"
+  printf 'Enter to confirm \xc2\xb7 Esc to cancel\n' > "$pane"
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "$pane"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      dash "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "chooser pending"
+  refute_output_has '\xe2'
+  refute_output_has '\x80'
+  refute_output_has '\x94'
+}
+
+@test "limit: a limit line with no 'resets' tail annotates bare usage-limit (boundary)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  pane="$BATS_TEST_TMPDIR/pane.txt"
+  printf "You've hit your weekly limit\n" > "$pane"
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "$pane"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "(usage limit)"
+  refute_output_has "resets"
+}
+
+@test "limit: a failing capture-pane never aborts the watch — bare stall, still exit 7 (error)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "/dev/null" 1
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "worker stalled"
+  refute_output_has "usage limit"
+}
+
+@test "chooser: an interactive chooser within the last 30 lines is reported as chooser pending (normal)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  pane="$BATS_TEST_TMPDIR/pane.txt"
+  printf 'Enter to confirm \xc2\xb7 Esc to cancel\n' > "$pane"
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "$pane"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "chooser pending"
+}
+
+@test "chooser: a confirm hint outside the last 30 lines is stale, not classified as chooser (boundary)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  pane="$BATS_TEST_TMPDIR/pane.txt"
+  printf 'Enter to confirm \xc2\xb7 Esc to cancel\n' > "$pane"
+  i=2; while [ "$i" -le 50 ]; do printf 'filler line %d\n' "$i" >> "$pane"; i=$((i+1)); done
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "$pane"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "worker stalled"
+  refute_output_has "chooser pending"
+}
+
+@test "chooser: usage-limit wins over chooser when both patterns match (precedence)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  pane="$BATS_TEST_TMPDIR/pane.txt"
+  printf "You've hit your session limit \xc2\xb7 resets 2:50pm Asia/Seoul\n" > "$pane"
+  printf 'Enter to confirm \xc2\xb7 Esc to cancel\n' >> "$pane"
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "$pane"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "usage limit"
+  refute_output_has "chooser pending"
+}
+
+@test "LO_LIMIT_EXTRA: a custom substring is additionally classified as usage-limit (normal)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  pane="$BATS_TEST_TMPDIR/pane.txt"
+  printf 'CUSTOM_QUOTA_HIT\n' > "$pane"
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "$pane"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" LO_LIMIT_EXTRA="CUSTOM_QUOTA_HIT" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "usage limit"
+}
+
+@test "LO_LIMIT_EXTRA: unset means default pattern only — no accidental off switch (boundary)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  pane="$BATS_TEST_TMPDIR/pane.txt"
+  printf 'CUSTOM_QUOTA_HIT\n' > "$pane"
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "$pane"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "worker stalled"
+  refute_output_has "usage limit"
+}
+
+@test "LO_LIMIT_EXTRA: a value absent from the pane falls through cleanly, no crash (error)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  pane="$BATS_TEST_TMPDIR/pane.txt"
+  printf 'nothing interesting here\n' > "$pane"
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "$pane"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" LO_LIMIT_EXTRA="NEVER_APPEARS" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "worker stalled"
+  refute_output_has "usage limit"
+}
+
+@test "degradation: an empty pane capture never aborts the watch — bare stall (normal)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  fake_tmux "$BATS_TEST_TMPDIR/fake-tmux" "/dev/null"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/fake-tmux" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 7 ]
+  assert_output_has "worker stalled"
+}
+
+@test "degradation: WATCH_TMUX unresolvable disables classification the same as it disables the stall check (boundary)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-x"}' > "$ORCH/status/t1.json"
+  printf 'exit 1\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=/nonexistent/tmux WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  refute_output_has "worker stalled"
+}
