@@ -1,7 +1,7 @@
 # Brief template — XML task brief
 
 The orchestrator fills this in per task and writes it to
-`.orchestration/briefs/{TASK}.md`. Structure follows the delegation 4-part
+`{ORCH_DIR}/briefs/{TASK}.md`. Structure follows the delegation 4-part
 contract (objective / output / tools / boundaries) plus done + effort, in XML
 tags so the session can re-recognize each section. Heavy context goes near the
 top (long-context guidance); the session prompt's one-line trigger cites the
@@ -61,8 +61,11 @@ specific tags below as authority.
   <!-- the plan is an INPUT, not an output: the coordinator ran `wiki-plan` on the
        planning model and wrote it before this session launched. Adopt it; report a
        gap rather than re-planning (re-planning would move the decisions onto the
-       worker's tier). -->
-  <plan>.orchestration/plans/{TASK}.md — written by the coordinator; adopt, verify against this brief, do not re-author</plan>
+       worker's tier). Orchestration artifacts (this brief, the plan, reviews) live
+       outside every worktree, so they are always addressed via {ORCH_DIR} (absolute);
+       repo files the worker edits stay relative to its own worktree cwd — an absolute
+       repo path would target the main worktree instead of the worker's own. -->
+  <plan>{ORCH_DIR}/plans/{TASK}.md — written by the coordinator; adopt, verify against this brief, do not re-author</plan>
 
   <!-- output contract: how to signal completion -->
   <output_contract>

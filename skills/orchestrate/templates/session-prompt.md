@@ -6,7 +6,11 @@ SINGLE line (no newlines).
 `orca orchestration task-create`, one Task per task-phase, so it MAY span multiple
 lines. Never tell an Orca worker to wait — it reports and ends its turn.
 
-Tokens: `{TASK}` task id · `{STATUS_DIR}` abs path · `{SKILL}` orchestrate skill dir abs path ·
+Tokens: `{TASK}` task id · `{STATUS_DIR}` abs path · `{ORCH_DIR}` abs path of this run's
+`.orchestration` dir — every orchestration artifact (briefs/plans/reviews) is
+addressed through this token; repo files (source, tests, tracked docs) stay
+relative to the worker's own worktree cwd, since an absolute repo path would
+target the main worktree instead · `{SKILL}` orchestrate skill dir abs path ·
 `{INTEG}` integration branch · `{BRANCH}` this session's branch · `{N}` rework round ·
 `{ORCA_TASK_ID}` Orca Task id from `task-create` (§O only) ·
 `{ORCA_DISPATCH_ID}` Orca Dispatch id from `orca-worker-start.sh` (§O only) — the
@@ -68,15 +72,15 @@ block — to every §1–§4 prompt, flattened into the single sent line.
 
 ## (1) Plan — injected at session launch
 
-You are the session for {TASK}. Treat .orchestration/briefs/{TASK}.md `<task_brief>` as authority — especially `<scope_boundaries>`, `<dependencies>`, and `<definition_of_done>`. Use the loop-implement skill but STOP after planning. The coordinator has ALREADY run `wiki-plan` and written the plan to .orchestration/plans/{TASK}.md, so take loop-implement step 2's "a plan already exists" path: ADOPT that plan, do not re-plan it. Check it against the brief — every decision actually made (nothing left "as appropriate"), each with its decision->page map entry, and no contradiction with `<scope_boundaries>`, `<dependencies>`, or `<definition_of_done>`. If it fails any of those, do NOT quietly rewrite it: report the specific gap as a failure and stop, so the coordinator re-plans on the planning model. Otherwise run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} plan_ready worktree=$PWD` and wait for an approval message. Do NOT write implementation code yet.
+You are the session for {TASK}. Treat {ORCH_DIR}/briefs/{TASK}.md `<task_brief>` as authority — especially `<scope_boundaries>`, `<dependencies>`, and `<definition_of_done>`. Use the loop-implement skill but STOP after planning. The coordinator has ALREADY run `wiki-plan` and written the plan to {ORCH_DIR}/plans/{TASK}.md, so take loop-implement step 2's "a plan already exists" path: ADOPT that plan, do not re-plan it. Check it against the brief — every decision actually made (nothing left "as appropriate"), each with its decision->page map entry, and no contradiction with `<scope_boundaries>`, `<dependencies>`, or `<definition_of_done>`. If it fails any of those, do NOT quietly rewrite it: report the specific gap as a failure and stop, so the coordinator re-plans on the planning model. Otherwise run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} plan_ready worktree=$PWD` and wait for an approval message. Do NOT write implementation code yet.
 
 ## (2) Implement — injected after plan approval
 
-Approved. Implement .orchestration/plans/{TASK}.md via the loop-implement skill: respect `<effort_level>` (max 3 retries), write tests first, run them, self-review, and at step 6.5 you MUST call the test-quality-auditor subagent. Never touch anything in `<out_of_scope>`. Confirm EVERY `<definition_of_done>` item, then run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD` and wait. Do not commit, push, or PR.
+Approved. Implement {ORCH_DIR}/plans/{TASK}.md via the loop-implement skill: respect `<effort_level>` (max 3 retries), write tests first, run them, self-review, and at step 6.5 you MUST call the test-quality-auditor subagent. Never touch anything in `<out_of_scope>`. Confirm EVERY `<definition_of_done>` item, then run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD` and wait. Do not commit, push, or PR.
 
 ## (3) Rework — injected when review requests changes
 
-Address the issues in .orchestration/reviews/{TASK}-r{N}.md via the loop-implement skill (re-run step 6.5 audit; never weaken or skip tests). Per finding: fix it, or answer its Question with the concrete reason and leave it — either way, append `- **Answer (r{N})** — fixed` or `- **Answer (r{N})** — stands: <reason>` under that finding in the absolute file $(dirname {STATUS_DIR})/reviews/{TASK}-r{N}.md; silence on any finding is not a valid resolution. This obligation binds blocking findings only — answering Non-blocking findings is encouraged, not required. Then run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD` and wait.
+Address the issues in {ORCH_DIR}/reviews/{TASK}-r{N}.md via the loop-implement skill (re-run step 6.5 audit; never weaken or skip tests). Per finding: fix it, or answer its Question with the concrete reason and leave it — either way, append `- **Answer (r{N})** — fixed` or `- **Answer (r{N})** — stands: <reason>` under that finding in the absolute file {ORCH_DIR}/reviews/{TASK}-r{N}.md; silence on any finding is not a valid resolution. This obligation binds blocking findings only — answering Non-blocking findings is encouraged, not required. Then run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD` and wait.
 
 ## (4) Merge-prep — injected after final approval
 
@@ -102,11 +106,11 @@ prompt here says "wait" — the worker reports and ends its turn.
 
 ## (O1) Plan — `--spec` of the plan Task
 
-You are the worker session for {TASK}. Treat .orchestration/briefs/{TASK}.md
+You are the worker session for {TASK}. Treat {ORCH_DIR}/briefs/{TASK}.md
 `<task_brief>` as authority — especially `<scope_boundaries>`, `<dependencies>`, and
 `<definition_of_done>`. Use the loop-implement skill but STOP after planning. The
 coordinator has ALREADY run `wiki-plan` and written the plan to
-.orchestration/plans/{TASK}.md, so take loop-implement step 2's "a plan already exists"
+{ORCH_DIR}/plans/{TASK}.md, so take loop-implement step 2's "a plan already exists"
 path: ADOPT that plan, do not re-plan it. Read it against the brief and check it is
 executable — every design decision actually made (nothing left "as appropriate"), each
 one carrying its decision->page map entry, and no contradiction with
@@ -122,7 +126,7 @@ Then END YOUR TURN. Do NOT write implementation code yet.
 
 ## (O2) Implement — `--spec` of the implement Task
 
-Approved. Implement .orchestration/plans/{TASK}.md via the loop-implement skill: respect
+Approved. Implement {ORCH_DIR}/plans/{TASK}.md via the loop-implement skill: respect
 `<effort_level>` (max 3 retries), write tests first, run them, self-review, and at step
 6.5 you MUST call the test-quality-auditor subagent. Never touch anything in
 `<out_of_scope>`. Confirm EVERY `<definition_of_done>` item, then run
@@ -134,11 +138,11 @@ Then END YOUR TURN. Do not commit, push, or PR — the orchestrator merges.
 
 ## (O3) Rework — `--spec` of the rework Task
 
-Address the issues in .orchestration/reviews/{TASK}-r{N}.md via the loop-implement skill
+Address the issues in {ORCH_DIR}/reviews/{TASK}-r{N}.md via the loop-implement skill
 (re-run step 6.5 audit; never weaken or skip tests). Per finding: fix it, or answer its
 Question with the concrete reason and leave it — either way, append `- **Answer (r{N})**
 — fixed` or `- **Answer (r{N})** — stands: <reason>` under that finding in the absolute
-file $(dirname {STATUS_DIR})/reviews/{TASK}-r{N}.md; silence on any finding is not a
+file {ORCH_DIR}/reviews/{TASK}-r{N}.md; silence on any finding is not a
 valid resolution. This obligation binds blocking findings only — answering Non-blocking
 findings is encouraged, not required. Then run
 `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD`

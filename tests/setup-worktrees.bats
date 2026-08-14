@@ -66,3 +66,40 @@ setup() {
   run git -C "$root/.worktrees/feat-t1" status --porcelain
   [[ "$output" != *".groundwork/guardrails.json"* ]]
 }
+
+# --- normal: merge-on-approval (issue #90) — a worktree created after integ ---
+# --- advances contains the merged dependency's code, and the script names ---
+# --- the exact commit it branched from -----------------------------------
+
+@test "worktree created after integ advances contains the merged dependency commit, output names the base" {
+  bash "$SW" feat/goal "$root" main feat/producer
+  echo dep > "$root/.worktrees/feat-producer/dep.txt"
+  git -C "$root/.worktrees/feat-producer" add dep.txt
+  git -C "$root/.worktrees/feat-producer" commit -qm "producer output"
+  # merge-on-approval (SKILL.md Phase 3 step 5): fast-forward the approved
+  # branch into integ BEFORE the next round dispatches a dependent.
+  git -C "$root" fetch . feat/producer:feat/goal
+  expect_hash=$(git -C "$root" rev-parse --short feat/goal)
+
+  run bash "$SW" feat/goal "$root" main feat/dependent
+  [ "$status" -eq 0 ]
+  [ -f "$root/.worktrees/feat-dependent/dep.txt" ]
+  printf '%s\n' "$output" | grep -qF "base=$expect_hash"
+}
+
+# --- boundary: an existing branch that predates the CURRENT integ tip -----
+# --- (created before a later approval merged) still warns -----------------
+
+@test "boundary: existing branch not based on the current integ tip still warns" {
+  bash "$SW" feat/goal "$root" main feat/t1
+  # advance integ with a commit feat/t1 never received (a later approval-merge)
+  git -C "$root" checkout -q -b tmp-advance feat/goal
+  echo z > "$root/z"; git -C "$root" add z; git -C "$root" commit -qm advance
+  git -C "$root" branch -f feat/goal tmp-advance
+  git -C "$root" checkout -q main
+  git -C "$root" branch -D tmp-advance
+
+  run bash "$SW" feat/goal "$root" main feat/t1
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | grep -qF "feat/t1 exists but is NOT based on feat/goal"
+}
