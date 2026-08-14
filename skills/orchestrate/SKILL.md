@@ -218,10 +218,18 @@ answered.
    earlier rounds satisfy `expected=<N>` immediately and the wait spins. Orca:
    `scripts/orca-wait.sh` with the implement Task ids, already event-driven.
 5. On wake, handle that task: review each worktree diff (`git -C <wt> diff
-   <integ>...HEAD`). If tests weak, audit with `test-quality-auditor`. On
-   approval, return to step 1 — whatever dependency it released shows up in the
-   next `ready-set.sh` round and the freed slot refills immediately. On rework
-   needed, write `reviews/<task>-rN.md` and re-deliver with `send-prompt.sh
+   <integ>...HEAD`). If tests weak, audit with `test-quality-auditor`. **On
+   approval, merge before you loop (issue #90):** fast-forward first —
+   `git fetch . <branch>:<integ>` (no checkout needed, works while the main
+   worktree sits on another branch) — and only fall back to
+   `scripts/safe-cleanup.sh merge <root> <integ> <branch>` when that is not
+   fast-forwardable (that verb DOES check out `<integ>` in the main worktree).
+   Either way, verify the merge landed with `git merge-base --is-ancestor
+   <branch> <integ>` before dispatching any dependent — that exit code is the
+   evidence, not the merge command's own chatter. Then return to step 1:
+   whatever dependency it released shows up in the next `ready-set.sh` round
+   already merged, and the freed slot refills immediately. On rework needed,
+   write `reviews/<task>-rN.md` and re-deliver with `send-prompt.sh
    send` (or new Orca Task on same terminal); after 3 failed rounds, escalate.
    When `ready-set.sh` returns **5**, go to Phase 5.
 
@@ -383,8 +391,24 @@ reasoning-effort flags) that `worker-start` cannot express.
    resume) child it depends on — the real signature, not a paraphrase. This is the
    contract the downstream session plans against; loose text invites drift. Wave 1
    with no completed dependencies skips this.
-1. `scripts/setup-worktrees.sh <integ> <root> <base> <branch>...` then verify with
-   `git worktree list`.
+
+   **What a `deps` edge delivers, and what it does not (issue #90).**
+   `graph.json` `deps` gate DISPATCH on the dependency's approval, and this step
+   injects its SIGNATURE — never its merged CODE. Merged code reaches a task's
+   worktree only through the merge-on-approval rule (step 5 below): a new
+   worktree branches from the integration branch's tip at the moment
+   `setup-worktrees.sh` runs (step 1), so it contains a dependency's code only
+   if that dependency was already approved and merged by then. A task that must
+   read merged results directly — realigning docs against another task's actual
+   diff, asserting an invariant that spans two tasks' code — cannot rely on the
+   signature alone: give it `deps` on every producer it reads, so it is not
+   dispatched until each producer is approved and merged.
+1. `scripts/setup-worktrees.sh <integ> <root> <base> <branch>...` — each worktree
+   is created AT DISPATCH TIME, branched from the integration branch's CURRENT
+   tip; never pre-create a worktree for a future wave, or it misses whatever
+   merges land between now and that wave's dispatch. Then verify with `git
+   worktree list` — the script's own `base=<hash>` line on each new worktree
+   names what it actually branched from.
 2. Per task: write `briefs/<task>.md` (templates/brief.md) — fill `<tools_guidance>`
    from the resolved tool profile so the session uses the right knowledge/tacit
    tools (the plan step is fixed to `wiki-plan`, not a configurable role), and for
@@ -509,9 +533,11 @@ Run the fixed four-lens pass on each worktree diff (`git -C <wt> diff
 Alongside the pass, if a session's tests look weak, **cross-call
 `test-quality-auditor` yourself** (self-call + orchestrator cross-call).
 On shortfall, write `reviews/<task>-rN.md`, inject §3 (rework), repeat. After 3
-failed rounds, escalate. When a task is approved, return to step 1 of the dispatch
-loop — whatever dependency it released shows up in the next `ready-set.sh` round and
-the freed slot is refilled immediately. When `ready-set.sh` returns **5**, go to Phase 5.
+failed rounds, escalate. When a task is approved, merge it into the integration
+branch first (Phase 3 step 5's merge-on-approval rule) before you return to step 1
+of the dispatch loop — whatever dependency it released shows up in the next
+`ready-set.sh` round already merged, and the freed slot is refilled immediately.
+When `ready-set.sh` returns **5**, go to Phase 5.
 
 **Insight emission.** After a rework round's fix is confirmed by re-review,
 emit one ★ Insight candidate per finding that was fixed and confirmed —
@@ -590,7 +616,10 @@ Show the full integration diff (`git diff`). **Wait for the user's confirmation.
 
 ## Phase 6 — Cleanup + merge (only after Gate 2)
 1. `scripts/safe-cleanup.sh merge <root> <integ> <branch>...` — refuses dirty
-   worktrees, merges sequentially, stops + reports on conflict (no --force).
+   worktrees, merges sequentially, stops + reports on conflict (no --force). A
+   branch already merged on approval (Phase 3 step 5, issue #90) re-merges here
+   as a no-op — git reports "Already up to date" — so this sweep stays correct
+   whether or not every branch was merged early.
 2. `scripts/safe-cleanup.sh remove-worktrees <root> <branch>...` (after merge
    verified; skips any dirty worktree).
 3. `scripts/safe-cleanup.sh kill-sessions lo-<n>...` (exact names only), or — instead
