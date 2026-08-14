@@ -22,6 +22,14 @@ extract_section() {
   ' "$file"
 }
 
+# Collapses embedded newlines (and the runs of whitespace they leave behind)
+# to a single space, so a substring assertion survives prose being
+# hard-wrapped across physical lines. Used only for substring checks, never
+# for the single-physical-line structural check (that one needs raw output).
+normalize_ws() {
+  printf '%s' "$1" | tr '\n' ' ' | tr -s ' '
+}
+
 # --- normal: §3 obliges fix-or-answer + the Answer-line convention ----------
 
 @test "§3: obliges fix-or-answer per finding and the Answer-line convention" {
@@ -44,20 +52,22 @@ extract_section() {
 
 @test "§O3: obliges fix-or-answer per finding and the Answer-line convention" {
   section="$(extract_section '## (O3)' "$TEMPLATE")"
-  [[ "$section" == *"fix it, or answer its Question"* ]]
-  [[ "$section" == *"Answer (r{N})"* ]]
-  [[ "$section" == *"silence"* ]]
-  [[ "$section" == *"blocking"* ]]
-  [[ "$section" == *"Non-blocking"* ]]
+  flat="$(normalize_ws "$section")"
+  [[ "$flat" == *"fix it, or answer its Question"* ]]
+  [[ "$flat" == *"Answer (r{N})"* ]]
+  [[ "$flat" == *"silence"* ]]
+  [[ "$flat" == *"blocking"* ]]
+  [[ "$flat" == *"Non-blocking"* ]]
 }
 
 # --- normal: §O3 obliges the per-finding worker_done --body summary ---------
 
 @test "§O3: worker_done --body must summarize per-finding outcomes" {
   section="$(extract_section '## (O3)' "$TEMPLATE")"
-  [[ "$section" == *"--body"* ]]
-  [[ "$section" == *"fixed"* ]]
-  [[ "$section" == *"stands"* ]]
+  flat="$(normalize_ws "$section")"
+  [[ "$flat" == *"--body"* ]]
+  [[ "$flat" == *"fixed"* ]]
+  [[ "$flat" == *"stands"* ]]
 }
 
 # --- boundary: §3 stays exactly one physical line (send-keys -l safe) -------
