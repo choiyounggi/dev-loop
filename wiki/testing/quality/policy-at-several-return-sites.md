@@ -64,7 +64,7 @@ flag tested?" and the answer so far is one green test.
 | A site is unreachable through the public interface | Do not force it — either delete the dead return or move the test to the level that can reach it ([testing-quality-behavior-not-implementation]); an unreachable site's mutation survives forever and reads as a permanent gap |
 | The handler is refactored so all sites funnel through one wrapper | Re-run the per-site mutations once after the refactor: the sites collapsed, so the site list — and the case count it justified — changed |
 | A new branch adds a fourth return during review | Treat the missing per-site test as the review finding; the existing three staying green is exactly the signal that does not fire |
-| The policy is applied at error returns too | Enumerate those as sites as well; an error path that skips the policy fails the same way and is usually the one CI actually hits |
+| The policy is applied at error returns too | Enumerate those as sites as well; an error path that skips the policy fails the same way |
 | You can only mutate via a script | Assert the edit landed before reading the verdict — a pattern that matches nothing still exits 0 ([testing-quality-tests-that-cannot-fail]) |
 
 ## Instead of

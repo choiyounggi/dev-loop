@@ -38,8 +38,8 @@ an unconditional default/auto-create side effect.
 3. **When the planned placement lands after such a side effect, surface the line
    numbers instead of silently re-planning.** In orchestrated or reviewed work,
    report "guard at plan-position L would run after side effect at line N" and
-   let the plan owner move it — the underlying decision usually survives; only
-   the placement changes.
+   let the plan owner move it — the decision itself is unchanged; only the
+   placement moves.
 4. **Test the guard's negative path against the side effect, not just the exit
    code.** Assert both the refusal (exit code/error) *and* that the earlier side
    effect did not run (the default file was not created). A guard placed after

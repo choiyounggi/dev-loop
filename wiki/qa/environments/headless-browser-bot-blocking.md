@@ -24,8 +24,9 @@ toast. You are about to record the site as having a server-side outage.
 
 1. **Split the network log by response kind before diagnosing.** The
    bot-blocking signature is asymmetric: document and static assets return 200
-   while the JSON data APIs alone return 4xx. A real outage usually takes the
-   document down too, or returns 5xx across the board.
+   while the JSON data APIs alone return 4xx. A real outage takes the
+   document down with it or returns 5xx across the board; when the document is
+   200 and only the data APIs 4xx, diagnose bot-blocking before outage.
 2. **Set a current desktop Chrome UA and reload the same URL.** Chromium builds
    the headless default user agent from the product name `HeadlessChrome`
    (`headless/lib/browser/headless_browser_impl.cc`,
