@@ -8,7 +8,7 @@ sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
   - https://www.rfc-editor.org/rfc/rfc8725
 last_verified: 2026-07-10
-related: [security-authz-resource-level-checks]
+related: [security-authz-resource-level-checks, security-authn-retiring-a-replaced-auth-gate]
 ---
 
 # Choosing How Users Stay Authenticated: Server Session vs Token

@@ -31,6 +31,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [session-vs-token](authn/session-vs-token.md) | Choosing how users stay authenticated (server session cookie vs JWT/stateless tokens) for a new app or API; reviewing an auth design; setting access-token lifetime against a revocation requirement (implementation → wiki/backend/common/auth/, wiki/frontend/auth/) |
+| [retiring-a-replaced-auth-gate](authn/retiring-a-replaced-auth-gate.md) | Replacing one authentication mechanism with another (basic-auth → member accounts, session key A → key B) and auth now fails or passes on only some routes or users; reviewing such a cutover before it ships; a route authenticates locally but refuses or admits everyone in production; auditing a session/cookie key that code reads but nothing writes; deciding the deny default and the test arms for a new gate |
 | [password-storage](authn/password-storage.md) | Implementing or reviewing password hashing (argon2id/bcrypt parameters, migrating off SHA-256/MD5); tuning hash cost vs login latency; login endpoint as a hashing-DoS target; bcrypt length limits |
 
 ## authz
