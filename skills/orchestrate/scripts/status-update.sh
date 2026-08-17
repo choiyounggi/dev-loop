@@ -30,8 +30,14 @@ now=$(date -u +%Y-%m-%dT%H:%M:%SZ)   # cross-platform (GNU/BSD) iso-8601 UTC
 wt=$(pwd -P)                          # physical path so loop-gate can match it
 # Record the tmux session name so watch-status can detect a dead worker. The
 # worker runs inside its tmux session; allow an explicit override (orchestrator
-# / tests) via STATUS_SESSION.
-sess="${STATUS_SESSION:-$(tmux display-message -p '#S' 2>/dev/null || true)}"
+# / tests) via STATUS_SESSION. Only ask tmux when actually inside one ($TMUX
+# set) — outside tmux, `tmux display-message` still exits 0 and answers with
+# the server's most-recently-active session, which is not this caller's (#97).
+if [ -n "${TMUX:-}" ]; then
+  sess="${STATUS_SESSION:-$(tmux display-message -p '#S' 2>/dev/null || true)}"
+else
+  sess="${STATUS_SESSION:-}"
+fi
 
 # Collect the extra key=value pairs into one JSON object first (in memory — no
 # file writes), so the whole record lands in a single atomic write below.

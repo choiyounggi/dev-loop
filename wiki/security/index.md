@@ -2,7 +2,8 @@
 
 Route here for: trust-boundary decisions — input validation, authn approach
 choice, per-resource authorization, secrets hygiene, dependency trust, PII
-handling. Mechanics owned elsewhere are linked: XSS rendering → frontend,
+handling, exposing executable tools to in-session LLM agents (prompt-injection
+blast radius). Mechanics owned elsewhere are linked: XSS rendering → frontend,
 CI secrets → infrastructure, JWT implementation → backend/frontend auth.
 
 Match your situation to a "load when" line; load only matching pages.
@@ -18,6 +19,12 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [exposing-an-origin-http-api](api-exposure/exposing-an-origin-http-api.md) | Putting an internal/origin HTTP API behind a public reverse proxy, CDN, or tunnel (Cloudflare Tunnel); deciding which security controls are code vs edge (TLS/HSTS, rate limiting, WAF); adding security response headers and making them apply to 5xx too; disabling docs/OpenAPI schema at the origin; sanitizing error responses; a dev-mode flag that can disable auth in production |
+
+## agent-exposure
+
+| Page | Load when |
+|------|-----------|
+| [in-session-tool-exposure](agent-exposure/in-session-tool-exposure.md) | Exposing executable actions to an LLM agent operating inside a user's authenticated session (WebMCP tools, in-page assistant, browser-agent integration); deciding confirmation gating per tool consequence class; reviewing prompt-injection blast radius of a tool set |
 
 ## authn
 
