@@ -8,7 +8,7 @@ sources:
   - https://man.openbsd.org/tmux
   - https://code.claude.com/docs/en/hooks
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
-last_verified: 2026-08-05
+last_verified: 2026-08-06
 related: [infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-session-completion-gates, platforms-shells-command-text-inspected-before-execution, platforms-tools-harness-mediated-tool-results, debugging-methodology-hypothesis-testing]
 ---
 
@@ -67,6 +67,8 @@ progress by running a script that writes outside its worktree.
 | An editor/Write tool succeeds where Bash was refused for the same path | The guardrail inspects Bash command text only, so the two channels disagree by design. Do not use the working channel to route around the rule — report it |
 | Heartbeat is fresh but no commits in N intervals | Fresh heartbeat plus unchanged primary artifact is the stalled state, distinct from alive-and-progressing and from dead; handle it as its own case |
 | The monitor is the only thing that can see the worker | Add the primary-artifact check to the monitor rather than trusting its verdict; a monitor with no artifact check cannot produce evidence |
+| Several workers go quiet almost simultaneously: liveness checks pass, heartbeats stay fresh, diffs stop growing | Before restarting anything, search each worker's pane/terminal tail for the CLI's usage-limit marker (e.g. `You've hit your session limit · resets HH:MM`) — a usage-limit pause is idle waiting, not a crash, so every liveness probe passes. After the stated reset time, send a resume prompt that orders: re-verify state (`git status`, rerun the tests) → remaining definition-of-done → completion signal. A bare "continue" sent before the reset is consumed by the same limit message, and a resume without the state re-check makes the worker guess where it stopped |
+| The next task is dispatched to the same terminal immediately after the worker's done signal and fails runtime-unavailable | The done message is the worker's report time, not the substrate's release time — the CLI is still tearing down its stop-hook chain and the previous dispatch still occupies the terminal. Wait for the substrate's own idle signal (e.g. `orca terminal wait --for tui-idle`) before dispatching; and when the failed dispatch consumed the task, create a new task from the same spec — the consumed one cannot be retried |
 
 ## Instead of
 
@@ -82,3 +84,4 @@ progress by running a script that writes outside its worktree.
 - https://man.openbsd.org/tmux — `has-session`, `display-message` behavior and session naming
 - https://code.claude.com/docs/en/hooks — hook architecture and path guardrails
 - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html — exit codes and output redirection
+- Field evidence 2026-08-06 (Claude CLI workers under tmux/Orca orchestration): three workers paused simultaneously on one usage-limit reset — identical `You've hit your session limit · resets 01:10` marker in each terminal tail while every liveness check passed; a state-recheck resume prompt sent after the reset resumed all three exactly at their interrupted step (test re-run). Same run: two dispatches issued immediately after `worker_done` both failed `runtime_unavailable` and consumed their tasks; dispatches issued after a `tui-idle` wait succeeded first try

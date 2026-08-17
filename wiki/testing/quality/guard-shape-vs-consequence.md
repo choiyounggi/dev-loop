@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html
   - https://pitest.org/
-last_verified: 2026-08-04
+last_verified: 2026-08-06
 related: [testing-quality-tests-that-cannot-fail, testing-quality-behavior-not-implementation, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, qa-process-regression-scope]
 ---
 
@@ -19,7 +19,9 @@ A guard test scans every shipped artifact of a kind — example files, configs,
 migrations, fixtures, schema docs — and asserts that none of them has a
 structural shape S. A newly added, legitimate artifact now has S, so the guard
 is red and you are deciding what to do about it. Also applies when authoring
-such a guard, before the first legitimate collision happens.
+such a guard, before the first legitimate collision happens — and when you have
+just widened a guard's scan surface (a leak/masking detector now scans a
+previously unscanned output channel) and a previously green test reddens.
 
 Reviewing a guard that has never been red → [testing-quality-tests-that-cannot-fail].
 
@@ -66,6 +68,7 @@ Reviewing a guard that has never been red → [testing-quality-tests-that-cannot
 | Reusing the production derivation means a bug in that derivation silently greens the guard | Accept the coupling — it is what keeps the guard's meaning in sync — and keep the step-4 fixture as the independent control that would catch the greening |
 | Computing C over every artifact is expensive | Keep the shape check as a cheap prefilter and compute C only for the artifacts S matched; the assertion stays "S and C" |
 | The guard reddens on an artifact that has S and genuinely has C | This is the guard working — fix the artifact, not the guard |
+| The guard's scan surface was just widened and an existing test reddens | Triage it as the widened guard's first true positive before touching guard or production code: diff what the new surface saw against what the fixture declares. Fixtures written before the surface existed often smuggle realistic data through paths the type system never classified (undeclared keys, copied payloads) — narrow the fixture to its declared fields, preserving the test's original intent. Re-greening old tests by loosening the detector reinstates the blind spot the widening closed |
 
 ## Instead of
 
@@ -80,4 +83,5 @@ Reviewing a guard that has never been red → [testing-quality-tests-that-cannot
 
 - https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html — Alex Eagle, "Testing on the Toilet: Change-Detector Tests Considered Harmful" (2015-01-27): "Change-detector tests do not add clarity, and you cannot safely refactor code if you know you need to adapt the tests afterwards to get them passing again." A shape-only guard that must be exempted for each new legitimate artifact is this failure mode at repo scope
 - https://pitest.org/ — "Faults (or mutations) are automatically seeded into your code, then your tests are run. If your tests fail then the mutation is killed, if your tests pass then the mutation lived" — the basis for step 4's required-red fixture
+- Field evidence (linkly #43, 2026-08-06): adding `result.bindings` to a differential masking surface immediately reddened `test_when_guard_removed_diverges`; the repro showed the fixture's seeded row carrying an undeclared `password` key raw through the new channel while the entity declared only `id`/`email`/`token`. Narrowing the payload to declared fields preserved the test's guard-divergence intent and returned 1218 tests green with the widened detector intact
 - Field evidence (linkly #35, 2026-08-04): `test_no_shipped_example_has_a_guarded_repository_call` asserted that no shipped `.lnpl` example contained a repository call under a guard. `examples/checkout.lnpl` legitimately added a `create` under `when stock > 0` — the issue's own reproduction shape — turning the guard permanently red. Re-expressing it as "a guarded call that could actually fail", with the conflict/miss decision taken from the production `_lnpl_ops` derivation via `seeded_entities`/`repository_calls`, returned the suite to `Ran 518 tests / OK` while a fixture holding a guarded-and-can-fail create still drove the guard red
