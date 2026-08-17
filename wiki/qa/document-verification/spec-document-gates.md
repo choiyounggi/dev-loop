@@ -15,6 +15,7 @@ sources:
   - https://github.com/DavidAnson/markdownlint/issues/1206
   - https://google.github.io/styleguide/docguide/best_practices.html
 last_verified: 2026-08-08
+last_verified: 2026-08-09
 related:
   [
     qa-process-acceptance-criteria,
@@ -25,6 +26,7 @@ related:
     testing-quality-checks-that-cannot-pass,
     qa-deliverables-command-transcripts-in-a-document,
     qa-deliverables-exclusivity-and-absence-claims,
+    qa-document-verification-generated-reference-drift-gates,
   ]
 ---
 
