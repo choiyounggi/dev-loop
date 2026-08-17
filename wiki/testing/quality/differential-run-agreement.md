@@ -10,7 +10,7 @@ sources:
   - https://pitest.org/quickstart/basic_concepts/
   - https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/
 last_verified: 2026-08-05
-related: [testing-strategy-differential-testing, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-stale-artifact-baselines]
+related: [testing-strategy-differential-testing, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-stale-artifact-baselines, testing-data-harness-vs-run-path-fixtures]
 ---
 
 # Citing an "Agree" Verdict from a Differential Run
