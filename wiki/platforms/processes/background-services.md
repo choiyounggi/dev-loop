@@ -12,7 +12,7 @@ sources:
   - https://man7.org/linux/man-pages/man1/nohup.1.html
   - https://man7.org/linux/man-pages/man1/loginctl.1.html
 last_verified: 2026-08-04
-related: [platforms-toolchains-version-management, platforms-shells-portable-shell-scripts, platforms-processes-non-interactive-cli-invocation, infrastructure-config-path-valued-config]
+related: [platforms-toolchains-version-management, platforms-shells-portable-shell-scripts, platforms-processes-non-interactive-cli-invocation, infrastructure-config-path-valued-config, platforms-toolchains-environment-resync-removes-undeclared-packages]
 ---
 
 # Keeping a Process Running Beyond the Terminal Session
