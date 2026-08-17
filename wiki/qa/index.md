@@ -23,6 +23,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [quantitative-claims-in-a-published-document](deliverables/quantitative-claims-in-a-published-document.md) | About to publish or hand out a hand-maintained document that states counts about the repository (README, landing page, launch post, architecture overview) — tests, rules, supported types, grammar productions, endpoints, documents in a given state; one number in such a document was reported wrong and you are deciding the scope of the fix; deciding how to publish a count that moves between runs, or which of two disagreeing sources (spec vs implementation) a sentence's number comes from |
 | [generated-artifacts-as-deliverable-source](deliverables/generated-artifacts-as-deliverable-source.md) | Asked to produce a document (ERD, schema reference, API surface list, dependency inventory) for a hand-off, review, or external partner when the repo already generates that content from code; deciding whether to re-run a stale generator or hand-write the deliverable; a hand-written reference document disagrees with the live system (checks that gate a document → document-verification) |
 
 ## document-verification

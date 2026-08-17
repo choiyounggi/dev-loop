@@ -33,6 +33,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [widening-a-closed-value-table](common/change-impact/widening-a-closed-value-table.md) | Adding an entry to a closed table mapping names to magnitudes or codes (duration units, status codes, currency exponents, severity levels) that lives as a named constant; scoping that change from a search for the constant's name; a new entry parses at one layer and is rejected or mis-converted at another; deciding what to do about an inlined copy of the table in a hot path, a second language backend, or a fixture |
 | [call-site-enumeration](common/change-impact/call-site-enumeration.md) | Changing the contract of a function/method/constructor other code calls — adding, removing, reordering or redefining a parameter — and you need the complete call-site list; scoping such a migration from a search; a migration scoped from recon came back green and then failed on call sites the search never listed; deciding whether to append a parameter or make it keyword-only (release-level re-test scope → qa/process/regression-scope) |
 
 ### reliability
