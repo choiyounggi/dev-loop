@@ -9,7 +9,7 @@ sources:
   - https://abseil.io/resources/swe-book/html/ch12.html
   - https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html
 last_verified: 2026-07-10
-related: [testing-quality-minimum-case-set, testing-mocking-what-to-mock, testing-quality-guard-shape-vs-consequence, backend-common-change-impact-call-site-enumeration]
+related: [testing-quality-minimum-case-set, testing-mocking-what-to-mock, testing-quality-guard-shape-vs-consequence, testing-quality-value-preserving-refactor-assertions, backend-common-change-impact-call-site-enumeration]
 ---
 
 # Asserting Behavior Through the Public Interface
@@ -55,6 +55,7 @@ the code.
 | Legacy code has no seams and extraction is too risky right now | Pin current behavior with tests at the nearest public boundary (characterization tests), refactor under them, then extract |
 | Framework/library requires lifecycle hooks that look like internals (React hooks, Spring beans) | Assert what the user of the component/bean observes (rendered result, endpoint response), not hook call order or bean internals |
 | A test asserts a mock of your own class was called (interaction test on owned code) | Replace with a state/output assertion on the real collaborator; keep interaction assertions only for external boundaries |
+| The behavior-preserving change moved a hardcoded literal into config/SSOT and you need a test that detects re-inlining | Apply the seam test: when the value is settable through an interface a caller or operator reaches without editing source (config file, env var, DI parameter, CLI flag), configurability is behavior — assert that the output follows the configured value, and step 2's invariant is intact because re-inlining removes an observable capability. When the only way to vary it is editing source or patching a module attribute the public interface never exposes, it is an implementation detail: keep step 2 as written and move the guard to a static check ([testing-quality-value-preserving-refactor-assertions]) |
 
 ## Instead of
 
