@@ -36,3 +36,45 @@ setup() {
   ( cd "$BATS_TEST_TMPDIR" && STATUS_SESSION=lo-7 bash "$SU" t4 implementing )
   [ "$(jq -r '.session' "$STATUS_DIR/t4.json")" = "lo-7" ]
 }
+
+@test "rework increments .attempt atomically across two calls (normal)" {
+  ( cd "$BATS_TEST_TMPDIR" && bash "$SU" t10 implementing )
+  ( cd "$BATS_TEST_TMPDIR" && bash "$SU" t10 rework )
+  f="$STATUS_DIR/t10.json"
+  [ "$(jq '.attempt' "$f")" = "1" ]
+  [ "$(jq -r '.phase' "$f")" = "rework" ]
+  ( cd "$BATS_TEST_TMPDIR" && bash "$SU" t10 rework )
+  [ "$(jq '.attempt' "$f")" = "2" ]
+  [ "$(jq -r '.phase' "$f")" = "rework" ]
+}
+
+@test "a non-rework phase after rework preserves .attempt (normal)" {
+  ( cd "$BATS_TEST_TMPDIR" && bash "$SU" t11 implementing )
+  ( cd "$BATS_TEST_TMPDIR" && bash "$SU" t11 rework )
+  f="$STATUS_DIR/t11.json"
+  [ "$(jq '.attempt' "$f")" = "1" ]
+  ( cd "$BATS_TEST_TMPDIR" && bash "$SU" t11 implementing )
+  [ "$(jq '.attempt' "$f")" = "1" ]
+  [ "$(jq -r '.phase' "$f")" = "implementing" ]
+}
+
+@test "rework with no existing status file is refused, file not created (error)" {
+  f="$STATUS_DIR/t12.json"
+  run bash -c "cd '$BATS_TEST_TMPDIR' && STATUS_DIR='$STATUS_DIR' bash '$SU' t12 rework"
+  [ "$status" -eq 4 ]
+  [ ! -e "$f" ]
+}
+
+@test "rework on malformed status JSON exits 4, file left byte-identical (error)" {
+  f="$STATUS_DIR/t13.json"
+  mkdir -p "$STATUS_DIR"
+  printf 'not-json' > "$f"
+  run bash -c "cd '$BATS_TEST_TMPDIR' && STATUS_DIR='$STATUS_DIR' bash '$SU' t13 rework"
+  [ "$status" -eq 4 ]
+  [ "$(cat "$f")" = "not-json" ]
+}
+
+@test "first-ever write (pending) initializes .attempt to 0 (boundary)" {
+  ( cd "$BATS_TEST_TMPDIR" && bash "$SU" t14 pending )
+  [ "$(jq '.attempt' "$STATUS_DIR/t14.json")" = "0" ]
+}

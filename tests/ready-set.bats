@@ -111,3 +111,51 @@ phase() { printf '{"task":"%s","phase":"%s"}' "$1" "$2" > "$S/$1.json"; }
   run sh "$RS" "$G" "$BATS_TEST_TMPDIR/nodir" 2
   [ "$status" -eq 4 ]
 }
+
+@test "an exhausted rework task blocks its dependents (deadlock)" {
+  graph '{"tasks":[{"id":"a","deps":[]},{"id":"b","deps":["a"]}]}'
+  printf '{"task":"a","phase":"rework","attempt":3}' > "$S/a.json"
+  run sh "$RS" "$G" "$S" 4
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"rework budget exhausted (attempt=3, max=3)"* ]]
+  [[ "$output" == *"a"* ]]
+}
+
+@test "an exhausted task alone yields deadlock, not wait (boundary)" {
+  graph '{"tasks":[{"id":"a","deps":[]}]}'
+  printf '{"task":"a","phase":"rework","attempt":3}' > "$S/a.json"
+  run sh "$RS" "$G" "$S" 4
+  [ "$status" -eq 3 ]
+}
+
+@test "attempt absent behaves exactly as before, no exhaustion (boundary)" {
+  graph '{"tasks":[{"id":"a","deps":[]}]}'
+  phase a rework
+  run sh "$RS" "$G" "$S" 2
+  [ "$status" -eq 2 ]
+}
+
+@test "attempt below default max still occupies a slot, not exhausted (boundary)" {
+  graph '{"tasks":[{"id":"a","deps":[]}]}'
+  printf '{"task":"a","phase":"rework","attempt":2}' > "$S/a.json"
+  run sh "$RS" "$G" "$S" 1
+  [ "$status" -eq 2 ]
+}
+
+@test "a non-numeric, zero, or negative LO_MAX_REWORK is refused (error)" {
+  graph '{"tasks":[{"id":"a","deps":[]}]}'
+  run env LO_MAX_REWORK=0 sh "$RS" "$G" "$S" 2
+  [ "$status" -eq 4 ]
+  run env LO_MAX_REWORK=abc sh "$RS" "$G" "$S" 2
+  [ "$status" -eq 4 ]
+  run env LO_MAX_REWORK=-1 sh "$RS" "$G" "$S" 2
+  [ "$status" -eq 4 ]
+}
+
+@test "LO_MAX_REWORK=1 with attempt=1 is exhausted at the boundary (>=, not >)" {
+  graph '{"tasks":[{"id":"a","deps":[]}]}'
+  printf '{"task":"a","phase":"rework","attempt":1}' > "$S/a.json"
+  run env LO_MAX_REWORK=1 sh "$RS" "$G" "$S" 2
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"rework budget exhausted (attempt=1, max=1)"* ]]
+}
