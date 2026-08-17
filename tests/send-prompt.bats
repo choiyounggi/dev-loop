@@ -228,6 +228,82 @@ mk_busy() {
   [ "$status" -eq 1 ]
 }
 
+# ------------------------------------ send: [Pasted text] guard (issue #96)
+#
+# cmd_send must never report "delivered" while the prompt sits as an
+# unsubmitted "[Pasted text #N]" placeholder. A real tmux pane cannot be
+# driven through an exact multi-call capture-pane sequence (before -> after ->
+# after each retry) deterministically, so these cases use a scripted fake tmux
+# on PATH — same technique as the `keys` fake below, extended with a captures
+# script so each successive capture-pane call returns the next scripted line.
+
+# $FAKE_CAPTURES holds one pane-snapshot per line; capture-pane returns the
+# Nth line on its Nth call (clamped to the last line once exhausted), so a
+# test can script exactly what cmd_send sees on the before-capture, the
+# post-send capture, and each retry re-capture.
+_use_fake_tmux_send() {
+  mkdir -p "$STUB_ROOT/bin"
+  FAKE_SEND_LOG="$STUB_ROOT/sends.log";      : > "$FAKE_SEND_LOG"
+  FAKE_CAPTURE_N="$STUB_ROOT/capture_n";     echo 0 > "$FAKE_CAPTURE_N"
+  FAKE_CAPTURES="$STUB_ROOT/captures";       : > "$FAKE_CAPTURES"
+  FAKE_ALIVE_FILE="$STUB_ROOT/alive";        : > "$FAKE_ALIVE_FILE"
+  export FAKE_SEND_LOG FAKE_CAPTURE_N FAKE_CAPTURES FAKE_ALIVE_FILE
+  cat > "$STUB_ROOT/bin/tmux" <<'FAKE'
+#!/bin/sh
+verb="$1"; shift
+case "$verb" in
+  has-session)  [ -e "$FAKE_ALIVE_FILE" ]; exit $? ;;
+  capture-pane)
+    n=$(cat "$FAKE_CAPTURE_N")
+    total=$(wc -l < "$FAKE_CAPTURES" | tr -d ' ')
+    idx=$((n + 1))
+    [ "$idx" -gt "$total" ] && idx="$total"
+    sed -n "${idx}p" "$FAKE_CAPTURES"
+    echo $((n + 1)) > "$FAKE_CAPTURE_N"
+    exit 0 ;;
+  send-keys)
+    printf '%s\n' "$*" >> "$FAKE_SEND_LOG"
+    exit 0 ;;
+esac
+exit 0
+FAKE
+  chmod +x "$STUB_ROOT/bin/tmux"
+  PATH="$STUB_ROOT/bin:$PATH"; export PATH
+}
+_enter_count() { grep -cx -- "-t =$S: Enter" "$FAKE_SEND_LOG"; }
+
+@test "send: a [Pasted text] placeholder cleared by one retry is delivered" {
+  _use_fake_tmux_send
+  printf '%s\n' 'READY>' '[Pasted text #1 +2 lines]' 'T3_PASTE_RAN' > "$FAKE_CAPTURES"
+  run --separate-stderr sh "$SP" send "$S" 'echo T3_PASTE'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  # submit Enter + exactly one retry Enter, never more once the placeholder clears
+  [ "$(_enter_count)" -eq 2 ]
+}
+
+@test "send: a [Pasted text] placeholder that never clears is unconfirmed, not delivered" {
+  _use_fake_tmux_send
+  printf '%s\n' 'READY>' '[Pasted text #1]' '[Pasted text #1]' '[Pasted text #1]' '[Pasted text #1]' \
+    > "$FAKE_CAPTURES"
+  run --separate-stderr sh "$SP" send "$S" 'echo T3_STUCK'
+  [ "$status" -eq 7 ]
+  [ "$output" = "unconfirmed" ]
+  # submit Enter + exactly 3 bounded retries — never an unbounded loop
+  [ "$(_enter_count)" -eq 4 ]
+}
+
+@test "boundary: a placeholder alongside the queued indicator reports queued, not unconfirmed" {
+  # Order is unchanged: the existing queued_pat check still wins over the new
+  # placeholder guard, so no retry Enter is sent at all.
+  _use_fake_tmux_send
+  printf '%s\n' 'READY>' '[Pasted text #1] Press up to edit queued messages' > "$FAKE_CAPTURES"
+  run --separate-stderr sh "$SP" send "$S" 'echo T3_BOTH'
+  [ "$status" -eq 4 ]
+  [ "$output" = "queued" ]
+  [ "$(_enter_count)" -eq 1 ]
+}
+
 # ---------------------------------------------------------------- wait
 
 @test "wait: returns picked-up once the worker drains its queue" {

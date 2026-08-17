@@ -52,6 +52,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [rollout-and-rollback](deploy/rollout-and-rollback.md) | Designing how a service reaches production (rollout strategy, health gating); preparing a risky release; a deploy involves a schema change, data migration, or feature flag and you need rollback mechanics |
+| [feature-flag-lifecycle](deploy/feature-flag-lifecycle.md) | Adding a feature flag/toggle and deciding its category (release, experiment, ops, permissioning) and expected lifetime; a flag has outlived the rollout/experiment that created it; deciding when and how to remove a flag and its dead code path; a flag is checked in many places |
 
 ## observability
 
