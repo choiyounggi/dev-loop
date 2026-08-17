@@ -238,7 +238,12 @@ so every `launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reus
 exact name for later `send-prompt.sh`); the script also exports the guardrails
 escalation env into each worker. Trust-screen wording drifts between CLI releases —
 if a launch hangs, set `LO_READY_EXTRA` / `LO_TRUST_EXTRA` (substrings) or
-`LO_READY_TIMEOUT`.
+`LO_READY_TIMEOUT`. `status-update.sh` resolves the status file's `session` field
+from `tmux display-message -p '#S'` only when the caller is itself inside tmux
+(`$TMUX` set) — a coordinator-side call (this shell, not a worker's tmux pane)
+must pass `STATUS_SESSION=<lo-n-runid>` explicitly, or the record's `session`
+field is left absent rather than guessed from whatever tmux session happens to
+be active.
 `watch-status.sh` now exits **5** on a pending guardrails escalation (approve/deny,
 clear `.orchestration/escalations/`, then DELIVER the outcome to the now-idle
 worker with `scripts/send-prompt.sh send lo-<n> "approved — re-run: <cmd>, then
@@ -479,7 +484,13 @@ exits — handle, then relaunch watch with the same target:
   recurs while `questions/<task>.json` exists, like exit 5; exit 5 wins when both
   are pending): read the record (`{ts, taskId, question, options, worktree}`),
   answer with `scripts/send-prompt.sh send lo-<n> "<answer>"`, delete the record
-  file, relaunch watch.
+  file. If the task's status was recorded `phase=failed` when it asked the
+  question, reset it to the phase you actually observe (read the worker pane
+  first) BEFORE relaunching watch — the reset IS a normal status write, not a
+  new phase word: `STATUS_DIR=<dir> STATUS_SESSION=<lo-n-runid> sh
+  scripts/status-update.sh <task> <observed-phase> note="reset after exit-6
+  answer"` — otherwise `watch-status.sh` counts the stale `failed` phase and
+  aborts with exit 3 again on the very next poll. Then relaunch watch.
 - **7 — stalled live worker** (prints `[watch] worker stalled — <task>:<session>`;
   the weakest signal — failed(3) and all-reached(0) win over it; driven by
   `tmux-worker-stalled.sh`, silence threshold `LO_STALL_SEC` default 600s; a
