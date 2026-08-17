@@ -5,7 +5,7 @@ three stack subtrees — route by concern first, stack second:
 
 | Subtree | Route there when |
 |---------|------------------|
-| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, enumerating call sites before a contract change, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, consuming LLM APIs (completion validation, context budgeting), consuming external-API responses, externally-owned defaults, object-storage references, sync-vs-async integration choice, WebSocket/SSE connection lifecycle |
+| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, enumerating call sites before a contract change, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, consuming LLM APIs (completion validation, context budgeting), MAPE-aligned point-prediction calibration, consuming external-API responses, externally-owned defaults, object-storage references, sync-vs-async integration choice, WebSocket/SSE connection lifecycle |
 | [java](java/index.md) | You are writing/reviewing JVM backend code (Java/Kotlin, Spring, JPA/Hibernate) and the concern is stack-specific: entity mapping, persistence context, proxy pitfalls, JVM threads/memory |
 | [node](node/index.md) | You are writing/reviewing Node.js/TypeScript backend code: event-loop blocking, promise error handling, runtime validation at boundaries, graceful shutdown |
 | [python](python/index.md) | You are writing/reviewing Python backend code: GIL/concurrency model, pydantic validation, WSGI/ASGI workers, language traps |
@@ -88,6 +88,12 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [completion-response-validation](common/llm/completion-response-validation.md) | Consuming OpenAI-compatible `/chat/completions` output as a final artifact (summary, document, notification); LLM responses coming back empty or truncated while HTTP status is 200; a reasoning-family model may be routed onto the alias you call |
 | [context-window-budget](common/llm/context-window-budget.md) | Repointing an LLM client or agent CLI at a different model, a self-hosted server (vLLM/Ollama), or a gateway (LiteLLM); setting `max_tokens` for a client whose default was sized for a larger model; the first request after such a switch returns 400 with a context-window error; deciding where to set the cap (request body vs client env var vs gateway config) and how to point the base URL at a proxy; handling truncation that arrives as a normal 200 |
+
+### ml
+
+| Page | Load when |
+|------|-----------|
+| [mape-aligned-point-prediction](common/ml/mape-aligned-point-prediction.md) | A regression model evaluated by MAPE was trained as a median predictor (log target + L1 loss, or quantile q50) — deciding what point value to emit, or the model systematically overpredicts on MAPE despite fitting well; choosing between a global scale factor and per-row variance-based correction |
 
 ### integrations
 
