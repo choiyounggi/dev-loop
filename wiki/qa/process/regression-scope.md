@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://martinfowler.com/articles/rise-test-impact-analysis.html
 last_verified: 2026-07-10
-related: [qa-process-release-gates, qa-bug-reports-reproducible-reports, backend-common-change-impact-call-site-enumeration]
+related: [qa-process-release-gates, qa-bug-reports-reproducible-reports, backend-common-change-impact-call-site-enumeration, backend-common-change-impact-corpus-sweep-before-a-rejection-rule]
 ---
 
 # Choosing What to Re-Test for a Change
