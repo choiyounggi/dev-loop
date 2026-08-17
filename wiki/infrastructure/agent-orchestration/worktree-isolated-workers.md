@@ -6,8 +6,9 @@ applies_to: [git, general]
 confidence: verified
 sources:
   - https://git-scm.com/docs/git-worktree
-last_verified: 2026-08-05
-related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, platforms-shells-command-text-inspected-before-execution]
+  - https://code.claude.com/docs/en/hooks
+last_verified: 2026-08-17
+related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-shells-command-text-inspected-before-execution]
 ---
 
 # Writing the Brief for a Worker Confined to Its Own Worktree
@@ -56,6 +57,7 @@ wait loop keeps escalating with no error from the task itself.
 | The brief names the main checkout only as a read source | It works, and it still couples the brief to one machine's layout — pass it as a named variable so the brief stays portable |
 | The guardrail is heuristic and matches on absolute paths | A relative path inside the worktree cannot trip it at all; that is the second reason to write paths relative |
 | A worker writes to a path under the main root that is a *sibling* string (`<main_root>-backup/…`) | The guardrail does not fire — the match requires a path separator after the main root — but the write is still outside the worktree; keep it out of the brief |
+| The guardrail is a Bash-command hook and the worker edits files through its native Edit/Write tool | The hook never runs — tool hooks match on the tool name, so a `Bash` matcher does not fire for Edit/Write calls, and an absolute-path edit into the main checkout lands with no block and no log. State in the brief that **all** file operations, whatever the tool, use worktree-relative paths, and `git status` the protected tree before merging any worker's branch — discovery otherwise depends on luck |
 
 ## Instead of
 
@@ -64,9 +66,12 @@ wait loop keeps escalating with no error from the task itself.
 | Put the main checkout's absolute path in a worker's `<output_contract>` | Give a worktree-relative path and collect the artifact from the worktree | One absolute write path halts every worker at the same phase, and the coordinator sees only a wait-loop timeout |
 | Disable the escape guardrail so the workers proceed | Rewrite the paths in the brief | The guardrail is what makes parallel workers safe to run against one repo |
 | Designate a shared scratch directory inside the repo for worker output | Place it outside the repo and pass its path as one named variable | A shared in-repo directory is both a guardrail trip and a write race between workers |
+| Trust a Bash-hook guardrail as the only isolation for workers with native file tools | Pair it with a relative-paths-only instruction in the brief and a pre-merge `git status` of the main checkout | The hook inspects only the tool its matcher names; an Edit-tool write to an absolute main-checkout path passes silently — the worker need not be routing around anything for the escape to happen |
 
 ## Sources
 
 - https://git-scm.com/docs/git-worktree — linked worktrees are separate checkouts sharing one repository; each has its own working directory
+- https://code.claude.com/docs/en/hooks — tool-event hook matchers filter on the tool name ("`Bash` matches only the Bash tool"); a hook registered for Bash does not run on Edit/Write calls
+- Field observation 2026-08-17 (linkly run, worker under a `worktree_escape` Bash-hook guard): the worker modified two `examples/*.lnpl` files in the **main checkout** via its native Edit tool with absolute paths — no block, no log; discovered only when the coordinator's `git pull` failed on local changes (contents happened to match the merged branch, so no damage). The same paths written via Bash redirection would have escalated
 - Field reproduction 2026-08-05 (groundwork guardrails 1.0.0 `hooks/bash-guard.sh`, `worktree_escape` rule, macOS): from a linked worktree, `cp ./a <main_root>/b` and `echo z > <main_root>/f` were both stopped; `cat <main_root>/f`, `ls <main_root>/.orchestration`, and `grep -n x <main_root>/f` all passed. The rule matches an absolute main-root mention together with a write verb (`rm|mv|cp|tee|mkdir|touch|install|dd`) or a redirect to an absolute path
 - Field context: a parallel run stalled at the same phase for two workers whose brief's `<output_contract>` named a main-checkout absolute path; the coordinator's wait loop returned its escalation status repeatedly. Rewriting the contract to worktree-relative paths let the remaining workers record their plans locally

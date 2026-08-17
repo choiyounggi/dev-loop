@@ -1,53 +1,117 @@
-# Knowledge consolidation — 15 open PRs (#17–#40) → one reconciled state
-
-The 15 open `knowledge/*` PRs (created 2026-08-04 → 2026-08-05, before the
-harvest processed-store dedupe fix in #41) contained 123 file-versions of ~75
-unique pages, with the same insight landing at up to 3 different paths across
-up to 8 PRs. Per-PR review would re-import those duplicates, so — as with the
-#6–#13 consolidation — this branch carries the reconciled end-state and the 15
-PRs are closed in its favor.
+# Knowledge flush — 3 insight(s)
 
 ## Verified best-practice
 
-Every adopted page's sources were carried from its originating PR's flush, where
-they were live-verified at flush time; no new URLs were introduced during
-consolidation (checked mechanically: every `http(s)` URL in every merged page
-appears in a source PR's diff; every added body line in amended pages traces to
-a source PR hunk — orphan-line verification). Confidence fields were kept as the
-originating flushes set them, except client-side-rate-limiting where the union
-of provider-doc citations (Okta, Auth0, GitHub, OpenAI, RFC 6585) supports
-`verified` for the load-bearing claims. One subagent's fabricated content (12
-files matching neither main nor any PR, with invented source URLs) was detected
-by the same verification and replaced with true PR content.
+**1. Guard placement vs. actual execution order (dev-loop t106).**
+Claim: when a plan inserts a precondition guard into an existing script, verify the
+insertion point against the target file's real line order — an earlier unconditional
+default/auto-create side effect makes a later guard dead code, even when the plan's
+underlying decision is correct.
+Verification: mechanism is precondition doctrine — checked against the Eiffel Design
+by Contract documentation (https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_(tm)%2C_Assertions_and_Exceptions),
+which states preconditions are monitored "on routine entry", i.e. before any body
+statement runs. Session evidence is a concrete reproduction: `status-update.sh:19`
+unconditionally created the status file before the plan's proposed guard position;
+the revised placement (between lines 18–19) made the BATS case "rework with no
+status file → exit 4, no file created" pass. Confidence: **field-tested**
+(doctrine-backed mechanism, field reproduction; no single official doc states the
+whole directive).
+
+**2. Coordinator status reset must precede prompt re-delivery (linkly iss0817 t60).**
+Claim: in multi-session orchestration, resetting a task's status file *after*
+re-sending the worker prompt races the worker's first progress signal; the file is
+last-write-wins, so the coordinator's late reset erases `plan_ready` and deadlocks
+the watch.
+Verification: the mechanism is an uncoordinated-writers file race — checked against
+https://en.wikipedia.org/wiki/Race_condition (programs colliding on a shared file
+produce order-dependent results; coordination or a single writer is required).
+Session evidence: timestamps show worker `plan_ready` (12:53:0x) overwritten by the
+coordinator's `pending` re-seed (12:53:07); the tmux pane recorded "status set to
+plan_ready" while the file read `pending`. Confidence: **field-tested**.
+
+**3. Bash-hook write guards do not cover native Edit/Write tools (linkly run).**
+Claim: a worktree-isolation guard implemented as a Bash-command hook is silently
+bypassed when the agent edits files via its native Edit/Write tools; isolation
+needs a relative-paths-only brief instruction plus a pre-merge `git status` of the
+protected tree.
+Verification: checked against the official Claude Code hooks documentation
+(https://code.claude.com/docs/en/hooks) — tool-event matchers filter on the tool
+name; "`Bash` matches only the Bash tool", so a Bash-matcher hook never fires on
+Edit/Write calls. Session evidence: a worker under a `worktree_escape` guard
+modified two `examples/*.lnpl` files in the main checkout via the Edit tool with
+no block and no log; found only when `git pull` failed. Confidence: **verified**
+(doc-backed mechanism + field observation).
 
 ## Existing-layer check
 
-- Merged-main near-dup scan before consolidation: pairwise Jaccard over
-  title + "When this applies" across all 141 merged pages → **0 flagged pairs**;
-  previously merged content carries no duplication.
-- Cross-PR dedup during consolidation: 10 duplicate clusters collapsed to one
-  canonical page each (rate limiting 8→1, call-site enumeration 7→folded into
-  the canonical merged in #20, stderr/exit-0 diagnostics 4→1, sysroot 2→1,
-  env-off-switch 2→1, completion predicates 2→1, robots.txt 2→1,
-  harness-mediated results 2→1, leaked artifacts 2→1, orchestration category
-  naming unified). Three near-pairs kept distinct after trigger comparison,
-  with mutual `related:` links (differential setup vs interpretation; expansion
-  semantics vs off-switch design; import-time tactics vs level choice).
-- 24 existing pages received union-merged amendments; additions already present
-  in main (from #16/#20) were skipped, and all non-canonical `related:` ids
-  were remapped to canonical page ids (post-merge broken-link scan: 0).
+Pages read: infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, testing-quality-guard-shape-vs-consequence, qa-exploratory-guard-true-path-coverage, backend-common-change-impact-call-site-enumeration
+
+Also read: root `INDEX.md`, `wiki/infrastructure/index.md`, `wiki/debugging/index.md`,
+`wiki/backend/index.md` (routing tables).
+
+- Insight 1: no existing page covers plan-prose-vs-line-order guard placement.
+  `guard-shape-vs-consequence` (repo-wide guard *tests*) and
+  `guard-true-path-coverage` (branch coverage of guarded steps) share the "guard
+  that never actually protects" theme but have different triggers → **new page**,
+  cross-linked to `call-site-enumeration` (same category) and
+  `guard-true-path-coverage` (both ways).
+- Insight 2: `shared-run-state` owns file-based coordination but had nothing on
+  coordinator/worker write ordering during re-delivery → **merged** (+1 edge case,
+  +1 Instead-of, +2 sources, related += pane-delivery-confirmation). No conflict
+  with existing directives.
+- Insight 3: `control-signals-vs-primary-artifacts` already has the worker-side
+  edge ("An editor/Write tool succeeds where Bash was refused — do not route
+  around, report it"). The candidate adds the *coordinator/guard-designer* side:
+  the escape happens innocently with no log, and the mitigations (brief wording +
+  pre-merge `git status`) were absent → **merged into
+  `worktree-isolated-workers`** (the brief-authoring page), related +=
+  control-signals-vs-primary-artifacts so both sides link. Flagged, not a
+  conflict: the two pages now cover the same mechanism from opposite roles.
+  (One-way link only — control-signals' `related:` line is concurrently edited by
+  open PRs #101/#64/#47; adding a third edit there would guarantee a conflict.)
+
+## Open-PR check
+
+Listed 30 open `knowledge/*` heads (#47–#104). Diffed the ones touching
+overlapping pages against merge-base (three-dot semantics; two-dot lists were
+polluted by main-side #108 additions): #103 (shared-run-state — related-link only),
+#101 (control-signals — related-link only), #92 (worktree-isolated-workers —
+gitignored-path edge), #80 (pane-delivery — pasted-text delivery), #79
+(dispatching-after-a-completion-report), #64 (control-signals/shared-run-state/
+pane-delivery — related-links + new pages), #51 (worktree-isolated-workers —
+cross-worktree read edges), #47 (control-signals usage-limit edge,
+worktree-isolated-workers version-dependent read escalation, guard-shape widening
+edge), #86 via `gh pr diff` (session-completion-gates). Fork PRs #91/#104 touch
+unrelated Java/DB/QA pages.
+
+Per-candidate verdicts:
+- Insight 1 (guard placement): no open head touches this trigger → **new**.
+- Insight 2 (reset-before-send): no open head carries the reset-ordering race;
+  #80's pane-delivery change is about paste-submission confirmation, a different
+  failure in the same re-delivery flow → **new**.
+- Insight 3 (Edit/Write bypass): #92/#51/#47 amend the same page's edge table with
+  *different* guardrail edges (gitignored paths, cross-worktree reads, read
+  escalations); none covers the native-tool bypass or the pre-merge git-status
+  check → **new** (merge conflicts among sibling amendments are line-adjacent but
+  content-disjoint).
 
 ## Routing decision
 
-- New categories: `infrastructure/agent-orchestration` (5 pages; unified the
-  competing `orchestration`/`agent-orchestration` names), `databases/data-survey`
-  (1), `qa/deliverables` (1). All other pages route into existing categories.
-- Canonical-path decisions: rate limiting → `backend/common/reliability/`
-  (sits beside timeouts-and-retries; 6 of 8 variants chose it); stderr
-  diagnostics → `platforms/processes/` (concern spans beyond shells); leaked
-  artifacts → `testing/data/artifact-leakage-from-a-suite`; call-site
-  enumeration → the existing `backend/common/change-impact/` page.
-- All 38 new pages listed in their domain indexes (nearest-index rule; backend
-  routes via its python sub-index for bytecode-cache-staleness); INDEX.md domain
-  summaries updated for infrastructure/qa/databases. Full-wiki lint: frontmatter,
-  ids, related-links, index coverage, size, qualifiers, staleness → 0 findings.
+- Insight 1 → **backend/common/change-impact** (existing category), new page
+  `inserting-a-guard-before-an-existing-side-effect`. The harvested `domain:
+  debugging` hint was re-routed: debugging is scoped to diagnosing failures,
+  while this is pre-change impact verification — exactly what change-impact holds
+  (precedent: call-site-enumeration, and in-flight #51/#58 additions to the same
+  category). backend/index.md gained the row.
+- Insight 2 → **infrastructure/agent-orchestration/shared-run-state** (merge; the
+  page owns coordination through shared files). infrastructure/index.md load-when
+  extended with the reset-during-re-delivery trigger.
+- Insight 3 → **infrastructure/agent-orchestration/worktree-isolated-workers**
+  (merge; the page owns brief authoring + guardrail direction). The harvested
+  `domain: security` hint was re-routed: the wiki's security domain is
+  application trust boundaries; agent-guardrail semantics live in
+  agent-orchestration, where the sibling worker-side edge already sits.
+  infrastructure/index.md load-when extended with the Bash-hook-vs-native-tools
+  trigger. Sources gained the official hooks doc.
+
+No new categories. log.md updated with the ingest entry.
