@@ -11,6 +11,7 @@ sources:
 last_verified: 2026-08-04
 related:
   [frontend-state-derived-state, qa-document-verification-spec-document-gates, qa-deliverables-command-transcripts-in-a-document]
+  [frontend-state-derived-state, qa-document-verification-spec-document-gates, qa-deliverables-exclusivity-and-absence-claims]
 ---
 
 # A Requested Deliverable Duplicating an Artifact the Repo Already Generates

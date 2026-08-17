@@ -24,6 +24,7 @@ related:
     testing-quality-spec-artifact-checks,
     testing-quality-checks-that-cannot-pass,
     qa-deliverables-command-transcripts-in-a-document,
+    qa-deliverables-exclusivity-and-absence-claims,
   ]
 ---
 
