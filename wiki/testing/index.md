@@ -52,7 +52,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [artifact-leakage-from-a-suite](data/artifact-leakage-from-a-suite.md) | Temp directories, build outputs, or scratch files pile up in the repo or system temp after a suite runs; a clone grows with no obvious owner; you suspect the leak comes from everywhere and need a way to locate it; deciding between per-site cleanup, the runner's owned-temp API, and a static rule that enforces the convention |
 | [harness-vs-run-path-fixtures](data/harness-vs-run-path-fixtures.md) | A test/spec harness and the production entry point each synthesize the program's input and the harness reads a narrower declaration set; a harness run reports a guarded step skipped with exit 0 and you are about to record that skip as program behavior; deciding whether a false guard means a false operand or an absent one |
-| [test-data-and-isolation](data/test-data-and-isolation.md) | Tests need fixture data and you are choosing how to create it; tests pass alone but fail together (or vice versa); DB cleanup, shared fixtures, time-dependent logic, or unique-value collisions |
+| [test-data-and-isolation](data/test-data-and-isolation.md) | Tests need fixture data and you are choosing how to create it; tests pass alone but fail together (or vice versa); DB cleanup, shared fixtures, time-dependent logic, or unique-value collisions; a suite behaves differently inside a harness-spawned session that injects env vars |
 
 ## mocking
 
