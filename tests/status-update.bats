@@ -4,6 +4,18 @@
 setup() {
   SU="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/status-update.sh"
   export STATUS_DIR="${BATS_TEST_TMPDIR}/status"
+  # Session resolution reads $TMUX/$STATUS_SESSION from the ambient environment
+  # (issue #97: a suite launched from inside a real tmux session would
+  # otherwise silently inherit it and mask the non-tmux regression below).
+  unset TMUX STATUS_SESSION
+}
+
+mk_tmux_stub() { # $1 = session name the stub's `display-message -p '#S'` answers with
+  d="${BATS_TEST_TMPDIR}/tmuxbin"
+  mkdir -p "$d"
+  printf '#!/bin/sh\necho "%s"\n' "$1" > "$d/tmux"
+  chmod +x "$d/tmux"
+  printf '%s' "$d"
 }
 
 @test "writes phase, timestamp, worktree and extras in one valid-JSON record" {
@@ -35,4 +47,25 @@ setup() {
 @test "records the tmux session name (STATUS_SESSION override) for liveness" {
   ( cd "$BATS_TEST_TMPDIR" && STATUS_SESSION=lo-7 bash "$SU" t4 implementing )
   [ "$(jq -r '.session' "$STATUS_DIR/t4.json")" = "lo-7" ]
+}
+
+@test "TMUX set, no STATUS_SESSION: asks tmux and records its answer (normal)" {
+  stub="$(mk_tmux_stub inside-session)"
+  run env TMUX=fake PATH="$stub:$PATH" bash "$SU" t5 implementing
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.session' "$STATUS_DIR/t5.json")" = "inside-session" ]
+}
+
+@test "TMUX unset: tmux is never consulted, session field stays absent (regression, issue #97)" {
+  stub="$(mk_tmux_stub wrongly-resolved-session)"
+  run env PATH="$stub:$PATH" bash "$SU" t6 implementing
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.session // "MISSING"' "$STATUS_DIR/t6.json")" = "MISSING" ]
+}
+
+@test "STATUS_SESSION wins outside tmux even with tmux on PATH (boundary)" {
+  stub="$(mk_tmux_stub wrongly-resolved-session)"
+  run env STATUS_SESSION=explicit PATH="$stub:$PATH" bash "$SU" t7 implementing
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.session' "$STATUS_DIR/t7.json")" = "explicit" ]
 }
