@@ -8,7 +8,7 @@ sources:
   - https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html
   - https://pitest.org/
 last_verified: 2026-08-06
-related: [testing-quality-tests-that-cannot-fail, testing-quality-behavior-not-implementation, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, qa-process-regression-scope]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-behavior-not-implementation, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, qa-process-regression-scope, testing-quality-source-text-wiring-assertions]
 ---
 
 # A Repo-Wide Guard That Fires on a Legitimate Artifact
@@ -81,7 +81,7 @@ Reviewing a guard that has never been red → [testing-quality-tests-that-cannot
 
 ## Sources
 
-- https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html — Alex Eagle, "Testing on the Toilet: Change-Detector Tests Considered Harmful" (2015-01-27): "Change-detector tests do not add clarity, and you cannot safely refactor code if you know you need to adapt the tests afterwards to get them passing again." A shape-only guard that must be exempted for each new legitimate artifact is this failure mode at repo scope
+- https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html — Alex Eagle, "Testing on the Toilet: Change-Detector Tests Considered Harmful" (2015-01-27), cited for the change-detector category: a shape-only guard that must be exempted for each new legitimate artifact is that failure mode at repo scope. Correction 2026-08-07: an earlier revision of this bullet presented "you cannot safely refactor code if you know you need to adapt the tests afterwards to get them passing again" as the article's own sentence. Re-fetching the page shows it is from a reader comment dated 2015-02-04 and its wording differs ("refactor stuff", "know for sure"); the article body was not retrievable in full, so nothing is quoted from it here
 - https://pitest.org/ — "Faults (or mutations) are automatically seeded into your code, then your tests are run. If your tests fail then the mutation is killed, if your tests pass then the mutation lived" — the basis for step 4's required-red fixture
 - Field evidence (linkly #43, 2026-08-06): adding `result.bindings` to a differential masking surface immediately reddened `test_when_guard_removed_diverges`; the repro showed the fixture's seeded row carrying an undeclared `password` key raw through the new channel while the entity declared only `id`/`email`/`token`. Narrowing the payload to declared fields preserved the test's guard-divergence intent and returned 1218 tests green with the widened detector intact
 - Field evidence (linkly #35, 2026-08-04): `test_no_shipped_example_has_a_guarded_repository_call` asserted that no shipped `.lnpl` example contained a repository call under a guard. `examples/checkout.lnpl` legitimately added a `create` under `when stock > 0` — the issue's own reproduction shape — turning the guard permanently red. Re-expressing it as "a guarded call that could actually fail", with the conflict/miss decision taken from the production `_lnpl_ops` derivation via `seeded_entities`/`repository_calls`, returned the suite to `Ran 518 tests / OK` while a fixture holding a guarded-and-can-fail create still drove the guard red
