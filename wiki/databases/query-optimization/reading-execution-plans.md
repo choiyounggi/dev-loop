@@ -8,7 +8,7 @@ sources:
   - https://www.postgresql.org/docs/current/using-explain.html
   - https://dev.mysql.com/doc/refman/8.0/en/explain-output.html
 last_verified: 2026-07-10
-related: [databases-indexing-index-selection, databases-query-optimization-large-in-lists]
+related: [databases-indexing-index-selection, databases-query-optimization-large-in-lists, databases-query-optimization-comparing-two-execution-plans]
 ---
 
 # Diagnosing a Query with Its Execution Plan
@@ -45,6 +45,7 @@ before shipping it.
 | Plan differs between parameter values | Skewed data: one plan per value class. Test with production-representative parameters, worst class included |
 | `EXPLAIN ANALYZE` on writes (`INSERT/UPDATE/DELETE`) | It executes them. Wrap in `BEGIN; ... ROLLBACK;` |
 | Production incident, can't run ANALYZE variants freely | Capture the live plan via `pg_stat_statements` / slow query log + `auto_explain` instead of experimenting on prod |
+| A node prints `never executed`, or you are comparing this plan against a second variant to blame one variable | The node ran zero times, so its cost is unmeasured — see [databases-query-optimization-comparing-two-execution-plans] before attributing the difference |
 
 ## Sources
 

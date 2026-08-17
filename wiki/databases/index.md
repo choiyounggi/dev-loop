@@ -22,6 +22,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [reading-execution-plans](query-optimization/reading-execution-plans.md) | A single query/statement is slow; verifying an index/query change with EXPLAIN before shipping (endpoint slow because it runs *many* fast queries → n-plus-one-queries) |
+| [comparing-two-execution-plans](query-optimization/comparing-two-execution-plans.md) | Attributing a slowdown to one variable by comparing `EXPLAIN (ANALYZE)` across two variants of a statement; one arm came back far faster or its plan shows `never executed` / `loops=0`; quoting the duration of an arm a client deadline cut short |
 | [keyset-pagination](query-optimization/keyset-pagination.md) | Implementing pagination, infinite scroll, or batch table walks |
 | [streaming-large-result-sets](query-optimization/streaming-large-result-sets.md) | Exporting/reading a very large single-query result into the app; process memory peaks on `fetchall` or building a big file; server-side cursor blocked by autocommit or a read-only proxy |
 | [large-in-lists](query-optimization/large-in-lists.md) | Building `IN (...)` queries whose list size can grow (batch lookups, fetch-by-ids) |
