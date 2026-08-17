@@ -9,7 +9,7 @@ sources:
   - https://kubernetes.io/blog/2023/04/24/openapi-v3-field-validation-ga/
   - https://json-schema.org/draft/2020-12/json-schema-validation
 last_verified: 2026-08-05
-related: [security-input-validation-at-trust-boundaries, infrastructure-config-environment-config, backend-common-api-design-error-responses, qa-process-acceptance-criteria, backend-common-change-impact-widening-a-closed-value-table]
+related: [security-input-validation-at-trust-boundaries, infrastructure-config-environment-config, backend-common-api-design-error-responses, qa-process-acceptance-criteria, backend-common-change-impact-widening-a-closed-value-table, platforms-processes-tool-diagnostics-without-a-failing-exit-code]
 ---
 
 # Accepting a Declaration the System Does Not Enforce
