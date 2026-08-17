@@ -14,6 +14,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [composite-index-column-order](indexing/composite-index-column-order.md) | Creating a multi-column index; choosing column order for equality + range/sort queries |
 | [covering-indexes](indexing/covering-indexes.md) | A query already served by an index still reads the table (heap) heavily; deciding whether to add INCLUDE/covering columns |
 | [partial-and-expression-indexes](indexing/partial-and-expression-indexes.md) | Queries always filter a fixed rare condition (status, deleted_at) or a function of a column (lower(email)); a uniqueness rule applies only to a subset of rows (e.g. live rows) |
+| [trigram-index-short-patterns](indexing/trigram-index-short-patterns.md) | A `LIKE`/`ILIKE '%keyword%'` search on a PostgreSQL `pg_trgm` GIN/GiST index is fast for ordinary words and slow for one- or two-character keywords; `EXPLAIN` shows a `Bitmap Index Scan` on the trigram index and the query is still slow; choosing a minimum search-keyword length, or deciding between pg_trgm, pg_bigm, and a driver index for another condition |
 | [index-write-cost](indexing/index-write-cost.md) | Adding indexes to write-heavy tables; bulk loads; auditing for unused/redundant indexes |
 
 ## query-optimization
