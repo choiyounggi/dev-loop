@@ -31,6 +31,13 @@ in the final tree (0 missing).
 - Post-merge scans: 0 conflict markers, broken-link scan and index-coverage
   lint run on the final tree (see log entry).
 
+## Open-PR check
+
+This consolidation *is* the reconciliation of the open-PR backlog: all 30 open
+`knowledge/*` PRs (#47–#110) are merged into this branch and closed in its
+favor. No other open knowledge PRs remain; #111 was merged to main first and
+this branch is based on it.
+
 ## Routing decision
 
 - New categories: `backend/common/ml` (mape-aligned-point-prediction),
