@@ -9,7 +9,7 @@ sources:
   - https://docs.python.org/3/library/ast.html
   - https://peps.python.org/pep-0570/
 last_verified: 2026-08-05
-related: [qa-process-regression-scope, backend-python-language-mutable-state-traps, testing-data-test-data-and-isolation, testing-quality-policy-at-several-return-sites, backend-common-change-impact-widening-a-closed-value-table, backend-common-change-impact-corpus-sweep-before-a-rejection-rule, backend-common-errors-diagnostics-from-a-shared-code-path]
+related: [qa-process-regression-scope, backend-python-language-mutable-state-traps, testing-data-test-data-and-isolation, testing-quality-policy-at-several-return-sites, backend-common-change-impact-widening-a-closed-value-table, backend-common-change-impact-corpus-sweep-before-a-rejection-rule, backend-common-errors-diagnostics-from-a-shared-code-path, backend-common-change-impact-inserting-a-guard-before-an-existing-side-effect]
 ---
 
 # Enumerating Call Sites Before Changing a Callee's Contract

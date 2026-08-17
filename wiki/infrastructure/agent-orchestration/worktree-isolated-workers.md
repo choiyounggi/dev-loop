@@ -8,6 +8,9 @@ sources:
   - https://git-scm.com/docs/git-worktree
 last_verified: 2026-08-13
 related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-shared-run-state, platforms-shells-command-text-inspected-before-execution]
+  - https://code.claude.com/docs/en/hooks
+last_verified: 2026-08-17
+related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-shells-command-text-inspected-before-execution]
 ---
 
 # Writing the Brief for a Worker Confined to Its Own Worktree
@@ -61,6 +64,7 @@ wait loop keeps escalating with no error from the task itself.
 | A read of a main-root path shares a command line with any write verb (`mkdir -p .claude/tmp && grep … <main_root>/x`) | It fires `ask`, even though the write targets a worktree-relative path — the two conditions are matched independently over the whole command string, not correlated with each other. Split the write and the read into separate commands |
 | A read of a main-root path is redirected to an absolute path (`grep … <main_root>/x > /tmp/out`) | It fires — the redirect-to-absolute branch matches regardless of what is being read. Redirect to a worktree-relative path |
 | The brief points the worker at a coordinator-state directory that is gitignored (`.orchestration/`, `.state/`) via a repo-relative path | The path resolves only in the main checkout: `git worktree add` checks out tracked files, so an ignored directory never materializes in a worktree. Substitute the absolute main-checkout path into the brief and state that the directory is gitignored and absent from the worktree — a capable worker otherwise hides the miss by searching for the file instead of failing |
+| The guardrail is a Bash-command hook and the worker edits files through its native Edit/Write tool | The hook never runs — tool hooks match on the tool name, so a `Bash` matcher does not fire for Edit/Write calls, and an absolute-path edit into the main checkout lands with no block and no log. State in the brief that **all** file operations, whatever the tool, use worktree-relative paths, and `git status` the protected tree before merging any worker's branch — discovery otherwise depends on luck |
 
 ## Instead of
 
@@ -70,10 +74,13 @@ wait loop keeps escalating with no error from the task itself.
 | Disable the escape guardrail so the workers proceed | Rewrite the paths in the brief | The guardrail is what makes parallel workers safe to run against one repo |
 | Designate a shared scratch directory inside the repo for worker output | Place it outside the repo and pass its path as one named variable | A shared in-repo directory is both a guardrail trip and a write race between workers |
 | Reuse the coordinator's repo-relative path to a gitignored state directory in a worker's prompt template | Expand it to the absolute path at substitution time and note the directory is absent from the worktree | Ignored files exist only where they were created; the relative form silently resolves to a nonexistent path in every worker, and reads of absolute main-root paths pass the guardrail |
+| Trust a Bash-hook guardrail as the only isolation for workers with native file tools | Pair it with a relative-paths-only instruction in the brief and a pre-merge `git status` of the main checkout | The hook inspects only the tool its matcher names; an Edit-tool write to an absolute main-checkout path passes silently — the worker need not be routing around anything for the escape to happen |
 
 ## Sources
 
 - https://git-scm.com/docs/git-worktree — linked worktrees are separate checkouts sharing one repository; each has its own working directory
+- https://code.claude.com/docs/en/hooks — tool-event hook matchers filter on the tool name ("`Bash` matches only the Bash tool"); a hook registered for Bash does not run on Edit/Write calls
+- Field observation 2026-08-17 (linkly run, worker under a `worktree_escape` Bash-hook guard): the worker modified two `examples/*.lnpl` files in the **main checkout** via its native Edit tool with absolute paths — no block, no log; discovered only when the coordinator's `git pull` failed on local changes (contents happened to match the merged branch, so no damage). The same paths written via Bash redirection would have escalated
 - Field reproduction 2026-08-05 (groundwork guardrails 1.0.0 `hooks/bash-guard.sh`, `worktree_escape` rule, macOS): from a linked worktree, `cp ./a <main_root>/b` and `echo z > <main_root>/f` were both stopped; `cat <main_root>/f`, `ls <main_root>/.orchestration`, and `grep -n x <main_root>/f` all passed. The rule matches an absolute main-root mention together with a write verb (`rm|mv|cp|tee|mkdir|touch|install|dd`) or a redirect to an absolute path
 - Field evidence 2026-08-06 (dev-loop orchestrate, Wave 2 worker consuming an upstream worktree's FINDINGS file): a read-only `awk`/`grep` verification and a `git status` check each raised `worktree_escape` as `ask` and stopped the coordinator's watch with exit 5; both were confirmed read-only and approved. This rule version fired on reads, unlike the 1.0.0 reproduction above where bare `cat`/`ls`/`grep` passed — the read/write asymmetry in the Do-this table is version-dependent, so probe before fanning out
 - Local reproduction 2026-08-06 (groundwork guardrails 1.2.0 `hooks/bash-guard.sh`, `worktree_escape`, macOS), run from a linked worktree against a sibling worktree's path: `grep -n foo <main_root>/<other>/FINDINGS.md`, `awk 'NR<5' <main_root>/<other>/FINDINGS.md`, `cat <main_root>/README.md` and `git -C <main_root>/<other> status --short` all passed; `mkdir -p .claude/tmp && grep -n foo <main_root>/<other>/FINDINGS.md`, `cp <main_root>/README.md ./x` and `grep -n foo <main_root>/<other>/FINDINGS.md > /tmp/out` each returned `ask`. Reading the rule confirms why: it fires when a main-root mention survives the strip **and** `(rm|mv|cp|tee|mkdir|touch|install|dd)` or a redirect to an absolute path matches anywhere in the command — the two tests are independent

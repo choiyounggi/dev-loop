@@ -8,7 +8,7 @@ sources:
   - https://istqb-glossary.page/branch-coverage/
   - "Field reproduction (lnpl 0.2.0, 2026-08-05): undeclared event reference passed compile (0 errors) and IR validation (PASS); failed only in runs that executed the guarded emit step; the one run where a presence guard skipped the step exited 0"
 last_verified: 2026-08-05
-related: [qa-exploratory-override-control-pairs, testing-quality-minimum-case-set, qa-exploratory-exploratory-sessions, qa-exploratory-lowered-declaration-survival, testing-data-harness-vs-run-path-fixtures]
+related: [qa-exploratory-override-control-pairs, testing-quality-minimum-case-set, qa-exploratory-exploratory-sessions, qa-exploratory-lowered-declaration-survival, testing-data-harness-vs-run-path-fixtures, backend-common-change-impact-inserting-a-guard-before-an-existing-side-effect]
 ---
 
 # Executing Guard-True Paths When Static Stages Skip Reference Resolution
