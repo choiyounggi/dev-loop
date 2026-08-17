@@ -11,7 +11,7 @@ sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
   - https://owasp.org/www-community/attacks/Path_Traversal
 last_verified: 2026-07-10
-related: [security-authz-resource-level-checks, frontend-security-xss-safe-rendering]
+related: [security-authz-resource-level-checks, frontend-security-xss-safe-rendering, security-agent-exposure-in-session-tool-exposure]
 ---
 
 # Validating Data at a Trust Boundary

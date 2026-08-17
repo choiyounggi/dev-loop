@@ -3,7 +3,8 @@
 Route here for: web UI code — component state placement, effect usage, rendering
 performance, component structure/composition, in-UI data fetching, async
 loading/error/empty UI states, bundle/asset load performance, form validation UX,
-XSS-safe output, client-side auth token handling, interactive-element accessibility.
+XSS-safe output, client-side auth token handling, interactive-element accessibility,
+agent-facing tool surfaces (WebMCP tool registration).
 
 Match your situation to a "load when" line; load only matching pages.
 
@@ -59,6 +60,12 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [token-handling-client-side](auth/token-handling-client-side.md) | A browser app must store or send auth credentials (JWT access/refresh tokens or session ids); reviewing where tokens live client-side; implementing silent refresh or logout; deciding whether the auth transport needs CSRF defense |
+
+## agent-interfaces
+
+| Page | Load when |
+|------|-----------|
+| [agent-facing-tool-surfaces](agent-interfaces/agent-facing-tool-surfaces.md) | Making a web app usable by AI agents ("agent-ready", "add WebMCP tools", assistant-driven ordering/search/booking); building a form or action flow where agent consumption is anticipated; reviewing browser-native agent tool registration |
 
 ## accessibility
 

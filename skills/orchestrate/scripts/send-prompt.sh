@@ -35,6 +35,8 @@
 # env:
 #   LO_QUEUED_PATTERN   substring meaning "queued behind a busy turn"
 #   LO_BUSY_PATTERN     substring meaning "mid-turn" (state only)
+#   LO_PASTED_PATTERN   substring meaning "collapsed to an unsubmitted paste
+#                       placeholder" (issue #96, default: [Pasted text)
 #   LO_PANE_TAIL_LINES  non-empty pane lines searched for those (default 6)
 #   LO_CONFIRM_DELAY    seconds to settle before classifying a send (default 1)
 #   LO_PICKUP_TIMEOUT   wait deadline in seconds (default 180)
@@ -53,6 +55,12 @@ TMUX_BIN=$(command -v tmux) || { echo "send-prompt: tmux not found" >&2; exit 12
 # into a reported "delivered".
 queued_pat="${LO_QUEUED_PATTERN:-Press up to edit queued messages}"
 busy_pat="${LO_BUSY_PATTERN:-esc to interrupt}"
+
+# Issue #96: a send can collapse into an unsubmitted "[Pasted text #N ...]"
+# placeholder left sitting in the input box — tmux still reports the send-keys
+# call as successful. launch-session.sh's submit-confirm loop proved the
+# remedy (a further Enter); cmd_send ports the same detection, bounded.
+pasted_pat="${LO_PASTED_PATTERN:-[Pasted text}"
 
 # Every grep against these uses `-- "$pat"`. A pattern beginning with '-' is
 # otherwise parsed as a grep flag ("unrecognized option"), which is the same
@@ -183,6 +191,30 @@ cmd_send() {
     note_pane "$1"
     echo "queued"; exit 4
   fi
+
+  # [Pasted text] guard (issue #96): the placeholder proves "buffered, not
+  # submitted" the same way queued_pat proves "buffered, not consumed" — so it
+  # gets the same retry-before-verdict treatment. Bounded to 3 extra Enters,
+  # mirroring launch-session.sh's submit-confirm loop; a pane still stuck after
+  # that is reported unconfirmed, never guessed delivered.
+  pasted_attempts=0
+  while printf '%s' "$after" | grep -qF -- "$pasted_pat" 2>/dev/null \
+    && [ "$pasted_attempts" -lt 3 ]; do
+    if ! "$TMUX_BIN" send-keys -t "$(target_pane "$1")" Enter; then
+      session_alive "$1" || { echo "gone"; exit 3; }
+      echo "send-prompt: send-keys failed for live session '$1'" >&2
+      exit 6
+    fi
+    pasted_attempts=$((pasted_attempts + 1))
+    sleep "$confirm_delay"
+    after=$(pane_tail "$1") || {
+      echo "send-prompt: capture-pane failed for live session '$1'" >&2; exit 6; }
+  done
+  if printf '%s' "$after" | grep -qF -- "$pasted_pat" 2>/dev/null; then
+    note_pane "$1"
+    echo "unconfirmed"; exit 7
+  fi
+
   if [ "$after" != "$before" ]; then
     echo "delivered"; exit 0
   fi
