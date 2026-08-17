@@ -21,6 +21,8 @@ in the final tree (0 missing).
 
 ## Existing-layer check
 
+Pages read: testing-quality-tests-that-cannot-fail, testing-quality-behavior-not-implementation, testing-quality-guard-shape-vs-consequence, testing-quality-harness-reverse-controls, testing-quality-policy-at-several-return-sites, testing-data-test-data-and-isolation, backend-common-change-impact-call-site-enumeration, backend-common-change-impact-inserting-a-guard-before-an-existing-side-effect, backend-common-change-impact-cross-module-consumer-census, backend-java-jpa-raw-jdbc-inside-a-jpa-transaction, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-session-completion-gates, qa-document-verification-spec-document-gates, qa-document-verification-editing-a-gated-document, qa-exploratory-guard-true-path-coverage, qa-environments-headless-browser-bot-blocking, qa-process-defect-class-resweep-after-review, qa-process-scope-purity-checks (conflict-resolution and qualifier-polish reads on the final tree)
+
 - Flush-time dedup notes were honored as recorded in each PR title (e.g. #74's
   two insights folded into #73/#52's pages arrive via those branches; #86's
   duplicate dropped); no dropped insight was re-imported.
