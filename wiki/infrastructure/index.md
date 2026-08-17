@@ -42,6 +42,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [host-cgroup-visibility](containers/host-cgroup-visibility.md) | A container must read the host's full cgroup v2 hierarchy (other pods' CPU/memory stats) via a hostPath/`-v` mount of `/sys/fs/cgroup`; the mounted directory is missing the `kubepods` subtree with no error |
 | [image-builds](containers/image-builds.md) | Writing or reviewing a Dockerfile; images rebuild everything on small changes, build slowly, or are too large; choosing an image tagging scheme |
 | [resource-limits-and-probes](containers/resource-limits-and-probes.md) | Writing or reviewing Kubernetes-style deployment manifests; pods OOMKilled, evicted, or CPU-throttled; a dependency outage triggered a restart storm; traffic hitting pods that are not ready |
+| [failing-pod-on-a-repo-synced-cluster](containers/failing-pod-on-a-repo-synced-cluster.md) | A pod will not start or keeps restarting (`Pending`, `ContainerCreating`, `CrashLoopBackOff`) on a cluster whose manifests a GitOps controller (Argo CD, Flux) applies; choosing between editing the live object and committing the manifest; reading `lastState.terminated` exitCode/reason before logs to separate an OOM kill from an application exit; you hold no cluster access and must hand the diagnosis over |
 
 ## data
 
