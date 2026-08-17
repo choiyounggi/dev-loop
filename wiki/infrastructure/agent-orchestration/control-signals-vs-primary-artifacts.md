@@ -9,7 +9,7 @@ sources:
   - https://code.claude.com/docs/en/hooks
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
 last_verified: 2026-08-06
-related: [infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-session-completion-gates, platforms-shells-command-text-inspected-before-execution, platforms-tools-harness-mediated-tool-results, debugging-methodology-hypothesis-testing]
+related: [infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-session-completion-gates, platforms-shells-command-text-inspected-before-execution, platforms-tools-harness-mediated-tool-results, debugging-methodology-hypothesis-testing, infrastructure-agent-orchestration-unattended-worker-questions]
 ---
 
 # Deciding a Worker Is Done, Alive, or Dead from a Status File or Watcher Verdict

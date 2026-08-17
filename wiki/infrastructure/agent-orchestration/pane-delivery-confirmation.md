@@ -8,7 +8,7 @@ sources:
   - https://man7.org/linux/man-pages/man3/termios.3.html
   - https://man7.org/linux/man-pages/man1/tmux.1.html
 last_verified: 2026-08-06
-related: [platforms-shells-option-like-argument-values, infrastructure-agent-orchestration-session-completion-gates, platforms-processes-non-interactive-cli-invocation]
+related: [platforms-shells-option-like-argument-values, infrastructure-agent-orchestration-session-completion-gates, platforms-processes-non-interactive-cli-invocation, infrastructure-agent-orchestration-unattended-worker-questions]
 ---
 
 # Confirming a Keystroke Sent to a Terminal Pane Was Actually Consumed
