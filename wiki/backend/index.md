@@ -5,7 +5,7 @@ three stack subtrees — route by concern first, stack second:
 
 | Subtree | Route there when |
 |---------|------------------|
-| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, enumerating call sites before a contract change, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, consuming LLM APIs (completion validation, context budgeting), consuming external-API responses, externally-owned defaults, object-storage references |
+| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, enumerating call sites before a contract change, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, consuming LLM APIs (completion validation, context budgeting), consuming external-API responses, externally-owned defaults, object-storage references, sync-vs-async integration choice, WebSocket/SSE connection lifecycle |
 | [java](java/index.md) | You are writing/reviewing JVM backend code (Java/Kotlin, Spring, JPA/Hibernate) and the concern is stack-specific: entity mapping, persistence context, proxy pitfalls, JVM threads/memory |
 | [node](node/index.md) | You are writing/reviewing Node.js/TypeScript backend code: event-loop blocking, promise error handling, runtime validation at boundaries, graceful shutdown |
 | [python](python/index.md) | You are writing/reviewing Python backend code: GIL/concurrency model, pydantic validation, WSGI/ASGI workers, language traps |
@@ -26,6 +26,8 @@ Match your situation to a "load when" line; load only matching pages.
 | [idempotency](common/api-design/idempotency.md) | An endpoint with side effects (create, charge, send) can receive the same request twice — client retry after timeout, user double-submit, gateway retry; designing idempotency-key storage; deciding which operations are safe to retry |
 | [pagination-contract](common/api-design/pagination-contract.md) | Designing a list endpoint's request/response contract — cursor vs page-number, limit caps, total counts, expired-cursor behavior (the backing SQL/index → databases/query-optimization/keyset-pagination) |
 | [unenforced-declarations](common/api-design/unenforced-declarations.md) | Your system accepts declarative input (config file, DSL/manifest, policy block, schema annotation) and part of what a caller may write is unimplemented — an unknown key, a verb outside your vocabulary, or a knob recorded but never acted on; a user reports "I declared X and nothing happened"; choosing between reject/warn/ignore and where that strictness is selected |
+| [cors-and-preflight](common/api-design/cors-and-preflight.md) | A browser-based caller on a different origin fails with a CORS error in the console (a direct curl to the same endpoint works); deciding whether a change to an endpoint's method/headers/content-type will trigger an OPTIONS preflight; designing `Access-Control-*` headers for a credentialed vs public endpoint; allowlisting more than one origin |
+| [api-versioning-and-breaking-changes](common/api-design/api-versioning-and-breaking-changes.md) | An API has external callers you cannot enumerate or force-upgrade and you need to add/remove/rename/retype a field or endpoint; classifying a change as backward-compatible vs breaking; choosing a versioning mechanism (header vs URL); deprecating an old version (internal-only contract changes → [backend-common-change-impact-call-site-enumeration]) |
 
 ### change-impact
 
@@ -99,3 +101,15 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [multi-object-write-ordering](common/storage/multi-object-write-ordering.md) | A diff writes two or more related objects (payload + checksum, data file + index entry, new version + the pointer that marks it current) with no transaction around the writes; reviewing such a diff for what a concurrent reader observes between the writes, or what a crash between them leaves behind |
 | [object-key-persistence](common/storage/object-key-persistence.md) | Persisting the result of an object-storage upload (`s3.upload()`, `lib-storage` `Upload`, a transfer manager) — choosing which response field goes in the DB column; building the read/signing path from a stored reference; migrating a column that holds URLs to keys; only large uploads 404 on read |
+
+### architecture
+
+| Page | Load when |
+|------|-----------|
+| [sync-vs-async-integration](common/architecture/sync-vs-async-integration.md) | Deciding whether one service/module should call another synchronously, hand work off through a queue, or publish an event — choosing by which property the interaction needs (immediate result, consistency, failure isolation, multiple independent consumers); a "fire and forget" call was made synchronously with no reason to block |
+
+### realtime
+
+| Page | Load when |
+|------|-----------|
+| [websocket-sse-lifecycle](common/realtime/websocket-sse-lifecycle.md) | Building or reviewing a WebSocket or Server-Sent Events channel — authenticating a long-lived connection, detecting a dead peer (ping/pong), reconnecting after a drop (SSE `retry`/`Last-Event-ID`, WebSocket client-side backoff), bounding backpressure on a slow client, or draining connections on shutdown/deploy |
