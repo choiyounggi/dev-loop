@@ -5,6 +5,17 @@
 
 setup() {
   LS="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/launch-session.sh"
+  # Isolate from ambient orchestration env. A worker session running this
+  # suite inherits LO_RUN_ID/LO_STATUS_DIR/LO_TASK_ID and GROUNDWORK_* from
+  # its own launch (issue #100) — `env VAR=val` in a test's `run` line MERGES
+  # with, not replaces, the inherited environment, so these leak into
+  # launch-session.sh (and the status-update.sh it calls) unless absent here.
+  # Tests that need a value set it explicitly via `run env VAR=val ...`,
+  # which overrides this unset for that one invocation.
+  unset LO_RUN_ID LO_DRY_RUN LO_TMUX LO_CLAUDE \
+        LO_READY_TIMEOUT LO_READY_INTERVAL LO_READY_EXTRA LO_TRUST_EXTRA \
+        LO_SUBMIT_TIMEOUT LO_SUBMIT_INTERVAL LO_STATUS_DIR LO_TASK_ID \
+        DEV_LOOP_WORKER_MODEL GROUNDWORK_ESCALATION_DIR GROUNDWORK_TASK_ID
 }
 
 @test "rejects an invalid permission mode (injection guard)" {
@@ -387,4 +398,32 @@ pane_not_ready() { # matches none of the ready/trust patterns
       sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD p"
   [ "$status" -eq 0 ]
   grep -q -- "--model 'claude-sonnet-5'" "$sd/keys"
+}
+
+# --- CONTAMINATION GUARD (issue #100 comment): a leaked real LO_STATUS_DIR
+# once let this suite overwrite a live run's status file. This test plants
+# real-looking decoy dirs as the ambient LO_STATUS_DIR/GROUNDWORK_ESCALATION_DIR
+# a worker session would have exported, re-runs the one boundary test that
+# does NOT itself pass LO_STATUS_DIR/LO_TASK_ID (so it depends entirely on
+# setup()'s unset for isolation) as a NESTED bats process — the only way to
+# put those vars in place *before* that test's own setup() runs — and proves
+# both that its outcome is unchanged AND that the decoys gained zero files.
+#
+# Negative control (verified 2026-08-14, not left in code): with the setup()
+# unset block removed, this test fails — decoy_status gains a zzz.json file,
+# reproducing the exact live contamination (t90.json overwritten in i8790).
+@test "CONTAMINATION GUARD: ambient LO_STATUS_DIR/GROUNDWORK_ESCALATION_DIR from a worker session write nothing into a real-looking decoy dir" {
+  decoy_status="$BATS_TEST_TMPDIR/decoy-status"; mkdir -p "$decoy_status"
+  decoy_esc="$BATS_TEST_TMPDIR/decoy-escalations"; mkdir -p "$decoy_esc"
+  run env LO_RUN_ID=zzz LO_STATUS_DIR="$decoy_status" LO_TASK_ID=zzz \
+      GROUNDWORK_ESCALATION_DIR="$decoy_esc" GROUNDWORK_TASK_ID=zzz \
+      bats --filter 'pre-seed: with both vars unset no status file is written' \
+      "$BATS_TEST_DIRNAME/launch-session.bats"
+  [ "$status" -eq 0 ]
+  # grep, not [[ ]]: a false mid-test [[ ]] does not fail a test under this
+  # bats/bash combination, which would make these assertions decoration.
+  printf '%s\n' "$output" | grep -qF '1..1'
+  printf '%s\n' "$output" | grep -qE '^ok 1 '
+  [ -z "$(ls -A "$decoy_status" 2>/dev/null)" ]
+  [ -z "$(ls -A "$decoy_esc" 2>/dev/null)" ]
 }

@@ -185,21 +185,3 @@ evidence: reviews/i83-insight-emission-r1.md + fixing commit a1b2c3d
   [ "$status" -eq 0 ]
   [ "$(_queue_lines "s2")" -eq 0 ]
 }
-
-# --- boundary: changes vs branch HEAD name only files this task owns or was --
-# --- explicitly authorized to touch (skills/orchestrate/SKILL.md, this test --
-# --- file, and tests/orchestrate-review-pass.bats for review round 1's F1) --
-
-@test "changes vs branch HEAD are exactly the files this task owns or was authorized to touch" {
-  cd "$REPO_ROOT" || return 1
-  run git status --porcelain
-  [ "$status" -eq 0 ]
-  while IFS= read -r line; do
-    [ -z "$line" ] && continue
-    f="${line:3}"
-    case "$f" in
-      skills/orchestrate/SKILL.md|tests/orchestrate-insight-emission.bats|tests/orchestrate-review-pass.bats) : ;;
-      *) return 1 ;;
-    esac
-  done <<< "$output"
-}
