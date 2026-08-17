@@ -46,6 +46,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [autovacuum-and-wraparound](operations/autovacuum-and-wraparound.md) | A write-heavy table bloats or slows over time; tuning autovacuum for a hot table; monitoring/preventing transaction-ID wraparound (age(datfrozenxid)); the database starts refusing writes to avoid wraparound; deciding VACUUM vs VACUUM FULL vs pg_repack |
+| [data-backfill-migrations](operations/data-backfill-migrations.md) | A migration must populate/transform existing rows on a live table (not just alter the schema); choosing batch size and transaction boundaries so the backfill doesn't hold row locks for its full duration; making a backfill resumable/idempotent; verifying a backfill actually completed instead of trusting exit status |
 
 ## data-survey
 
