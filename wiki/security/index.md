@@ -3,7 +3,8 @@
 Route here for: trust-boundary decisions — input validation, authn approach
 choice, per-resource authorization, secrets hygiene, dependency trust, PII
 handling, exposing executable tools to in-session LLM agents (prompt-injection
-blast radius), the author identity a commit publishes. Mechanics owned elsewhere are linked: XSS rendering → frontend,
+blast radius), the author identity a commit publishes, live
+host-compromise triage (incident response). Mechanics owned elsewhere are linked: XSS rendering → frontend,
 CI secrets → infrastructure, JWT implementation → backend/frontend auth.
 
 Match your situation to a "load when" line; load only matching pages.
@@ -51,6 +52,13 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [supply-chain](dependencies/supply-chain.md) | Adding a dependency (add-vs-write decision, name verification, install scripts); updating dependencies (auto-update PRs, major versions, transitive CVE overrides); hardening against malicious/compromised packages (lockfiles, reproducible installs) |
+
+## incident-response
+
+| Page | Load when |
+|------|-----------|
+| [verifying-assumed-security-agents](incident-response/verifying-assumed-security-agents.md) | About to reason from a documented claim (CLAUDE.md, runbook, wiki) that a host runs an EDR/security agent — judging whether a threat "would have been detected", triaging a suspected compromise, or applying rules premised on the agent's presence |
+| [process-identity-by-path-and-hash](incident-response/process-identity-by-path-and-hash.md) | Triaging or cleaning up a host compromise and a process name in `ps` matches a known system daemon (`sysmond`, `kworker`); deciding whether to kill, quarantine, or leave a suspicious-named process |
 
 ## data
 

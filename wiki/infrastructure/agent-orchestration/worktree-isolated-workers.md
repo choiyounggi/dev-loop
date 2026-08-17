@@ -6,8 +6,8 @@ applies_to: [git, general]
 confidence: verified
 sources:
   - https://git-scm.com/docs/git-worktree
-last_verified: 2026-08-06
-related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, platforms-shells-command-text-inspected-before-execution]
+last_verified: 2026-08-13
+related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-shared-run-state, platforms-shells-command-text-inspected-before-execution]
 ---
 
 # Writing the Brief for a Worker Confined to Its Own Worktree
@@ -60,6 +60,7 @@ wait loop keeps escalating with no error from the task itself.
 | A worker reads another **worker's** worktree (`<main_root>/<other-worktree>/FINDINGS.md`) — a later wave consuming an earlier wave's output | The rule strips only the worker's *own* worktree path before looking for a main-root mention, so a sibling worktree's path stays in the string and the read is one write verb away from firing. Give the consumer a copy in its own worktree, or keep the cross-worktree read on a command line of its own |
 | A read of a main-root path shares a command line with any write verb (`mkdir -p .claude/tmp && grep … <main_root>/x`) | It fires `ask`, even though the write targets a worktree-relative path — the two conditions are matched independently over the whole command string, not correlated with each other. Split the write and the read into separate commands |
 | A read of a main-root path is redirected to an absolute path (`grep … <main_root>/x > /tmp/out`) | It fires — the redirect-to-absolute branch matches regardless of what is being read. Redirect to a worktree-relative path |
+| The brief points the worker at a coordinator-state directory that is gitignored (`.orchestration/`, `.state/`) via a repo-relative path | The path resolves only in the main checkout: `git worktree add` checks out tracked files, so an ignored directory never materializes in a worktree. Substitute the absolute main-checkout path into the brief and state that the directory is gitignored and absent from the worktree — a capable worker otherwise hides the miss by searching for the file instead of failing |
 
 ## Instead of
 
@@ -68,6 +69,7 @@ wait loop keeps escalating with no error from the task itself.
 | Put the main checkout's absolute path in a worker's `<output_contract>` | Give a worktree-relative path and collect the artifact from the worktree | One absolute write path halts every worker at the same phase, and the coordinator sees only a wait-loop timeout |
 | Disable the escape guardrail so the workers proceed | Rewrite the paths in the brief | The guardrail is what makes parallel workers safe to run against one repo |
 | Designate a shared scratch directory inside the repo for worker output | Place it outside the repo and pass its path as one named variable | A shared in-repo directory is both a guardrail trip and a write race between workers |
+| Reuse the coordinator's repo-relative path to a gitignored state directory in a worker's prompt template | Expand it to the absolute path at substitution time and note the directory is absent from the worktree | Ignored files exist only where they were created; the relative form silently resolves to a nonexistent path in every worker, and reads of absolute main-root paths pass the guardrail |
 
 ## Sources
 
@@ -76,3 +78,4 @@ wait loop keeps escalating with no error from the task itself.
 - Field evidence 2026-08-06 (dev-loop orchestrate, Wave 2 worker consuming an upstream worktree's FINDINGS file): a read-only `awk`/`grep` verification and a `git status` check each raised `worktree_escape` as `ask` and stopped the coordinator's watch with exit 5; both were confirmed read-only and approved. This rule version fired on reads, unlike the 1.0.0 reproduction above where bare `cat`/`ls`/`grep` passed — the read/write asymmetry in the Do-this table is version-dependent, so probe before fanning out
 - Local reproduction 2026-08-06 (groundwork guardrails 1.2.0 `hooks/bash-guard.sh`, `worktree_escape`, macOS), run from a linked worktree against a sibling worktree's path: `grep -n foo <main_root>/<other>/FINDINGS.md`, `awk 'NR<5' <main_root>/<other>/FINDINGS.md`, `cat <main_root>/README.md` and `git -C <main_root>/<other> status --short` all passed; `mkdir -p .claude/tmp && grep -n foo <main_root>/<other>/FINDINGS.md`, `cp <main_root>/README.md ./x` and `grep -n foo <main_root>/<other>/FINDINGS.md > /tmp/out` each returned `ask`. Reading the rule confirms why: it fires when a main-root mention survives the strip **and** `(rm|mv|cp|tee|mkdir|touch|install|dd)` or a redirect to an absolute path matches anywhere in the command — the two tests are independent
 - Field context: a parallel run stalled at the same phase for two workers whose brief's `<output_contract>` named a main-checkout absolute path; the coordinator's wait loop returned its escalation status repeatedly. Rewriting the contract to worktree-relative paths let the remaining workers record their plans locally
+- Local reproduction 2026-08-13 (git 2.x, macOS): in a repo with `.gitignore` containing `.orchestration/` and a populated `.orchestration/status/`, `git worktree add ../wt1 -b wt1` produced a worktree where `ls ../wt1/.orchestration` → No such file or directory and `cat .orchestration/status/run.json` from the worktree cwd failed; `git ls-files .orchestration` → 0 tracked files. Field context: dev-loop's own `templates/session-prompt.md` handed workers `.orchestration/…` relative paths, and workers located the files by searching the main checkout rather than failing
