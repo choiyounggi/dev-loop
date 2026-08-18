@@ -5,10 +5,10 @@ three stack subtrees — route by concern first, stack second:
 
 | Subtree | Route there when |
 |---------|------------------|
-| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, enumerating call sites before a contract change, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, consuming LLM APIs (completion validation, context budgeting), consuming external-API responses, externally-owned defaults, object-storage references, sync-vs-async integration choice, WebSocket/SSE connection lifecycle |
+| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, enumerating call sites before a contract change, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, consuming LLM APIs (completion validation, context budgeting), MAPE-aligned point-prediction calibration, consuming external-API responses, externally-owned defaults, object-storage references, sync-vs-async integration choice, WebSocket/SSE connection lifecycle |
 | [java](java/index.md) | You are writing/reviewing JVM backend code (Java/Kotlin, Spring, JPA/Hibernate) and the concern is stack-specific: entity mapping, persistence context, proxy pitfalls, JVM threads/memory |
 | [node](node/index.md) | You are writing/reviewing Node.js/TypeScript backend code: event-loop blocking, promise error handling, runtime validation at boundaries, graceful shutdown |
-| [python](python/index.md) | You are writing/reviewing Python backend code: GIL/concurrency model, pydantic validation, WSGI/ASGI workers, language traps |
+| [python](python/index.md) | You are writing/reviewing Python backend code: GIL/concurrency model, pydantic validation, WSGI/ASGI workers, language traps, packaging data files and resolving them after install |
 
 Load a stack page IN ADDITION to the matching common page when both apply — common
 owns the principle, the stack page owns the mechanics. SQL, index, and DB-side
@@ -33,7 +33,12 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [widening-a-closed-value-table](common/change-impact/widening-a-closed-value-table.md) | Adding an entry to a closed table mapping names to magnitudes or codes (duration units, status codes, currency exponents, severity levels) that lives as a named constant; scoping that change from a search for the constant's name; a new entry parses at one layer and is rejected or mis-converted at another; deciding what to do about an inlined copy of the table in a hot path, a second language backend, or a fixture |
+| [corpus-sweep-before-a-rejection-rule](common/change-impact/corpus-sweep-before-a-rejection-rule.md) | Adding a rule to a compiler/linter/parser/schema validator/repo gate that will start rejecting input the tool accepted silently, and the existing corpus must keep passing; producing the evidence a plan needs before writing the rule (reject count + rejected-path list, enumeration method stated); such a rule landed and went red on inputs nobody had called defective; deciding between narrowing the rule, an opt-in strictness level, and an exemption (whether unimplemented declarative input should reject/warn/ignore at all → common/api-design/unenforced-declarations) |
+| [aggregation-layer-of-a-shared-helper](common/change-impact/aggregation-layer-of-a-shared-helper.md) | A plan, brief, or review comment says to unify or replace "the N call sites" of a helper and names them by line number rather than by what the code does; one site feeds a set-level SQL aggregate while another returns a per-row value that application code reduces later; a "shared helper" landed with one consumer adopting it and the other keeping its old semantics; deciding which layer owns a missing-value rule and whether the plan's grep-count acceptance criterion is reachable at all |
 | [call-site-enumeration](common/change-impact/call-site-enumeration.md) | Changing the contract of a function/method/constructor other code calls — adding, removing, reordering or redefining a parameter — and you need the complete call-site list; scoping such a migration from a search; a migration scoped from recon came back green and then failed on call sites the search never listed; deciding whether to append a parameter or make it keyword-only (release-level re-test scope → qa/process/regression-scope) |
+| [cross-module-consumer-census](common/change-impact/cross-module-consumer-census.md) | Your task added a public function, endpoint, export, or hook whose consumer belongs to a *different* task (parallel work split by file ownership, a backend change whose UI wiring is another ticket); deciding whether that task is done; a feature typed, tested, reviewed and merged changes nothing at runtime; separating same-module helpers and entry points from genuine orphans in a zero-consumer list |
+| [inserting-a-guard-before-an-existing-side-effect](common/change-impact/inserting-a-guard-before-an-existing-side-effect.md) | Implementing, adopting, or auditing a planned change that adds a precondition guard to an existing script/function where the plan names the insertion point in prose ("after X is built"); the target has an earlier unconditional default/auto-create side effect touching the state the guard checks; writing the test for such a guard's refusal path |
 
 ### reliability
 
@@ -60,6 +65,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [exception-handling](common/errors/exception-handling.md) | Writing a catch block or deciding where errors are handled/logged/translated in a service — catch placement, log-once, wrapping with cause preserved, typed results for expected outcomes; one fault producing duplicate alerts |
+| [diagnostics-from-a-shared-code-path](common/errors/diagnostics-from-a-shared-code-path.md) | Writing or reviewing a rejection/validation message emitted by one function several callers reach (a check shared by two syntaxes, request and response, two config blocks) — especially when the message names a construct in literal text or tells the author what to write instead; a user reports a rejection naming a construct they did not write |
 | [async-failure-handling](common/errors/async-failure-handling.md) | Handing work to in-process async (@Async, unawaited futures/promises) — deciding fire-and-forget vs consumed future vs durable job; side effects silently never happening with no error logs; unobserved futures; async work enqueued inside a transaction |
 
 ### auth
@@ -88,12 +94,20 @@ Match your situation to a "load when" line; load only matching pages.
 | [completion-response-validation](common/llm/completion-response-validation.md) | Consuming OpenAI-compatible `/chat/completions` output as a final artifact (summary, document, notification); LLM responses coming back empty or truncated while HTTP status is 200; a reasoning-family model may be routed onto the alias you call |
 | [context-window-budget](common/llm/context-window-budget.md) | Repointing an LLM client or agent CLI at a different model, a self-hosted server (vLLM/Ollama), or a gateway (LiteLLM); setting `max_tokens` for a client whose default was sized for a larger model; the first request after such a switch returns 400 with a context-window error; deciding where to set the cap (request body vs client env var vs gateway config) and how to point the base URL at a proxy; handling truncation that arrives as a normal 200 |
 
+### ml
+
+| Page | Load when |
+|------|-----------|
+| [mape-aligned-point-prediction](common/ml/mape-aligned-point-prediction.md) | A regression model evaluated by MAPE was trained as a median predictor (log target + L1 loss, or quantile q50) — deciding what point value to emit, or the model systematically overpredicts on MAPE despite fitting well; choosing between a global scale factor and per-row variance-based correction |
+
 ### integrations
 
 | Page | Load when |
 |------|-----------|
 | [externally-owned-defaults](common/integrations/externally-owned-defaults.md) | A code/config default names a resource the repo does not own (model alias, endpoint, bucket, queue, index) — reviewing or merging a PR that claims that default works, adding a startup check that the name still resolves, or diagnosing a default path that broke with no code change |
+| [consumer-required-fields](common/integrations/consumer-required-fields.md) | Writing an adapter that maps one module's records into the payload a second module (scoring engine, plugin, external client) consumes, with the target shape taken from a docstring, README example, or sample payload; such an adapter runs end to end with no error and the downstream numbers come out low; deciding which mapped fields need their own assertion |
 | [robots-txt-and-source-selection](common/integrations/robots-txt-and-source-selection.md) | Choosing which site to fetch a published dataset from and reading its robots.txt to decide whether your client may crawl it; the file contains a `Disallow: /` and you are deciding whose group it belongs to; setting the crawler's User-Agent and checking that token against the file; robots.txt returned a non-200 status; the origin restricts your token and you are looking for a portal that republishes the same records |
+| [estimate-derived-thresholds](common/integrations/estimate-derived-thresholds.md) | Submitting an action to an external system whose actual outcome can differ from the decision-time estimate (market order fill vs quote) while persisting absolute trigger values derived from that estimate (SL/TP prices, alert thresholds); derived triggers fire immediately or at the wrong level right after the action confirms; choosing where to recompute them from the actual outcome |
 
 ### storage
 

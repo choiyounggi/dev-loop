@@ -3,7 +3,8 @@
 Route here for: trust-boundary decisions — input validation, authn approach
 choice, per-resource authorization, secrets hygiene, dependency trust, PII
 handling, exposing executable tools to in-session LLM agents (prompt-injection
-blast radius). Mechanics owned elsewhere are linked: XSS rendering → frontend,
+blast radius), the author identity a commit publishes, live
+host-compromise triage (incident response). Mechanics owned elsewhere are linked: XSS rendering → frontend,
 CI secrets → infrastructure, JWT implementation → backend/frontend auth.
 
 Match your situation to a "load when" line; load only matching pages.
@@ -31,6 +32,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [session-vs-token](authn/session-vs-token.md) | Choosing how users stay authenticated (server session cookie vs JWT/stateless tokens) for a new app or API; reviewing an auth design; setting access-token lifetime against a revocation requirement (implementation → wiki/backend/common/auth/, wiki/frontend/auth/) |
+| [retiring-a-replaced-auth-gate](authn/retiring-a-replaced-auth-gate.md) | Replacing one authentication mechanism with another (basic-auth → member accounts, session key A → key B) and auth now fails or passes on only some routes or users; reviewing such a cutover before it ships; a route authenticates locally but refuses or admits everyone in production; auditing a session/cookie key that code reads but nothing writes; deciding the deny default and the test arms for a new gate |
 | [password-storage](authn/password-storage.md) | Implementing or reviewing password hashing (argon2id/bcrypt parameters, migrating off SHA-256/MD5); tuning hash cost vs login latency; login endpoint as a hashing-DoS target; bcrypt length limits |
 
 ## authz
@@ -51,9 +53,17 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [supply-chain](dependencies/supply-chain.md) | Adding a dependency (add-vs-write decision, name verification, install scripts); updating dependencies (auto-update PRs, major versions, transitive CVE overrides); hardening against malicious/compromised packages (lockfiles, reproducible installs) |
 
+## incident-response
+
+| Page | Load when |
+|------|-----------|
+| [verifying-assumed-security-agents](incident-response/verifying-assumed-security-agents.md) | About to reason from a documented claim (CLAUDE.md, runbook, wiki) that a host runs an EDR/security agent — judging whether a threat "would have been detected", triaging a suspected compromise, or applying rules premised on the agent's presence |
+| [process-identity-by-path-and-hash](incident-response/process-identity-by-path-and-hash.md) | Triaging or cleaning up a host compromise and a process name in `ps` matches a known system daemon (`sysmond`, `kworker`); deciding whether to kill, quarantine, or leave a suspicious-named process |
+
 ## data
 
 | Page | Load when |
 |------|-----------|
 | [pii-handling](data/pii-handling.md) | A feature stores/processes personal data (emails, names, phones, addresses, government ids); reviewing a log/analytics/export/URL path that can carry PII; designing retention/erasure or handling an erasure request; choosing staging/test data for tables holding PII |
+| [commit-identity-in-public-repos](data/commit-identity-in-public-repos.md) | About to commit to a repository whose history is public (or will be published) from a machine whose git identity was configured for something else — a work laptop, a shared build box, a container image; a repository's history uses a different author address than your current git config; deciding between a global, per-repository, and per-commit identity override; responding to an employer or personal address already pushed to a public repository; giving CI/bot commits their own identity |
 | [masking-verification](data/masking-verification.md) | About to claim masking/redaction of a sensitive field works (logger filter, type-driven masking, serializer); a masking check passed on one output channel; reviewing an automated "masking PASS" verdict |

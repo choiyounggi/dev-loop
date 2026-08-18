@@ -9,7 +9,7 @@ sources:
   - https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html
   - https://vladmihalcea.com/spring-transaction-best-practices/
 last_verified: 2026-07-10
-related: [backend-common-jobs-idempotent-handlers, backend-common-errors-exception-handling, databases-transactions-isolation-level-selection]
+related: [backend-java-jpa-raw-jdbc-inside-a-jpa-transaction, backend-common-jobs-idempotent-handlers, backend-common-errors-exception-handling, databases-transactions-isolation-level-selection]
 ---
 
 # Transaction Boundaries in Application Code

@@ -11,7 +11,7 @@ sources:
   - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import
   - https://nodejs.org/api/test.html
 last_verified: 2026-08-06
-related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-tests-that-cannot-fail]
+related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-tests-that-cannot-fail, testing-mocking-captured-call-arguments]
 ---
 
 # Deciding Whether to Mock, Fake, or Use the Real Dependency
@@ -34,7 +34,7 @@ where mocks are breaking on refactors.
 | Nondeterminism sources: clock, randomness, UUID generation | Inject them and substitute a fixed clock / seeded generator in tests |
 | Your own DB, when the test's subject is query behavior (SQL shape, mapping, constraints) | Real test database — a mocked DB asserts your assumption of the contract, not the contract ([testing-strategy-test-level-choice]) |
 | A dependency that is real-capable but too slow/stateful for every unit test (your DB behind a repository, a queue) | An in-memory **fake** implementing the same interface, kept honest by running the contract's own integration tests against the real one |
-| Command sent to an external boundary is itself the behavior (charge card, publish event) | Mock the owned boundary interface and assert the **outbound contract**: which command, with what arguments — not internal call sequences leading up to it |
+| Command sent to an external boundary is itself the behavior (charge card, publish event) | Mock the owned boundary interface and assert the **outbound contract**: which command, with what arguments — not internal call sequences leading up to it. Assert the recorded call whole, so no argument of it stays unchecked ([testing-mocking-captured-call-arguments]) |
 
 2. Stub **queries**, assert **commands**: for data the dependency returns, a
    stub with canned answers is enough — assert the subject's resulting

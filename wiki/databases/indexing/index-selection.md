@@ -8,7 +8,7 @@ sources:
   - https://www.postgresql.org/docs/current/indexes.html
   - https://use-the-index-luke.com/
 last_verified: 2026-07-10
-related: [databases-indexing-composite-index-column-order, databases-indexing-index-write-cost, databases-query-optimization-reading-execution-plans]
+related: [databases-indexing-composite-index-column-order, databases-indexing-index-write-cost, databases-query-optimization-reading-execution-plans, databases-indexing-trigram-index-short-patterns]
 ---
 
 # Deciding Whether a Column Needs an Index
@@ -48,7 +48,7 @@ designing a new table and choosing initial indexes.
 |------|------|
 | Table is small (fits in a few pages) | Planner will sequential-scan regardless; skip the index until the table grows |
 | Column has few distinct values but you always query one rare value | Partial index on that value beats a full index |
-| Text search / `LIKE '%term%'` | B-tree cannot serve infix matches; use a trigram or full-text index type instead of adding a useless B-tree |
+| Text search / `LIKE '%term%'` | B-tree cannot serve infix matches; use a trigram or full-text index type instead of adding a useless B-tree — and set the minimum keyword length that index type needs ([databases-indexing-trigram-index-short-patterns]) |
 | Write-heavy table, marginal read gain | Weigh maintenance cost first ([databases-indexing-index-write-cost]) |
 | Creating the index on a large live table | PostgreSQL: `CREATE INDEX CONCURRENTLY` — no long write-block, cannot run inside a transaction, and a failed build leaves an `INVALID` index (drop it, retry). MySQL 8.0: online DDL (`ALGORITHM=INPLACE, LOCK=NONE`) |
 

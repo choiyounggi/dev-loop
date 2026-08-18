@@ -11,7 +11,7 @@ sources:
   - https://housing.seoul.go.kr/robots.txt
   - https://apply.gh.or.kr/robots.txt
 last_verified: 2026-08-05
-related: [backend-common-integrations-externally-owned-defaults, backend-common-reliability-timeouts-and-retries]
+related: [backend-common-integrations-externally-owned-defaults, backend-common-reliability-timeouts-and-retries, qa-environments-headless-browser-bot-blocking]
 ---
 
 # Choosing a Source to Crawl by Reading robots.txt

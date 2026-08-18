@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://code.claude.com/docs/en/hooks
 last_verified: 2026-08-05
-related: [platforms-shells-command-text-inspected-before-execution, platforms-processes-non-interactive-cli-invocation, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts]
+related: [platforms-shells-command-text-inspected-before-execution, platforms-processes-non-interactive-cli-invocation, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-agent-permission-classifier-denials]
 ---
 
 # A Plugin Rewrites What a Tool Returns Before the Agent Sees It

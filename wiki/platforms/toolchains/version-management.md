@@ -10,7 +10,7 @@ sources:
   - https://mise.jdx.dev/configuration.html
   - https://docs.npmjs.com/cli/v11/configuring-npm/package-json
 last_verified: 2026-07-10
-related: [platforms-processes-background-services, platforms-shells-portable-shell-scripts, platforms-toolchains-compiler-sysroot-on-macos]
+related: [platforms-processes-background-services, platforms-shells-portable-shell-scripts, platforms-toolchains-compiler-sysroot-on-macos, platforms-toolchains-environment-resync-removes-undeclared-packages]
 ---
 
 # Pinning Tool Versions So Every Machine Runs the Same Toolchain

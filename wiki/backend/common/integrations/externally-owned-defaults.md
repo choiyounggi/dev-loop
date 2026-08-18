@@ -9,7 +9,7 @@ sources:
   - https://developers.openai.com/api/docs/api-reference/models/list
   - https://docs.litellm.ai/docs/proxy/model_discovery
 last_verified: 2026-07-31
-related: [backend-common-llm-completion-response-validation, infrastructure-config-environment-config, qa-process-release-gates]
+related: [backend-common-llm-completion-response-validation, infrastructure-config-environment-config, qa-process-release-gates, backend-common-integrations-consumer-required-fields]
 ---
 
 # Defaults That Name a Resource Owned Outside the Repository
