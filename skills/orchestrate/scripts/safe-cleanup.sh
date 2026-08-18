@@ -21,9 +21,18 @@
 #       then `git worktree prune`, then report (never delete) any .worktrees/
 #       directory git does not know about. The coordinator no longer has to
 #       remember each session name.
-#   safe-cleanup.sh list-orphans <repo-root>                 [read-only]
+#   safe-cleanup.sh teardown [--dry-run] <repo-root>         [requires LO_RUN_ID]
+#       Atomic, idempotent, run-scoped end-of-run cleanup: derive this run's
+#       worktrees from its own .orchestration/status/*.json records, remove
+#       them, sweep its sessions, then archive .orchestration/* (except prior
+#       archive-* dirs) into archive-<YYYYMMDD>-<runid>/. Requires jq. A
+#       re-run with nothing left to do is a no-op (exit 0).
+#   safe-cleanup.sh list-orphans [--stale] <repo-root>        [read-only]
 #       Enumerate orphan candidates across ALL run ids and exit. Kills nothing,
-#       deletes nothing, prunes nothing. Needs no LO_RUN_ID.
+#       deletes nothing, prunes nothing. Needs no LO_RUN_ID. With --stale,
+#       annotates each session record with stale=yes|no|unknown, derived from
+#       that run's own status records (requires jq; without it, warns and
+#       reports unknown for all). Without --stale, output is unchanged.
 #
 # --dry-run may appear in any argument position on any destructive verb. It
 # prints exactly what the real run would touch and changes nothing; refusals
@@ -39,7 +48,7 @@
 #   re-run with LO_RUN_ID=<that-id> sweep — deliberate, never automatic.
 #
 # list-orphans record format (tab-separated, one record per line):
-#   session<TAB><name><TAB>run=<runid|none><TAB>created=<epoch>
+#   session<TAB><name><TAB>run=<runid|none><TAB>created=<epoch>[<TAB>stale=<yes|no|unknown>]
 #   worktree-stale<TAB><path><TAB>reason=gitdir-missing
 #   worktree-unregistered<TAB><path>
 set -eu
@@ -182,11 +191,14 @@ report_unregistered() {
 # into tmux -t targets and into a glob, so it is checked against a strict
 # allowlist and REFUSED when absent: with no scope the pattern would match every
 # concurrent run's sessions, so this fails closed rather than widening.
+# $1: the calling verb's name, for the REFUSE message (default sweep, so
+# sweep's own REFUSE output is unchanged for callers that pass nothing).
 run_scope() {
+  verb="${1:-sweep}"
   rid="${LO_RUN_ID:-}"
   case "$rid" in
     ''|*[!A-Za-z0-9_-]*)
-      echo "sweep: REFUSE — LO_RUN_ID unset or malformed (need [A-Za-z0-9_-]+); refusing to sweep an unscoped pattern." >&2
+      echo "$verb: REFUSE — LO_RUN_ID unset or malformed (need [A-Za-z0-9_-]+); refusing to $verb an unscoped pattern." >&2
       return 1 ;;
   esac
   return 0
@@ -228,12 +240,140 @@ sweep() {
   return 0
 }
 
+# Atomic, idempotent, run-scoped end-of-run teardown: derive (from THIS run's
+# own status records) -> remove_worktrees -> sweep -> archive. Archive runs
+# last because derivation and sweep both still need the status files in place.
+teardown() {
+  root="${1:?teardown: repo-root required}"
+  run_scope teardown || return 1
+  JQ=$(command -v jq) || { echo "teardown: jq not found" >&2; return 127; }
+
+  # Derive this run's worktree branches from its own status/*.json records
+  # only — NEVER a bare .worktrees/* glob, which would cross into concurrent
+  # runs' worktrees.
+  branches=""
+  sdir="$root/.orchestration/status"
+  if [ -d "$sdir" ]; then
+    for f in "$sdir"/*.json; do
+      [ -f "$f" ] || continue
+      sess=$("$JQ" -r '.session // empty' "$f" 2>/dev/null) || continue
+      case "$sess" in
+        lo-*-"$rid") : ;;
+        *) continue ;;
+      esac
+      # same single-field boundary rule as sweep's own match, so a foreign run
+      # whose id merely ends with ours can never alias into this run's derive.
+      mid=${sess#lo-}; mid=${mid%-"$rid"}
+      case "$mid" in ''|*-*) continue ;; esac
+      wt=$("$JQ" -r '.worktree // empty' "$f" 2>/dev/null) || continue
+      [ -n "$wt" ] || continue
+      [ -d "$wt" ] || continue
+      br=$("$GIT" -C "$wt" branch --show-current 2>/dev/null) || continue
+      [ -n "$br" ] || continue
+      branches="$branches
+$br"
+    done
+  fi
+  # no status files or no worktrees -> proceed silently (idempotent)
+  if [ -n "$branches" ]; then
+    # deliberately unquoted: word-split the newline-joined list into separate
+    # operands (POSIX sh has no arrays); safe because git ref names cannot
+    # contain whitespace, so no branch here can be split mid-name.
+    remove_worktrees "$root" $branches
+  fi
+  sweep "$root"
+
+  # Archive everything under .orchestration/ except prior archive-* dirs into
+  # one dated, run-scoped destination. mkdir -p makes a re-run reuse the same
+  # destination instead of failing.
+  adir="$root/.orchestration"
+  dest="$adir/archive-$(date +%Y%m%d)-$rid"
+  moved=0
+  if [ -d "$adir" ]; then
+    for e in "$adir"/*; do
+      [ -e "$e" ] || continue
+      base=$(basename "$e")
+      case "$base" in archive-*) continue ;; esac
+      if [ "$DRY" -eq 1 ]; then
+        echo "would archive: $e"
+      else
+        mkdir -p "$dest"
+        mv "$e" "$dest/"
+        echo "archived: $e"
+      fi
+      moved=$((moved + 1))
+    done
+  fi
+  [ "$moved" -eq 0 ] && echo "teardown: nothing to archive"
+  return 0
+}
+
+# Classify one run id's staleness from ITS OWN status records, for
+# `list-orphans --stale`: yes = every matching record's phase is terminal
+# (done|failed); no = at least one is not; unknown = no matching records at
+# all (archived away, or a hand-made session with no run id) — unknown is
+# positive absence-of-evidence, not a sweep recommendation. Caches verdicts in
+# $STALE_CACHE across calls within one list_orphans run (POSIX sh has no maps).
+_stale_for_rid() {
+  qrid="$1"; qroot="$2"
+  [ "$qrid" = "none" ] && { echo unknown; return 0; }
+  [ -n "$SJQ" ] || { echo unknown; return 0; }
+  case "$STALE_CACHE" in
+    *" $qrid=yes "*)     echo yes;     return 0 ;;
+    *" $qrid=no "*)      echo no;      return 0 ;;
+    *" $qrid=unknown "*) echo unknown; return 0 ;;
+  esac
+  found=0; nonterm=0
+  qsdir="$qroot/.orchestration/status"
+  if [ -d "$qsdir" ]; then
+    for sf in "$qsdir"/*.json; do
+      [ -f "$sf" ] || continue
+      s=$("$SJQ" -r '.session // empty' "$sf" 2>/dev/null) || continue
+      case "$s" in
+        *-"$qrid") : ;;
+        *) continue ;;
+      esac
+      found=1
+      p=$("$SJQ" -r '.phase // empty' "$sf" 2>/dev/null) || continue
+      case "$p" in
+        done|failed) : ;;
+        *) nonterm=1 ;;
+      esac
+    done
+  fi
+  if [ "$found" -eq 0 ]; then verdict=unknown
+  elif [ "$nonterm" -eq 1 ]; then verdict=no
+  else verdict=yes
+  fi
+  STALE_CACHE="$STALE_CACHE $qrid=$verdict "
+  echo "$verdict"
+}
+
 # Read-only enumeration of orphan candidates. Deliberately NOT scoped to
 # LO_RUN_ID: a run that died mid-flight took its id with it, so scoping the
 # listing would hide exactly the leaks worth finding. Removal stays scoped
 # (`sweep`), so discovery is cheap and destruction stays deliberate.
 list_orphans() {
+  # Parse --stale in any position; self-contained since this function is the
+  # terminal consumer of its own "$@" (no caller relies on it afterward).
+  STALE=0
+  n=$#
+  while [ "$n" -gt 0 ]; do
+    a="$1"; shift
+    case "$a" in
+      --stale) STALE=1 ;;
+      *) set -- "$@" "$a" ;;
+    esac
+    n=$((n - 1))
+  done
   root="${1:?list-orphans: repo-root required}"
+
+  SJQ=""
+  if [ "$STALE" -eq 1 ]; then
+    SJQ=$(command -v jq 2>/dev/null) || echo "list-orphans: jq not found — --stale reporting unknown for all" >&2
+  fi
+  STALE_CACHE=""
+
   TMUXBIN=$(command -v tmux 2>/dev/null) || TMUXBIN=""
   if [ -n "$TMUXBIN" ]; then
     roster=$("$TMUXBIN" list-sessions -F '#{session_name} #{session_created}' 2>/dev/null || true)
@@ -248,7 +388,12 @@ list_orphans() {
         lo-*-*) rid=${name##*-} ;;
         *) rid=none ;;
       esac
-      printf 'session\t%s\trun=%s\tcreated=%s\n' "$name" "$rid" "$created"
+      if [ "$STALE" -eq 1 ]; then
+        stale=$(_stale_for_rid "$rid" "$root")
+        printf 'session\t%s\trun=%s\tcreated=%s\tstale=%s\n' "$name" "$rid" "$created" "$stale"
+      else
+        printf 'session\t%s\trun=%s\tcreated=%s\n' "$name" "$rid" "$created"
+      fi
     done
   else
     # enumeration is informational — a missing tmux must not fail the command
@@ -295,6 +440,7 @@ case "$cmd" in
   remove-worktrees) remove_worktrees "$@" ;;
   kill-sessions)   kill_sessions "$@" ;;
   sweep)           sweep "$@" ;;
+  teardown)        teardown "$@" ;;
   list-orphans)    list_orphans "$@" ;;
-  *) echo "usage: safe-cleanup.sh {init-check <workdir>|merge [--dry-run] <root> <integ> <branch>...|remove-worktrees [--dry-run] <root> <branch>...|kill-sessions [--dry-run] <session>...|sweep [--dry-run] <root>|list-orphans <root>}" >&2; exit 1 ;;
+  *) echo "usage: safe-cleanup.sh {init-check <workdir>|merge [--dry-run] <root> <integ> <branch>...|remove-worktrees [--dry-run] <root> <branch>...|kill-sessions [--dry-run] <session>...|sweep [--dry-run] <root>|teardown [--dry-run] <root>|list-orphans [--stale] <root>}" >&2; exit 1 ;;
 esac
