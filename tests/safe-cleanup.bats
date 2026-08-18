@@ -488,23 +488,27 @@ _mkteardownrun() {
   printf '%s' "$_r"
 }
 
-# Rebuild $PATH with jq made unresolvable, while every other tool in jq's own
-# directory (git, on this machine) stays available: mirror that directory's
-# contents minus jq into a stub under STUB_ROOT and swap it in at the same
-# PATH position. Blanket-removing jq's directory would also hide git, since
-# both live in /opt/homebrew/bin here — the exact defect this guards against.
+# Rebuild $PATH with EVERY jq visible on it made unresolvable, while every
+# other tool alongside each jq stays available: for each PATH entry that
+# contains an executable jq, mirror that directory's contents minus jq into
+# its own stub under STUB_ROOT and swap it in at that entry's own position.
+# review r2/F1: a helper that only handles the FIRST jq hit is a no-op on any
+# PATH carrying more than one (CI images ship a preinstalled jq AND the
+# workflow's own install) — it must walk the whole PATH, not just resolve
+# `command -v jq` once.
 _path_without_jq() {
-  jqdir=$(dirname "$(command -v jq)")
-  stub="$STUB_ROOT/nojq"; mkdir -p "$stub"
-  for f in "$jqdir"/*; do
-    b=$(basename "$f")
-    [ "$b" = "jq" ] && continue
-    ln -sf "$f" "$stub/$b"
-  done
   newpath=""
+  idx=0
   oldifs=$IFS; IFS=':'
   for d in $PATH; do
-    if [ "$d" = "$jqdir" ]; then
+    if [ -x "$d/jq" ]; then
+      idx=$((idx + 1))
+      stub="$STUB_ROOT/nojq-$idx"; mkdir -p "$stub"
+      for f in "$d"/*; do
+        b=$(basename "$f")
+        [ "$b" = "jq" ] && continue
+        ln -sf "$f" "$stub/$b"
+      done
       newpath="${newpath:+$newpath:}$stub"
     else
       newpath="${newpath:+$newpath:}$d"
@@ -512,6 +516,22 @@ _path_without_jq() {
   done
   IFS=$oldifs
   printf '%s' "$newpath"
+}
+
+# review r2/F1: a guard so the simulation can never silently regress into a
+# no-op again — fails the test loudly (not just the downstream jq-dependent
+# assertions, which could pass or fail for unrelated reasons) if the rebuilt
+# PATH still resolves a jq. Called as its own top-level statement (never
+# embedded in a `VAR=$(...) other_cmd` prefix): the shell does not propagate
+# a command substitution's own exit status into that other command's status,
+# so a failure there would be silently swallowed instead of failing the test.
+_assert_no_jq() {
+  if PATH="$1" command -v jq >/dev/null 2>&1; then
+    printf 'expected PATH [%s] to have no resolvable jq, but found: %s\n' \
+      "$1" "$(PATH="$1" command -v jq)" >&2
+    return 1
+  fi
+  return 0
 }
 
 @test "teardown: error — REFUSEs when LO_RUN_ID is unset and touches nothing" {
@@ -532,7 +552,9 @@ _path_without_jq() {
   root="$(_mkteardownrun td2)"
   export FAKE_ROSTER='lo-1-runA'
   export LO_RUN_ID=runA
-  PATH="$(_path_without_jq)" run sh "$SC" teardown "$root"
+  nojq_path="$(_path_without_jq)"
+  _assert_no_jq "$nojq_path"
+  PATH="$nojq_path" run sh "$SC" teardown "$root"
   [ "$status" -eq 127 ]
   _has "$output" "jq not found"
   [ -d "$root/.worktrees/feat-own" ]
@@ -691,7 +713,9 @@ lo-1-runB'
   printf '{"task":"a","phase":"done","session":"lo-1-runA"}' > "$root/.orchestration/status/a.json"
   export FAKE_ROSTER='lo-1-runA 1700000001'
   unset LO_RUN_ID
-  PATH="$(_path_without_jq)" run sh "$SC" list-orphans --stale "$root"
+  nojq_path="$(_path_without_jq)"
+  _assert_no_jq "$nojq_path"
+  PATH="$nojq_path" run sh "$SC" list-orphans --stale "$root"
   [ "$status" -eq 0 ]
   _has "$output" "jq not found"
   _has "$output" "stale=unknown"
