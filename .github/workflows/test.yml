@@ -31,7 +31,7 @@ jobs:
       - name: Install bats + jq + tmux
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
-            brew install bats-core jq tmux
+            brew install bash bats-core jq tmux
           else
             sudo apt-get update
             sudo apt-get install -y bats jq tmux
@@ -48,3 +48,10 @@ jobs:
 
       - name: Run bats suite
         run: bats tests/
+
+      - name: Negative control — mid-test assertion canary (must fail)
+        run: |
+          if bats tests/canary/mid-test-assertion-canary.bats; then
+            echo "::error::canary passed — mid-test [[ ]] failures are being masked (issue #114)"
+            exit 1
+          fi
