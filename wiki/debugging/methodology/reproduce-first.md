@@ -8,8 +8,8 @@ sources:
   - https://sscce.org/
   - https://www.debuggingbook.org/html/DeltaDebugger.html
   - https://sre.google/sre-book/effective-troubleshooting/
-last_verified: 2026-07-10
-related: [debugging-methodology-hypothesis-testing, debugging-concurrency-intermittent-failures]
+last_verified: 2026-08-13
+related: [debugging-methodology-hypothesis-testing, debugging-concurrency-intermittent-failures, debugging-signals-logs-and-correlation]
 ---
 
 # Building a Reproduction Before Investigating a Bug
@@ -54,6 +54,7 @@ When a full local reproduction is impossible, capture evidence instead:
 | Reproduction needs data you are not allowed to copy | Reproduce the shape, not the content: synthesize data matching the schema, volume, and the specific values named in the failure (nulls, empty lists, boundary sizes) |
 | The report names the exact line to fix | Reproduce anyway before editing; a reproduction that survives the claimed fix disproves the report's diagnosis cheaply |
 | Bug reproduces only on the reporter's machine | Diff the two environments one variable at a time — versions, locale, config — moving your environment toward theirs until it fails ([debugging-methodology-isolate-by-bisection]) |
+| Prod-only failure with no visible error — the client swallows it (a `.catch()` that ignores, an empty error handler) and the action just "does nothing" | Grep the production service logs for the endpoint path before reading more code: from the UI a 500 and a no-op are indistinguishable, and one server-side exception line kills whole families of hypotheses that local code reading cannot ([debugging-signals-logs-and-correlation]) |
 
 ## Instead of
 
@@ -68,3 +69,4 @@ When a full local reproduction is impossible, capture evidence instead:
 - https://sscce.org/ — minimal, self-contained example discipline
 - https://www.debuggingbook.org/html/DeltaDebugger.html — systematically reducing failure-inducing inputs
 - https://sre.google/sre-book/effective-troubleshooting/ — "simplify and reduce"; reproduction as the basis of diagnosis
+- Field context 2026-08 (silent-swallow row, field-tested): a prod-only bookmark bug where backend code, proxy, and browser click were all verified normal from the outside; one `journalctl | grep bookmark` surfaced PostgreSQL's "no unique or exclusion constraint matching the ON CONFLICT specification", pinning the cause to a deployed DB left on an old schema — a cause invisible in the repo's code

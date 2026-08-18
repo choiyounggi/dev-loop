@@ -9,7 +9,7 @@ sources:
   - https://docs.vale.sh/topics/scopes.md
   - https://docs.vale.sh/checks/existence
   - https://github.com/DavidAnson/markdownlint/blob/main/doc/md013.md
-last_verified: 2026-07-30
+last_verified: 2026-08-14
 related: [qa-process-acceptance-criteria, qa-process-regression-scope, testing-quality-tests-that-cannot-fail]
 ---
 
@@ -32,7 +32,7 @@ now fails on wording whose meaning did not change.
 |-------------|---------|-----------------------|
 | Phrase or vocabulary | a pattern requiring/forbidding certain verbs near a term | Reworded sentence stops matching, or starts matching a forbidden pattern |
 | Line or row count | "file has 444 lines", "table has 5 rows" | Any insertion shifts the count |
-| Substring | a section title or term quoted verbatim | Retitling or translating the term silently drops it |
+| Substring | a section title, term, or phrase quoted verbatim | Retitling or translating the term silently drops it; reflowing a paragraph wraps the phrase across two physical lines, and a single-line pattern (`[[ … == *"phrase"* ]]`, `grep` without normalization) no longer matches |
 | Quoted original | a check that requires an upstream sentence to appear verbatim | Paraphrasing removes it while preserving meaning |
 
 2. **State facts about an upstream document as observations, not definitions.** A
@@ -74,7 +74,8 @@ now fails on wording whose meaning did not change.
 | Gate anchors on a line count you must change | Update the gate and the document in the same commit, and say so in the PR ([qa-process-acceptance-criteria]) |
 | The failure surfaces in another task's or another agent's check log | Attribute before repairing: identify which file the failing pattern targets, since a cross-file gate makes your edit look like their regression |
 | The gate is genuinely wrong (it forbids a correct sentence with no replacement available) | Change the gate, with a control proving it still catches the defect it owns — do not reword a correct document into a worse one |
-| You are authoring the gate rather than the document | This page covers the author's side; gate construction and its controls are a separate concern → [testing-quality-tests-that-cannot-fail] |
+| The gate is green on your machine and red only in CI after a prose edit (macOS-authored bats suites) | Treat the anchor inventory of step 1 as the authoritative local signal, not the test run: under bash ≤4.0 (macOS system bash 3.2) a failing mid-test `[[ ]]` does not fail the test, so the broken anchor passes silently on your platform ([testing-quality-tests-that-cannot-fail]) |
+| You are authoring the gate rather than the document | This page covers the author's side; gate construction and its controls are a separate concern → [testing-quality-tests-that-cannot-fail]. For a phrase anchor specifically, compare whitespace-normalized text (collapse runs of whitespace, then `grep -qF`) so legitimate reflow of the document cannot break the gate |
 
 ## Instead of
 
@@ -84,6 +85,7 @@ now fails on wording whose meaning did not change.
 | Write "X defines/mandates two variants" when describing an upstream contract | Write the observable shape: "the table has two rows and no Y row" | A vocabulary gate cannot separate describing from redefining, so the defining verb fails a sentence whose content is correct |
 | Run an audit pattern over the whole document that quotes it | Bound it to the normative region by heading range or line range | The quotation is a match, so the whole-file run measures the document's prose about itself |
 | Record "grep found 0 hits" as the audit result | Record the scoped condition that must hold ("no hits outside §Audit") | The bare count is true only for the file revision that produced it and silently becomes false on the next edit |
+| Reflow or rewrap a paragraph a gate quotes as a phrase | Keep each asserted phrase on one physical line, or switch that gate to whitespace-normalized comparison in the same commit | A single-line substring anchor breaks at any wrap point inside the phrase, and on macOS bats the breakage is locally invisible (bash ≤4.0 `[[ ]]` gap) |
 
 ## Sources
 
@@ -91,6 +93,8 @@ now fails on wording whose meaning did not change.
 - https://docs.vale.sh/topics/scopes.md — scopes restrict where a rule applies via markup-aware selectors; "Any scope prefaced with `~` is negated" and scopes can be chained, so checks can be kept off regions like code examples
 - https://github.com/DavidAnson/markdownlint/blob/main/doc/md013.md — rules expose `code_blocks`, `tables`, `headings` booleans (default `true`) so quoted code can be excluded from a prose rule
 - https://man7.org/linux/man-pages/man1/pgrep.1.html — "The running pgrep, pkill, or pidwait process will never report itself as a match" — self-exclusion is designed in because self-matching is the expected failure
+- Measured 2026-08-14 (macOS bash 3.2.57): `[[ "$s" == *"return to step 1"* ]]` does not match when `$s` carries the phrase split across a newline — the wrap genuinely breaks the anchor on every platform; and `set -e; [[ 1 -eq 2 ]]; echo REACHED` prints, so the broken mid-test anchor is invisible under macOS bats while bash ≥4.2 CI fails it
+- Field reproduction ×2 (dev-loop): PR #94 §O3 and PR #102 — reflowing SKILL.md prose split `return to step 1 of the dispatch` across two lines; `tests/orchestrate-review-pass.bats` asserted it as a single-line substring, CI red on ubuntu only, fixed by reflowing the phrase onto one physical line (commit 9cbc065)
 
 ## Field context
 

@@ -14,6 +14,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [composite-index-column-order](indexing/composite-index-column-order.md) | Creating a multi-column index; choosing column order for equality + range/sort queries |
 | [covering-indexes](indexing/covering-indexes.md) | A query already served by an index still reads the table (heap) heavily; deciding whether to add INCLUDE/covering columns |
 | [partial-and-expression-indexes](indexing/partial-and-expression-indexes.md) | Queries always filter a fixed rare condition (status, deleted_at) or a function of a column (lower(email)); a uniqueness rule applies only to a subset of rows (e.g. live rows) |
+| [trigram-index-short-patterns](indexing/trigram-index-short-patterns.md) | A `LIKE`/`ILIKE '%keyword%'` search on a PostgreSQL `pg_trgm` GIN/GiST index is fast for ordinary words and slow for one- or two-character keywords; `EXPLAIN` shows a `Bitmap Index Scan` on the trigram index and the query is still slow; choosing a minimum search-keyword length, or deciding between pg_trgm, pg_bigm, and a driver index for another condition |
 | [index-write-cost](indexing/index-write-cost.md) | Adding indexes to write-heavy tables; bulk loads; auditing for unused/redundant indexes |
 
 ## query-optimization
@@ -21,6 +22,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [reading-execution-plans](query-optimization/reading-execution-plans.md) | A single query/statement is slow; verifying an index/query change with EXPLAIN before shipping (endpoint slow because it runs *many* fast queries → n-plus-one-queries) |
+| [comparing-two-execution-plans](query-optimization/comparing-two-execution-plans.md) | Attributing a slowdown to one variable by comparing `EXPLAIN (ANALYZE)` across two variants of a statement; one arm came back far faster or its plan shows `never executed` / `loops=0`; quoting the duration of an arm a client deadline cut short |
 | [keyset-pagination](query-optimization/keyset-pagination.md) | Implementing pagination, infinite scroll, or batch table walks |
 | [streaming-large-result-sets](query-optimization/streaming-large-result-sets.md) | Exporting/reading a very large single-query result into the app; process memory peaks on `fetchall` or building a big file; server-side cursor blocked by autocommit or a read-only proxy |
 | [large-in-lists](query-optimization/large-in-lists.md) | Building `IN (...)` queries whose list size can grow (batch lookups, fetch-by-ids) |
@@ -52,6 +54,8 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [catalog-statistics-as-current-state](data-survey/catalog-statistics-as-current-state.md) | Finding a large PostgreSQL table's newest rows when the column has no index, so you reach for `pg_class.relpages`/`reltuples`, `pg_stats` most-common values, or a `ctid` range scan of the last blocks; about to conclude "no recent data" from a cheap catalog probe; choosing the scan's starting block or how to bound a `ctid` range |
+| [audit-columns-as-update-evidence](data-survey/audit-columns-as-update-evidence.md) | About to read `update_dt`/`updated_at`/`modified_by` (NULL, or equal to the insert timestamp) as evidence that rows were never modified or a feature is unused; an incident needs to know whether writes to those rows were *attempted*; deciding whether ORM callback auditing or a DB trigger is the right writer for the claim you need to make |
 | [surveying-live-data-for-a-rule](data-survey/surveying-live-data-for-a-rule.md) | A task says to sample real data to decide a mapping table, normalization/canonicalization rule, enum value set, or parsing rule; a `GROUP BY`/`DISTINCT` survey came back with zero rows; deciding what evidence replaces the data when the table is empty; recording in the deliverable which evidence a rule was actually derived from |
 
 ## sqlite

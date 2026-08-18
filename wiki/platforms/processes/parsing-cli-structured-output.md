@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://man7.org/linux/man-pages/man1/jq.1.html
 last_verified: 2026-08-04
-related: [platforms-processes-non-interactive-cli-invocation, backend-common-integrations-externally-owned-defaults]
+related: [platforms-processes-non-interactive-cli-invocation, backend-common-integrations-externally-owned-defaults, platforms-processes-cloud-cli-invocation-bounds]
 ---
 
 # Parsing Another Tool's `--json` Output From Automation

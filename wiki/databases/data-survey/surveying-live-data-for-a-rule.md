@@ -8,7 +8,7 @@ sources:
   - https://www.postgresql.org/docs/current/functions-aggregate.html
   - https://greatexpectations.io/blog/exploring-data-quality-volume/
 last_verified: 2026-08-05
-related: [databases-query-optimization-existence-and-count-checks, databases-schema-design-requirements-to-tables, databases-schema-design-nullability-and-defaults]
+related: [databases-data-survey-catalog-statistics-as-current-state, databases-query-optimization-existence-and-count-checks, databases-schema-design-requirements-to-tables, databases-schema-design-nullability-and-defaults]
 ---
 
 # Surveying Live Data to Derive a Mapping or Normalization Rule

@@ -12,6 +12,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [reproduce-first](methodology/reproduce-first.md) | A bug is reported or behavior is wrong and you are about to investigate or fix; deciding what to capture when full reproduction is impossible (prod-only, timing-dependent, one-off crash) |
 | [isolate-by-bisection](methodology/isolate-by-bisection.md) | A bug reproduces but its location is unknown; it worked before / works in env A but not env B / fails with one input but not another — binary-searching versions (git bisect), code paths, data, or environment diffs |
 | [hypothesis-testing](methodology/hypothesis-testing.md) | You have a suspect cause and are about to "try a fix"; several suspects compete and you must pick what to test next; verifying that a fix that "worked" actually addressed the mechanism |
+| [probe-path-vs-operation-path](methodology/probe-path-vs-operation-path.md) | A precondition probe (login status, health, connectivity) reports success while the operation it gates fails with an auth/permission error; a browser page-load login check gates direct API calls made with stored cookies; deciding what a preflight probe must exercise under refresh-token cookie auth |
 | [verify-the-fix](methodology/verify-the-fix.md) | You believe a bug is fixed and are about to close or ship it; the bug "cannot be reproduced anymore" after changes; a previously fixed bug came back; deciding what must pass (repro re-run, both directions, regression test) and what to clean up before closing |
 
 ## signals

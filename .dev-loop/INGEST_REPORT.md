@@ -1,53 +1,51 @@
-# Knowledge consolidation — 15 open PRs (#17–#40) → one reconciled state
+# Knowledge consolidation — 30 open PRs (#47–#110) → one reconciled state
 
-The 15 open `knowledge/*` PRs (created 2026-08-04 → 2026-08-05, before the
-harvest processed-store dedupe fix in #41) contained 123 file-versions of ~75
-unique pages, with the same insight landing at up to 3 different paths across
-up to 8 PRs. Per-PR review would re-import those duplicates, so — as with the
-#6–#13 consolidation — this branch carries the reconciled end-state and the 15
-PRs are closed in its favor.
+The 30 open `knowledge/*` PRs (created 2026-08-06 → 2026-08-17, all after the
+harvest processed-store dedupe fix in #41) each carried flush-time dedup against
+the then-open PR set, but every branch also rewrote `log.md` and this report and
+several branches amended the same pages, so per-PR merge meant a conflict
+cascade at every step. As with the #17–#40 consolidation, this branch carries
+the reconciled end-state and the 30 PRs are closed in its favor.
 
-## Verified best-practice
+## Method
 
-Every adopted page's sources were carried from its originating PR's flush, where
-they were live-verified at flush time; no new URLs were introduced during
-consolidation (checked mechanically: every `http(s)` URL in every merged page
-appears in a source PR's diff; every added body line in amended pages traces to
-a source PR hunk — orphan-line verification). Confidence fields were kept as the
-originating flushes set them, except client-side-rate-limiting where the union
-of provider-doc citations (Okta, Auth0, GitHub, OpenAI, RFC 6585) supports
-`verified` for the load-bearing claims. One subagent's fabricated content (12
-files matching neither main nor any PR, with invented source URLs) was detected
-by the same verification and replaced with true PR content.
+Branches were merged chronologically (PR order #47 → #110) onto post-#111 main.
+Non-bookkeeping conflicts were union-resolved per file: `related:` lists as id
+unions, `last_verified` as the max date, index "load when" rows as the newer
+routing framing plus the branch's genuinely new trigger clauses, edge-case
+tables as row unions with duplicate-substance rows dropped (one row in
+worktree-isolated-workers whose budgeting advice restated an already-merged
+row). `log.md` was rebuilt by splicing every branch's own entries into date
+order (44 entries added); each branch's added wiki pages were verified present
+in the final tree (0 missing).
 
 ## Existing-layer check
 
-- Merged-main near-dup scan before consolidation: pairwise Jaccard over
-  title + "When this applies" across all 141 merged pages → **0 flagged pairs**;
-  previously merged content carries no duplication.
-- Cross-PR dedup during consolidation: 10 duplicate clusters collapsed to one
-  canonical page each (rate limiting 8→1, call-site enumeration 7→folded into
-  the canonical merged in #20, stderr/exit-0 diagnostics 4→1, sysroot 2→1,
-  env-off-switch 2→1, completion predicates 2→1, robots.txt 2→1,
-  harness-mediated results 2→1, leaked artifacts 2→1, orchestration category
-  naming unified). Three near-pairs kept distinct after trigger comparison,
-  with mutual `related:` links (differential setup vs interpretation; expansion
-  semantics vs off-switch design; import-time tactics vs level choice).
-- 24 existing pages received union-merged amendments; additions already present
-  in main (from #16/#20) were skipped, and all non-canonical `related:` ids
-  were remapped to canonical page ids (post-merge broken-link scan: 0).
+Pages read: testing-quality-tests-that-cannot-fail, testing-quality-behavior-not-implementation, testing-quality-guard-shape-vs-consequence, testing-quality-harness-reverse-controls, testing-quality-policy-at-several-return-sites, testing-data-test-data-and-isolation, backend-common-change-impact-call-site-enumeration, backend-common-change-impact-inserting-a-guard-before-an-existing-side-effect, backend-common-change-impact-cross-module-consumer-census, backend-java-jpa-raw-jdbc-inside-a-jpa-transaction, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-session-completion-gates, qa-document-verification-spec-document-gates, qa-document-verification-editing-a-gated-document, qa-exploratory-guard-true-path-coverage, qa-environments-headless-browser-bot-blocking, qa-process-defect-class-resweep-after-review, qa-process-scope-purity-checks (conflict-resolution and qualifier-polish reads on the final tree)
+
+- Flush-time dedup notes were honored as recorded in each PR title (e.g. #74's
+  two insights folded into #73/#52's pages arrive via those branches; #86's
+  duplicate dropped); no dropped insight was re-imported.
+- Where a branch's index row diverged from a later routing revision already on
+  main (the 2026-08-12 disjoint-scope revision for spec-document-gates vs
+  testing/quality), the merged row keeps the revision's scope and carries only
+  the branch's new trigger clauses.
+- Post-merge scans: 0 conflict markers, broken-link scan and index-coverage
+  lint run on the final tree (see log entry).
+
+## Open-PR check
+
+This consolidation *is* the reconciliation of the open-PR backlog: all 30 open
+`knowledge/*` PRs (#47–#110) are merged into this branch and closed in its
+favor. No other open knowledge PRs remain; #111 was merged to main first and
+this branch is based on it.
 
 ## Routing decision
 
-- New categories: `infrastructure/agent-orchestration` (5 pages; unified the
-  competing `orchestration`/`agent-orchestration` names), `databases/data-survey`
-  (1), `qa/deliverables` (1). All other pages route into existing categories.
-- Canonical-path decisions: rate limiting → `backend/common/reliability/`
-  (sits beside timeouts-and-retries; 6 of 8 variants chose it); stderr
-  diagnostics → `platforms/processes/` (concern spans beyond shells); leaked
-  artifacts → `testing/data/artifact-leakage-from-a-suite`; call-site
-  enumeration → the existing `backend/common/change-impact/` page.
-- All 38 new pages listed in their domain indexes (nearest-index rule; backend
-  routes via its python sub-index for bytecode-cache-staleness); INDEX.md domain
-  summaries updated for infrastructure/qa/databases. Full-wiki lint: frontmatter,
-  ids, related-links, index coverage, size, qualifiers, staleness → 0 findings.
+- New categories: `backend/common/ml` (mape-aligned-point-prediction),
+  `backend/python/packaging` (data-files-and-install-paths),
+  `security/incident-response` (verifying-assumed-security-agents,
+  process-identity-by-path-and-hash). All other 53 new pages route into
+  existing categories; 51 existing pages received union-merged amendments.
+- All new pages are listed in their domain indexes (nearest-index rule);
+  INDEX.md domain summaries updated for backend, frontend, security.
