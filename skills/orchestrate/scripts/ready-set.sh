@@ -17,8 +17,9 @@
 # exit 0  dispatch these (stdout: one task id per line, at most <free> of them)
 # exit 2  nothing to dispatch, but tasks are in flight — wait for an event
 # exit 3  nothing to dispatch, nothing in flight, unfinished tasks remain —
-#         DEADLOCK (a failed dependency, or a cycle). Never wait on this: with
-#         no worker running, no event can ever arrive. Report it.
+#         DEADLOCK (a failed dependency, a cycle, or a task whose rework
+#         `.attempt` has reached LO_MAX_REWORK). Never wait on this: with no
+#         worker running, no event can ever arrive. Report it.
 # exit 4  the graph or the status dir could not be read, or an argument is
 #         invalid — refuse rather than guess
 # exit 5  every task is in a terminal state — the run is complete
@@ -31,6 +32,9 @@
 #
 # env:
 #   LO_MAX_SESSIONS  upper bound on <cap> (a tuning knob like LO_PHASE_TIMEOUTS)
+#   LO_MAX_REWORK    rework budget: a task whose status `.attempt` >= this and
+#                     whose phase is not approved/merged/done is failed-for-
+#                     scheduling (default 3; exit-4 validated, same as LO_MAX_SESSIONS)
 set -u
 
 JQ=$(command -v jq) || { echo "ready-set: jq not found" >&2; exit 127; }
@@ -54,6 +58,15 @@ if [ -n "${LO_MAX_SESSIONS:-}" ]; then
   [ "$LO_MAX_SESSIONS" -lt "$cap" ] && cap="$LO_MAX_SESSIONS"
 fi
 
+# LO_MAX_REWORK is the rework budget: a task whose .attempt reaches it is
+# failed-for-scheduling. Validated the same way as LO_MAX_SESSIONS — never
+# silently defaulted on a bad value.
+max_rework="${LO_MAX_REWORK:-3}"
+case "$max_rework" in
+  ''|*[!0-9]*) echo "ready-set: LO_MAX_REWORK must be a positive integer" >&2; exit 4 ;;
+esac
+[ "$max_rework" -gt 0 ] || { echo "ready-set: LO_MAX_REWORK must be > 0" >&2; exit 4; }
+
 ids=$("$JQ" -r '.tasks[]?.id // empty' "$graph" 2>/dev/null) || {
   echo "ready-set: graph '$graph' is not valid JSON" >&2; exit 4; }
 
@@ -68,6 +81,14 @@ phase_of() { # $1 = task id -> its recorded phase, or "pending" when unrecorded
   p=$("$JQ" -r '.phase // "pending"' "$f" 2>/dev/null) || p=pending
   [ -n "$p" ] || p=pending
   echo "$p"
+}
+
+attempt_of() { # $1 = task id -> its recorded rework .attempt, or 0
+  f="$sdir/$1.json"
+  [ -f "$f" ] || { echo 0; return; }
+  a=$("$JQ" -r '.attempt // 0' "$f" 2>/dev/null) || a=0
+  case "$a" in ''|*[!0-9]*) a=0 ;; esac
+  echo "$a"
 }
 
 is_satisfied() { # $1 = phase -> 0 when a dependent may start on it
@@ -86,6 +107,19 @@ for id in $ids; do
     [ "$ph" = failed ] && unfinished=$((unfinished + 1))
     continue
   fi
+
+  # A non-terminal task whose rework budget is exhausted is failed-for-
+  # scheduling exactly like `failed` above: it never occupies a slot again
+  # and permanently blocks its dependents. Checked strictly in the
+  # non-terminal path so a `failed` task with a stale high attempt can never
+  # be counted here too.
+  att=$(attempt_of "$id")
+  if [ "$att" -ge "$max_rework" ]; then
+    echo "ready-set: $id rework budget exhausted (attempt=$att, max=$max_rework)" >&2
+    unfinished=$((unfinished + 1))
+    continue
+  fi
+
   unfinished=$((unfinished + 1))
   if [ "$ph" != pending ]; then busy=$((busy + 1)); continue; fi
 

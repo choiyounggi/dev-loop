@@ -3,8 +3,10 @@
 # A session calls this at the end of each phase to record its state.
 #
 # usage: STATUS_DIR=<absolute-dir> status-update.sh <task> <phase> [key=value ...]
-#   phase: pending|planning|plan_ready|implementing|impl_done|approved|merged|done|failed
+#   phase: pending|planning|plan_ready|implementing|impl_done|approved|merged|done|failed|rework
 #   extra: worktree=... branch=... prUrl=... planPath=... error=... reworkCount=...
+#
+# rework increments .attempt atomically; requires an existing valid status file.
 #
 # e.g. STATUS_DIR=/repo/.orchestration/status status-update.sh task-1 plan_ready worktree=/repo/.worktrees/task-1
 set -eu
@@ -16,6 +18,12 @@ task="$1"; phase="$2"; shift 2
 
 mkdir -p "$dir"
 file="$dir/$task.json"
+
+if [ "$phase" = rework ]; then
+  [ -f "$file" ] && "$JQ" -e . "$file" >/dev/null 2>&1 \
+    || { echo "status-update: rework on missing/malformed status for '$task'" >&2; exit 4; }
+fi
+
 [ -f "$file" ] || printf '{"task":"%s"}' "$task" > "$file"
 
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)   # cross-platform (GNU/BSD) iso-8601 UTC
@@ -50,6 +58,8 @@ trap 'rm -f "$tmp"' EXIT
 "$JQ" --arg p "$phase" --arg t "$now" --arg w "$wt" --arg s "$sess" --argjson e "$extra" \
   '.phase=$p | .updatedAt=$t | .worktree=$w
    | (if $s != "" then .session=$s else . end)
-   | . + $e' "$file" > "$tmp" && mv "$tmp" "$file"
+   | . + $e
+   | .attempt = (if $p == "rework" then ((.attempt // 0) + 1) else (.attempt // 0) end)' \
+  "$file" > "$tmp" && mv "$tmp" "$file"
 
 echo "status[$task] = $phase"

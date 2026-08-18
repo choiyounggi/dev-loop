@@ -72,12 +72,15 @@ lens_order() {
   [[ "$section" != *'5. **'* ]]
 }
 
-@test "Phase 4 retains the surrounding mechanics: diff command, 3-round cap, escalation, dispatch-loop return" {
+@test "Phase 4 retains the surrounding mechanics: diff command, rework budget, escalation, dispatch-loop return" {
   section="$(phase4_section "$SKILL")"
   [[ "$section" == *'git -C <wt> diff'* ]]
   [[ "$section" == *'<integ>...HEAD'* ]]
-  [[ "$section" == *'After 3'* ]]
-  [[ "$section" == *'escalate'* ]]
+  # the 3-round cap is code-enforced since #106: the budget lives in
+  # ready-set.sh (LO_MAX_REWORK) and exhaustion escalates via the exit-3
+  # DEADLOCK route to a human decision
+  [[ "$section" == *'LO_MAX_REWORK'* ]]
+  [[ "$section" == *'human decision'* ]]
   [[ "$section" == *'return to step 1 of the dispatch'* ]]
   [[ "$section" == *'go to Phase 5'* ]]
 }
