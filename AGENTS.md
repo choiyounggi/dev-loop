@@ -191,3 +191,19 @@ After any wiki change, all of these must hold (lint checks them):
 3. `log.md` has an appended entry: `## [YYYY-MM-DD] <ingest|revise|lint> | <summary>`.
 4. Every `related:` id and inline link resolves to an existing page.
 5. No page exceeds 120 body lines.
+
+## Running tests on macOS
+
+macOS ships bash 3.2, which does not honor a mid-test `[[ ]]` assertion's exit
+status — only a test function's *last* command decides the verdict, so an
+earlier failed `[[ ]]` is silently masked (issue #114). Install a modern bash
+before running the suite:
+
+```sh
+brew install bash
+PATH=/opt/homebrew/bin:$PATH bats tests/
+```
+
+`tests/bash-version-guard.bats` refuses to run under bash < 4, and
+`tests/canary/mid-test-assertion-canary.bats` (run inverted in CI) proves
+mid-test assertion failures are still detectable.
