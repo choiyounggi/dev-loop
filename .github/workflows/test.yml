@@ -37,5 +37,14 @@ jobs:
             sudo apt-get install -y bats jq tmux
           fi
 
+      # Mechanical wiki gates, surfaced as their own step so a wiki defect is
+      # named in the CI summary instead of buried in the bats run (both are
+      # also covered by bats live-corpus tests; node is preinstalled on
+      # GitHub runners).
+      - name: Wiki checks (structure + duplicates + prohibitions)
+        run: |
+          node scripts/wiki-structure-checks.js wiki
+          node scripts/wiki-lint-prohibitions.js wiki
+
       - name: Run bats suite
         run: bats tests/
