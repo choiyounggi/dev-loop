@@ -38,6 +38,18 @@ test file path(s). If any are missing, ask for them rather than guessing.
 4. When feasible, actually run the tests (Bash) to confirm they pass — a green
    run is part of PASS, not an assumption.
 
+## Floor pre-gate
+
+The caller may pass `floor=pass` or `floor=unknown` — the result of the
+mechanical test-floor.sh pre-gate that already ran before you were called.
+- `floor=pass`: existence and count checks (tests exist, case counts, assertion
+  presence) are pre-verified — weight your judgment toward semantic quality:
+  whether assertions are meaningful, error/boundary CLASSIFICATION, and
+  implementation-echo tests.
+- `floor=unknown` (or no floor result given): keep full scope, including the
+  existence and count checks in the quantitative gate below — the floor could
+  not classify the framework, so nothing about this diff has been pre-verified.
+
 ## Output — emit exactly this, nothing else
 
 ```

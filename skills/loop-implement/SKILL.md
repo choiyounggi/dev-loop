@@ -99,8 +99,12 @@ starting the next, so a downstream task always builds on a verified upstream one
 6. Self-review + refactor — bugs, edge cases, resource leaks, input validation,
                         unused code; re-check against the named pages' edge-case
                         rows and the `tacit` danger zones if configured.          [TDD Refactor / self-review]
-6.5 Independent audit — REQUIRED: call the test-quality-auditor subagent with the
-                        task brief, the diff, and the test paths. (self-grading guard)
+6.5 Floor + independent audit — REQUIRED: run the test-floor.sh mechanical
+                        pre-gate first; exit 3 is an immediate VERDICT: FAIL
+                        (loop to step 3) without spending the auditor call.
+                        Otherwise call the test-quality-auditor subagent with
+                        the task brief, the diff, the test paths, and the
+                        floor result. (self-grading guard)
 7. Judge against done — PASS only if the checklist is met AND the auditor returns
                         VERDICT: PASS. Emit the task report (format below, with the
                         WIKI: references you applied).                          [DoD / evaluator]
@@ -188,10 +192,24 @@ size* below.)
   the actual pattern quoted and the actual branch written as if/else, each with
   its `wiki/` page as basis. The implementing pass should execute, not re-decide.
 
-## Calling the auditor (step 6.5)
+## Floor pre-gate + calling the auditor (step 6.5)
+
+Before calling the auditor, run the mechanical floor pre-gate — it judges only
+the countable half of test quality (tests exist, case counts, assertion
+presence), never the semantic half:
+
+```
+sh ${CLAUDE_PLUGIN_ROOT}/skills/orchestrate/scripts/test-floor.sh <cwd> <same diff range step 6's self-review used>
+```
+
+- exit 3 (stdout `fail`) -> treat as `VERDICT: FAIL` immediately: strengthen
+  the tests (never weaken them), increment the attempt count, and loop back
+  to step 3 — without spending the auditor subagent call.
+- exit 0 (stdout `pass`) or exit 2 (stdout `unknown`) -> proceed to the auditor.
 
 Use the Agent tool to run the `test-quality-auditor` subagent. Pass it: the task
-brief, the change diff (`git diff`), and the test file path(s). It returns:
+brief, the change diff (`git diff`), the test file path(s), and the floor result
+(`floor=pass` or `floor=unknown`). It returns:
 
 ```
 VERDICT: PASS | FAIL
@@ -201,6 +219,9 @@ REASONS: ...
 - `VERDICT: PASS` -> proceed to step 7.
 - `VERDICT: FAIL` -> address REASONS by strengthening the tests/code (never by
   weakening tests), increment the attempt count, and loop back to step 3.
+
+Floor passed != quality passed — the auditor still rules on semantic quality
+even when the floor came back clean.
 
 This subagent is bundled with the plugin, so it is always available. Do NOT call
 other agents by name (e.g. a code-reviewer) — they may not exist in the user's

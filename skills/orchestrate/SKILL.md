@@ -228,9 +228,12 @@ answered.
    <branch> <integ>` before dispatching any dependent — that exit code is the
    evidence, not the merge command's own chatter. Then return to step 1:
    whatever dependency it released shows up in the next `ready-set.sh` round
-   already merged, and the freed slot refills immediately. On rework needed,
-   write `reviews/<task>-rN.md` and re-deliver with `send-prompt.sh
-   send` (or new Orca Task on same terminal); after 3 failed rounds, escalate.
+   already merged, and the freed slot refills immediately. On rework needed, run
+   the Phase 4 rework sequence — `status-update.sh <task> rework`, read the
+   new `.attempt`, write `reviews/<task>-rN.md`, re-deliver with
+   `send-prompt.sh send` (or a new Orca Task on the same terminal). The
+   rework budget is `ready-set.sh`'s job (`LO_MAX_REWORK`); exhaustion
+   surfaces as exit-3 DEADLOCK, handled at step 1.
    When `ready-set.sh` returns **5**, go to Phase 5.
 
 **Session knobs (tmux substrate, set once per run):** `export LO_RUN_ID=<short-run-id>`
@@ -260,6 +263,9 @@ phase of each wait: precedence is an explicit `[timeout-sec]` argument, then the
 matching entry, then the 3600s default. A malformed entry (no `=`, non-numeric,
 `<= 0`, or an unknown phase name) is refused with **exit 4**, never silently
 defaulted; the effective budget and its source are printed before the wait.
+`LO_MAX_REWORK` (default 3) is the rework budget `ready-set.sh` enforces —
+same validation as `LO_MAX_SESSIONS` (empty/non-numeric/`<= 0` refused with
+**exit 4**).
 
 **Substrate (the user decided at Gate 1 — do not re-decide here):** the answer was
 Orca or tmux. **Orca** → spawn **and supervise** workers through it, not raw tmux:
@@ -523,6 +529,15 @@ substrate: `task-create` the implement Task, then `scripts/orca-worker-start.sh
 wait with `scripts/orca-wait.sh`. Rework rounds are further Tasks on the same
 `--terminal`.)*
 
+Before the four-lens pass, run the floor: `scripts/test-floor.sh <wt>
+'<integ>...HEAD'`. **Exit 3** — skip the four-lens pass and the auditor
+entirely; the itemized stderr reasons (`no-tests` / `case-count:<file>:<n>` /
+`no-assertion:<file>:<case>`) become the findings of `reviews/<task>-rN.md` —
+this consumes a rework round exactly like any other finding (run the rework
+sequence below). **Exit 0 or 2** — continue to the four-lens pass unchanged,
+and when the auditor is invoked, pass `floor=pass` or `floor=unknown`
+alongside it.
+
 Run the fixed four-lens pass on each worktree diff (`git -C <wt> diff
 <integ>...HEAD`) — write the result to `reviews/<task>-rN.md` from
 `templates/review-report.md`:
@@ -543,8 +558,16 @@ Run the fixed four-lens pass on each worktree diff (`git -C <wt> diff
 
 Alongside the pass, if a session's tests look weak, **cross-call
 `test-quality-auditor` yourself** (self-call + orchestrator cross-call).
-On shortfall, write `reviews/<task>-rN.md`, inject §3 (rework), repeat. After 3
-failed rounds, escalate. When a task is approved, merge it into the integration
+On shortfall, decide rework: `STATUS_DIR=.orchestration/status
+scripts/status-update.sh <task> rework` atomically increments `.attempt`;
+read the NEW value N from `status/<task>.json`, write `reviews/<task>-rN.md`
+(N is that counter value, so the filename and the counter can never
+disagree), inject §3 (rework), repeat. The rework budget is
+**`ready-set.sh`'s job**, not tracked here: `LO_MAX_REWORK` (default 3) fails
+a non-terminal task for scheduling once its `.attempt` reaches it, and with
+nothing else in flight that surfaces as **exit 3 DEADLOCK** naming the
+exhausted task — Phase 3 step 1 already routes that to a human decision.
+When a task is approved, merge it into the integration
 branch first (Phase 3 step 5's merge-on-approval rule) before you
 return to step 1 of the dispatch loop — whatever dependency it released shows up in the next
 `ready-set.sh` round already merged, and the freed slot is refilled immediately.
@@ -653,7 +676,9 @@ each `.orchestration/status/*.json` phase, and which `briefs/plans/reviews/`
 artifacts exist. Resume from the earliest incomplete step (idempotently skip done
 steps). There is no intermediate state such as a Wave index to restore. Reading
 `.orchestration/graph.json` plus `status/*.json` and running `ready-set.sh` IS
-the restored state — the same inputs always yield the same answer. Check `tmux ls`, and run `scripts/tmux-worker-stalled.sh <session>` on each
+the restored state — the same inputs always yield the same answer. The
+rework round number is read from `status/<task>.json`'s `.attempt` field —
+never reconstructed by globbing `reviews/<task>-r*.md`. Check `tmux ls`, and run `scripts/tmux-worker-stalled.sh <session>` on each
 live one — a session that exists is not a worker that moves. Relaunch dead sessions and
 re-deliver the right prompt with `scripts/send-prompt.sh send`. For leftovers of a
 run that already died, `scripts/safe-cleanup.sh list-orphans <root>` enumerates them
