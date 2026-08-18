@@ -669,6 +669,21 @@ Show the full integration diff (`git diff`). **Wait for the user's confirmation.
 exactly what the real run would touch and changes nothing, while refusals (dirty
 worktree) still fire — a dry run never looks safer than the real one.
 **Local merge into the feature branch only.** Remote push / PR is the user's job.
+Steps 2–3 above (worktree removal, session sweep), plus archiving
+`.orchestration/` artifacts, are exactly what `teardown` composes into one call
+below — Phase 6's cleanup and the end-of-run contract cannot drift apart.
+
+## End-of-run contract
+Every orchestration run terminates in exactly one of three outcomes: **merged**
+(Gate 2 passed, Phase 6 ran), **aborted** (the user or coordinator stopped the
+run before Gate 2), or **escalated-and-abandoned** (a max-rework/max-retry
+escalation was raised and the user chose not to continue). In all three, the
+final step is the same: `LO_RUN_ID=<run-id> scripts/safe-cleanup.sh teardown
+<root>` — it derives this run's worktrees from its own
+`.orchestration/status/*.json`, removes them (dirty ones SKIPped, never
+`--force`), sweeps this run's tmux sessions, and archives `.orchestration/`
+artifacts to `archive-<date>-<runid>/`. A run that ends without teardown is
+exactly the leak `list-orphans --stale` exists to find.
 
 ## Re-entry (resume)
 On re-invocation with no context, measure real state first: `git worktree list`,
@@ -681,8 +696,9 @@ rework round number is read from `status/<task>.json`'s `.attempt` field —
 never reconstructed by globbing `reviews/<task>-r*.md`. Check `tmux ls`, and run `scripts/tmux-worker-stalled.sh <session>` on each
 live one — a session that exists is not a worker that moves. Relaunch dead sessions and
 re-deliver the right prompt with `scripts/send-prompt.sh send`. For leftovers of a
-run that already died, `scripts/safe-cleanup.sh list-orphans <root>` enumerates them
-read-only, including each session's run id.
+run that already died, `scripts/safe-cleanup.sh list-orphans --stale <root>`
+enumerates them read-only (each with a `stale` verdict and its run id); tear a
+dead one down with `LO_RUN_ID=<id> scripts/safe-cleanup.sh teardown <root>`.
 On the Orca substrate, rebind the Run first (`orca orchestration run-use --id
 <run_id> --json`), then measure with `orca orchestration task-list --json` +
 `scripts/orca-worktree-alive.sh <wt>` **and** `scripts/orca-worker-stalled.sh <wt>`
