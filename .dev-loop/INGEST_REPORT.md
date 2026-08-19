@@ -1,5 +1,7 @@
 # Knowledge flush — 8 insight(s)
 
+Cross-Check: independent adversarial `claude -p` review run on this branch before the PR — verdict REVISE (4 major, 8 minor); all applied, each major re-verified independently (see the Cross-Check section below).
+
 8 queued candidates → **7 new pages** (two candidates share one mechanism and were
 merged into a single page), 7 existing pages amended with reciprocal `related:`
 links, 5 domain indexes updated, `log.md` appended.
