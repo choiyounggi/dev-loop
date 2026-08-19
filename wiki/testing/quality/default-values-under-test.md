@@ -9,12 +9,12 @@ sources:
   - https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/
   - https://docs.python.org/3/reference/compound_stmts.html
 last_verified: 2026-08-12
-related:
-  [
+related: [
     testing-quality-minimum-case-set,
     testing-quality-tests-that-cannot-fail,
     testing-mocking-captured-call-arguments,
     testing-quality-harness-reverse-controls,
+    testing-quality-expectation-sets-with-one-distinct-value,
   ]
 ---
 

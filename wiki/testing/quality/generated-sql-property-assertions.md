@@ -10,7 +10,7 @@ sources:
   - https://dev.mysql.com/doc/refman/8.4/en/comparison-operators.html
   - https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/
 last_verified: 2026-08-14
-related: [testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, databases-schema-design-nullability-and-defaults, backend-common-change-impact-aggregation-layer-of-a-shared-helper]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, databases-schema-design-nullability-and-defaults, backend-common-change-impact-aggregation-layer-of-a-shared-helper, databases-query-optimization-repeated-sublinks-in-a-pulled-up-derived-table]
 ---
 
 # Locking a Missing-Value Property in Generated SQL the Suite Never Executes
@@ -55,8 +55,11 @@ anchor to a site, this one binds a property to a whole expression.
 
 4. **Assert the aggregate's occurrence count.** A nameless `CASE` refill has to
    evaluate the aggregate a second time, so "`SUM(` appears exactly once" is the
-   only family that reddens on it — and it doubles as the single-evaluation
-   regression guard for a correlated subquery.
+   only family that reddens on it — and it doubles as the regression guard against a
+   *textual* second evaluation of the aggregate in a correlated subquery. It does not
+   reach planner-level duplication: a flattened derived table can evaluate the same
+   rendered text once per referencing aggregate, which only the plan shows
+   ([databases-query-optimization-repeated-sublinks-in-a-pulled-up-derived-table]).
 
 5. **Bind the guarded identifier and the aggregated identifier to an alias
    captured from the anchor** rather than hardcoding the name. Capturing keeps a

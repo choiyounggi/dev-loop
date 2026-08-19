@@ -28,6 +28,8 @@ Match your situation to a "load when" line; load only matching pages.
 | [large-in-lists](query-optimization/large-in-lists.md) | Building `IN (...)` queries whose list size can grow (batch lookups, fetch-by-ids) |
 | [n-plus-one-queries](query-optimization/n-plus-one-queries.md) | Loading a list plus per-row associations via an ORM; query count scales with result size |
 | [existence-and-count-checks](query-optimization/existence-and-count-checks.md) | Writing "is there any…", counts, badges, or gating logic on row presence |
+| [repeated-sublinks-in-a-pulled-up-derived-table](query-optimization/repeated-sublinks-in-a-pulled-up-derived-table.md) | A PostgreSQL correlated subquery sits in a derived table's select list and two or more outer aggregates/expressions read it; runtime is a clean multiple of one pass over the driving rows; choosing between `OFFSET 0`, `WITH ... AS MATERIALIZED`, `LATERAL` and leaving a grouped derived table alone; writing or reviewing a comment that claims a per-row value is computed once; understanding why a generated-SQL string test cannot see repeated evaluation |
+
 
 ## schema-design
 

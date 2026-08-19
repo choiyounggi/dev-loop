@@ -8,7 +8,7 @@ sources:
   - https://raw.githubusercontent.com/chromium/chromium/main/headless/lib/browser/headless_browser_impl.cc
   - "Field reproduction 2026-08-14: dabangapp.com/map/apt — data APIs (markers, room-list) all HTTP 400 under the default headless UA while the page shell and map tiles loaded; after setting a desktop Chrome UA (Mozilla/5.0 … Chrome/131 …) the same URL loaded all data"
 last_verified: 2026-08-14
-related: [backend-common-integrations-robots-txt-and-source-selection, testing-e2e-e2e-stability]
+related: [backend-common-integrations-robots-txt-and-source-selection, testing-e2e-e2e-stability, qa-environments-browser-console-capture-gaps]
 ---
 
 # Empty Data from a Commercial Site Under a Headless Browser
