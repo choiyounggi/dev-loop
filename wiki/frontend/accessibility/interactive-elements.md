@@ -8,7 +8,7 @@ sources:
   - https://www.w3.org/TR/using-aria/
   - https://www.w3.org/WAI/ARIA/apg/patterns/
 last_verified: 2026-07-10
-related: [frontend-forms-validation-timing, frontend-agent-interfaces-agent-facing-tool-surfaces]
+related: [frontend-forms-validation-timing, frontend-agent-interfaces-agent-facing-tool-surfaces, frontend-design-anti-slop-visual-design]
 ---
 
 # Building Clickable and Keyboard-Operable UI

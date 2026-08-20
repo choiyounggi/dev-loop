@@ -4,7 +4,8 @@ Route here for: web UI code — component state placement, effect usage, renderi
 performance, component structure/composition, in-UI data fetching, async
 loading/error/empty UI states, bundle/asset load performance, form validation UX,
 XSS-safe output, client-side auth token handling, interactive-element accessibility,
-agent-facing tool surfaces (WebMCP tool registration).
+agent-facing tool surfaces (WebMCP tool registration), visual design decisions
+(color/typography/layout/motion styling, canvas effect layers).
 
 Match your situation to a "load when" line; load only matching pages.
 
@@ -73,3 +74,10 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [interactive-elements](accessibility/interactive-elements.md) | Building/reviewing any clickable or keyboard-operable UI (buttons, links, toggles, menus, dialogs, custom widgets); asked to make a div clickable; fixing focus/tab order |
+
+## design
+
+| Page | Load when |
+|------|-----------|
+| [anti-slop-visual-design](design/anti-slop-visual-design.md) | Styling or restyling web UI without a design spec; output looks "AI-generated" or template-like; choosing colors, fonts, page structure, or motion for new UI; reviewing a UI diff for template tells |
+| [html-in-canvas](design/html-in-canvas.md) | Wanting shader/3D/canvas-composited effects on real interactive HTML (forms, buttons, sections); about to hand-draw UI widgets inside a canvas with manual hit-testing; adding a canvas effect layer to an existing page |
