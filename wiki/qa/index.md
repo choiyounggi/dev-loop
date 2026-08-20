@@ -44,6 +44,8 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [test-environment-parity](environments/test-environment-parity.md) | A bug reproduces only in production; planning what a staging environment must mirror; deciding whether a staging pass clears a release |
 | [headless-browser-bot-blocking](environments/headless-browser-bot-blocking.md) | QA/dogfooding an external production site through a headless browser shows an intact page shell but empty lists/data with generic "temporary delay" toasts; deciding between "their server is down" and "our client is classified as a bot"; data APIs alone return 4xx while static assets load |
+| [browser-console-capture-gaps](environments/browser-console-capture-gaps.md) | About to read a browser-automation tool's console output as a QA verdict ("no errors", "the script never ran"); the collected list is empty for a page known to log on load; deciding when the collector attaches and whether to clear+reload; judging whether a browser extension's content script executed when its logs never appear |
+
 
 ## bug-reports
 

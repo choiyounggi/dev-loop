@@ -31,6 +31,8 @@ Match your situation to a "load when" line; load only matching pages.
 | [harness-mediated-tool-results](tools/harness-mediated-tool-results.md) | A plugin or hook in your agent harness returned substitute content for a built-in tool (truncated read, redaction, a note telling you to call something else); deciding whether a short result is interception or a genuinely small/empty file; the hook's suggested workaround failed too; briefing spawned worker sessions about a known-degraded tool |
 | [plugin-mcp-server-registration](tools/plugin-mcp-server-registration.md) | A plugin-bundled MCP server is missing from `/mcp` or its tools are uncallable while the plugin's skills work; deciding whether the fault is registration, config shape, or the server itself; about to change a plugin `.mcp.json` (bare map vs `mcpServers` wrapper, `command`/`args`/`env`) to make a server appear; relaying a shell variable into a server with `${VAR}` and the server reads the wrong value; a plugin updated mid-session and its server still runs the old path |
 | [version-keyed-artifact-cache](tools/version-keyed-artifact-cache.md) | Shipping a code update to a distribution system that caches artifacts by a version string (a Claude Code marketplace plugin, or any tag-pinned cache) and the update runs but the old behavior persists; deciding why `/plugin update` reports "at latest" yet new code never runs; locating and clearing a stale `~/.claude/plugins/cache/<mkt>/<plugin>/<version>/` |
+| [unpacked-extension-source-reload](tools/unpacked-extension-source-reload.md) | You edited a file of an unpacked Chromium extension (content script, service worker, manifest) and are about to judge the change in the browser, or the edit appears to have no effect; deciding which of extension-reload and host-page-reload a given file requires; adding a running-build version marker; automating the `chrome://extensions` reload control from an agent or CDP script |
+
 
 ## environment
 
@@ -46,6 +48,8 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [paths-case-and-line-endings](filesystems/paths-case-and-line-endings.md) | A repo moves between macOS/Windows/Linux and files disappear or collide; an import resolves locally but fails on Linux CI (casing); renaming only the case of a file; diffs show every line changed or a script dies with `bad interpreter: ^M` (CRLF); setting up `.gitattributes` line-ending policy; generating file names or paths that must be valid on Windows (reserved names, path length) |
 | [permissions-and-exec-bits](filesystems/permissions-and-exec-bits.md) | "Permission denied" running a script that exists; a script loses its executable bit through git/Windows/zip/CI artifacts; surprise file-mode diffs in git (`core.fileMode`); docker bind-mount files root-owned or unreadable (host/container uid mismatch); pipeline stages can't read each other's artifacts (umask); setting up a shared directory for several users/daemons; reviewing file-permission handling in a repo or pipeline |
+| [deleted-file-recovery-on-apfs](filesystems/deleted-file-recovery-on-apfs.md) | Someone asks you to recover a file or folder deleted on macOS and you are about to recommend a recovery tool; deciding whether free-space carving is available at all (TRIM/APFS) before spending time on it; ordering the copy sources (Trash, APFS local snapshot, Time Machine, cloud trash); recovering an exact path from an app's stored bookmark data when the remembered name is wrong |
+
 
 ## processes
 

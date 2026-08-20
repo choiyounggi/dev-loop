@@ -11,7 +11,7 @@ sources:
   - https://docs.python.org/3/library/shutil.html
   - https://docs.python.org/3/using/cmdline.html
 last_verified: 2026-08-11
-related: [backend-python-language-default-encoding-in-text-io, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, backend-python-language-mutable-state-traps]
+related: [backend-python-language-default-encoding-in-text-io, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, backend-python-language-mutable-state-traps, backend-python-language-source-introspection-of-a-dynamically-loaded-module]
 ---
 
 # Edited Python Source the Interpreter Keeps Ignoring

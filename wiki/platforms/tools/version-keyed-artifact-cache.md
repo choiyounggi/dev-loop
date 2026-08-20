@@ -10,7 +10,7 @@ sources:
   - https://github.com/anthropics/claude-code/issues/17361
   - https://github.com/anthropics/claude-code/issues/61954
 last_verified: 2026-08-04
-related: [platforms-toolchains-version-management, platforms-tools-plugin-mcp-server-registration]
+related: [platforms-toolchains-version-management, platforms-tools-plugin-mcp-server-registration, platforms-tools-unpacked-extension-source-reload]
 ---
 
 # Shipping New Code Through a Version-Keyed Artifact Cache
