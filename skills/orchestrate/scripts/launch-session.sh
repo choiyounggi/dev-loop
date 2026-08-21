@@ -24,12 +24,14 @@
 #
 #   exit 0    launched and the prompt is confirmed submitted
 #   exit 1    wrong argument count
-#   exit 2    invalid permission mode
+#   exit 2    invalid permission mode, invalid worker model, invalid session
+#             name, a worktree argument that is not a git work-tree root, or
+#             an LO_STATUS_DIR/LO_TASK_ID pair with exactly one set (issue #123)
 #   exit 4    the REPL never became ready (prints the last screen)
 #   exit 5    the prompt was sent but submission could NOT be confirmed — the
 #             session is alive and may hold an unsubmitted prompt (prints the
 #             last screen). Distinct from 4: there the CLI never came up.
-#   exit 127  tmux or claude not found
+#   exit 127  tmux, git, or claude not found
 #
 # env (also test hooks):
 #   LO_RUN_ID          suffix making the session name unique per run
@@ -49,8 +51,11 @@
 #                      prompt is confirmed submitted — so dead/stalled-worker
 #                      detection covers the session from launch, not from its
 #                      first self-report. A seeding failure warns on stderr
-#                      and never changes the exit code. Either var unset:
-#                      exactly the previous behavior, no new output.
+#                      and never changes the exit code. Both unset: exactly
+#                      the previous behavior, no new output. Exactly one set —
+#                      including set-but-empty, e.g. LO_TASK_ID="" — is a
+#                      caller bug (issue #123), rejected at exit 2 before any
+#                      tmux session is touched.
 set -eu
 # NOT named TMUX: that is tmux's OWN variable (the server socket). Assigning it
 # here would overwrite the caller's exported value, and every tmux child would
@@ -67,6 +72,15 @@ session="$1"; wt="$2"; perm="$3"; prompt="$4"
 # previous run cannot collide (and get silently skipped below). The orchestrator
 # sets LO_RUN_ID once per run and reuses the resulting name for later send-keys.
 [ -n "${LO_RUN_ID:-}" ] && session="${session}-${LO_RUN_ID}"
+
+# whitelist the session name — it is interpolated into tmux commands (new-session,
+# has-session, send-keys, capture-pane) and matched by safe-cleanup.sh's sweep, so
+# reject anything outside the safe allowlist before it reaches any of them. Catches
+# both a bad $1 and a bad LO_RUN_ID suffix (issue #123: a zsh word-splitting bug
+# handed this a space-containing name and it was silently accepted).
+case "$session" in
+  ''|*[!A-Za-z0-9_-]*) echo "launch-session: invalid session name '$session'" >&2; exit 2 ;;
+esac
 
 # whitelist the permission mode — it is interpolated into a shell command sent to
 # the pane, so reject anything unexpected (injection guard).
@@ -88,6 +102,41 @@ fi
 # Resolve-only mode: print the effective session name and exit before touching
 # tmux/claude. Lets the orchestrator (and tests) learn the exact name.
 if [ -n "${LO_DRY_RUN:-}" ]; then echo "session=$session"; exit 0; fi
+
+# LO_STATUS_DIR / LO_TASK_ID must be set together or not at all. A caller bug
+# that sets one and leaves the other empty (issue #123: LO_TASK_ID="") used to
+# silently skip status pre-seed below with no error. Set-but-empty counts as
+# unset here — that is exactly the incident shape — so reject before any tmux
+# session exists.
+sd="${LO_STATUS_DIR:-}"; ti="${LO_TASK_ID:-}"
+if { [ -n "$sd" ] && [ -z "$ti" ]; } || { [ -z "$sd" ] && [ -n "$ti" ]; }; then
+  echo "launch-session: LO_STATUS_DIR and LO_TASK_ID must be set together (exactly one is set: LO_STATUS_DIR='$sd' LO_TASK_ID='$ti')" >&2
+  exit 2
+fi
+
+# The worktree argument must be a git work-tree ROOT, not merely a directory
+# that exists. Rejects a shared parent directory (issue #123: a coordinator bug
+# handed this the worktrees' parent instead of the task's own worktree) and a
+# subdirectory of a real checkout, either of which used to be handed straight
+# to tmux `-c` with no error. Compare PHYSICAL paths: git already resolves
+# symlinks in its own output, and macOS resolves $TMPDIR through a symlink, so
+# a naive string compare against the raw argument false-rejects a valid root.
+GIT_BIN="$(command -v git 2>/dev/null || true)"
+[ -n "$GIT_BIN" ] || { echo "launch-session: git not found" >&2; exit 127; }
+if [ ! -d "$wt" ]; then
+  echo "launch-session: worktree '$wt' does not exist" >&2
+  exit 2
+fi
+if ! "$GIT_BIN" -C "$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "launch-session: worktree '$wt' is not a git work-tree" >&2
+  exit 2
+fi
+wt_root=$("$GIT_BIN" -C "$wt" rev-parse --show-toplevel)
+wt_physical=$(cd "$wt" && pwd -P)
+if [ "$wt_root" != "$wt_physical" ]; then
+  echo "launch-session: worktree '$wt' is not a git work-tree root (root is '$wt_root')" >&2
+  exit 2
+fi
 
 # Pre-seed the status record so dead/stalled-worker detection covers this
 # worker from launch time, not from its first self-report (plan_ready).

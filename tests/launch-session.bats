@@ -16,10 +16,15 @@ setup() {
         LO_READY_TIMEOUT LO_READY_INTERVAL LO_READY_EXTRA LO_TRUST_EXTRA \
         LO_SUBMIT_TIMEOUT LO_SUBMIT_INTERVAL LO_STATUS_DIR LO_TASK_ID \
         DEV_LOOP_WORKER_MODEL GROUNDWORK_ESCALATION_DIR GROUNDWORK_TASK_ID
+
+  # A valid git work-tree root, for every test that needs the worktree guard
+  # (issue #123) to pass through to the behavior under test. Dry-run-only tests
+  # may keep a fake path instead — the worktree guard runs after the dry-run exit.
+  WT="$BATS_TEST_TMPDIR/wt"; mkdir -p "$WT"; git -C "$WT" init -q
 }
 
 @test "rejects an invalid permission mode (injection guard)" {
-  run bash "$LS" sess "${BATS_TEST_TMPDIR}/wt" "bypassPermissions; rm -rf ~" "prompt"
+  run bash "$LS" sess "$WT" "bypassPermissions; rm -rf ~" "prompt"
   [ "$status" -eq 2 ]
 }
 
@@ -43,6 +48,59 @@ setup() {
 @test "invalid permission mode is still rejected in dry-run (no guard bypass)" {
   run env LO_DRY_RUN=1 bash "$LS" lo-1 "${BATS_TEST_TMPDIR}/wt" "bad; rm -rf ~" "prompt"
   [ "$status" -eq 2 ]
+}
+
+# --- Issue #123: session-name guard ----------------------------------------
+# A zsh coordinator's word-splitting bug can hand this a space-containing
+# session name; the name is interpolated into tmux commands and matched by
+# safe-cleanup.sh's sweep, so it is allowlist-rejected before any tmux call.
+# LO_DRY_RUN is used here because the guard runs before the dry-run exit
+# (D2) — no tmux/claude stub is needed to prove it fires.
+
+@test "rejects a session name containing a space (issue #123 zsh word-splitting incident)" {
+  run env LO_DRY_RUN=1 sh "$LS" "lo-2 t2-lobby" "$WT" bypassPermissions "prompt"
+  [ "$status" -eq 2 ]
+  printf '%s\n' "$output" | grep -qF "invalid session name"
+}
+
+@test "rejects an LO_RUN_ID suffix that would corrupt the final session name" {
+  run env LO_DRY_RUN=1 LO_RUN_ID="r1 evil" sh "$LS" lo-1 "$WT" bypassPermissions "prompt"
+  [ "$status" -eq 2 ]
+  printf '%s\n' "$output" | grep -qF "invalid session name"
+}
+
+@test "rejects an empty session name (boundary)" {
+  run env LO_DRY_RUN=1 sh "$LS" "" "$WT" bypassPermissions "prompt"
+  [ "$status" -eq 2 ]
+  printf '%s\n' "$output" | grep -qF "invalid session name"
+}
+
+# --- Issue #123: worktree-root guard ----------------------------------------
+# The worktree argument must be a git work-tree ROOT. A coordinator bug can
+# hand this the worktrees' shared parent directory instead of the task's own
+# worktree; that and a non-root subdirectory of a real checkout both used to
+# be handed straight to tmux `-c` with no error. The guard runs before any
+# tmux/claude call, so no stub is needed — a real `tmux` on PATH is enough to
+# pass the earlier binary-resolution check (unaffected by this guard's order).
+
+@test "rejects a non-existent worktree path (boundary)" {
+  run sh "$LS" lo-1 "$BATS_TEST_TMPDIR/does-not-exist" bypassPermissions "prompt"
+  [ "$status" -eq 2 ]
+  printf '%s\n' "$output" | grep -qF "does not exist"
+}
+
+@test "rejects a plain non-git directory as the worktree (issue #123 shared-parent-dir incident)" {
+  plain="$BATS_TEST_TMPDIR/plain"; mkdir -p "$plain"
+  run sh "$LS" lo-1 "$plain" bypassPermissions "prompt"
+  [ "$status" -eq 2 ]
+  printf '%s\n' "$output" | grep -qF "is not a git work-tree"
+}
+
+@test "rejects a subdirectory of a git repo that is not the work-tree root" {
+  sub="$WT/sub"; mkdir -p "$sub"
+  run sh "$LS" lo-1 "$sub" bypassPermissions "prompt"
+  [ "$status" -eq 2 ]
+  printf '%s\n' "$output" | grep -qF "is not a git work-tree root"
 }
 
 # ---------------------------------------------------------------------------
@@ -146,7 +204,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
 @test "TMUX: the caller's tmux socket reaches the child untouched" {
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; echo 0 > "$sd/has-session-rc"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
-      TMUX=SENTINEL-SOCKET,111,0 sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "p"
+      TMUX=SENTINEL-SOCKET,111,0 sh "$LS" lo-1 "$WT" bypassPermissions "p"
   [ "$status" -eq 0 ]
   grep -q 'TMUX=SENTINEL-SOCKET,111,0' "$sd/env-log"
 }
@@ -155,7 +213,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; echo 0 > "$sd/has-session-rc"
   stub="$(mk_tmux_stub)"
   run env STUB_DIR="$sd" LO_TMUX="$stub" LO_CLAUDE=/bin/echo \
-      TMUX=SENTINEL-SOCKET,111,0 sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "p"
+      TMUX=SENTINEL-SOCKET,111,0 sh "$LS" lo-1 "$WT" bypassPermissions "p"
   [ "$status" -eq 0 ]
   # the assertion that fails on the pre-fix script:
   ! grep -q "TMUX=$stub" "$sd/env-log"
@@ -164,7 +222,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
 @test "TMUX: a caller with no TMUX set still launches (boundary — masks the bug)" {
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; echo 0 > "$sd/has-session-rc"
   run env -u TMUX STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "p"
+      sh "$LS" lo-1 "$WT" bypassPermissions "p"
   [ "$status" -eq 0 ]
   grep -q 'TMUX=<unset>' "$sd/env-log"
 }
@@ -175,7 +233,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_not_ready > "$sd/pane"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=3 LO_READY_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "p"
+      sh "$LS" lo-1 "$WT" bypassPermissions "p"
   [ "$status" -eq 4 ]
   [ "$(cat "$sd/captures")" = "3" ]
 }
@@ -184,7 +242,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_not_ready > "$sd/pane"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "p"
+      sh "$LS" lo-1 "$WT" bypassPermissions "p"
   [ "$status" -eq 4 ]
   [[ "$output" == *"REPL not ready"* ]]
 }
@@ -193,7 +251,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_not_ready > "$sd/pane"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "p"
+      sh "$LS" lo-1 "$WT" bypassPermissions "p"
   [ "$status" -eq 4 ]
   [[ "$output" == *"NOTREADYMARKER"* ]]
 }
@@ -202,7 +260,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_not_ready > "$sd/pane"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=1 LO_READY_INTERVAL=2 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "p"
+      sh "$LS" lo-1 "$WT" bypassPermissions "p"
   [ "$status" -eq 4 ]
   [ "$(cat "$sd/captures")" = "1" ]
 }
@@ -217,7 +275,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   pane_ready_submitted > "$sd/pane"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD hello"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello"
   [ "$status" -eq 0 ]
   [[ "$output" == *"submitted"* ]]
 }
@@ -227,7 +285,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   pane_ready_unsubmitted > "$sd/pane"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD you are the worker"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD you are the worker"
   [ "$status" -eq 5 ]
   [[ "$output" != *"ok:"* ]]
   [[ "$output" == *"NOT confirmed submitted"* ]]
@@ -238,7 +296,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   pane_ready_pasted > "$sd/pane"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD you are the worker"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD you are the worker"
   [ "$status" -eq 5 ]
   [[ "$output" == *"NOT confirmed submitted"* ]]
 }
@@ -248,7 +306,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   pane_ready_pasted > "$sd/pane"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD hello"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello"
   [ "$status" -eq 5 ]
   [[ "$output" == *"Pasted text"* ]]
 }
@@ -261,7 +319,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   pane_ready_submitted   > "$sd/pane-3"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=6 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD you are the worker"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD you are the worker"
   [ "$status" -eq 0 ]
   # the initial Enter plus exactly one remedial Enter
   [ "$(grep -c '^-t lo-1 Enter$' "$sd/keys")" = "2" ]
@@ -273,7 +331,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   pane_ready_submitted > "$sd/pane-1"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD hello"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello"
   [ "$status" -eq 5 ]
 }
 
@@ -283,7 +341,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   start=$(date +%s)
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=1 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD hello"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello"
   elapsed=$(( $(date +%s) - start ))
   [ "$status" -eq 5 ]
   [ "$elapsed" -lt 10 ]
@@ -302,12 +360,12 @@ pane_not_ready() { # matches none of the ready/trust patterns
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_RUN_ID=r7 LO_STATUS_DIR="$st" LO_TASK_ID=t3 \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR/wt" bypassPermissions "ZZPROMPTHEAD hello"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello"
   [ "$status" -eq 0 ]
   [ -f "$st/t3.json" ]
   [ "$(jq -r .phase "$st/t3.json")" = "pending" ]
   [ "$(jq -r .session "$st/t3.json")" = "lo-1-r7" ]
-  [ "$(jq -r .worktree "$st/t3.json")" = "$BATS_TEST_TMPDIR/wt" ]
+  [ "$(jq -r .worktree "$st/t3.json")" = "$WT" ]
 }
 
 @test "pre-seed: with both vars unset no status file is written and stdout is unchanged (boundary)" {
@@ -315,21 +373,31 @@ pane_not_ready() { # matches none of the ready/trust patterns
   st="$BATS_TEST_TMPDIR/status"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR/wt" bypassPermissions "ZZPROMPTHEAD hello"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello"
   [ "$status" -eq 0 ]
   [ "$output" = "ok: lo-1 launched + prompt submitted (confirmed)" ]
   [ ! -e "$st" ]
 }
 
-@test "pre-seed: LO_STATUS_DIR alone (LO_TASK_ID unset) writes nothing (boundary)" {
-  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_ready_submitted > "$sd/pane"
+@test "pre-seed: LO_STATUS_DIR alone (LO_TASK_ID unset) is now rejected (contract updated by issue #123)" {
   st="$BATS_TEST_TMPDIR/status"
-  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
-      LO_STATUS_DIR="$st" \
-      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR/wt" bypassPermissions "ZZPROMPTHEAD hello"
-  [ "$status" -eq 0 ]
-  [ "$output" = "ok: lo-1 launched + prompt submitted (confirmed)" ]
+  run env LO_STATUS_DIR="$st" sh "$LS" lo-1 "$WT" bypassPermissions "hello"
+  [ "$status" -eq 2 ]
+  printf '%s\n' "$output" | grep -qF "LO_STATUS_DIR and LO_TASK_ID must be set together"
+  [ ! -e "$st" ]
+}
+
+@test "pre-seed: LO_TASK_ID alone (LO_STATUS_DIR unset) is rejected" {
+  run env LO_TASK_ID=t9 sh "$LS" lo-1 "$WT" bypassPermissions "hello"
+  [ "$status" -eq 2 ]
+  printf '%s\n' "$output" | grep -qF "LO_STATUS_DIR and LO_TASK_ID must be set together"
+}
+
+@test "pre-seed: LO_STATUS_DIR set with LO_TASK_ID as an empty string is rejected (issue #123 incident shape: set-but-empty counts as unset)" {
+  st="$BATS_TEST_TMPDIR/status"
+  run env LO_STATUS_DIR="$st" LO_TASK_ID="" sh "$LS" lo-1 "$WT" bypassPermissions "hello"
+  [ "$status" -eq 2 ]
+  printf '%s\n' "$output" | grep -qF "LO_STATUS_DIR and LO_TASK_ID must be set together"
   [ ! -e "$st" ]
 }
 
@@ -340,7 +408,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_STATUS_DIR="$BATS_TEST_TMPDIR/blocker/sub" LO_TASK_ID=t3 \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR/wt" bypassPermissions "ZZPROMPTHEAD hello"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello"
   [ "$status" -eq 0 ]
   # grep, not [[ ]]: a false mid-test [[ ]] does not fail a test under this
   # bats/bash combination, which would make these assertions decoration
@@ -353,12 +421,12 @@ pane_not_ready() { # matches none of the ready/trust patterns
   st="$BATS_TEST_TMPDIR/status"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_STATUS_DIR="$st" LO_TASK_ID=t3 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR/wt" bypassPermissions "p"
+      sh "$LS" lo-1 "$WT" bypassPermissions "p"
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" | grep -qF "session=lo-1"
   [ "$(jq -r .phase "$st/t3.json")" = "pending" ]
   [ "$(jq -r .session "$st/t3.json")" = "lo-1" ]
-  [ "$(jq -r .worktree "$st/t3.json")" = "$BATS_TEST_TMPDIR/wt" ]
+  [ "$(jq -r .worktree "$st/t3.json")" = "$WT" ]
 }
 
 # --- DEV_LOOP_WORKER_MODEL --------------------------------------------------
@@ -383,7 +451,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   pane_ready_submitted > "$sd/pane-2"
   run env -u DEV_LOOP_WORKER_MODEL STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=4 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD p"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD p"
   [ "$status" -eq 0 ]
   ! grep -q -- '--model' "$sd/keys"
 }
@@ -395,7 +463,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
       DEV_LOOP_WORKER_MODEL=claude-sonnet-5 \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=4 LO_SUBMIT_INTERVAL=1 \
-      sh "$LS" lo-1 "$BATS_TEST_TMPDIR" bypassPermissions "ZZPROMPTHEAD p"
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD p"
   [ "$status" -eq 0 ]
   grep -q -- "--model 'claude-sonnet-5'" "$sd/keys"
 }
