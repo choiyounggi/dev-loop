@@ -46,7 +46,8 @@ specific tags below as authority.
        inherits them: knowledge=<tool|default>, tacit=<tool|default>, plan=<tool|default> -->
   <tools_guidance>{e.g. docs/specs to read, how to explore; DB read-only if any; resolved roles — knowledge/tacit/plan}</tools_guidance>
 
-  <constraints>{local rules; surgical changes only on shared files}</constraints>
+  <constraints>{local rules; surgical changes only on shared files}
+  token hygiene: bound tool output (tail/head, ranged reads); delegate visual checks to a subagent — see wiki/infrastructure/agent-orchestration/session-context-token-budget.md</constraints>
 
   <!-- "what done looks like" — verifiable -->
   <definition_of_done>

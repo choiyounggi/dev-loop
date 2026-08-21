@@ -481,9 +481,13 @@ tpl_sections_single_line() {
   # protocol every worker depends on. cksum is POSIX, so this holds on both CI
   # runners. If this block is ever intentionally changed, update this number in
   # the SAME commit and say so in the PR.
+  # Bumped from 2594177116/1010 when rule [4] gained the token-hygiene item
+  # (t2-skill-token-directives): bound tool output + delegate visual checks to
+  # a subagent, citing wiki/infrastructure/agent-orchestration/session-context-
+  # token-budget.md.
   run sh -c "sed -n '/^## Subagent usage protocol/,\$p' '$TPL' | cksum"
   [ "$status" -eq 0 ]
-  [ "$output" = "2594177116 1010" ]
+  [ "$output" = "4167093106 1552" ]
 }
 
 @test "template: negative control — the byte-identity guard fails on a reworded block" {
@@ -492,7 +496,7 @@ tpl_sections_single_line() {
   sed 's/you MUST call the/you MAY call the/' "$TPL" > "$reworded"
   ! cmp -s "$TPL" "$reworded"   # the edit really changed something
   run sh -c "sed -n '/^## Subagent usage protocol/,\$p' '$reworded' | cksum"
-  [ "$output" != "2594177116 1010" ]
+  [ "$output" != "4167093106 1552" ]
 }
 
 @test "template: the Orca prompt set is byte-identical" {

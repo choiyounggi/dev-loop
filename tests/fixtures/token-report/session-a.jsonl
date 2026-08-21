@@ -1,0 +1,5 @@
+{"message":{"usage":{"input_tokens":100,"cache_read_input_tokens":0,"cache_creation_input_tokens":900,"output_tokens":50}}}
+{"message":{"usage":{"input_tokens":100,"cache_read_input_tokens":800,"cache_creation_input_tokens":100,"output_tokens":150}}}
+{"type":"summary"}
+not valid json at all
+{"message":{"usage":{"input_tokens":200,"cache_read_input_tokens":1800,"cache_creation_input_tokens":0,"output_tokens":300}}}
