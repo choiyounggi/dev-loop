@@ -267,6 +267,20 @@ defaulted; the effective budget and its source are printed before the wait.
 same validation as `LO_MAX_SESSIONS` (empty/non-numeric/`<= 0` refused with
 **exit 4**).
 
+**The coordinator shell may be zsh:** zsh (the macOS default) does not
+word-split unquoted parameter expansions the way bash does, so a bash-style
+loop such as `for pair in "$name $task"; do launch-session.sh $pair; done`
+silently passes the whole `"name task"` string as one argument instead of
+splitting it into two. Launch each task with its own explicit
+`launch-session.sh` call, arguments spelled out per task, never through a
+splitting loop. `launch-session.sh` now fails fast against exactly this class
+of bug: it exits **2** before any tmux call when the final session name
+(after the `LO_RUN_ID` suffix) is empty or contains a character outside
+`[A-Za-z0-9_-]`, when the worktree argument is not a git work-tree root, or
+when exactly one of `LO_STATUS_DIR`/`LO_TASK_ID` is set (set-but-empty counts
+as unset). A malformed caller now gets an immediate exit 2 instead of a
+silently launched broken worker.
+
 **Substrate (the user decided at Gate 1 — do not re-decide here):** the answer was
 Orca or tmux. **Orca** → spawn **and supervise** workers through it, not raw tmux:
 it resolves the trust/TUI screen, gives native liveness, and pushes worker events to
