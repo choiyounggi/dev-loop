@@ -11,7 +11,7 @@ sources:
   - https://developer.mozilla.org/en-US/docs/Web/Performance/Guides/Lazy_loading
   - https://web.dev/articles/font-best-practices
 last_verified: 2026-07-10
-related: [frontend-rendering-rerender-and-memoization]
+related: [frontend-rendering-rerender-and-memoization, frontend-design-responsive-layout]
 ---
 
 # Reducing First-Load Payload: Bundle, Images, Fonts

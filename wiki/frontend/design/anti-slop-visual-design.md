@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - "hallmark skill v1.1.0 (anti-AI-slop design skill; distills Anthropic's frontend-design skill, the Claude cookbook on frontend aesthetics, and the 2026 tactile-rebellion consensus)"
 last_verified: 2026-08-20
-related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements]
+related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements, frontend-design-responsive-layout]
 ---
 
 # Making Web UI Look Designed, Not Generated

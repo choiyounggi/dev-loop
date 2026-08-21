@@ -5,7 +5,8 @@ performance, component structure/composition, in-UI data fetching, async
 loading/error/empty UI states, bundle/asset load performance, form validation UX,
 XSS-safe output, client-side auth token handling, interactive-element accessibility,
 agent-facing tool surfaces (WebMCP tool registration), visual design decisions
-(color/typography/layout/motion styling, canvas effect layers).
+(color/typography/layout/motion styling, canvas effect layers, responsive
+layout across viewport sizes).
 
 Match your situation to a "load when" line; load only matching pages.
 
@@ -80,4 +81,5 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [anti-slop-visual-design](design/anti-slop-visual-design.md) | Styling or restyling web UI without a design spec; output looks "AI-generated" or template-like; choosing colors, fonts, page structure, or motion for new UI; reviewing a UI diff for template tells |
+| [responsive-layout](design/responsive-layout.md) | Building or reviewing UI that must work across viewport sizes (phone → desktop); choosing breakpoints, touch-target sizes, fluid type, or responsive images; a layout overflows horizontally or breaks on mobile; fixing a zoom/reflow accessibility failure (WCAG 1.4.4/1.4.10/2.5.8) |
 | [html-in-canvas](design/html-in-canvas.md) | Wanting shader/3D/canvas-composited effects on real interactive HTML (forms, buttons, sections); about to hand-draw UI widgets inside a canvas with manual hit-testing; adding a canvas effect layer to an existing page |
