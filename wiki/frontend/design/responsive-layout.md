@@ -1,0 +1,87 @@
+---
+id: frontend-design-responsive-layout
+domain: frontend
+category: design
+applies_to: [css, html, general]
+confidence: verified
+sources:
+  - https://web.dev/articles/responsive-web-design-basics
+  - https://developer.mozilla.org/en-US/docs/Web/HTML/Guides/Viewport_meta_element
+  - https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html
+  - https://www.w3.org/WAI/WCAG21/Understanding/target-size.html
+  - https://www.w3.org/WAI/WCAG21/Understanding/resize-text.html
+  - https://www.w3.org/WAI/WCAG21/Understanding/reflow.html
+  - https://web.dev/articles/min-max-clamp
+  - https://web.dev/patterns/layout/repeat-auto-minmax
+  - https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_container_queries
+  - https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/img
+  - https://developer.mozilla.org/en-US/docs/Web/CSS/min-width
+  - https://developer.mozilla.org/en-US/docs/Web/CSS/length#relative_length_units_based_on_viewport
+  - https://developer.mozilla.org/en-US/docs/Web/CSS/@media/hover
+  - https://webkit.org/blog/7929/designing-websites-for-iphone-x/
+last_verified: 2026-08-21
+related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements, frontend-performance-bundle-and-assets]
+---
+
+# Making One Layout Work From 320px Phones to Desktop
+
+## When this applies
+
+Building or reviewing web UI that must render across viewport sizes (phone →
+desktop); choosing breakpoints, touch-target sizes, fluid type, or responsive
+images; a layout overflows horizontally, breaks on mobile, or fails a zoom/reflow
+accessibility check.
+
+## Do this
+
+Work through these in order — each later item assumes the earlier ones hold:
+
+| Case | Do |
+|------|----|
+| Any page intended for mobile | Ship exactly `<meta name="viewport" content="width=device-width, initial-scale=1">`. Without it, mobile browsers render into a ~980px virtual viewport and scale down, so width-based media queries never trigger |
+| Same meta tag, zoom settings | Leave pinch-zoom enabled: `user-scalable=no` and `maximum-scale=1` are forbidden because low-vision users need ≥2× zoom (WCAG minimum; 5× is the documented best practice) and iOS ignores the restriction anyway — omit both attributes |
+| Writing the stylesheet | Mobile-first: base styles target the smallest screen; layer wider layouts with `min-width` media queries. This minimizes overrides versus a desktop-first `max-width` cascade |
+| Choosing breakpoint values | Place a breakpoint where THIS content's layout breaks (expand the window until it does), not at device-catalog widths — device-based breakpoints rot as hardware ships |
+| A grid of cards/tiles must reflow by width | `grid-template-columns: repeat(auto-fit, minmax(<content-min>, 1fr))` — zero media queries; `auto-fit` collapses empty tracks and stretches the rest, `auto-fill` keeps empty tracks |
+| A component must respond to its container, not the viewport (sidebar vs main placement) | `@container` query with `container-type: inline-size` on the ancestor; keep an intrinsic grid/flex layout as the no-support fallback |
+| Sizing interactive targets | ≥24×24 CSS px per WCAG 2.2 AA (SC 2.5.8); 44×44 meets AAA (SC 2.5.5). A smaller target is compliant only when a 24px-diameter circle centered on it intersects no other target's circle — see [frontend-accessibility-interactive-elements] for the rest of the interactive contract |
+| Fluid type | `font-size: clamp(<min-rem>, <vw-based>, <max-rem>)`, then verify at 200% browser zoom before shipping — a clamp ceiling can stop text from reaching 200% of its original size, which fails WCAG 1.4.4 |
+| Serving images | `srcset` + `sizes` so the browser picks the resource for the slot's layout width; explicit `width`/`height` attributes on every `<img>` so space is reserved pre-load (prevents CLS; matters most on lazy-loaded images) |
+| Final gate before shipping | Render at 320px CSS width: all content and functions present with no horizontal scrolling (WCAG 1.4.10 reflow — 320px equals a 1280px desktop at 400% zoom) |
+
+## Edge cases
+
+| Case | Then |
+|------|------|
+| A full-height section uses `100vh` and content hides under the mobile URL bar | `vh` sizes to the largest viewport (chrome retracted). Use `dvh` (tracks the current chrome state, may reflow during scroll) or `svh` (smallest viewport — stable, may leave a gap when chrome retracts) |
+| UI is revealed only on hover | Gate it behind `@media (hover: hover)` and give touch users a tap-visible path — `hover: none` devices can only emulate hover via long-tap |
+| Edge-to-edge layout on notched/rounded-corner phones | Add `viewport-fit=cover` to the viewport meta, then `padding: max(<base>, env(safe-area-inset-left))` (and the other three insets) so content clears the sensor housing without losing its baseline padding |
+| A grid/flex track overflows the viewport because of one long unbreakable child (URL, image, `<pre>`) | Items default to `min-width: auto` ≈ their `min-content` size, so the track cannot shrink below the child. Use `minmax(0, 1fr)` for the track or `min-width: 0` on the item |
+| The layout passes but still "reads AI-generated" | Responsiveness is the floor, not the design — apply [frontend-design-anti-slop-visual-design] (its narrow-viewport row assumes this page's overflow fixes) |
+
+## Instead of
+
+| If you are about to | Do this instead | Why |
+|---------------------|-----------------|-----|
+| Copy breakpoints from a device list (375/768/1024/…) | Derive each breakpoint from where this content's layout fails | Device catalogs churn; content-driven breakpoints are fewer and don't rot |
+| Add `maximum-scale=1` to stop iOS input-focus zoom | Set the input's `font-size` to ≥16px so iOS has no reason to zoom | The attribute blocks low-vision zoom (WCAG ≥2×) and iOS ignores it since iOS 10 anyway |
+| Write one media query per column count for a card grid | `repeat(auto-fit, minmax(<min>, 1fr))` | The intrinsic grid covers every width, including ones you didn't test |
+| Give a track a fixed-px minimum: `minmax(200px, 1fr)` on a container that can be <200px | `minmax(0, 1fr)` plus `min-width` on the content that truly needs it | The px floor forces horizontal overflow on viewports narrower than the sum of floors |
+| Fix mobile layout bugs desktop-first, per bug report | Run the 320px no-horizontal-scroll gate once and fix what it surfaces | The gate is the WCAG 1.4.10 reflow criterion — piecemeal fixes miss views nobody reported |
+
+## Sources
+
+- https://web.dev/articles/responsive-web-design-basics — content-driven (not device-based) breakpoints; small-screen-first workflow
+- https://developer.mozilla.org/en-US/docs/Web/HTML/Guides/Viewport_meta_element — ~980px virtual viewport without the meta tag; `user-scalable=no` harm; ≥2× zoom requirement, 5× best practice
+- https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html — SC 2.5.8: 24×24 CSS px AA minimum, 24px-circle spacing exception
+- https://www.w3.org/WAI/WCAG21/Understanding/target-size.html — SC 2.5.5: 44×44 CSS px AAA
+- https://www.w3.org/WAI/WCAG21/Understanding/resize-text.html — 1.4.4: text must resize to 200% without loss
+- https://www.w3.org/WAI/WCAG21/Understanding/reflow.html — 1.4.10: no 2-D scrolling at 320 CSS px width
+- https://web.dev/articles/min-max-clamp — clamp() fluid type; clamp ceiling can fail 1.4.4
+- https://web.dev/patterns/layout/repeat-auto-minmax — auto-fit vs auto-fill semantics
+- https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_container_queries — @container, container-type, fallback stance
+- https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/img — srcset/sizes selection; width/height reserve space against layout shift
+- https://developer.mozilla.org/en-US/docs/Web/CSS/min-width — `min-width: auto` → min-content minimum on grid/flex items (the overflow mechanism)
+- https://developer.mozilla.org/en-US/docs/Web/CSS/length#relative_length_units_based_on_viewport — vh ≈ lvh; svh/dvh semantics
+- https://developer.mozilla.org/en-US/docs/Web/CSS/@media/hover — hover:none on touch (long-tap emulation only)
+- https://webkit.org/blog/7929/designing-websites-for-iphone-x/ — viewport-fit=cover + env(safe-area-inset-*) + max() pattern
