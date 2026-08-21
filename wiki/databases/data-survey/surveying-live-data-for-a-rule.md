@@ -62,6 +62,7 @@ what comes back.
 | Rows exist but every value in the surveyed column is `NULL` | `GROUP BY` returns one group whose key is `NULL`; the rule needs a `NULL` branch, and the non-`NULL` shape still has to come from code |
 | The count is small but non-zero (a handful of rows) | Treat it as a sample, not a census: cross-check against the writers before closing the value set, and say in the artifact that the set is open |
 | Writers disagree with each other about the stored shape | That disagreement is the finding — record every producer's shape and route the normalization decision to the owner rather than picking one |
+| The mapping table was hand-transcribed (from a spec, another system, or this survey) and a migration/backfill will apply it | Verify each entry individually against live data before the migration runs — transposed (copy-paste-swapped) entries are the dominant defect class in hand-built ID/enum mappings, and they survive spot checks because most entries are right |
 
 ## Instead of
 
@@ -76,3 +77,4 @@ what comes back.
 - https://www.postgresql.org/docs/current/functions-aggregate.html — "except for `count`, these functions return a null value when no rows are selected. In particular, `sum` of no rows returns null, not zero as one might expect, and `array_agg` returns null rather than an empty array"
 - https://greatexpectations.io/blog/exploring-data-quality-volume/ — volume (row count) as a first-class data-quality dimension; undetected volume anomalies "skew analyses and lead to flawed decision-making"
 - Reproduced 2026-08-05 (`sqlite3 :memory:`, empty table): `SELECT area_nm, count(*) … GROUP BY area_nm` → 0 rows; `SELECT count(*)` → one row `0`; `SELECT max(area_nm)` → one row `NULL`
+- https://github.com/EveryInc/compound-engineering-plugin — data-migration-expert agent: swapped/inverted ID-enum mapping entries named the single most common and dangerous migration bug; verify each mapping entry against production data individually

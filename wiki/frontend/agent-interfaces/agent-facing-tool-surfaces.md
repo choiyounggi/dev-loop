@@ -10,7 +10,7 @@ sources:
   - https://developer.chrome.com/docs/ai/webmcp/declarative-api
   - https://webmachinelearning.github.io/webmcp/
 last_verified: 2026-08-18
-related: [security-agent-exposure-in-session-tool-exposure, frontend-accessibility-interactive-elements]
+related: [security-agent-exposure-in-session-tool-exposure, frontend-accessibility-interactive-elements, backend-common-api-design-agent-tool-granularity]
 ---
 
 # Exposing Site Actions as Tools for AI Agents (WebMCP)
@@ -55,7 +55,7 @@ registers browser-native agent tools.
    each field from, in priority order: its `toolparamdescription` attribute,
    its associated `<label>` content, its `aria-description`. Give every field
    a real `<label>`, correct input `type`, and `required` where applicable —
-   the same work [frontend-accessibility-interactive-elements] already
+   the same work [frontend-accessibility-interactive-elements, backend-common-api-design-agent-tool-granularity] already
    requires — and add `toolparamdescription` only where the label alone
    under-specifies the value format.
 
