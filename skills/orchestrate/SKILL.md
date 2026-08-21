@@ -31,6 +31,20 @@ even if they can't re-read the config. A role is a tool injected into one step,
 never a loop: do not map a role to an implement/verify-loop tool or another
 orchestrator (that nests loops); there is no `implement` role.
 
+## Coordinator token budget
+Accumulated context, not turn count, is what drives a run's cost — every call
+resends the full history at the cached rate, so cost per turn grows as the run
+goes on. Three things the coordinator itself controls: (a) never `Read` a
+screenshot or other image directly into this session — delegate the visual
+check to a subagent that returns a text verdict instead; (b) bound every pane
+capture and status read (`tail -N` on tmux panes, one-line `jq` filters on
+status JSON) instead of pulling full output into context; (c) at Gate 1 and
+Gate 2 — the two points where a human is already present — if the run has gone
+long, tell the user this is a safe `/compact` point (the coordinator cannot
+compact its own session). Basis:
+`wiki/infrastructure/agent-orchestration/session-context-token-budget.md`
+(directives 2–4).
+
 ## Preflight
 Run `${CLAUDE_PLUGIN_ROOT}/hooks/preflight.sh` to resolve git/tmux/jq paths and
 surface any missing CLI. **git, tmux, and jq are all required** — if any is
@@ -698,6 +712,15 @@ final step is the same: `LO_RUN_ID=<run-id> scripts/safe-cleanup.sh teardown
 `--force`), sweeps this run's tmux sessions, and archives `.orchestration/`
 artifacts to `archive-<date>-<runid>/`. A run that ends without teardown is
 exactly the leak `list-orphans --stale` exists to find.
+
+After teardown, audit the run's token efficiency: `sh {SKILL}/scripts/token-report.sh
+--cwd <root> .` for the coordinator's own session, plus one more `--cwd
+<worktree>` per run worktree (each worker's transcripts live under its own
+cwd). Put the table and any `warn:` lines in the final run report — a
+peak-context warning is the signal to split tasks or delegate more next run.
+Exit 0 is the report, exit 2 a usage error, exit 4 a malformed `LO_CTX_WARN`.
+Basis: `wiki/infrastructure/agent-orchestration/session-context-token-budget.md`
+(directive 1).
 
 ## Re-entry (resume)
 On re-invocation with no context, measure real state first: `git worktree list`,

@@ -211,3 +211,11 @@ and report exactly once:
 [3] Forbidden — do not call any agent by name other than `test-quality-auditor`.
     Others (e.g. a code-reviewer) may not exist in the user's environment and will
     fail silently.
+
+[4] Token hygiene — bound tool output before it reaches your context: pipe long
+    command output through `tail`/`head`, read big files by range
+    (offset/limit) instead of in full, and prefer a filename-only search mode
+    over one that returns full matched content. Delegate any screenshot or
+    visual verification to a subagent that returns a text verdict — an image
+    `Read` directly into this session is re-billed in full on every later turn.
+    See wiki/infrastructure/agent-orchestration/session-context-token-budget.md.
