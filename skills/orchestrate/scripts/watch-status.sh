@@ -156,13 +156,29 @@ while [ "$elapsed" -lt "$budget" ]; do
   # by design so an unhandled escalation is never silently dropped.
   if [ -d "$escdir" ]; then
     esc_pending=""
+    esc_lines=""
     for e in "$escdir"/*.json; do
       [ -f "$e" ] || continue
       etk=$("$JQ" -r '.taskId // "?"' "$e" 2>/dev/null || echo "?")
       erule=$("$JQ" -r '.rule // "?"' "$e" 2>/dev/null || echo "?")
+      ets=$("$JQ" -r '.ts // "?"' "$e" 2>/dev/null || echo "?")
+      # A stale record's meaning ("answer still awaited") is decided by comparing
+      # its ts against the task's CURRENT phase/updatedAt — read from the same
+      # status file the rest of the watch already polls.
+      esf="$dir/${etk}.json"
+      if [ -f "$esf" ]; then
+        ephase=$("$JQ" -r '.phase // "?"' "$esf" 2>/dev/null || echo "?")
+        eupdated=$("$JQ" -r '.updatedAt // "?"' "$esf" 2>/dev/null || echo "?")
+      else
+        ephase="?"
+        eupdated="?"
+      fi
+      esc_lines="${esc_lines}[watch] escalation pending — ${etk}:${erule} (recorded ${ets}; phase=${ephase} @${eupdated})
+"
       esc_pending="$esc_pending ${etk}:${erule}"
     done
     if [ -n "$esc_pending" ]; then
+      printf '%s' "$esc_lines"
       echo "[watch] escalation pending —$esc_pending — approve/deny and clear $escdir"
       exit 5
     fi

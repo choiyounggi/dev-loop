@@ -16,6 +16,30 @@ setup() {
   [[ "$output" == *"t1"* ]]
 }
 
+@test "escalation: triage line carries the record ts and the status phase/updatedAt (normal)" {
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-08-20T10:00:00Z"}' > "$ORCH/status/t1.json"
+  printf '{"taskId":"t1","rule":"git_force_push","ts":"2026-08-20T09:55:00Z"}' > "$ORCH/escalations/e1.json"
+  run bash "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 5 ]
+  [[ "$output" == *"recorded 2026-08-20T09:55:00Z"* ]]
+  [[ "$output" == *"phase=implementing @2026-08-20T10:00:00Z"* ]]
+}
+
+@test "escalation: a malformed record still exits 5 with the '?' fallback (error)" {
+  printf '{not valid json' > "$ORCH/escalations/e1.json"
+  run bash "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 5 ]
+  [[ "$output" == *"escalation pending"* ]]
+  [[ "$output" == *"?"* ]]
+}
+
+@test "escalation: a record whose taskId has no status file renders phase=? @? (boundary)" {
+  printf '{"taskId":"tGhost","rule":"git_force_push","ts":"2026-08-20T09:55:00Z"}' > "$ORCH/escalations/e1.json"
+  run bash "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 5 ]
+  [[ "$output" == *"phase=? @?"* ]]
+}
+
 @test "no escalation: normal completion still exits 0" {
   printf '{"task":"t1","phase":"done"}' > "$ORCH/status/t1.json"
   run bash "$WS" "$ORCH/status" done 1 5 1
