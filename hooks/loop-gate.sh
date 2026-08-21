@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # loop-orchestrator Stop hook — verification-loop integrity gate.
 #
-# Blocks a MANAGED session from ending while its verification loop is still
-# incomplete, so a session can't quietly stop mid-loop (or after weakening
-# tests) without reaching a terminal phase. No-op for any session that isn't
-# under loop-orchestrator control. See design.md §8.4.
+# Blocks a MANAGED worker session from ending while its recorded phase is
+# pending|planning|implementing|rework — mid-loop abandonment. Every other
+# phase (done/approved/merged/failed/plan_ready/impl_done, or an unknown/unset
+# value) is terminal or an instructed wait-phase and allows the stop. Blocking
+# additionally requires THIS session to be the managed worker: when the
+# matched status entry has a non-empty .session, only a tmux session whose
+# name equals it is blocked — a coordinator visiting the same worktree, or
+# any non-tmux session, is never blocked. Records without .session (pre-
+# launch-session.sh) fall back to cwd-match only. See design.md §8.4.
 #
 # Stop hook stdin is FLAT JSON (verified against real hook payloads):
 #   { "cwd": "...", "session_id": "...", "transcript_path": "...",
@@ -49,11 +54,25 @@ for f in "$statusdir"/*.json; do
   [ -e "$f" ] || continue
   wt=$("$JQ" -r '.worktree // empty' "$f" 2>/dev/null)
   ph=$("$JQ" -r '.phase // empty' "$f" 2>/dev/null)
+  sess=$("$JQ" -r '.session // empty' "$f" 2>/dev/null)
   [ -n "$wt" ] && wt=$(cd "$wt" 2>/dev/null && pwd -P || printf '%s' "$wt")
   [ "$wt" = "$CWD" ] || continue
+
+  # Session identity: only the managed tmux worker is blockable. A record
+  # without .session (pre-launch-session.sh) falls back to cwd-match alone.
+  if [ -n "$sess" ]; then
+    is_worker=0
+    if [ -n "$TMUX" ]; then
+      tmux_bin="${LOOP_GATE_TMUX:-tmux}"
+      cur_sess=$("$tmux_bin" display-message -p '#S' 2>/dev/null)
+      [ -n "$cur_sess" ] && [ "$cur_sess" = "$sess" ] && is_worker=1
+    fi
+    [ "$is_worker" -eq 1 ] || break   # coordinator, or a non-matching/non-tmux session
+  fi
+
   case "$ph" in
-    done|approved|merged|failed|"") : ;;   # terminal/unknown — allow stop
-    *) incomplete_phase="$ph" ;;
+    pending|planning|implementing|rework) incomplete_phase="$ph" ;;
+    *) : ;;   # terminal, instructed-wait, or unrecognized — allow stop
   esac
   break   # one status entry per worktree; stop at the matched one
 done
