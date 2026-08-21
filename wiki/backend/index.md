@@ -28,6 +28,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [unenforced-declarations](common/api-design/unenforced-declarations.md) | Your system accepts declarative input (config file, DSL/manifest, policy block, schema annotation) and part of what a caller may write is unimplemented — an unknown key, a verb outside your vocabulary, or a knob recorded but never acted on; a user reports "I declared X and nothing happened"; choosing between reject/warn/ignore and where that strictness is selected |
 | [cors-and-preflight](common/api-design/cors-and-preflight.md) | A browser-based caller on a different origin fails with a CORS error in the console (a direct curl to the same endpoint works); deciding whether a change to an endpoint's method/headers/content-type will trigger an OPTIONS preflight; designing `Access-Control-*` headers for a credentialed vs public endpoint; allowlisting more than one origin |
 | [api-versioning-and-breaking-changes](common/api-design/api-versioning-and-breaking-changes.md) | An API has external callers you cannot enumerate or force-upgrade and you need to add/remove/rename/retype a field or endpoint; classifying a change as backward-compatible vs breaking; choosing a versioning mechanism (header vs URL); deprecating an old version (internal-only contract changes → [backend-common-change-impact-call-site-enumeration]) |
+| [agent-tool-granularity](common/api-design/agent-tool-granularity.md) | Adding agent capabilities to an app (MCP server, function-calling tools, plugin tools); choosing between exposing a workflow function and exposing primitives; an agent cannot perform an action the UI offers; reviewing a tool list for CRUD completeness, completion signaling, or UI/agent parity |
 
 ### change-impact
 
@@ -93,6 +94,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [completion-response-validation](common/llm/completion-response-validation.md) | Consuming OpenAI-compatible `/chat/completions` output as a final artifact (summary, document, notification); LLM responses coming back empty or truncated while HTTP status is 200; a reasoning-family model may be routed onto the alias you call |
 | [context-window-budget](common/llm/context-window-budget.md) | Repointing an LLM client or agent CLI at a different model, a self-hosted server (vLLM/Ollama), or a gateway (LiteLLM); setting `max_tokens` for a client whose default was sized for a larger model; the first request after such a switch returns 400 with a context-window error; deciding where to set the cap (request body vs client env var vs gateway config) and how to point the base URL at a proxy; handling truncation that arrives as a normal 200 |
+| [binding-instructions-for-agents](common/llm/binding-instructions-for-agents.md) | Authoring or editing a skill, system prompt, hook message, or CLAUDE.md/AGENTS.md rule that must change an agent's behavior under pressure; an instruction keeps getting rationalized around; choosing between prohibition, recipe, template-slot, and predicate-rule forms; writing a skill's description/trigger line |
 
 ### ml
 

@@ -8,7 +8,7 @@ sources:
   - https://www.debuggingbook.org/html/Intro_Debugging.html
   - https://sre.google/sre-book/effective-troubleshooting/
 last_verified: 2026-07-10
-related: [debugging-methodology-reproduce-first, debugging-methodology-hypothesis-testing, backend-common-change-impact-call-site-enumeration]
+related: [debugging-methodology-reproduce-first, debugging-methodology-hypothesis-testing, backend-common-change-impact-call-site-enumeration, testing-strategy-failing-test-first, qa-process-completion-claims]
 ---
 
 # Verifying a Fix Before Closing the Bug
@@ -29,7 +29,7 @@ with a stated mechanism. Work through every row:
 | Flip both directions | The repro must fail on the pre-fix build/commit and pass on the post-fix one; where feasible, re-introduce the faulty condition and watch the failure return — the mechanism confirmation from [debugging-methodology-hypothesis-testing] |
 | Eliminate state pollution | Run the verification from a clean state: clear caches (build cache, HTTP/browser cache, dependency cache), remove stale artifacts and hot-reload state, reset leftover DB rows — clean build, fresh session |
 | Intermittent bug | Run the repro the SAME amplified number of times that reliably failed before (amplification: wiki/debugging/concurrency/intermittent-failures.md) — one green run of a 1-in-20 bug proves nothing |
-| Pin with a regression test | Encode the repro as an automated test that fails without the fix and passes with it, so the bug cannot silently return (failing-test-first rule: wiki/testing/) |
+| Pin with a regression test | Encode the repro as an automated test that fails without the fix and passes with it, so the bug cannot silently return ([testing-strategy-failing-test-first]) |
 | Clean up the investigation | Remove debug logging/prints, temporary config/flags, commented-out experiments; diff the final change against the intent — everything not serving the fix reverts |
 | Scope check | List the other inputs/paths the confirmed mechanism implies (same root cause elsewhere) and confirm the fix covers them; re-run the edge cases of the touched code that worked before the fix |
 

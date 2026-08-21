@@ -2,8 +2,9 @@
 
 Route here for: release-quality process — acceptance criteria, gates,
 regression scoping, test-environment parity, post-release verification, bug
-reports, manual/exploratory testing, and automated verification of document
-deliverables (specs/RFCs). Writing automated test code → wiki/testing/;
+reports, manual/exploratory testing, evidence for completion claims, acting on
+code-review feedback, adversarial review of high-risk diffs, and automated
+verification of document deliverables (specs/RFCs). Writing automated test code → wiki/testing/;
 rollout/canary/rollback mechanics → wiki/infrastructure/.
 
 Match your situation to a "load when" line; load only matching pages.
@@ -19,6 +20,9 @@ Match your situation to a "load when" line; load only matching pages.
 | [post-release-verification](process/post-release-verification.md) | A release just deployed to production; defining what "released safely" means; an incident revealed a release was broken for hours before anyone noticed |
 | [scope-purity-checks](process/scope-purity-checks.md) | Proving a change/session/agent run touched nothing outside an allowed path set by filtering `git status --porcelain` output; a purity gate flags `?? dir/` for a directory that is wholly in scope; writing such a gate for an orchestration/CI workflow; a purity check in a permanent test suite fails on unrelated uncommitted files |
 | [defect-class-resweep-after-review](process/defect-class-resweep-after-review.md) | Addressing review findings when the remediation itself adds code (a new function, branch, call site, formatter); about to hand that diff to a verifier, an audit, or CI as "review comments addressed"; deciding whether a bot's acknowledged/resolved thread means the class is closed; reporting fix completeness as a class-with-method count rather than a per-finding list |
+| [completion-claims](process/completion-claims.md) | About to report work as done, fixed, or passing — to a human, a coordinator, a PR, or a commit message; about to write "should work" or "tests pass" without a fresh run; deciding what evidence a completion claim requires; relaying a subagent's success report |
+| [evaluating-review-feedback](process/evaluating-review-feedback.md) | Review findings arrived (human, bot, or reviewer agent) and you are deciding what to implement; a finding is unclear; a reviewer proposes robustness or features nothing uses; you disagree with a finding and are deciding how to respond |
+| [adversarial-change-review](process/adversarial-change-review.md) | Reviewing a diff ≥50 changed lines or one touching auth/payments/migrations/external APIs; a checklist review found nothing on a high-blast-radius change; deciding review depth for a risky diff; constructing failure scenarios (assumption violation, composition, cascade, abuse) |
 
 ## deliverables
 

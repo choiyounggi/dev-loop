@@ -7,8 +7,10 @@ A Claude Code plugin that merges two things into one self-contained tool:
 - **[loop-orchestrator]** — a methodology-grounded verification loop (TDD / PDCA /
   Reflexion) for driving one task, or many parallel tasks, to "done".
 - **[dev-llm-wiki]** — a case-routed, semantic-layer knowledge base of software
-  best-practices and edge cases, plus a planning methodology that grounds every
-  design decision in it.
+  best-practices, edge cases, and development-process methodology (test-first
+  ordering, review discipline, completion-evidence gates, agent-orchestration
+  decision policy, agent-facing tool/instruction design), plus a planning
+  methodology that grounds every design decision in it.
 
 And it scales past one session: the `orchestrate` skill is a **multi-session
 orchestrator** over the same loop — it decomposes a goal into a dependency
@@ -241,7 +243,7 @@ ordinary `gh pr create` in any repo.
 dev-loop/
 ├── .claude-plugin/{plugin,marketplace}.json
 ├── AGENTS.md INDEX.md templates/     # wiki schema + routing entry + page/brief/session-prompt templates
-├── wiki/                             # 10-domain semantic-layer knowledge base
+├── wiki/                             # 10-domain semantic-layer knowledge base (260 pages: best practices, edge cases, process methodology)
 ├── skills/                           # the 8 skills above (user-invocable; appear in the / menu by skill name)
 ├── agents/test-quality-auditor.md    # bundled independent test auditor (loop step 6.5)
 ├── hooks/

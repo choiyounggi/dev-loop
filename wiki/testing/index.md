@@ -1,9 +1,10 @@
 # testing — Domain Index
 
 Route here for: writing or structuring automated tests — choosing the test
-level, selecting cases and assertions, test data and isolation, mock/fake
-decisions, fixing flaky tests, verifying tests can actually fail, validating a
-check before its target exists, testing
+level, selecting cases and assertions, test-before-code ordering (failing test
+first), scoping tests for changes whose execution reaches other layers, test
+data and isolation, mock/fake decisions, fixing flaky tests, verifying tests
+can actually fail, validating a check before its target exists, testing
 async code (promises/timers/events), and browser E2E selector/wait/setup
 strategy. Release-process quality (gates, manual testing, bug triage) →
 wiki/qa/.
@@ -19,6 +20,8 @@ Match your situation to a "load when" line; load only matching pages.
 | [test-level-choice](strategy/test-level-choice.md) | Deciding at which level (unit/integration/e2e) to test new or changed behavior; reviewing a test plan's level distribution; logic buried in a controller or framework wiring needs coverage; a "pure" function's module runs I/O at import so its "unit" test needs a DB (and a function-level skip can't prevent it) |
 | [signal-delivery-to-a-process-under-test](strategy/signal-delivery-to-a-process-under-test.md) | Testing a program's SIGINT/Ctrl-C shutdown path; a `kill -INT` on a `&`-backgrounded PID is silently ignored and `wait` hangs to the harness timeout; the signal test passes by hand in a terminal but hangs in CI; choosing between a shell script and a subprocess driver for delivering signals |
 | [orm-generated-test-schema](strategy/orm-generated-test-schema.md) | Planning a regression test for a defect caused by the ORM model and the real database disagreeing (nullability, type, length, index); checking what a test profile's `ddl-auto`/schema source makes reproducible; choosing between a migration-built test database with `validate` and an `information_schema` comparison gate; reviewing a plan that promises to "add a test that reproduces" a drift-shaped defect |
+| [failing-test-first](strategy/failing-test-first.md) | Implementing new behavior or a bug fix and deciding the order of test and production code; a test passed on its first-ever run; production code exists that no test required; expected values are about to be copied from the code's own output; encoding a bug repro as a regression test |
+| [cross-layer-effect-tests](strategy/cross-layer-effect-tests.md) | About to mark a change tested when its tests exercise only the changed unit; the changed path fires callbacks/middleware/hooks/jobs/DB triggers; the change persists state in more than one step; several surfaces (API, CLI, job) expose the same changed logic; deciding whether unit-level coverage suffices for a change |
 
 
 ## quality

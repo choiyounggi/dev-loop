@@ -8,7 +8,7 @@ sources:
   - https://www.eecg.utoronto.ca/~yuan/papers/incorrect_fix_abstract.html
   - https://dl.acm.org/doi/10.1145/2025113.2025121
 last_verified: 2026-08-11
-related: [qa-process-regression-scope, backend-common-change-impact-call-site-enumeration, testing-quality-tests-that-cannot-fail]
+related: [qa-process-regression-scope, backend-common-change-impact-call-site-enumeration, testing-quality-tests-that-cannot-fail, qa-process-evaluating-review-feedback]
 ---
 
 # Re-Sweeping the Reviewed Defect Class Across Your Own Remediation Diff
@@ -44,7 +44,7 @@ Choosing what to *re-test* for the release around it →
 4. **Turn a class with two or more sites into one shared helper plus one test that
    asserts the property at every site**, so the next round's new site inherits the
    fix instead of needing to be found again
-   ([testing-quality-tests-that-cannot-fail] for making that assertion able to
+   ([testing-quality-tests-that-cannot-fail, qa-process-evaluating-review-feedback] for making that assertion able to
    fail).
 
 5. **Read the remediation diff as unreviewed code.** It was written under time
