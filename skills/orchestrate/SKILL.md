@@ -261,12 +261,16 @@ from `tmux display-message -p '#S'` only when the caller is itself inside tmux
 must pass `STATUS_SESSION=<lo-n-runid>` explicitly, or the record's `session`
 field is left absent rather than guessed from whatever tmux session happens to
 be active.
-`watch-status.sh` now exits **5** on a pending guardrails escalation (approve/deny,
-clear `.orchestration/escalations/`, then DELIVER the outcome to the now-idle
-worker with `scripts/send-prompt.sh send lo-<n> "approved — re-run: <cmd>, then
-continue"` or `"denied — <alternative>"` — the guardrails deny message told the
-worker the orchestrator would re-run it, so a cleared escalation without a
-delivered answer leaves it waiting forever — then relaunch) and **3** on a failed
+`watch-status.sh` now exits **5** on a pending guardrails escalation, one line per
+record naming its `recorded <ts>` next to the task's current `phase @<updatedAt>` —
+triage from that line alone: if the phase transition is LATER than the record, the
+worker already moved on by bypassing the denial, so `rm` the record WITHOUT
+delivering an answer (nothing is waiting for it). Otherwise the worker is still
+waiting: approve/deny, clear `.orchestration/escalations/`, then DELIVER the
+outcome to the now-idle worker with `scripts/send-prompt.sh send lo-<n> "approved —
+re-run: <cmd>, then continue"` or `"denied — <alternative>"` — the guardrails deny
+message told the worker the orchestrator would re-run it, so a cleared escalation
+without a delivered answer leaves it waiting forever — then relaunch. Exits **3** on a failed
 OR a *dead* worker (a non-terminal task whose tmux session vanished — recorded via
 the status file's `session` field) — both abort fast instead of waiting the
 timeout. It also exits **6** on a pending worker question and **7** on a live
