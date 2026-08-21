@@ -112,8 +112,38 @@ remove_worktrees() {
   for br in "$@"; do
     safe=$(printf '%s' "$br" | tr '/' '-'); wt="$root/.worktrees/$safe"
     [ -d "$wt" ] || continue
-    if [ -n "$("$GIT" -C "$wt" status --porcelain 2>/dev/null)" ]; then
-      echo "remove-worktrees: SKIP — uncommitted changes in $wt (never --force)." >&2
+    # `|| status_out=""` matters under `set -eu`: this is a bare top-level
+    # assignment (unlike the old `[ -n "$(...)" ]` form, where a substitution
+    # failure inside `[ ]` was immune to set -e), so a $wt that exists but has
+    # a stale/broken gitdir link (git fails, nonzero exit) would otherwise
+    # abort the WHOLE script here instead of degrading to "treat as clean,
+    # let `git worktree remove` below report FAILED and move on".
+    status_out=$("$GIT" -C "$wt" status --porcelain 2>/dev/null) || status_out=""
+    if [ -n "$status_out" ]; then
+      # Classify: any line NOT starting with `??` is tracked dirt (staged or
+      # modified); lines that are ALL `??` are untracked-only (e.g. worker
+      # scratch). Split on newline only (IFS) so a path containing spaces
+      # stays one element — reassigning "$@" here is safe: the enclosing
+      # `for br in "$@"` already snapshotted its own iteration list above.
+      oldifs=$IFS; IFS='
+'
+      set -- $status_out
+      IFS=$oldifs
+      tracked=0; upaths=""; ucount=0
+      for pline in "$@"; do
+        case "$pline" in
+          '??'*)
+            ucount=$((ucount + 1))
+            [ "$ucount" -le 3 ] && upaths="${upaths:+$upaths }${pline#???}"
+            ;;
+          *) tracked=1 ;;
+        esac
+      done
+      if [ "$tracked" -eq 1 ]; then
+        echo "remove-worktrees: SKIP — uncommitted changes in $wt (dirt=modified; never --force)." >&2
+      else
+        echo "remove-worktrees: SKIP — uncommitted changes in $wt (untracked-only: $upaths; never --force)." >&2
+      fi
       continue
     fi
     if [ "$DRY" -eq 1 ]; then echo "would remove: $wt"; continue; fi
@@ -240,13 +270,56 @@ sweep() {
   return 0
 }
 
+# Archive one worktree's untracked scratch (including info/exclude-excluded
+# files, e.g. the .claude/ scratch worker-guardrails.sh excludes — `ls-files
+# --others` WITHOUT --exclude-standard still lists them) into this run's
+# dated archive dir, then delete exactly the archived files from the
+# worktree, pruning directories left empty by that deletion. Tracked files
+# are never touched here. Copy-before-delete: a mkdir/cp failure aborts this
+# worktree's archive without deleting anything, so the caller's
+# remove_worktrees below still SKIPs it as dirty rather than half-deleting.
+# $1: worktree path  $2: this branch's worker-scratch destination dir
+archive_scratch() {
+  wt="$1"; adest="$2"
+  files=$("$GIT" -C "$wt" ls-files --others 2>/dev/null) || return 0
+  [ -n "$files" ] || return 0
+  oldifs=$IFS; IFS='
+'
+  set -- $files
+  IFS=$oldifs
+  if [ "$DRY" -eq 1 ]; then
+    for f in "$@"; do echo "would archive: $wt/$f"; done
+    return 0
+  fi
+  for f in "$@"; do
+    src="$wt/$f"
+    [ -f "$src" ] || continue
+    tgt="$adest/$f"
+    if ! mkdir -p "$(dirname "$tgt")" || ! cp -p "$src" "$tgt"; then
+      echo "teardown: FAILED to archive $src — worktree left in place" >&2
+      return 1
+    fi
+    rm -f "$src"
+    d=$(dirname "$src")
+    while [ "$d" != "$wt" ] && [ -d "$d" ]; do
+      rmdir "$d" 2>/dev/null || break
+      d=$(dirname "$d")
+    done
+  done
+  return 0
+}
+
 # Atomic, idempotent, run-scoped end-of-run teardown: derive (from THIS run's
-# own status records) -> remove_worktrees -> sweep -> archive. Archive runs
-# last because derivation and sweep both still need the status files in place.
+# own status records) -> archive worker scratch -> remove_worktrees -> sweep
+# -> archive. Archive runs last because derivation and sweep both still need
+# the status files in place.
 teardown() {
   root="${1:?teardown: repo-root required}"
   run_scope teardown || return 1
   JQ=$(command -v jq) || { echo "teardown: jq not found" >&2; return 127; }
+
+  adir="$root/.orchestration"
+  dest="$adir/archive-$(date +%Y%m%d)-$rid"
 
   # Derive this run's worktree branches from its own status/*.json records
   # only — NEVER a bare .worktrees/* glob, which would cross into concurrent
@@ -276,6 +349,17 @@ $br"
   fi
   # no status files or no worktrees -> proceed silently (idempotent)
   if [ -n "$branches" ]; then
+    # Archive each branch's untracked scratch BEFORE removal — including
+    # info/exclude-excluded scratch like .claude/ — so a worktree whose only
+    # dirt is scratch ends up clean and gets removed below instead of
+    # SKIPped; tracked modifications are untouched here and still make
+    # remove_worktrees SKIP exactly as before.
+    for br in $branches; do
+      safe=$(printf '%s' "$br" | tr '/' '-'); wt="$root/.worktrees/$safe"
+      [ -d "$wt" ] || continue
+      archive_scratch "$wt" "$dest/worker-scratch/$safe" \
+        || echo "teardown: scratch archive failed for $wt — left in place, will SKIP as dirty" >&2
+    done
     # deliberately unquoted: word-split the newline-joined list into separate
     # operands (POSIX sh has no arrays); safe because git ref names cannot
     # contain whitespace, so no branch here can be split mid-name.
@@ -283,11 +367,10 @@ $br"
   fi
   sweep "$root"
 
-  # Archive everything under .orchestration/ except prior archive-* dirs into
-  # one dated, run-scoped destination. mkdir -p makes a re-run reuse the same
-  # destination instead of failing.
-  adir="$root/.orchestration"
-  dest="$adir/archive-$(date +%Y%m%d)-$rid"
+  # Archive everything remaining under .orchestration/ except prior archive-*
+  # dirs into the same dated, run-scoped destination used for worker scratch
+  # above. mkdir -p makes a re-run reuse the same destination instead of
+  # failing.
   moved=0
   if [ -d "$adir" ]; then
     for e in "$adir"/*; do

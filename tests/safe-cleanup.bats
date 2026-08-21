@@ -627,6 +627,115 @@ lo-1-runB'
 }
 
 # ---------------------------------------------------------------------------
+# Task t3 — #129: teardown archives untracked worker scratch (including
+# excluded .claude/) before removal; tracked modifications still SKIP.
+# ---------------------------------------------------------------------------
+
+@test "teardown: untracked-only worker scratch (.claude/) is archived then the worktree is removed" {
+  _use_fake_tmux
+  root="$(_mkteardownrun td7)"
+  mkdir -p "$root/.worktrees/feat-own/.claude/tmp"
+  echo "notes" > "$root/.worktrees/feat-own/.claude/tmp/note.md"
+  export FAKE_ROSTER='lo-1-runA'
+  export LO_RUN_ID=runA
+  run sh "$SC" teardown "$root"
+  [ "$status" -eq 0 ]
+  [ ! -d "$root/.worktrees/feat-own" ]
+  archived="$root/.orchestration/archive-$(date +%Y%m%d)-runA/worker-scratch/feat-own"
+  [ -f "$archived/.claude/tmp/note.md" ]
+  run cat "$archived/.claude/tmp/note.md"
+  [ "$output" = "notes" ]
+}
+
+@test "teardown: a tracked modification still SKIPs the worktree, labeled dirt=modified" {
+  _use_fake_tmux
+  root="$(_mkteardownrun td8)"
+  echo "changed" > "$root/.worktrees/feat-own/f"   # f is tracked, committed before the worktree was branched
+  export FAKE_ROSTER='lo-1-runA'
+  export LO_RUN_ID=runA
+  run sh "$SC" teardown "$root"
+  [ "$status" -eq 0 ]
+  _has "$output" "dirt=modified"
+  [ -d "$root/.worktrees/feat-own" ]
+}
+
+@test "remove-worktrees: untracked-only scratch SKIPs the worktree, labeled untracked-only" {
+  root="${BATS_TEST_TMPDIR}/rw1"; _mkrepo "$root" >/dev/null
+  mkdir -p "$root/.worktrees/feat-t1/.claude"
+  echo "scratch" > "$root/.worktrees/feat-t1/.claude/note.md"
+  run sh "$SC" remove-worktrees "$root" feat/t1
+  [ "$status" -eq 0 ]
+  _has "$output" "untracked-only"
+  # the standalone verb never archives or deletes un-archived scratch
+  [ -d "$root/.worktrees/feat-t1" ]
+  [ -f "$root/.worktrees/feat-t1/.claude/note.md" ]
+}
+
+@test "teardown: dry-run announces would-archive for worker scratch and touches nothing" {
+  _use_fake_tmux
+  root="$(_mkteardownrun td9)"
+  mkdir -p "$root/.worktrees/feat-own/.claude/tmp"
+  echo "notes" > "$root/.worktrees/feat-own/.claude/tmp/note.md"
+  export FAKE_ROSTER='lo-1-runA'
+  export LO_RUN_ID=runA
+  run sh "$SC" teardown --dry-run "$root"
+  [ "$status" -eq 0 ]
+  _has "$output" "would archive: $root/.worktrees/feat-own/.claude/tmp/note.md"
+  [ -f "$root/.worktrees/feat-own/.claude/tmp/note.md" ]
+  [ -d "$root/.worktrees/feat-own" ]
+  [ ! -d "$root/.orchestration/archive-$(date +%Y%m%d)-runA" ]
+}
+
+@test "teardown: boundary — a clean worktree (no scratch) is removed with nothing scratch-specific archived" {
+  _use_fake_tmux
+  root="$(_mkteardownrun td10)"
+  export FAKE_ROSTER='lo-1-runA'
+  export LO_RUN_ID=runA
+  run sh "$SC" teardown "$root"
+  [ "$status" -eq 0 ]
+  [ ! -d "$root/.worktrees/feat-own" ]
+  [ ! -d "$root/.orchestration/archive-$(date +%Y%m%d)-runA/worker-scratch/feat-own" ]
+}
+
+# review r1/F1: a directory that exists at remove_worktrees' CONVENTIONAL path
+# (tr '/' '-' on the branch name) but is not the worktree the status record
+# actually points to, and carries a stale/broken gitdir link — `git status`
+# on it fails (nonzero exit). Under `set -eu`, a bare `status_out=$(...)`
+# assignment would abort the WHOLE script right there; the fix degrades that
+# to "treat as clean, let `worktree remove` report FAILED and move on" so
+# sweep and archive still run.
+@test "teardown: a broken (stale-gitdir) directory at the conventional worktree path does not abort sweep+archive" {
+  _use_fake_tmux
+  root="${BATS_TEST_TMPDIR}/td11"
+  mkdir -p "$root"
+  git -C "$root" init -q
+  git -C "$root" config user.email t@t; git -C "$root" config user.name t
+  echo x > "$root/f"; git -C "$root" add f; git -C "$root" commit -qm init
+  git -C "$root" branch feat/own
+  # the REAL worktree the status record points to lives elsewhere...
+  git -C "$root" worktree add -q "$root/.worktrees/feat-own-real" feat/own
+  # ...while a stray directory with a broken gitdir link squats at the
+  # conventional path remove_worktrees always recomputes independently.
+  mkdir -p "$root/.worktrees/feat-own"
+  echo "gitdir: $root/.git/worktrees/does-not-exist" > "$root/.worktrees/feat-own/.git"
+  mkdir -p "$root/.orchestration/status"
+  printf '{"task":"own","phase":"done","session":"lo-1-runA","worktree":"%s"}' \
+    "$root/.worktrees/feat-own-real" > "$root/.orchestration/status/own.json"
+  export FAKE_ROSTER='lo-1-runA'
+  export LO_RUN_ID=runA
+  run sh "$SC" teardown "$root"
+  [ "$status" -eq 0 ]
+  # teardown did NOT abort: the session was still swept...
+  killed=$(cat "$FAKE_KILL_LOG")
+  _has "$killed" "lo-1-runA"
+  # ...and .orchestration was still archived past the broken directory.
+  archived="$root/.orchestration/archive-$(date +%Y%m%d)-runA"
+  [ -f "$archived/status/own.json" ]
+  # the broken dir itself is reported/skipped, never force-removed
+  [ -d "$root/.worktrees/feat-own" ]
+}
+
+# ---------------------------------------------------------------------------
 # Task 06 — `list-orphans --stale`: read-only staleness annotation.
 # yes = every status record matching the session's run id is done|failed;
 # no = at least one is not; unknown = no matching record (archived, foreign
