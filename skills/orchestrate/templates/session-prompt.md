@@ -100,6 +100,12 @@ Approved. Commit your changes on {BRANCH} with a conventional message (no push, 
     arrives as a new prompt via send-prompt.sh. Do not poll, do not proceed
     on a guess.
 
+[3] If a guardrails denial was escalated and you then choose a workaround instead of
+    waiting for the coordinator's answer, DELETE your own record(s) first — every file
+    in `{ORCH_DIR}/escalations/` whose `.taskId` equals `{TASK}` — before proceeding.
+    A record's meaning is "answer still awaited"; leaving it in place after you've
+    already moved on strands the coordinator on stale state.
+
 **Orca substrate.** §O1–§O4 — one `--spec` per task-phase, delivered by Orca. Not
 send-keys: a `--spec` MAY span multiple lines. Each phase is a separate Task, so no
 prompt here says "wait" — the worker reports and ends its turn.
@@ -172,6 +178,10 @@ and report exactly once:
 [3] Forward a guardrails block instead of stalling on it — when a command is denied with
     an escalation notice, send
     `orca orchestration send --type escalation --subject "guardrails <rule>" --body "<command + why>" --task-id {ORCA_TASK_ID} --dispatch-id {ORCA_DISPATCH_ID} --json`.
+    If you then choose a workaround instead of waiting for the coordinator's answer,
+    DELETE your own record(s) first — every file in `{ORCH_DIR}/escalations/` whose
+    `.taskId` equals `{TASK}` — before proceeding; a record's meaning is "answer still
+    awaited".
 
 [4] Blocking question — `orca orchestration ask --question "<q>" --timeout-ms <n> --json`,
     then end your turn. Never open a local interactive prompt: no human is attached to

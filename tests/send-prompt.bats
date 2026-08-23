@@ -513,9 +513,11 @@ tpl_sections_single_line() {
   # reference became `{ORCH_DIR}/...` (issue #87): a worker's cwd is its own
   # worktree, which does not contain `.orchestration/`, so the bare relative
   # form resolved to nothing.
+  # Bumped from 2521059482/6502 when Orca rule [3] gained the
+  # escalation-record-cleanup obligation.
   run sh -c "sed -n '/^\*\*Orca substrate\.\*\*/,/^## Subagent usage protocol/p' '$TPL' | cksum"
   [ "$status" -eq 0 ]
-  [ "$output" = "2521059482 6502" ]
+  [ "$output" = "3279716624 6776" ]
 }
 
 @test "template: the Orca ask rule forbids deciding a timed-out question" {

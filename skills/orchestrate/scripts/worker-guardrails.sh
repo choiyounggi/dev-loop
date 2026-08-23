@@ -49,4 +49,12 @@ if ! grep -qxF '.groundwork/' "$excl" 2>/dev/null; then
   printf '.groundwork/\n' >> "$excl" 2>/dev/null \
     || echo "worker-guardrails: warn — could not exclude .groundwork/ in $wt" >&2
 fi
+
+# Claude worker sessions predictably create untracked .claude/ scratch in
+# their cwd; exclude it the same way as .groundwork/ above so it never
+# dirties the worker worktree's status (issue #129 proposal 1).
+if ! grep -qxF '.claude/' "$excl" 2>/dev/null; then
+  printf '.claude/\n' >> "$excl" 2>/dev/null \
+    || echo "worker-guardrails: warn — could not exclude .claude/ in $wt" >&2
+fi
 exit 0

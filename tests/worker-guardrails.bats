@@ -113,6 +113,38 @@ setup() {
   [ -f "$plain/.groundwork/guardrails.json" ]
 }
 
+# ---------------------------------------------------------------------------
+# Task t3 — #129: exclude the predictable .claude/ worker scratch too,
+# mirroring the .groundwork/ block above (D1).
+# ---------------------------------------------------------------------------
+
+@test "excludes .claude/ scratch, mirroring the .groundwork/ block" {
+  run sh "$WG" "$wt"
+  [ "$status" -eq 0 ]
+  excl=$(git -C "$wt" rev-parse --git-path info/exclude)
+  case "$excl" in /*) : ;; *) excl="$wt/$excl" ;; esac
+  run grep -cxF '.claude/' "$excl"
+  [ "$output" -eq 1 ]
+}
+
+@test "idempotent: a second run does not duplicate the .claude/ exclude" {
+  sh "$WG" "$wt"
+  run sh "$WG" "$wt"
+  [ "$status" -eq 0 ]
+  excl=$(git -C "$wt" rev-parse --git-path info/exclude)
+  case "$excl" in /*) : ;; *) excl="$wt/$excl" ;; esac
+  run grep -cxF '.claude/' "$excl"
+  [ "$output" -eq 1 ]
+}
+
+@test "boundary: a non-git directory still gets the config; the .claude/ exclude step is a silent no-op" {
+  plain="${BATS_TEST_TMPDIR}/plain2"; mkdir -p "$plain"
+  run sh "$WG" "$plain"
+  [ "$status" -eq 0 ]
+  [ -f "$plain/.groundwork/guardrails.json" ]
+  [ ! -f "$plain/.git/info/exclude" ]
+}
+
 # The real orchestrator shape. Note (measured): for a LINKED worktree git resolves
 # `--git-path info/exclude` to an ABSOLUTE path inside the MAIN repo, so the
 # exclusion is shared across worktrees rather than per-worktree — which is why the
