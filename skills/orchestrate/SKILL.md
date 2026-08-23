@@ -127,8 +127,18 @@ key without the signature, read it from the integration branch / its merged code
 rather than re-creating it. This is how "one sub-issue already done, do the rest"
 works safely.
 
-Either way, ask the user — one question at a time — until goal / scope / constraints
-/ done criteria are clear enough to decompose. Don't start until they are.
+Either way, map open decisions as a **design tree** — each decision branches into
+the decisions that hang off it — then run **frontier rounds**:
+- A decision belongs in the **frontier** when its prerequisites are already
+  settled; a decision whose answer depends on another still-open decision waits
+  for a later round.
+- A fact the environment can answer (repo state, config, docs) is the
+  orchestrator's job to look up — never asked of the user; only genuine
+  decisions go to the user.
+- Each round, ask the WHOLE frontier at once as one numbered list; every item
+  is a **question + a recommended answer** (never a bare open question).
+Repeat rounds until the frontier is empty — goal / scope / constraints / done
+criteria clear enough to decompose. Don't start until they are.
 
 ## Phase 1 — Environment branch
 - **git repo present** → create a feature (integration) branch + one worktree per
@@ -187,7 +197,9 @@ design links entirely — the original behavior.
 ## 🚦 Gate 1 — task-split approval (REQUIRED)
 Report the task list, the dependency graph (showing the expected flow as Waves is
 fine), the proposed **slot count with its rationale and what it protects**, and a
-rough cost note. **Wait for the
+rough cost note. Bundle every remaining open decision (task-set options, substrate
+choice) into that same report as one numbered frontier round, each item carrying a
+recommended answer — never a separate turn per decision. **Wait for the
 user's approval** before launching anything.
 
 **Substrate — ask here, in this same turn.** Before writing that report, run
