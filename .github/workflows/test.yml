@@ -51,7 +51,7 @@ jobs:
       # (a real release incident), so this step names the gate directly in
       # the CI summary rather than relying only on the bats run below.
       - name: Version gate (marketplace.json vs plugin.json)
-        run: sh scripts/check-versions.sh
+        run: bash scripts/check-versions.sh
 
       - name: Run bats suite
         run: bats tests/
