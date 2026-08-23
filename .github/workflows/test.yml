@@ -46,6 +46,13 @@ jobs:
           node scripts/wiki-structure-checks.js wiki
           node scripts/wiki-lint-prohibitions.js wiki
 
+      # marketplace.json and plugin.json duplicate the plugin version
+      # (scripts/check-versions.sh); this pair has drifted unenforced before
+      # (a real release incident), so this step names the gate directly in
+      # the CI summary rather than relying only on the bats run below.
+      - name: Version gate (marketplace.json vs plugin.json)
+        run: bash scripts/check-versions.sh
+
       - name: Run bats suite
         run: bats tests/
 
