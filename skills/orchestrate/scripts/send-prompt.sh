@@ -26,19 +26,34 @@
 #  5    —               deadline expired       —              —
 #  6    tmux command failed against a live session
 #  7    unconfirmed     —                      —              —
+#  8    lost            —                      —              —
 # 127   tmux not found
 #
-# stdout is exactly one token — delivered|queued|unconfirmed|picked-up|timeout|
-# ready|busy|gone|sent. Branch on the exit code; stderr is advisory context only
-# and must never be parsed.
+# 7 vs 8 (issue #7): exit 7 means the pane showed no fresh evidence but MAY
+# still have been delivered — nothing observed is not proof of failure. Do NOT
+# resend on a 7; cross-check with `wait`/`state` instead. Exit 8 means loss is
+# CONFIRMED — two quiet observations, LO_LOST_CONFIRM_DELAY apart, plus one
+# automatic full resend that also found nothing — safe to treat as genuinely
+# lost. cmd_send never reports 8 from a single unchanged capture.
+#
+# stdout is exactly one token — delivered|queued|unconfirmed|lost|picked-up|
+# timeout|ready|busy|gone|sent. Branch on the exit code; stderr is advisory
+# context only and must never be parsed.
 #
 # env:
 #   LO_QUEUED_PATTERN   substring meaning "queued behind a busy turn"
-#   LO_BUSY_PATTERN     substring meaning "mid-turn" (state only)
+#   LO_BUSY_PATTERN     substring meaning "mid-turn" (state only, and send's
+#                       delivered-via-busy-marker check)
 #   LO_PASTED_PATTERN   substring meaning "collapsed to an unsubmitted paste
 #                       placeholder" (issue #96, default: [Pasted text)
 #   LO_PANE_TAIL_LINES  non-empty pane lines searched for those (default 6)
 #   LO_CONFIRM_DELAY    seconds to settle before classifying a send (default 1)
+#   LO_STABLE_DELAY     seconds between pre-send pane-stabilization captures
+#                       (default 1; issue #7 keys->send redraw race guard)
+#   LO_STABLE_TRIES     max extra stabilization captures before giving up and
+#                       typing anyway (default 3; best-effort, non-blocking)
+#   LO_LOST_CONFIRM_DELAY  seconds before re-checking a candidate-lost pane a
+#                       second time (default 3; issue #7)
 #   LO_PICKUP_TIMEOUT   wait deadline in seconds (default 180)
 #   LO_PICKUP_INTERVAL  wait poll interval in seconds (default 2)
 set -eu
@@ -71,6 +86,17 @@ pasted_pat="${LO_PASTED_PATTERN:-[Pasted text}"
 # with an exit code that means nothing to the caller.
 confirm_delay="${LO_CONFIRM_DELAY:-1}"
 case "$confirm_delay" in ''|*[!0-9]*) confirm_delay=1 ;; esac
+
+# Extra pre-send capture pairs to wait for a settling pane (D5 — keys->send
+# redraw race guard, issue #7). Same sanitize pattern as confirm_delay above.
+stable_delay="${LO_STABLE_DELAY:-1}"
+case "$stable_delay" in ''|*[!0-9]*) stable_delay=1 ;; esac
+stable_tries="${LO_STABLE_TRIES:-3}"
+case "$stable_tries" in ''|*[!0-9]*) stable_tries=3 ;; esac
+
+# Seconds before re-checking a candidate-lost pane a second time (D3, issue #7).
+lost_confirm_delay="${LO_LOST_CONFIRM_DELAY:-3}"
+case "$lost_confirm_delay" in ''|*[!0-9]*) lost_confirm_delay=3 ;; esac
 
 usage() {
   cat >&2 <<'EOF'
@@ -137,6 +163,49 @@ note_pane() {
   [ -n "$last" ] && echo "send-prompt[$1]: $last" >&2 || true
 }
 
+# Last <= 40 bytes of the prompt (D2, issue #7): short enough to avoid
+# false-matching unrelated scrollback, long enough not to collide by accident.
+# validate_prompt already guarantees no control characters survive in it.
+prompt_fingerprint() {
+  printf '%s' "$1" | tail -c 40
+}
+
+# Type the prompt and submit it. Shared by cmd_send's initial send and its D4
+# lost-recovery resend so the two stay byte-identical.
+type_and_enter() {
+  # $1=session $2=prompt
+  failed=0
+  "$TMUX_BIN" send-keys -t "$(target_pane "$1")" -l -- "$2" || failed=1
+  [ "$failed" -eq 1 ] || "$TMUX_BIN" send-keys -t "$(target_pane "$1")" Enter || failed=1
+  if [ "$failed" -eq 1 ]; then
+    # A send can fail because the worker died mid-call. Re-ask rather than
+    # reporting a generic error for what is really a gone session.
+    session_alive "$1" || { echo "gone"; exit 3; }
+    echo "send-prompt: send-keys failed for live session '$1'" >&2
+    exit 6
+  fi
+}
+
+# Press Enter alone — cmd_send's self-heal retry (D2, issue #96/#7). Same
+# failure handling as type_and_enter's submit key.
+send_enter_or_die() {
+  if ! "$TMUX_BIN" send-keys -t "$(target_pane "$1")" Enter; then
+    session_alive "$1" || { echo "gone"; exit 3; }
+    echo "send-prompt: send-keys failed for live session '$1'" >&2
+    exit 6
+  fi
+}
+
+# True when the pane still looks like the prompt was buffered, not consumed:
+# either the [Pasted text] placeholder (issue #96) or — D2 — the prompt's own
+# fingerprint still sitting in a pane that shows no diff from before the send.
+# Both get the same bounded-Enter retry in cmd_send's heal loop.
+send_looks_unsubmitted() {
+  # $1=after $2=before $3=fingerprint
+  printf '%s' "$1" | grep -qF -- "$pasted_pat" 2>/dev/null && return 0
+  [ "$1" = "$2" ] && printf '%s' "$1" | grep -qF -- "$3" 2>/dev/null
+}
+
 cmd_state() {
   [ $# -eq 1 ] || usage
   validate_session "$1"
@@ -157,71 +226,121 @@ cmd_send() {
   [ $# -eq 2 ] || usage
   validate_session "$1"
   validate_prompt "$2"
-  if ! session_alive "$1"; then
+  sess="$1"; prompt="$2"
+  if ! session_alive "$sess"; then
     echo "gone"; exit 3
   fi
 
-  before=$(pane_tail "$1") || {
-    echo "send-prompt: capture-pane failed for live session '$1'" >&2; exit 6; }
+  # D5 (keys->send redraw race guard, issue #7): settle the pane before typing.
+  # A pane mid-redraw (chooser animation, spinner) can make an unrelated
+  # capture look like a diff; wait for two CONSECUTIVE identical captures, same
+  # command/flags every time (pane-delivery-confirmation: "same command and
+  # flags"). Best-effort — a pane that never settles (a live spinner) must not
+  # block forever, so this gives up after LO_STABLE_TRIES extra captures and
+  # sends anyway.
+  prev=$(pane_tail "$sess") || {
+    echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
+  tries=0
+  while [ "$tries" -lt "$stable_tries" ]; do
+    sleep "$stable_delay"
+    cur=$(pane_tail "$sess") || {
+      echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
+    tries=$((tries + 1))
+    if [ "$cur" = "$prev" ]; then
+      prev="$cur"
+      break
+    fi
+    prev="$cur"
+  done
+  before="$prev"
 
-  # The payload goes after '--'. Without it tmux parses a prompt that begins with
-  # '-' as its own flag ("unknown flag -n") and the prompt is never delivered.
-  # The prompt never reaches a shell: it is one argv element to tmux, so shell
-  # metacharacters in it are inert.
-  failed=0
-  "$TMUX_BIN" send-keys -t "$(target_pane "$1")" -l -- "$2" || failed=1
-  [ "$failed" -eq 1 ] || "$TMUX_BIN" send-keys -t "$(target_pane "$1")" Enter || failed=1
-  if [ "$failed" -eq 1 ]; then
-    # A send can fail because the worker died mid-call. Re-ask rather than
-    # reporting a generic error for what is really a gone session.
-    session_alive "$1" || { echo "gone"; exit 3; }
-    echo "send-prompt: send-keys failed for live session '$1'" >&2
-    exit 6
-  fi
+  fingerprint=$(prompt_fingerprint "$prompt")
+
+  # The payload goes after '--'. Without it tmux parses a prompt that begins
+  # with '-' as its own flag ("unknown flag -n") and the prompt is never
+  # delivered. The prompt never reaches a shell: it is one argv element to
+  # tmux, so shell metacharacters in it are inert.
+  type_and_enter "$sess" "$prompt"
 
   sleep "$confirm_delay"
-  after=$(pane_tail "$1") || {
-    echo "send-prompt: capture-pane failed for live session '$1'" >&2; exit 6; }
+  after=$(pane_tail "$sess") || {
+    echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
 
-  # Order is load-bearing, do not reorder. A busy pane still ECHOES the typed
-  # characters, so the pane changes even when the prompt was only queued —
-  # measured. Testing "did the pane change" first therefore reports a false
-  # "delivered" for exactly the case this script exists to catch.
-  if printf '%s' "$after" | grep -qF -- "$queued_pat" 2>/dev/null; then
-    note_pane "$1"
-    echo "queued"; exit 4
-  fi
-
-  # [Pasted text] guard (issue #96): the placeholder proves "buffered, not
-  # submitted" the same way queued_pat proves "buffered, not consumed" — so it
-  # gets the same retry-before-verdict treatment. Bounded to 3 extra Enters,
-  # mirroring launch-session.sh's submit-confirm loop; a pane still stuck after
-  # that is reported unconfirmed, never guessed delivered.
-  pasted_attempts=0
-  while printf '%s' "$after" | grep -qF -- "$pasted_pat" 2>/dev/null \
-    && [ "$pasted_attempts" -lt 3 ]; do
-    if ! "$TMUX_BIN" send-keys -t "$(target_pane "$1")" Enter; then
-      session_alive "$1" || { echo "gone"; exit 3; }
-      echo "send-prompt: send-keys failed for live session '$1'" >&2
-      exit 6
+  # resent: flag guard (not recursion) for the D4 one-shot lost-recovery
+  # resend, so a second confirmed-lost observation cannot trigger a second one.
+  resent=0
+  while :; do
+    # Order is load-bearing, do not reorder. A busy pane still ECHOES the typed
+    # characters, so the pane changes even when the prompt was only queued —
+    # measured. Testing "did the pane change" first therefore reports a false
+    # "delivered" for exactly the case this script exists to catch.
+    if printf '%s' "$after" | grep -qF -- "$queued_pat" 2>/dev/null; then
+      note_pane "$sess"
+      echo "queued"; exit 4
     fi
-    pasted_attempts=$((pasted_attempts + 1))
-    sleep "$confirm_delay"
-    after=$(pane_tail "$1") || {
-      echo "send-prompt: capture-pane failed for live session '$1'" >&2; exit 6; }
-  done
-  if printf '%s' "$after" | grep -qF -- "$pasted_pat" 2>/dev/null; then
-    note_pane "$1"
-    echo "unconfirmed"; exit 7
-  fi
 
-  if [ "$after" != "$before" ]; then
-    echo "delivered"; exit 0
-  fi
-  # Keys were written, but nothing observable happened. Report the uncertainty
-  # instead of defaulting to success.
-  note_pane "$1"
-  echo "unconfirmed"; exit 7
+    # Unsubmitted-text self-heal: the [Pasted text] placeholder (issue #96) OR
+    # the prompt's own fingerprint still sitting in a pane with no diff from
+    # before the send (D2, issue #7) — both mean "buffered, not consumed", so
+    # both get the same bounded-Enter retry, mirroring launch-session.sh's
+    # submit-confirm loop and cmd_wait's iteration-counted pattern (no
+    # `timeout`/`date -d`, macOS BSD userland).
+    heal_tries=0
+    while [ "$heal_tries" -lt 3 ] \
+      && send_looks_unsubmitted "$after" "$before" "$fingerprint"; do
+      send_enter_or_die "$sess"
+      heal_tries=$((heal_tries + 1))
+      sleep "$confirm_delay"
+      after=$(pane_tail "$sess") || {
+        echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
+    done
+    if send_looks_unsubmitted "$after" "$before" "$fingerprint"; then
+      note_pane "$sess"
+      echo "unconfirmed"; exit 7
+    fi
+
+    # D1: the target's own busy marker outranks a pane diff (pane-delivery-
+    # confirmation's evidence table: busy/queued indicator > pane diff) — a
+    # worker already mid-turn on this input is delivered, even when this
+    # capture window shows no textual change.
+    if printf '%s' "$after" | grep -qF -- "$busy_pat" 2>/dev/null; then
+      echo "delivered"; exit 0
+    fi
+
+    if [ "$after" != "$before" ]; then
+      echo "delivered"; exit 0
+    fi
+
+    # No queued/pasted/fingerprint/busy marker and no observable diff: a
+    # candidate for "lost" (case B) — but a single quiet capture is not proof;
+    # case A (delivered, evidence just hasn't appeared yet) looks identical for
+    # one instant ("Resend on the first unchanged capture" is the exact
+    # anti-pattern pane-delivery-confirmation names). Re-observe once before
+    # treating it as anything (D3).
+    sleep "$lost_confirm_delay"
+    after2=$(pane_tail "$sess") || {
+      echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
+    if [ "$after2" != "$after" ]; then
+      after="$after2"
+      continue
+    fi
+
+    # Same quiet observation twice. Flag-guarded (not recursive): resend once,
+    # then reclassify from the top; a second confirmed-quiet observation after
+    # that resend is the actual lost verdict (D4).
+    if [ "$resent" -eq 0 ]; then
+      resent=1
+      before="$after"
+      type_and_enter "$sess" "$prompt"
+      sleep "$confirm_delay"
+      after=$(pane_tail "$sess") || {
+        echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
+      continue
+    fi
+
+    note_pane "$sess"
+    echo "lost"; exit 8
+  done
 }
 
 # keys <session> <key>...
