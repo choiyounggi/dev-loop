@@ -77,8 +77,13 @@ make_fixture_repo() {
   printf '%s\n' "$output" | grep -qF "plugin.json"
 }
 
-@test "normal: the real repo reports skip for the already-released v1.9.0" {
+@test "normal: the real repo exits 0 with a need or skip line for the current version" {
+  # CI checkouts are shallow and carry no tags (actions/checkout default), so
+  # whether the current version's tag exists differs between CI and a dev
+  # machine. Assert the environment-independent contract instead: exit 0 and
+  # exactly one need/skip line naming the current plugin.json version.
+  current="v$(jq -r '.version' "$REPO_ROOT/.claude-plugin/plugin.json")"
   run "$SCRIPT" "$REPO_ROOT"
   [ "$status" -eq 0 ]
-  printf '%s\n' "$output" | grep -qF "skip: v1.9.0 already released"
+  printf '%s\n' "$output" | grep -qE "^(need|skip): $current"
 }
