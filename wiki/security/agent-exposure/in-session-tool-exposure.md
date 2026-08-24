@@ -8,7 +8,7 @@ sources:
   - https://developer.chrome.com/docs/ai/webmcp/secure-tools
   - https://webmachinelearning.github.io/webmcp/
 last_verified: 2026-08-18
-related: [frontend-agent-interfaces-agent-facing-tool-surfaces, security-input-validation-at-trust-boundaries]
+related: [frontend-agent-interfaces-agent-facing-tool-surfaces, security-input-validation-at-trust-boundaries, security-agent-exposure-authorization-scope-persistence]
 ---
 
 # Exposing Executable Tools to an Agent in a User's Session

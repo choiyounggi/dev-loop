@@ -6,8 +6,9 @@ applies_to: [general]
 confidence: field-tested
 sources:
   - https://github.com/obra/superpowers
-last_verified: 2026-08-22
-related: [backend-common-api-design-agent-tool-granularity]
+  - https://github.com/ayghri/i-have-adhd/blob/main/skills/i-have-adhd/SKILL.md
+last_verified: 2026-08-24
+related: [backend-common-api-design-agent-tool-granularity, backend-common-llm-progressive-disclosure-artifacts]
 ---
 
 # Instruction Text That Must Bind an LLM Agent's Behavior
@@ -45,6 +46,14 @@ description or trigger line that decides when an instruction loads.
 5. Write description/trigger fields as loading conditions only ("use when
    ..."). A description that summarizes the workflow gets followed as the
    workflow — the agent acts on the summary and skips the body's steps.
+6. For an output-shape rule, append a pre-send self-check the agent runs
+   against its own draft before emitting — phrased as observable predicates
+   ("does the first line state the action? does the last line commit to a
+   next step?"), each with the fix ("if not, delete it"). A rule stated only
+   at the top of a skill is applied at generation time and forgotten by the
+   final token; the self-check re-applies it to the finished output.
+   i-have-adhd's "Pre-send check" pairs each of its ten output rules with such
+   a predicate.
 
 ## Edge cases
 
@@ -65,3 +74,4 @@ description or trigger line that decides when an instruction loads.
 ## Sources
 
 - https://github.com/obra/superpowers — writing-skills skill and its testing references: baseline-fails-first discipline, form-matched-to-failure table with head-to-head wording measurements, nuance-clause degradation, description-as-trigger-only rule; field-tested across the framework's own skill suite
+- https://github.com/ayghri/i-have-adhd/blob/main/skills/i-have-adhd/SKILL.md — "Pre-send check": each output rule paired with a pre-emit self-check predicate and its fix

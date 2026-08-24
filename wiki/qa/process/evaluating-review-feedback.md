@@ -9,7 +9,7 @@ sources:
   - https://google.github.io/eng-practices/review/reviewer/standard.html
   - https://google.github.io/eng-practices/review/reviewer/looking-for.html
 last_verified: 2026-08-22
-related: [qa-process-defect-class-resweep-after-review, qa-process-adversarial-change-review]
+related: [qa-process-defect-class-resweep-after-review, qa-process-adversarial-change-review, qa-process-llm-review-pipelines]
 ---
 
 # Acting on Code Review Feedback

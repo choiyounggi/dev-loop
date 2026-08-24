@@ -23,6 +23,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [completion-claims](process/completion-claims.md) | About to report work as done, fixed, or passing — to a human, a coordinator, a PR, or a commit message; about to write "should work" or "tests pass" without a fresh run; deciding what evidence a completion claim requires; relaying a subagent's success report |
 | [evaluating-review-feedback](process/evaluating-review-feedback.md) | Review findings arrived (human, bot, or reviewer agent) and you are deciding what to implement; a finding is unclear; a reviewer proposes robustness or features nothing uses; you disagree with a finding and are deciding how to respond |
 | [adversarial-change-review](process/adversarial-change-review.md) | Reviewing a diff ≥50 changed lines or one touching auth/payments/migrations/external APIs; a checklist review found nothing on a high-blast-radius change; deciding review depth for a risky diff; constructing failure scenarios (assumption violation, composition, cascade, abuse) |
+| [llm-review-pipelines](process/llm-review-pipelines.md) | Building or configuring an automated LLM code-review pipeline (CI review bot, review skill, PR-reviewer agent); review token cost grows with changeset size; deciding which stages run as deterministic code vs model judgment; keeping review rules as matchable data not prompt prose; model-written comments land on wrong lines; measuring a precision-vs-recall threshold change |
 
 ## deliverables
 
