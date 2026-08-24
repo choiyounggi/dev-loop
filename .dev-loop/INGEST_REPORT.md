@@ -1,120 +1,72 @@
-# Ingest report — responsive-layout (frontend/design)
+# Ingest report — GitHub-trending agent-skill practices
 
-One new verified page: `wiki/frontend/design/responsive-layout.md` — the mobile-responsive
-layout contract for UI that must work across viewport sizes (320px phone → desktop).
-
-## Verified best-practice
-
-Every directive was live-verified this session by a research subagent that fetched each
-cited URL (web.dev, MDN, W3C WCAG Understanding docs, WebKit official blog):
-
-- Exact viewport meta `width=device-width, initial-scale=1`; zoom stays enabled —
-  `user-scalable=no`/`maximum-scale=1` block the ≥2× zoom WCAG requires and iOS
-  ignores them anyway (MDN Viewport_meta_element; ~980px virtual-viewport mechanism).
-- Mobile-first `min-width` layering with content-driven (not device-catalog)
-  breakpoints (web.dev responsive-web-design-basics, quoted).
-- Intrinsic layout before media queries: `repeat(auto-fit, minmax(<min>, 1fr))`
-  (web.dev patterns) and `@container`/`container-type` with intrinsic fallback (MDN).
-- Touch targets: 24×24 CSS px AA (WCAG 2.2 SC 2.5.8, 24px-circle spacing exception)
-  and 44×44 AAA (SC 2.5.5) — W3C Understanding docs.
-- `clamp()` fluid type gated on a 200%-zoom check — a clamp ceiling can fail
-  WCAG 1.4.4 (web.dev min-max-clamp, quoted).
-- `srcset`/`sizes` + explicit `width`/`height` for CLS-free responsive images (MDN img).
-- Horizontal-overflow mechanism: grid/flex `min-width: auto` → min-content floor,
-  fixed with `minmax(0, 1fr)` / `min-width: 0` (MDN min-width).
-- Edge cases: `vh`≈`lvh` vs `dvh`/`svh` (MDN length units), `@media (hover: hover)`
-  long-tap emulation (MDN), `viewport-fit=cover` + `env(safe-area-inset-*)` +
-  `max()` (WebKit blog 7929).
-- Final gate: 320px width, no horizontal scrolling (WCAG 1.4.10 reflow).
-
-Deliberately NOT ingested (unverifiable this session): Apple HIG 44pt and Material 3
-48dp exact figures (JS-rendered pages returned no body text — WCAG carries the
-target-size claims instead) and the rem-vs-px media-query sub-claim (no authoritative
-fetch performed). `confidence: verified`, 14 sources in frontmatter, each annotated
-in the page's Sources section with what it supports.
-
-## Existing-layer check
-
-Pages read: frontend-design-anti-slop-visual-design, frontend-design-html-in-canvas,
-frontend-accessibility-interactive-elements, frontend-performance-bundle-and-assets,
-frontend-rendering-long-lists, frontend-data-fetching-infinite-scroll.
-
-No existing page carries this trigger. Closest overlaps and how they were handled:
-- anti-slop-visual-design has one narrow-viewport edge-case row (overflow-x clip,
-  minmax(0,1fr)) — that row is symptom triage inside a visual-design audit, not a
-  responsive methodology; the new page owns the mechanism and the two are
-  cross-linked both ways (its edge case now routes to the new page and vice versa).
-- interactive-elements owns the full interactive contract; the new page's
-  touch-target row routes onward to it rather than duplicating.
-- bundle-and-assets owns image loading performance; the new page covers only the
-  responsive selection (`srcset`/`sizes`) + CLS reservation angle; related both ways.
-
-## Open-PR check
-
-`gh pr list --state open` returned zero rows at ingest time — no open knowledge PR
-touches frontend/design; routed as `new`.
-
-## Routing decision
-
-Domain `frontend` (web UI code), category `design` (existing — visual/layout design
-decisions; created 2026-08-20). New page rather than merge because the trigger
-(viewport-range layout, breakpoints, touch targets, zoom/reflow failures) matches no
-existing "load when" line. Plumbing: frontend/index.md +1 design row with the WCAG
-SC numbers in the load-when line, routing intro extended with responsive scope,
-log.md ingest entry appended. Lint: prohibition directives unchanged at 71 (no bats
-bump needed); structure checks 252 pages / 13 indexes / 0 findings; page body 63
-lines (≤120).
-
----
-
-# Ingest report — anti-slop theme-defaults reinforcement (same PR, second unit)
-
-Amends `wiki/frontend/design/anti-slop-visual-design.md` so a committed non-generic
-theme is framed as the DEFAULT for unspecced screens, not an upgrade.
+Distilled from a session analyzing the week's GitHub-trending repos. Ten repos
+were triaged; six carried transferable engineering practice, and five directive
+units were ingested (4 new pages + 1 amend). Four repos (airllm, airi,
+pascalorg/editor, microsoft/AI-For-Beginners) were out of domain or unverified
+at code level and dropped.
 
 ## Verified best-practice
 
-Primary source live-fetched: Anthropic Engineering, "Improving frontend design
-through Skills" (claude.com/blog, 2025-11-12). The contributor-supplied
-velog.io/@xxziiko post was confirmed to be its Korean translation (content
-cross-checked as matching). Ingested from it: default-font avoid-list
-(Inter/Roboto/Open Sans/Lato/system) with the distributional-convergence
-mechanism; feel-category font taxonomy; the second-order convergence warning
-(vary the escape choice — "Space Grotesk as the new Inter"); quantified extreme
-contrast (weights 100–200 vs 800–900, 3×+ size jumps); dominant-field +
-sharp-accent palettes with IDE-theme/cultural inspiration; domain-derived
-aesthetic direction; staggered page-load motion budget; right-altitude rule for
-authoring reusable design guidance. Secondary source live-fetched:
-github.com/pbakaus/impeccable README (gray-text-on-colored-background,
-bounce/elastic easing anti-patterns). The aurora-blob Instead-of row was
-reconciled with Anthropic's atmospheric-background endorsement instead of left
-contradictory.
+Every directive is cited to a source file confirmed live via `gh api` before
+writing (all 9 cited repo paths returned their `.path` — none fabricated):
 
-Deliberately NOT ingested: javaexpert.tistory.com/1624's deeper Impeccable quotes
-(the SKILL.md path it cites 404s — repo restructured, command set unstable
-17→23), the 16px body floor, and "adapt don't delete" (third-party, no stated
-mechanism, primary unverifiable).
+1. **Deterministic-preprocess × LLM-judgment review pipeline** — `alibaba/open-code-review`.
+   README "Core Design" + `skills/open-code-review/SKILL.md` (rule.json layering).
+   The ~1/9-token figure is the repo's own AACR-Bench measurement (50 repos /
+   200 PRs / 1,505 labels) — recorded as vendor-self-measured, not independently
+   reproduced. Corrects the source podcast's mis-stated "19%".
+2. **Progressive-disclosure knowledge artifact** — `virgiliojr94/book-to-skill`.
+   README "What it generates" + SKILL.md Step 7 (BOOK_TYPE × DEPTH budget
+   matrix) and Step 2.6 (grep/sed slice access for ≥50K-token originals).
+3. **Agent-skill/MCP supply-chain vetting** — `zhaoxuya520/reverse-skill`
+   `skills/ops/skill-supply-chain.md` (OWASP-cited pre-install checklist) +
+   `different-ai/openwork` `skills-lock.json` (source+hash pinning) +
+   `virgiliojr94/book-to-skill` `SECURITY-NOTICE.md` (documented malicious
+   re-upload: TLS bypass, wallet collection, C2).
+4. **Authorization-scope persistence for dangerous capabilities** —
+   `zhaoxuya520/reverse-skill` `skills/ops/scope-contract.md` (`scope.md` with
+   `auth.status: granted` gate, force-flag non-bypass, `network_profile`) +
+   `RULES.md`.
+5. **Pre-send self-check (amend)** — `ayghri/i-have-adhd`
+   `skills/i-have-adhd/SKILL.md` "Pre-send check" pairing each output rule with
+   a pre-emit predicate.
 
 ## Existing-layer check
 
-Pages read: frontend-design-anti-slop-visual-design, frontend-design-responsive-layout,
-frontend-design-html-in-canvas, frontend-accessibility-interactive-elements.
+Read the adjacent pages before writing to merge-not-duplicate. The
+progressive-disclosure and review-pipeline triggers were absent; the
+i-have-adhd self-check was the only genuinely new element over
+binding-instructions (its exception-hierarchy/precedence content is already
+covered there and was NOT re-ingested). block/buzz's audit-log design and
+openwork's 2-tool gateway were considered and rejected (off usage-context /
+below directive bar; the gateway is also in tension with agent-tool-granularity).
 
-Same trigger as anti-slop-visual-design (styling unspecced UI / avoiding the
-generated look) → merged into that page per the merge-before-create rule; no new
-page. Fluid-type clamp() guidance from the tistory post was already covered by
-this PR's responsive-layout page — not duplicated.
+Pages read: qa-process-evaluating-review-feedback, qa-process-adversarial-change-review, backend-common-llm-binding-instructions-for-agents, backend-common-llm-context-window-budget, backend-common-api-design-agent-tool-granularity, security-agent-exposure-in-session-tool-exposure, security-dependencies-supply-chain, infrastructure-agent-orchestration-autonomous-decision-rulings
 
 ## Open-PR check
 
-This PR (#122) is the only open knowledge PR; the amendment lands on its branch
-as a second commit, keeping one PR per flush.
+`gh pr list --state open` returned zero rows — no in-flight knowledge PR to
+deduplicate against. All five units routed as new/amend without conflict.
 
 ## Routing decision
 
-Domain frontend, category design, existing page amended: +2 frontmatter sources,
-+5 directive rows, +1 edge case, 2 rows reworded; frontend/index.md load-when
-line extended (theme direction as default; LLM design-guidance authoring).
-Confidence stays field-tested (page mixes Anthropic-verified and hallmark-distilled
-rules). Prohibition directives unchanged at 71; structure checks 252/13/0; body
-85 lines (≤120).
+- `qa/process/llm-review-pipelines` — NEW page. qa owns release-quality review
+  process; no existing category page carried the automated-LLM-review-pipeline
+  trigger.
+- `backend/common/llm/progressive-disclosure-artifacts` — NEW page. backend/llm
+  owns agent/LLM-artifact authoring; `context-window-budget` covers output-cap
+  sizing only, a different trigger.
+- `security/dependencies/agent-skill-supply-chain` — NEW page (not merged into
+  `supply-chain.md`): distinct trigger (executable agent skills vs npm/pip
+  packages), one-case-per-page. Cross-linked to `supply-chain` both ways.
+- `security/agent-exposure/authorization-scope-persistence` — NEW page.
+  agent-exposure owns what an agent is permitted to do; distinct from
+  `in-session-tool-exposure` (WebMCP browser tools). Linked to it and to
+  `autonomous-decision-rulings`.
+- `backend/common/llm/binding-instructions-for-agents` — AMEND (+Do-this #6,
+  +source). Same trigger, additive directive.
+
+Lint: `wiki-lint-prohibitions.js` → directives 71 / violations 0 (count
+unchanged, no bats bump needed). `wiki-structure-checks.js` → 265 pages, 0
+findings. bats wiki-lint suite → 17/17 pass.

@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://github.com/obra/superpowers
 last_verified: 2026-08-22
-related: [infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts]
+related: [infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, security-agent-exposure-authorization-scope-persistence]
 ---
 
 # Deciding Without a Human During an Unattended Run

@@ -11,7 +11,7 @@ sources:
   - https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/
   - https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates
 last_verified: 2026-07-10
-related: [security-secrets-secrets-in-code]
+related: [security-secrets-secrets-in-code, security-dependencies-agent-skill-supply-chain]
 ---
 
 # Trusting and Maintaining Third-Party Dependencies

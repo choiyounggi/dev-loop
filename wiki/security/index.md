@@ -26,6 +26,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [in-session-tool-exposure](agent-exposure/in-session-tool-exposure.md) | Exposing executable actions to an LLM agent operating inside a user's authenticated session (WebMCP tools, in-page assistant, browser-agent integration); deciding confirmation gating per tool consequence class; reviewing prompt-injection blast radius of a tool set |
+| [authorization-scope-persistence](agent-exposure/authorization-scope-persistence.md) | Authoring a skill or agent that can take consequential, hard-to-reverse actions against a target (active security scanning, exploitation, destructive ops, spending); authorization depends on the specific target and must be established before acting; keeping a `--force` flag from bypassing the authorization check; scoping network blast radius |
 
 ## authn
 
@@ -52,6 +53,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [supply-chain](dependencies/supply-chain.md) | Adding a dependency (add-vs-write decision, name verification, install scripts); updating dependencies (auto-update PRs, major versions, transitive CVE overrides); hardening against malicious/compromised packages (lockfiles, reproducible installs) |
+| [agent-skill-supply-chain](dependencies/agent-skill-supply-chain.md) | Installing or importing a third-party agent skill, plugin, or MCP server (Claude Code, opencode, a team skill marketplace); vetting an external SKILL.md before an agent can execute it; resolving the canonical owner of a trending skill repo; pinning skills by source+hash; a skill asks the agent to auto-register an MCP server; publishing skills for a team |
 
 ## incident-response
 
