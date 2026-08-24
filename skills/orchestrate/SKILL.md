@@ -562,11 +562,14 @@ exits — handle, then relaunch watch with the same target:
 
 ## Phase 4 — Implement + review (max 3 rework)
 Deliver §2 (implement) to each session with `scripts/send-prompt.sh send lo-<n>
-"<prompt>"` — **0** delivered, **4** queued behind a busy turn, **7** unconfirmed,
-**3** the session is gone, **2** the session name or prompt was rejected. Branch on
-the exit code; stdout is exactly one token and stderr is advisory context that must
-never be parsed. On **4**, `scripts/send-prompt.sh wait lo-<n> [timeout]` blocks
-until the worker picks it up (**0** picked-up, **5** deadline expired). Then
+"<prompt>"` — **0** delivered, **4** queued behind a busy turn, **7** unconfirmed
+(may still have been delivered — do not resend; cross-check with `wait`/`state`),
+**8** lost (confirmed: two quiet observations plus a failed automatic resend —
+safe to re-dispatch), **3** the session is gone, **2** the session name or prompt
+was rejected. Branch on the exit code; stdout is exactly one token and stderr is
+advisory context that must never be parsed. On **4**, `scripts/send-prompt.sh wait
+lo-<n> [timeout]` blocks until the worker picks it up (**0** picked-up, **5**
+deadline expired). Then
 `watch-status ... impl_done <N>`. *(Orca
 substrate: `task-create` the implement Task, then `scripts/orca-worker-start.sh
 --task <impl_task> --terminal <handle>` to reuse that task's existing session, and

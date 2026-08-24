@@ -211,16 +211,19 @@ mk_busy() {
   [ "$output" = "gone" ]
 }
 
-@test "send: a pane that shows no reaction is unconfirmed, never a false delivered" {
-  # Terminal echo off while the pane is busy: the keys go nowhere observable.
-  # "delivered" must be a positive finding, not the default when nothing is known.
+@test "send: a pane that shows no reaction at all is lost after a failed auto-resend" {
+  # Terminal echo off: the keys go nowhere observable, no fingerprint, no busy
+  # marker, no diff — this is exactly case B (D3/D4), not the old catch-all
+  # "unconfirmed". "delivered" must never be the default when nothing is known,
+  # and this specific nothing-at-all shape is the one the issue calls lost.
   mk_session
   tmux send-keys -t "$S" -l -- "stty -echo; sleep 8; stty echo"
   tmux send-keys -t "$S" Enter
   sleep 1
-  run --separate-stderr sh "$SP" send "$S" 'echo T3_INVISIBLE'
-  [ "$status" -eq 7 ]
-  [ "$output" = "unconfirmed" ]
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_CONFIRM_DELAY=1 LO_LOST_CONFIRM_DELAY=1 \
+    sh "$SP" send "$S" 'echo T3_INVISIBLE'
+  [ "$status" -eq 8 ]
+  [ "$output" = "lost" ]
 }
 
 @test "send: usage error when the prompt argument is missing" {
@@ -275,7 +278,10 @@ _enter_count() { grep -cx -- "-t =$S: Enter" "$FAKE_SEND_LOG"; }
 @test "send: a [Pasted text] placeholder cleared by one retry is delivered" {
   _use_fake_tmux_send
   printf '%s\n' 'READY>' '[Pasted text #1 +2 lines]' 'T3_PASTE_RAN' > "$FAKE_CAPTURES"
-  run --separate-stderr sh "$SP" send "$S" 'echo T3_PASTE'
+  # LO_STABLE_TRIES=0: the new D5 pre-send stabilization guard consumes extra
+  # capture-pane calls of its own — off here so this test's scripted capture
+  # sequence (before/after/retry) keeps its original meaning.
+  run --separate-stderr env LO_STABLE_TRIES=0 sh "$SP" send "$S" 'echo T3_PASTE'
   [ "$status" -eq 0 ]
   [ "$output" = "delivered" ]
   # submit Enter + exactly one retry Enter, never more once the placeholder clears
@@ -286,7 +292,7 @@ _enter_count() { grep -cx -- "-t =$S: Enter" "$FAKE_SEND_LOG"; }
   _use_fake_tmux_send
   printf '%s\n' 'READY>' '[Pasted text #1]' '[Pasted text #1]' '[Pasted text #1]' '[Pasted text #1]' \
     > "$FAKE_CAPTURES"
-  run --separate-stderr sh "$SP" send "$S" 'echo T3_STUCK'
+  run --separate-stderr env LO_STABLE_TRIES=0 sh "$SP" send "$S" 'echo T3_STUCK'
   [ "$status" -eq 7 ]
   [ "$output" = "unconfirmed" ]
   # submit Enter + exactly 3 bounded retries — never an unbounded loop
@@ -298,9 +304,100 @@ _enter_count() { grep -cx -- "-t =$S: Enter" "$FAKE_SEND_LOG"; }
   # placeholder guard, so no retry Enter is sent at all.
   _use_fake_tmux_send
   printf '%s\n' 'READY>' '[Pasted text #1] Press up to edit queued messages' > "$FAKE_CAPTURES"
-  run --separate-stderr sh "$SP" send "$S" 'echo T3_BOTH'
+  run --separate-stderr env LO_STABLE_TRIES=0 sh "$SP" send "$S" 'echo T3_BOTH'
   [ "$status" -eq 4 ]
   [ "$output" = "queued" ]
+  [ "$(_enter_count)" -eq 1 ]
+}
+
+# ------------------------------------------- send: rc=7 3-way split (issue #7)
+#
+# D1: busy marker outranks a pane diff. D2: the prompt's own fingerprint left
+# sitting in an un-advanced pane self-heals the same way the placeholder does.
+# D3/D4: "lost" requires two quiet observations AND one failed auto-resend —
+# never a verdict from a single unchanged capture. D5: a wobbling pane is
+# settled (two consecutive identical captures) before any key is typed.
+
+@test "send: a busy marker alone is delivered(0), even with no pane diff at all" {
+  # D1: the busy/queued indicator is stronger evidence than a text diff (pane-
+  # delivery-confirmation's evidence table) — same before/after content, busy
+  # marker present both times, must still classify as delivered, not lost.
+  _use_fake_tmux_send
+  printf '%s\n' 'WORKING... esc to interrupt' 'WORKING... esc to interrupt' > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_TRIES=0 sh "$SP" send "$S" 'echo T3_BUSY_CASE'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+}
+
+@test "send: negative control — the same unchanged pane WITHOUT a busy marker is not delivered" {
+  # Proves the busy case above can fail: identical before/after content, no
+  # busy marker this time, no fingerprint either — falls into the lost path
+  # (confirmed-quiet twice, resend also quiet), not delivered by the diff
+  # check (which the D1 test alone couldn't rule out).
+  _use_fake_tmux_send
+  printf '%s\n' 'IDLE>' 'IDLE>' 'IDLE>' 'IDLE>' 'IDLE>' > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_LOST_CONFIRM_DELAY=0 \
+    sh "$SP" send "$S" 'echo T3_NEGCTRL'
+  [ "$status" -eq 8 ]
+  [ "$output" = "lost" ]
+}
+
+@test "send: the prompt's own fingerprint sitting unsubmitted self-heals via Enter, then delivers" {
+  # D2: same trigger as the [Pasted text] case (buffered, not consumed) but
+  # detected via the prompt's own tail bytes instead of the placeholder text —
+  # covers CLIs that echo the literal prompt into an input box rather than
+  # collapsing it to a "[Pasted text]" marker.
+  _use_fake_tmux_send
+  printf '%s\n' '> echo T3_FP_HEALCASE' '> echo T3_FP_HEALCASE' 'T3_FP_HEALCASE_RAN' \
+    > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_TRIES=0 sh "$SP" send "$S" 'echo T3_FP_HEALCASE'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  # submit Enter + exactly one self-heal retry Enter
+  [ "$(_enter_count)" -eq 2 ]
+}
+
+@test "send: two quiet observations with a failed auto-resend is lost, exit 8" {
+  # D3+D4: no queued/pasted/fingerprint/busy marker, no diff, confirmed twice
+  # (LO_LOST_CONFIRM_DELAY apart), one automatic full resend also finds
+  # nothing — only THEN is it reported lost. Never on the first unchanged
+  # capture ("Resend on the first unchanged capture" — the exact anti-pattern
+  # pane-delivery-confirmation names).
+  _use_fake_tmux_send
+  printf '%s\n' 'IDLE>' 'IDLE>' 'IDLE>' 'IDLE>' 'IDLE>' > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_CONFIRM_DELAY=0 LO_LOST_CONFIRM_DELAY=0 \
+    sh "$SP" send "$S" 'echo T3_LOST_CASE'
+  [ "$status" -eq 8 ]
+  [ "$output" = "lost" ]
+  # exactly one resend: 2 sends (initial -l + Enter) + 2 sends (the one resend)
+  [ "$(grep -cx -- "-t =$S: -l -- echo T3_LOST_CASE" "$FAKE_SEND_LOG")" -eq 2 ]
+  [ "$(_enter_count)" -eq 2 ]
+}
+
+@test "send: a resend that succeeds is delivered, not lost" {
+  # D4's other branch: same lost-candidate setup, but the auto-resend produces
+  # a real diff, so it reports delivered instead of exhausting to lost.
+  _use_fake_tmux_send
+  printf '%s\n' 'IDLE>' 'IDLE>' 'IDLE>' 'T3_RESEND_RAN' > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_CONFIRM_DELAY=0 LO_LOST_CONFIRM_DELAY=0 \
+    sh "$SP" send "$S" 'echo T3_RESEND_OK'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  [ "$(grep -cx -- "-t =$S: -l -- echo T3_RESEND_OK" "$FAKE_SEND_LOG")" -eq 2 ]
+}
+
+@test "send: a wobbling pane is settled to two identical captures before any key is typed" {
+  # D5: the pane changes twice, then stabilizes; only the settled snapshot is
+  # used as "before", and no send-keys call happens until stabilization ends.
+  _use_fake_tmux_send
+  printf '%s\n' 'WOBBLE1' 'WOBBLE2' 'STABLE' 'STABLE' 'STABLE_DONE' > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_DELAY=0 LO_STABLE_TRIES=3 \
+    sh "$SP" send "$S" 'echo T3_STABLE_CASE'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  # 4 stabilization captures (WOBBLE1/WOBBLE2/STABLE/STABLE) + 1 post-send
+  # capture (STABLE_DONE) = 5 capture-pane calls total, all BEFORE any send.
+  [ "$(cat "$FAKE_CAPTURE_N")" -eq 5 ]
   [ "$(_enter_count)" -eq 1 ]
 }
 
