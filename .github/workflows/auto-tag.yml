@@ -1,0 +1,61 @@
+# Auto-tag + auto-release on every push to main.
+#
+# Today's flow is: bump .claude-plugin/plugin.json + marketplace.json via
+# PR (gated by scripts/check-versions.sh), merge, then hand-create tag
+# vX.Y.Z. This workflow automates the hand-create step: it runs
+# scripts/auto-tag.sh (detection only) against the post-merge main, and
+# when the version has no tag yet, creates and pushes it.
+#
+# Why this workflow also creates the GitHub Release itself, instead of
+# relying on .github/workflows/release.yml (which fires on `push: tags:
+# v*`): a tag pushed here using the default GITHUB_TOKEN does NOT trigger
+# other workflow runs — GitHub's recursion guard suppresses events
+# triggered by the GITHUB_TOKEN's own actions, to stop workflows from
+# retriggering each other in a loop. So `git push origin "$tag"` below
+# would silently never fire release.yml. release.yml is kept as-is for the
+# manual path (a human running `git tag vX.Y.Z && git push origin vX.Y.Z`
+# locally, with their own credentials, still triggers it normally).
+name: Auto-tag release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # needed to create + push the tag and create the Release
+
+concurrency:
+  group: auto-tag-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  auto-tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full tag history for auto-tag.sh
+
+      - name: Detect and create release tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # MUST run under bash, never sh: ubuntu's /bin/sh is dash, and
+          # this script relies on `set -o pipefail` (bash-only) — running it
+          # under sh silently drops pipefail and broke this repo's CI before.
+          output=$(bash scripts/auto-tag.sh)
+          echo "$output"
+
+          case "$output" in
+            need:*)
+              tag=$(echo "$output" | awk '{print $2}')
+              git tag "$tag"
+              git push origin "$tag"
+              gh release create "$tag" --generate-notes
+              ;;
+            skip:*)
+              echo "Nothing to do."
+              ;;
+          esac
