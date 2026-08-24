@@ -74,7 +74,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
-| [interactive-elements](accessibility/interactive-elements.md) | Building/reviewing any clickable or keyboard-operable UI (buttons, links, toggles, menus, dialogs, custom widgets); asked to make a div clickable; fixing focus/tab order |
+| [interactive-elements](accessibility/interactive-elements.md) | Building/reviewing any clickable or keyboard-operable UI (buttons, links, toggles, menus, dialogs, custom widgets); asked to make a div clickable; fixing focus/tab order; implementing a dropdown/tooltip/toast overlay or disabling background content behind an overlay |
 
 ## design
 
