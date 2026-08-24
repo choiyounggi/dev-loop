@@ -79,7 +79,11 @@ starting the next, so a downstream task always builds on a verified upstream one
 
    ── for each task, in Task order: ──
 0. Define done       — from the task's Objective + Verify + the plan's Deliverables:
-                        write this task's pass/fail checklist FIRST.            [DoD/XP]
+                        write this task's pass/fail checklist FIRST, as a gates
+                        ledger file `.dev-loop/gates/<task-id>.md` (copy
+                        `templates/gates.md`): each machine-checkable criterion
+                        gets CHECK:/EXPECT:, manual ones EVIDENCE only.
+                        (See "Gates ledger" below.)                             [DoD/XP]
 1. Analyze + load refs— read THIS task's "Wiki pages (read these first, only
                         these)" — the pages `wiki-plan` navigated to — and load
                         exactly those from `${CLAUDE_PLUGIN_ROOT}/wiki/`, plus the
@@ -105,8 +109,10 @@ starting the next, so a downstream task always builds on a verified upstream one
                         Otherwise call the test-quality-auditor subagent with
                         the task brief, the diff, the test paths, and the
                         floor result. (self-grading guard)
-7. Judge against done — PASS only if the checklist is met AND the auditor returns
-                        VERDICT: PASS. Emit the task report (format below, with the
+7. Judge against done — PASS only if gate-check --run exits 0 on this task's
+                        ledger (every gate MET with recorded evidence, or
+                        visibly ABANDONED) AND the auditor returns VERDICT:
+                        PASS. Emit the task report (format below, with the
                         WIKI: references you applied).                          [DoD / evaluator]
    - PASS  -> next task in Task order (back to step 0), until all tasks done.
    - FAIL  -> 7b.
@@ -149,6 +155,8 @@ TASK:   <NN-slug>
 CHANGED: <each file created/modified, one per line>
 TESTS:  <n cases; the Red->Green transition; auditor VERDICT>
 VERIFY: <the task's Verify command → actual result>
+GATES:  <met=N unmet=N abandoned=N from gate-check; EVERY abandonment listed
+         as "id — reason" — a silently dropped gate is never allowed>
 WIKI:   <page id applied → the row/directive followed, one line each>
 NOTES:  <deviations (should be none); for BLOCKED: the exact missing decision/
          input, as a one-line question wiki-plan can answer>
@@ -228,8 +236,34 @@ other agents by name (e.g. a code-reviewer) — they may not exist in the user's
 environment. For optional exploration you may delegate to the core Agent tool
 generically, without depending on a specific agent name.
 
+## Gates ledger (steps 0 and 7)
+
+The done-checklist is not prose in context — it is a file the machine can
+judge, so "done" survives long sessions and is never a self-report. At step 0
+write `.dev-loop/gates/<task-id>.md` from `templates/gates.md`; at step 7 run:
+
+```
+sh ${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh --run .dev-loop/gates/<task-id>.md
+```
+
+- The checker executes each runnable gate's `CHECK:` itself; a gate is MET
+  only on exit 0 AND the `EXPECT:` token in the output. It flips the box and
+  records the evidence — never tick a runnable gate by hand.
+- A checked box whose `EVIDENCE:` still reads `pending` is CLAIMED — a
+  done-claim without proof, treated as worse than unchecked.
+- An impossible gate is abandoned in the open (`ABANDON: <id> <reason>`),
+  never deleted; every abandonment appears on the report's `GATES:` line.
+- The plugin's Stop hook (loop-gate) parses these ledgers — without executing
+  commands — and blocks the session from ending while gates are UNMET or
+  CLAIMED (bounded: it releases after 6 stops with no ledger progress). So a
+  session cannot quietly end on an unproven "done".
+- Keep `.dev-loop/` out of version control (it is workspace state, like
+  `.orchestration/`); add it to the project's `.gitignore` once.
+
 ## Guardrails (do not violate)
 - Never weaken, delete, or skip tests to make them pass. Green must be honest.
+- Never tick a runnable gate by hand or hand-write its EVIDENCE — only
+  gate-check.sh --run records proof. Ledger green must be honest too.
 - Bounded retry: at most 3 attempts; then stop and escalate the real failure.
 - "I don't know" / "unverified" never counts as pass — stop and report.
 - Scale to size: trivial tasks (typos, config values, simple renames) are out of

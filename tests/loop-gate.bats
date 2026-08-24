@@ -115,3 +115,118 @@ _run_gate() { # <cwd> <stop_hook_active>
   run _run_gate "$WS" false
   [ "$status" -eq 0 ]
 }
+
+# --- Gate 2: gates ledger (.dev-loop/gates/*.md) ---
+
+_write_unmet_ledger() { # <dir>
+  mkdir -p "$1"
+  cat > "$1/t1.md" <<'EOF'
+- [ ] G1: tests pass
+  CHECK: true
+  EXPECT: ok
+  EVIDENCE: pending
+EOF
+}
+
+_write_met_ledger() { # <dir>
+  mkdir -p "$1"
+  cat > "$1/t1.md" <<'EOF'
+- [x] G1: tests pass
+  CHECK: true
+  EXPECT: ok
+  EVIDENCE: exit=0 matched: ok
+EOF
+}
+
+@test "gates: unmet gate blocks with exit 2 and names it" {
+  _write_unmet_ledger "$WS/.dev-loop/gates"
+  run _run_gate "$WS" false
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"UNMET"* ]]
+  [[ "$output" == *"G1"* ]]
+}
+
+@test "gates: all met allows stop and clears counter state" {
+  _write_met_ledger "$WS/.dev-loop/gates"
+  printf '{"sessions":{"1":{"hash":"x","blocks":3}}}' > "$WS/.dev-loop/gate-hook-state.json"
+  run _run_gate "$WS" false
+  [ "$status" -eq 0 ]
+  [ ! -f "$WS/.dev-loop/gate-hook-state.json" ]
+}
+
+@test "gates: checked box with pending evidence (CLAIMED) blocks" {
+  mkdir -p "$WS/.dev-loop/gates"
+  cat > "$WS/.dev-loop/gates/t1.md" <<'EOF'
+- [x] G1: claimed done
+  CHECK: true
+  EXPECT: ok
+  EVIDENCE: pending
+EOF
+  run _run_gate "$WS" false
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"CLAIMED"* ]]
+}
+
+@test "gates: malformed ledger blocks (an error is not completion)" {
+  mkdir -p "$WS/.dev-loop/gates"
+  printf '# just a title, no gates\n' > "$WS/.dev-loop/gates/t1.md"
+  run _run_gate "$WS" false
+  [ "$status" -eq 2 ]
+}
+
+@test "gates: abandoned-only ledger allows stop" {
+  mkdir -p "$WS/.dev-loop/gates"
+  cat > "$WS/.dev-loop/gates/t1.md" <<'EOF'
+- [ ] G1: impossible
+  EVIDENCE: pending
+ABANDON: G1 upstream removed the API
+EOF
+  run _run_gate "$WS" false
+  [ "$status" -eq 0 ]
+}
+
+@test "gates: enforced even when stop_hook_active=true" {
+  _write_unmet_ledger "$WS/.dev-loop/gates"
+  run _run_gate "$WS" true
+  [ "$status" -eq 2 ]
+}
+
+@test "gates: releases after 6 blocks without ledger progress" {
+  _write_unmet_ledger "$WS/.dev-loop/gates"
+  for i in 1 2 3 4 5 6; do
+    run _run_gate "$WS" false
+    [ "$status" -eq 2 ]
+  done
+  run _run_gate "$WS" false
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"releasing"* ]]
+}
+
+@test "gates: ledger progress resets the no-progress counter" {
+  _write_unmet_ledger "$WS/.dev-loop/gates"
+  for i in 1 2 3; do run _run_gate "$WS" false; done
+  # progress: the ledger content changes (a second gate appears)
+  cat >> "$WS/.dev-loop/gates/t1.md" <<'EOF'
+- [ ] G2: another outcome
+  CHECK: true
+  EXPECT: ok
+  EVIDENCE: pending
+EOF
+  run _run_gate "$WS" false
+  [ "$status" -eq 2 ]
+  blocks=$(jq -r '.sessions | to_entries[0].value.blocks' "$WS/.dev-loop/gate-hook-state.json")
+  [ "$blocks" -eq 1 ]
+}
+
+@test "gates: no gates dir keeps legacy behavior (exit 0, unmanaged)" {
+  run _run_gate "$WS" false
+  [ "$status" -eq 0 ]
+}
+
+@test "gates: phase gate fires before ledger gate in a managed worktree" {
+  printf '{"worktree":"%s","phase":"implementing"}' "$WS" > "$WS/.orchestration/status/t1.json"
+  _write_unmet_ledger "$WS/.dev-loop/gates"
+  run _run_gate "$WS" false
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"phase=implementing"* ]]
+}
