@@ -258,7 +258,7 @@ sub_iters=$(( submit_timeout / submit_interval )); [ "$sub_iters" -ge 1 ] || sub
 fingerprint=$(printf '%s' "$prompt" | cut -c1-40)
 
 input_box() { # $1 = pane text -> the input-box region, or rc 1 if not locatable
-  _rules=$(printf '%s\n' "$1" | grep -n '^[[:space:]]*─\{3,\}[[:space:]]*$' | cut -d: -f1)
+  _rules=$(printf '%s\n' "$1" | grep -nE '^[[:space:]]*(─){3,}[[:space:]]*$' | cut -d: -f1)
   [ "$(printf '%s' "$_rules" | grep -c .)" -ge 2 ] || return 1
   _last=$(printf '%s\n' "$_rules" | tail -1)
   _prev=$(printf '%s\n' "$_rules" | tail -2 | head -1)
