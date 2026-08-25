@@ -1,0 +1,48 @@
+# Fail loudly when a dev-loop release has not reached installed users.
+#
+# dev-loop is installed as `dev-loop@groundwork`, and groundwork's marketplace
+# entry pins an exact tag (`source.ref: vX.Y.Z`). Tagging + publishing a Release
+# here distributes nothing until that pin moves, and the hand-step has been
+# missed before (v1.11.0 shipped while `/plugin` reported 1.10.0 as latest).
+#
+# groundwork's own hourly `sync-dev-loop-pin` workflow opens the bump PR, so
+# drift that survives this check means the PR was never merged.
+
+name: pin drift
+
+on:
+  schedule:
+    - cron: "43 */6 * * *" # every 6 hours, offset off the hour
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pin-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the latest release tag and groundwork's pinned ref
+        id: refs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          latest=$(gh api repos/choiyounggi/dev-loop/releases/latest --jq .tag_name)
+          pinned=$(curl -fsSL https://raw.githubusercontent.com/choiyounggi/groundwork/main/.claude-plugin/marketplace.json \
+            | jq -r '.plugins[] | select(.name == "dev-loop") | .source.ref // ""')
+          echo "latest release: $latest"
+          echo "groundwork pin: $pinned"
+          {
+            echo "latest=$latest"
+            echo "pinned=$pinned"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Compare
+        env:
+          LATEST: ${{ steps.refs.outputs.latest }}
+          PINNED: ${{ steps.refs.outputs.pinned }}
+        run: bash scripts/check-pin-drift.sh "$LATEST" "$PINNED"

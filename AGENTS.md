@@ -207,3 +207,36 @@ PATH=/opt/homebrew/bin:$PATH bats tests/
 `tests/bash-version-guard.bats` refuses to run under bash < 4, and
 `tests/canary/mid-test-assertion-canary.bats` (run inverted in CI) proves
 mid-test assertion failures are still detectable.
+
+## Releasing (four steps, all four required)
+
+dev-loop is installed as `dev-loop@groundwork`, and groundwork's marketplace
+entry is **tag-pinned** (`source: {source: url, url: …dev-loop.git, ref: vX.Y.Z}`).
+Claude Code checks out exactly that ref, so a merged PR — even a tagged, published
+release — reaches nobody until the pin moves. Every dev-loop release runs all four:
+
+1. Bump the version in **both** `.claude-plugin/plugin.json` and
+   `.claude-plugin/marketplace.json` (a repo-wide grep for the old version finds
+   both; `scripts/check-versions.sh` fails the build if they disagree). Merge.
+2. Confirm the tag: `auto-tag.yml` cuts `vX.Y.Z` and `release.yml` publishes it —
+   verify with `gh release list` that the new tag shows as **Latest**.
+3. Move the pin in `choiyounggi/groundwork`: `scripts/sync-dev-loop-pin.sh vX.Y.Z`,
+   then merge that PR. groundwork's hourly `sync-dev-loop-pin` workflow opens it
+   on its own; `gh workflow run sync-dev-loop-pin.yml --repo choiyounggi/groundwork`
+   triggers it immediately instead of waiting.
+4. Tell the user to run `/plugin marketplace update groundwork` then
+   `/plugin update dev-loop@groundwork`. Nothing before this step changes what a
+   running session loads; live orchestrate workers keep their cached copy until
+   relaunched.
+
+Step 3 is the one that gets skipped. Symptom: `/plugin` reports the *old* version
+as latest right after a successful release — that is a stale pin, not a broken
+release. Diagnose by reading the `source.ref` in groundwork's marketplace.json
+(`~/.claude/plugins/marketplaces/groundwork/.claude-plugin/marketplace.json` locally,
+or the raw file on `main`), never from `gh release list` in this repo. The
+`pin-drift` workflow fails every 6 hours while the pin is behind, and
+`scripts/check-pin-drift.sh <latest-tag> <pinned-ref>` runs the same check by hand.
+
+A CI-only change (workflows, tests, scripts not shipped to users) does not need a
+version bump — step 1 applies to anything a plugin consumer loads: skills, hooks,
+wiki pages, templates, references.
