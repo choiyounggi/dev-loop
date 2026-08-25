@@ -17,6 +17,43 @@ orchestrator→session via `launch-session.sh` (the first prompt) then
 `send-prompt.sh` (every later one), carrying templates/session-prompt.md §1–§4 on
 tmux, or the Task `--spec` (same file, §O1–§O4) on Orca.
 
+## Asking the user — every question is a chooser (REQUIRED)
+Every question this skill puts to the **user** is delivered with the
+**AskUserQuestion** tool, so they answer by selecting an option instead of typing
+a reply. Prose in the turn is the *briefing* (task list, graph, slot count, cost
+note, diff); the *decision* is always the tool call. This covers Phase 0 frontier
+rounds, Gate 1 (task split **and** substrate), Gate 2, a Phase 3 deadlock, and any
+worker escalation that needs a human verdict.
+
+**Required shape**
+- One call per round, up to 4 questions in it. A frontier wider than 4 → back-to-back
+  calls of ≤4 questions, numbering continuous across them; never one question per turn.
+- Each question carries 2–4 options; the **recommended answer is option 1**, its
+  label suffixed `(Recommended)`. `header` ≤12 chars.
+- Options are the concrete outcomes ("approve as proposed", "drop task 3", "Orca"),
+  not a yes/no restatement of the prose.
+- `multiSelect: true` when the items are independent (e.g. which optional tasks to include).
+- Free-text is already available to the user as "Other" — never author an "Other" option.
+
+**Predicate-keyed**
+
+| Situation | Ask |
+|---|---|
+| Phase 0, frontier of open decisions | one question per frontier item, ≤4 per call, each with its recommended answer |
+| Gate 1, `orca-detect.sh` non-zero (no Orca) | Q1 task split: approve as proposed / revise / abort. Say nothing about substrates |
+| Gate 1, `orca-detect.sh` exit 0 (Orca present) | the SAME call carries Q1 task split **and** Q2 substrate: Orca / tmux |
+| Gate 2, after showing the integration diff | Q1: merge / send back for rework / abort |
+| Phase 3 deadlock, or an escalation needing a human | options = the concrete resolutions available, not "how should I proceed?" |
+| You are a **worker** session (templates/session-prompt.md) | never AskUserQuestion — escalate via `ask-coordinator.sh`; only the coordinator asks the user |
+
+**Pre-send check** — before ending any turn that asks the user something: does this
+turn contain an AskUserQuestion call? Is the recommended option first and labelled?
+If the turn instead ends with a question in prose, delete that prose question and
+re-send it as the tool call. Enforcement is machine-side too: the
+`orchestrate-ask-gate.sh` PreToolUse hook denies `launch-session.sh` /
+`orca-worker-start.sh` / `orca-spawn.sh` until this session's transcript shows the
+AskUserQuestion (and, when Orca is detected, one naming the substrate choice).
+
 ## Tool profile
 Resolve the pluggable tool profile once up front:
 `sh ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh --summary`. It maps capability
@@ -135,8 +172,9 @@ the decisions that hang off it — then run **frontier rounds**:
 - A fact the environment can answer (repo state, config, docs) is the
   orchestrator's job to look up — never asked of the user; only genuine
   decisions go to the user.
-- Each round, ask the WHOLE frontier at once as one numbered list; every item
-  is a **question + a recommended answer** (never a bare open question).
+- Each round, ask the WHOLE frontier at once — as **AskUserQuestion** questions
+  (§ Asking the user), one per frontier item, each a **question + a recommended
+  answer** (never a bare open question, never prose the user must type back).
 Repeat rounds until the frontier is empty — goal / scope / constraints / done
 criteria clear enough to decompose. Don't start until they are.
 
@@ -197,15 +235,18 @@ design links entirely — the original behavior.
 ## 🚦 Gate 1 — task-split approval (REQUIRED)
 Report the task list, the dependency graph (showing the expected flow as Waves is
 fine), the proposed **slot count with its rationale and what it protects**, and a
-rough cost note. Bundle every remaining open decision (task-set options, substrate
-choice) into that same report as one numbered frontier round, each item carrying a
-recommended answer — never a separate turn per decision. **Wait for the
-user's approval** before launching anything.
+rough cost note. That report is the briefing; the approval itself is **one
+AskUserQuestion call** (§ Asking the user) in the same turn — Q1 the task split
+(approve as proposed / revise / abort). Bundle every remaining open decision
+(task-set options, substrate choice) into that same call as further questions,
+each with a recommended answer — never a separate turn per decision, never a
+prose question. **Wait for the user's approval** before launching anything.
 
 **Substrate — ask here, in this same turn.** Before writing that report, run
 `scripts/orca-detect.sh`. Non-zero (no Orca): tmux, silently — say nothing about
-substrates. Exit 0: report that Orca was detected and put the choice in this same
-report — **Orca**: native trust-screen handling, event-driven waits, native
+substrates. Exit 0: report that Orca was detected and carry the choice as a
+**question in the same AskUserQuestion call** as the split approval, options
+— **Orca**: native trust-screen handling, event-driven waits, native
 liveness; **tmux**: mid-flight steering via `send-prompt.sh`, no extra dependency. **Wait
 for the user's answer**; their answer decides, and you carry it into Phase 3. A
 detected Orca always asks — there is no default, no remembered choice, no
@@ -693,7 +734,9 @@ Merge-preview onto the integration branch and run the integration tests (use the
 session as rework. Repeat until green.
 
 ## 🚦 Gate 2 — pre-merge review (REQUIRED)
-Show the full integration diff (`git diff`). **Wait for the user's confirmation.**
+Show the full integration diff (`git diff`), then ask for the verdict with
+**AskUserQuestion** (§ Asking the user) — merge / send back for rework / abort.
+**Wait for the user's confirmation.**
 
 ## Phase 6 — Cleanup + merge (only after Gate 2)
 1. `scripts/safe-cleanup.sh merge <root> <integ> <branch>...` — refuses dirty
@@ -771,7 +814,8 @@ kept), so re-running it is safe. Note the difference from **partial resume** (Ph
 
 ## Guardrails
 - You never implement — sessions do; you analyze, plan, review, manage.
-- Gate 1 (task-split) and Gate 2 (pre-merge) are mandatory; everything else autonomous.
+- Gate 1 (task-split) and Gate 2 (pre-merge) are mandatory and are asked with
+  AskUserQuestion, never as a prose question; everything else autonomous.
 - No remote push, no PR, no force-push. Destructive cleanup only after Gate 2, via
   safe-cleanup (never --force).
 - Sessions must not weaken tests (loop-implement guard); the auditor enforces it.

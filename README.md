@@ -229,7 +229,7 @@ ordinary `gh pr create` in any repo.
 | Skill | Role |
 |-------|------|
 | `loop-implement` | **The single implementer** — consumes the wiki-plan and executes its tasks in order (loading each task's named wiki pages) through the verification loop. Plan step = wiki-plan. |
-| `orchestrate` | **The multi-session orchestrator** — split one goal into parallel worker sessions, each running loop-implement — over **Orca when detected** (Task/Dispatch tracking, event-driven `worker_done`/`ask`/`escalation` waits, native liveness), else tmux with a hardened watch (worker question channel, stall surfacing, allowlisted chooser keys). Scheduling is a dependency graph plus slot accounting, not wave barriers: `ready-set.sh` says what may start now, the slot count is proposed at Gate 1 and bounded by `LO_MAX_SESSIONS`, and a failed dependency surfaces as a reported deadlock rather than a silent wait. Per-role model selection: a cheap worker model, a strong planner/auditor. Workers escalate guardrails `ask`s instead of blocking, may propose splitting an over-large task mid-run, and dead workers are detected. |
+| `orchestrate` | **The multi-session orchestrator** — split one goal into parallel worker sessions, each running loop-implement — over **Orca when detected** (Task/Dispatch tracking, event-driven `worker_done`/`ask`/`escalation` waits, native liveness), else tmux with a hardened watch (worker question channel, stall surfacing, allowlisted chooser keys). Scheduling is a dependency graph plus slot accounting, not wave barriers: `ready-set.sh` says what may start now, the slot count is proposed at Gate 1 and bounded by `LO_MAX_SESSIONS`, and a failed dependency surfaces as a reported deadlock rather than a silent wait. Per-role model selection: a cheap worker model, a strong planner/auditor. Workers escalate guardrails `ask`s instead of blocking, may propose splitting an over-large task mid-run, and dead workers are detected. Both human gates (task split + substrate, pre-merge) are put to you as **AskUserQuestion choosers**, enforced by `orchestrate-ask-gate.sh`. |
 | `wiki-plan` | **The fixed plan methodology** — route each decision to a wiki page, decompose into ordered, page-navigated tasks. |
 | `wiki-ingest` | Add verified knowledge to the right semantic layer (used by knowledge-flush). |
 | `wiki-query` | Answer a question from the wiki with citations. |
@@ -254,7 +254,8 @@ dev-loop/
 │   ├── loop-gate.sh                  # Stop: verification-loop integrity gate
 │   ├── harvest-insights.sh + harvest.js  # Stop: harvest insights → queue
 │   ├── auto-flush.sh                 # Stop: auto-run knowledge-flush (guarded) → PR
-│   └── pre-flush-pr-gate.sh          # PreToolUse: enforce the flush pre-PR pipeline
+│   ├── pre-flush-pr-gate.sh          # PreToolUse: enforce the flush pre-PR pipeline
+│   └── orchestrate-ask-gate.sh       # PreToolUse: no worker launch until Gate 1 was asked with AskUserQuestion
 ├── scripts/resolve-tools.sh          # capability-role profile resolver (no `plan` role)
 ├── tests/                            # bats suites — hooks (harvest, flush gate, loop gate) + orchestration scripts; CI runs them on ubuntu + macos
 ├── references/tool-profile.md
