@@ -71,16 +71,66 @@ orchestrator (that nests loops); there is no `implement` role.
 ## Coordinator token budget
 Accumulated context, not turn count, is what drives a run's cost — every call
 resends the full history at the cached rate, so cost per turn grows as the run
-goes on. Three things the coordinator itself controls: (a) never `Read` a
-screenshot or other image directly into this session — delegate the visual
-check to a subagent that returns a text verdict instead; (b) bound every pane
-capture and status read (`tail -N` on tmux panes, one-line `jq` filters on
-status JSON) instead of pulling full output into context; (c) at Gate 1 and
-Gate 2 — the two points where a human is already present — if the run has gone
-long, tell the user this is a safe `/compact` point (the coordinator cannot
-compact its own session). Basis:
+goes on. Four things the coordinator itself controls:
+
+(a) never `Read` a screenshot or other image directly into this session —
+delegate the visual check to a subagent that returns a text verdict instead;
+(b) bound every pane capture and status read (`tail -N` on tmux panes, one-line
+`jq` filters on status JSON) instead of pulling full output into context;
+(c) **say where a `/compact` is safe** — the coordinator cannot compact its own
+session, so a human has to be told. The safe points differ in what they hand
+back, so they are keyed by predicate:
+
+| At this point | What to say | What gets re-read from disk afterwards |
+|---|---|---|
+| Gate 1, once the split is approved | a safe `/compact` point, if the run has already gone long | `.orchestration/graph.json` and the briefs |
+| **After each merge-on-approval** — once `git merge-base --is-ancestor <branch> <integ>` has confirmed the merge landed (Phase 3 step 5) | a safe `/compact` point | `.orchestration/graph.json`, `.orchestration/status/*.json`, and the brief + plan of whatever `ready-set.sh` dispatches next |
+| Gate 2, with the integration diff shown | a safe `/compact` point | the integration diff, re-read with `git diff` |
+
+The middle row is the one that matters. Gate 1 and Gate 2 are the *first* and
+*last* things a run does, so on their own they leave the long autonomous middle
+— where essentially all of the context accumulates — with no sanctioned
+checkpoint; one measured run peaked at **613,698** context, more than 2x
+`token-report.sh`'s own warn threshold, and was told about it only after
+teardown. That boundary is safe for exactly the reason **Re-entry** gives:
+nothing unrecoverable is held there, because the graph, every task's phase and
+`.attempt`, the briefs, the plans, the reviews and the merged commits are all
+already on disk. It also recurs once per approved task rather than twice per
+run.
+
+(d) **measure it during the run, not only after it.** At that same
+merge-on-approval boundary, before offering the `/compact`, read this
+coordinator session's own peak context. Target the newest transcript in the
+project's mapped directory, not the directory: the teardown form
+(`--cwd <root> .`) reports every past session for this project, while the newest
+transcript is this live session, since it is the only one being written during
+the run.
+
+```sh
+d="$HOME/.claude/projects/$(printf '%s' "$PWD" | tr '/.' '-')"
+newest=$(ls -t "$d"/*.jsonl | head -1)
+sh {SKILL}/scripts/token-report.sh "$newest"
+```
+
+That prints a two-row table, plus one `warn: peak context …` line on stderr once
+peak passes `LO_CTX_WARN` (default 300000). Pass the warn line to the user along
+with the compact offer. The End-of-run contract runs the same script over the
+whole run; this is that measurement taken while it can still change something.
+
+**Known amplifier — the re-plan loop.** When a worker reports the plan is
+contradictory or under-decided (Phase 3 step 2a), every round appends
+permanently to coordinator context: the worker's gap report, your verification
+of it against the code, the plan patch, and the re-send. One measured run did
+eleven of them. Each round was worth doing — it caught a real defect every time
+— so the fix is not to skip the loop but to keep the re-send short: the worker
+re-reads `{ORCH_DIR}/plans/<task>.md` from disk anyway, so send `plan patched at
+§N — re-read it from disk and re-run the adoption check` instead of restating
+the fix in the prompt.
+
+Basis:
 `wiki/infrastructure/agent-orchestration/session-context-token-budget.md`
-(directives 2–4).
+(directives 2–4), plus this skill's own **Re-entry** guarantee for the
+merge-on-approval row.
 
 ## Preflight
 Run `${CLAUDE_PLUGIN_ROOT}/hooks/preflight.sh` to resolve git/tmux/jq paths and
