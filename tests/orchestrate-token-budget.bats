@@ -27,6 +27,13 @@ flat_skill() {
   normalize_ws "$(cat "$SKILL")"
 }
 
+# The section body only — a file-wide grep would pass vacuously, since
+# "merge-on-approval" also appears in Phase 3 step 5 and Phase 6
+# (tests-that-cannot-fail, wiki/testing/quality/tests-that-cannot-fail.md).
+section_body() {
+  awk '/^## Coordinator token budget$/{f=1;next} /^## /{f=0} f' "$SKILL"
+}
+
 WIKI_SLUG='wiki/infrastructure/agent-orchestration/session-context-token-budget.md'
 
 # --- doc-gate 1: Coordinator token budget section (D1) ---------------------
@@ -77,5 +84,23 @@ WIKI_SLUG='wiki/infrastructure/agent-orchestration/session-context-token-budget.
   fixture="${BATS_TEST_TMPDIR}/brief-no-hygiene.md"
   grep -v 'token hygiene' "$BRIEF" > "$fixture"
   count="$(grep -cF 'token hygiene' "$fixture" || true)"
+  [ "$count" -eq 0 ]
+}
+
+# --- doc-gate 4: in-run compact points + measurement + amplifier (D1/D4/D6) ---
+
+@test "doc-gate: Coordinator token budget names the merge-on-approval compact point, the in-run measurement, and the re-plan amplifier" {
+  flat="$(normalize_ws "$(section_body)")"
+  printf '%s' "$flat" | grep -qF "After each merge-on-approval"
+  printf '%s' "$flat" | grep -qF "status/*.json"
+  printf '%s' "$flat" | grep -qF "token-report.sh"
+  printf '%s' "$flat" | grep -qF "re-plan loop"
+}
+
+@test "doc-gate can fail: a fixture with the Coordinator token budget section stripped does not match" {
+  fixture="${BATS_TEST_TMPDIR}/no-section.md"
+  awk '/^## Coordinator token budget$/{f=1} /^## Preflight$/{f=0} !f' "$SKILL" > "$fixture"
+  flat="$(normalize_ws "$(cat "$fixture")")"
+  count="$(printf '%s' "$flat" | grep -cF "After each merge-on-approval" || true)"
   [ "$count" -eq 0 ]
 }

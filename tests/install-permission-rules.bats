@@ -8,6 +8,8 @@
 # generated rule strings are deterministic and the real user settings can
 # never be read or written by a test run.
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   IPR="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/install-permission-rules.sh"
   WORK="${BATS_TEST_TMPDIR}/work"
@@ -108,7 +110,7 @@ expected_rule1() {
 }
 
 @test "missing jq exits 127 (boundary)" {
-  run env HOME="$FAKE_HOME" PATH="/nonexistent" sh "$IPR" "$TARGET"
+  run -127 env HOME="$FAKE_HOME" PATH="/nonexistent" sh "$IPR" "$TARGET"
   [ "$status" -eq 127 ]
 }
 

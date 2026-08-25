@@ -4,6 +4,8 @@
 #   -> atomic $(dirname $STATUS_DIR)/questions/<task>.json {ts,taskId,question,options,worktree}
 #   exit 0 written / 1 usage / 127 jq missing; one pending question per task.
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   AC="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/ask-coordinator.sh"
   ORCH="${BATS_TEST_TMPDIR}/.orchestration"
@@ -51,7 +53,7 @@ setup() {
 }
 
 @test "missing jq exits 127 (error)" {
-  run env PATH=/nonexistent STATUS_DIR="$ORCH/status" /bin/sh "$AC" t1 "q?"
+  run -127 env PATH=/nonexistent STATUS_DIR="$ORCH/status" /bin/sh "$AC" t1 "q?"
   [ "$status" -eq 127 ]
   [[ "$output" == *"jq not found"* ]]
 }
