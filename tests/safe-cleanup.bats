@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for safe-cleanup.sh guards
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   SC="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/safe-cleanup.sh"
   # Per-test scratch root for the injected tmux fake. Kept INSIDE the repo
@@ -554,7 +556,7 @@ _assert_no_jq() {
   export LO_RUN_ID=runA
   nojq_path="$(_path_without_jq)"
   _assert_no_jq "$nojq_path"
-  PATH="$nojq_path" run sh "$SC" teardown "$root"
+  PATH="$nojq_path" run -127 sh "$SC" teardown "$root"
   [ "$status" -eq 127 ]
   _has "$output" "jq not found"
   [ -d "$root/.worktrees/feat-own" ]
