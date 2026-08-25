@@ -225,7 +225,7 @@ fail-closed로 거부됩니다. 게이트는 knowledge-flush PR로 좁게 스코
 | 스킬 | 역할 |
 |-------|------|
 | `loop-implement` | **단일 구현자** — wiki-plan을 소비해 태스크를 순서대로 (각 태스크가 명시한 위키 페이지를 로드하며) 검증 루프로 실행. 계획 단계 = wiki-plan. |
-| `orchestrate` | **멀티 세션 오케스트레이터** — 하나의 목표를 병렬 워커 세션들로 분할, 각 세션은 loop-implement 실행 — 감지되면 **Orca 위에서**(Task/Dispatch 추적, `worker_done`/`ask`/`escalation` 이벤트 대기, 네이티브 liveness), 아니면 강화된 감시의 tmux(워커 질문 채널, 스톨 표면화, 허용목록 선택 UI 키). 스케줄링은 웨이브 배리어가 아니라 의존 그래프 + 슬롯 회계: `ready-set.sh`가 지금 시작해도 되는 task를 판정하고, 슬롯 수는 Gate 1에서 제안·승인되며 `LO_MAX_SESSIONS`가 상한이고, 실패한 의존은 조용한 대기가 아니라 보고되는 교착으로 드러난다. 역할별 모델 선택: 워커는 저렴한 모델, 플래너/감사자는 강한 모델. 워커는 guardrails `ask`에서 멈추지 않고 에스컬레이션하며, 실행 중 task 분할을 제안할 수 있고, 죽은 워커는 감지된다. |
+| `orchestrate` | **멀티 세션 오케스트레이터** — 하나의 목표를 병렬 워커 세션들로 분할, 각 세션은 loop-implement 실행 — 감지되면 **Orca 위에서**(Task/Dispatch 추적, `worker_done`/`ask`/`escalation` 이벤트 대기, 네이티브 liveness), 아니면 강화된 감시의 tmux(워커 질문 채널, 스톨 표면화, 허용목록 선택 UI 키). 스케줄링은 웨이브 배리어가 아니라 의존 그래프 + 슬롯 회계: `ready-set.sh`가 지금 시작해도 되는 task를 판정하고, 슬롯 수는 Gate 1에서 제안·승인되며 `LO_MAX_SESSIONS`가 상한이고, 실패한 의존은 조용한 대기가 아니라 보고되는 교착으로 드러난다. 역할별 모델 선택: 워커는 저렴한 모델, 플래너/감사자는 강한 모델. 워커는 guardrails `ask`에서 멈추지 않고 에스컬레이션하며, 실행 중 task 분할을 제안할 수 있고, 죽은 워커는 감지된다. 사람이 개입하는 두 게이트(task 분할 + substrate, 머지 전)는 항상 **AskUserQuestion 선택지**로 제시되며 `orchestrate-ask-gate.sh`가 이를 강제한다. |
 | `wiki-plan` | **고정된 계획 방법론** — 각 결정을 위키 페이지로 라우팅, 순서 있는 페이지-내비게이션 태스크로 분해. |
 | `wiki-ingest` | 검증된 지식을 올바른 시맨틱 레이어에 추가 (knowledge-flush가 사용). |
 | `wiki-query` | 위키에서 인용과 함께 질문에 답변. |
@@ -250,7 +250,8 @@ dev-loop/
 │   ├── loop-gate.sh                  # Stop: 검증 루프 무결성 게이트
 │   ├── harvest-insights.sh + harvest.js  # Stop: 인사이트 하베스트 → 큐
 │   ├── auto-flush.sh                 # Stop: knowledge-flush 자동 실행 (가드됨) → PR
-│   └── pre-flush-pr-gate.sh          # PreToolUse: 플러시 사전 PR 파이프라인 강제
+│   ├── pre-flush-pr-gate.sh          # PreToolUse: 플러시 사전 PR 파이프라인 강제
+│   └── orchestrate-ask-gate.sh       # PreToolUse: Gate 1을 AskUserQuestion으로 묻기 전에는 워커 실행 차단
 ├── scripts/resolve-tools.sh          # capability-role 프로파일 리졸버 (`plan` role 없음)
 ├── tests/                            # bats 스위트 — 훅(하베스트, 플러시 게이트, 루프 게이트) + 오케스트레이션 스크립트; CI가 ubuntu + macos에서 실행
 ├── references/tool-profile.md
