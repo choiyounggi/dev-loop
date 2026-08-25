@@ -27,6 +27,7 @@
 #  6    tmux command failed against a live session
 #  7    unconfirmed     —                      —              —
 #  8    lost            —                      —              —
+#  9    —               unsubmitted            unsubmitted    —
 # 127   tmux not found
 #
 # 7 vs 8 (issue #7): exit 7 means the pane showed no fresh evidence but MAY
@@ -36,9 +37,13 @@
 # automatic full resend that also found nothing — safe to treat as genuinely
 # lost. cmd_send never reports 8 from a single unchanged capture.
 #
+# 9 (issue #145): the pane's input box is holding an unsubmitted `[Pasted text`
+# prompt. Recover with `keys <session> Enter` — never a re-`send`, which types
+# a second prompt on top of the first and double-pastes.
+#
 # stdout is exactly one token — delivered|queued|unconfirmed|lost|picked-up|
-# timeout|ready|busy|gone|sent. Branch on the exit code; stderr is advisory
-# context only and must never be parsed.
+# timeout|unsubmitted|ready|busy|gone|sent. Branch on the exit code; stderr is
+# advisory context only and must never be parsed.
 #
 # env:
 #   LO_QUEUED_PATTERN   substring meaning "queued behind a busy turn"
@@ -46,7 +51,11 @@
 #                       delivered-via-busy-marker check)
 #   LO_PASTED_PATTERN   substring meaning "collapsed to an unsubmitted paste
 #                       placeholder" (issue #96, default: [Pasted text)
-#   LO_PANE_TAIL_LINES  non-empty pane lines searched for those (default 6)
+#   LO_PANE_TAIL_LINES  non-empty pane lines searched for the queued/busy
+#                       markers (default 6) — does NOT bound the pasted-marker
+#                       scan, which is anchored on the input box (issue #145)
+#   LO_PASTED_TAIL_LINES  fallback window for the pasted marker when the input
+#                       box cannot be located (default 40)
 #   LO_CONFIRM_DELAY    seconds to settle before classifying a send (default 1)
 #   LO_STABLE_DELAY     seconds between pre-send pane-stabilization captures
 #                       (default 1; issue #7 keys->send redraw race guard)
@@ -98,6 +107,14 @@ case "$stable_tries" in ''|*[!0-9]*) stable_tries=3 ;; esac
 lost_confirm_delay="${LO_LOST_CONFIRM_DELAY:-3}"
 case "$lost_confirm_delay" in ''|*[!0-9]*) lost_confirm_delay=3 ;; esac
 
+# Fallback window for the pasted-marker scan when the input box cannot be
+# located (issue #145). Deliberately much larger than LO_PANE_TAIL_LINES: this
+# path has no box to anchor on, and the marker's distance from the bottom
+# grows with the pasted payload.
+pasted_tail="${LO_PASTED_TAIL_LINES:-40}"
+case "$pasted_tail" in ''|*[!0-9]*) pasted_tail=40 ;; esac
+[ "$pasted_tail" -ge 1 ] || pasted_tail=40
+
 usage() {
   cat >&2 <<'EOF'
 usage: send-prompt.sh <subcommand> ...
@@ -142,6 +159,14 @@ validate_prompt() {
 
 session_alive() { "$TMUX_BIN" has-session -t "$(target_session "$1")" 2>/dev/null; }
 
+# The last non-empty lines of a capture ALREADY IN HAND. Split out of
+# pane_tail so a caller holding a full capture can take both views of it —
+# the tail window and the input box — from one capture-pane call (#145).
+tail_of() { # $1 = full pane text
+  printf '%s\n' "$1" | grep -v '^[[:space:]]*$' \
+    | tail -n "${LO_PANE_TAIL_LINES:-6}" || true
+}
+
 # The last non-empty lines of the pane. A TUI paints its queued/busy indicator
 # at the bottom and repaints it away when the queue drains; scrollback further
 # up never clears, so searching the whole pane would latch on stale text.
@@ -151,11 +176,50 @@ session_alive() { "$TMUX_BIN" has-session -t "$(target_session "$1")" 2>/dev/nul
 # and silently returning the former is how a stale verdict gets reported as fact.
 pane_tail() {
   raw=$(capture_pane "$1") || return 1
-  printf '%s\n' "$raw" | grep -v '^[[:space:]]*$' \
-    | tail -n "${LO_PANE_TAIL_LINES:-6}" || true
+  tail_of "$raw"
 }
 
 capture_pane() { "$TMUX_BIN" capture-pane -t "$(target_pane "$1")" -p 2>/dev/null; }
+
+# The CLI's input box: the region between the last two horizontal rules of a
+# full pane capture. Byte-identical with launch-session.sh's input_box() —
+# tests/send-prompt.bats asserts the two copies never drift (issue #145).
+input_box() { # $1 = pane text -> the input-box region, or rc 1 if not locatable
+  _rules=$(printf '%s\n' "$1" | grep -nE '^[[:space:]]*(─){3,}[[:space:]]*$' | cut -d: -f1)
+  [ "$(printf '%s' "$_rules" | grep -c .)" -ge 2 ] || return 1
+  _last=$(printf '%s\n' "$_rules" | tail -1)
+  _prev=$(printf '%s\n' "$_rules" | tail -2 | head -1)
+  [ "$_prev" -lt "$_last" ] || return 1
+  printf '%s\n' "$1" | sed -n "$((_prev + 1)),$((_last - 1))p"
+}
+
+# Is this capture's input box holding an unsubmitted pasted prompt?
+#
+# Takes pane TEXT, not a session: every caller already holds a full capture,
+# and three tests assert exact capture-pane call counts (D3b). Scans the BOX,
+# not a fixed tail — an unsubmitted paste renders its own remainder below the
+# marker, so the marker's distance from the bottom grows with the payload and
+# any fixed `tail -N` is defeated by a large enough prompt (measured in the
+# field at 7 lines against a 6-line window, #145). Scanning the box rather
+# than the whole capture also keeps a marker that is only in the transcript
+# above from being read as unsubmitted.
+#
+#   0  holding an unsubmitted paste
+#   1  box located and clean
+#   2  cannot tell — the chrome could not be located and the degraded window
+#      found nothing; the caller keeps its previous verdict
+pasted_in_pane() { # $1 = full pane text, $2 = session (advisory label only)
+  if _box=$(input_box "$1"); then
+    printf '%s' "$_box" | grep -qF -- "$pasted_pat" 2>/dev/null && return 0
+    return 1
+  fi
+  if printf '%s\n' "$1" | grep -v '^[[:space:]]*$' | tail -n "$pasted_tail" \
+    | grep -qF -- "$pasted_pat" 2>/dev/null; then
+    echo "send-prompt[$2]: input box not locatable — pasted marker found in the last $pasted_tail non-empty lines (degraded check)" >&2
+    return 0
+  fi
+  return 2
+}
 
 # Advisory context for a human reading the log — never part of stdout.
 note_pane() {
@@ -201,9 +265,9 @@ send_enter_or_die() {
 # fingerprint still sitting in a pane that shows no diff from before the send.
 # Both get the same bounded-Enter retry in cmd_send's heal loop.
 send_looks_unsubmitted() {
-  # $1=after $2=before $3=fingerprint
-  printf '%s' "$1" | grep -qF -- "$pasted_pat" 2>/dev/null && return 0
-  [ "$1" = "$2" ] && printf '%s' "$1" | grep -qF -- "$3" 2>/dev/null
+  # $1=after_raw $2=after $3=before $4=fingerprint $5=session
+  pasted_in_pane "$1" "$5" && return 0
+  [ "$2" = "$3" ] && printf '%s' "$2" | grep -qF -- "$4" 2>/dev/null
 }
 
 cmd_state() {
@@ -212,12 +276,18 @@ cmd_state() {
   if ! session_alive "$1"; then
     echo "gone"; exit 3
   fi
-  pane=$(pane_tail "$1") || {
+  raw=$(capture_pane "$1") || {
     echo "send-prompt: capture-pane failed for live session '$1'" >&2; exit 6; }
+  pane=$(tail_of "$raw")
   if printf '%s' "$pane" | grep -qF -- "$queued_pat" 2>/dev/null \
     || printf '%s' "$pane" | grep -qF -- "$busy_pat" 2>/dev/null; then
     note_pane "$1"
     echo "busy"; exit 4
+  fi
+  if pasted_in_pane "$raw" "$1"; then
+    _adv=$(tail_of "$raw" | tail -n 1)
+    [ -n "$_adv" ] && printf '%s\n' "$_adv" | sed "s/^/send-prompt[$1]: /" >&2
+    echo "unsubmitted"; exit 9
   fi
   echo "ready"; exit 0
 }
@@ -238,13 +308,15 @@ cmd_send() {
   # flags"). Best-effort — a pane that never settles (a live spinner) must not
   # block forever, so this gives up after LO_STABLE_TRIES extra captures and
   # sends anyway.
-  prev=$(pane_tail "$sess") || {
+  prev_raw=$(capture_pane "$sess") || {
     echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
+  prev=$(tail_of "$prev_raw")
   tries=0
   while [ "$tries" -lt "$stable_tries" ]; do
     sleep "$stable_delay"
-    cur=$(pane_tail "$sess") || {
+    cur_raw=$(capture_pane "$sess") || {
       echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
+    cur=$(tail_of "$cur_raw")
     tries=$((tries + 1))
     if [ "$cur" = "$prev" ]; then
       prev="$cur"
@@ -263,8 +335,9 @@ cmd_send() {
   type_and_enter "$sess" "$prompt"
 
   sleep "$confirm_delay"
-  after=$(pane_tail "$sess") || {
+  after_raw=$(capture_pane "$sess") || {
     echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
+  after=$(tail_of "$after_raw")
 
   # resent: flag guard (not recursion) for the D4 one-shot lost-recovery
   # resend, so a second confirmed-lost observation cannot trigger a second one.
@@ -287,14 +360,15 @@ cmd_send() {
     # `timeout`/`date -d`, macOS BSD userland).
     heal_tries=0
     while [ "$heal_tries" -lt 3 ] \
-      && send_looks_unsubmitted "$after" "$before" "$fingerprint"; do
+      && send_looks_unsubmitted "$after_raw" "$after" "$before" "$fingerprint" "$sess"; do
       send_enter_or_die "$sess"
       heal_tries=$((heal_tries + 1))
       sleep "$confirm_delay"
-      after=$(pane_tail "$sess") || {
+      after_raw=$(capture_pane "$sess") || {
         echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
+      after=$(tail_of "$after_raw")
     done
-    if send_looks_unsubmitted "$after" "$before" "$fingerprint"; then
+    if send_looks_unsubmitted "$after_raw" "$after" "$before" "$fingerprint" "$sess"; then
       note_pane "$sess"
       echo "unconfirmed"; exit 7
     fi
@@ -318,10 +392,12 @@ cmd_send() {
     # anti-pattern pane-delivery-confirmation names). Re-observe once before
     # treating it as anything (D3).
     sleep "$lost_confirm_delay"
-    after2=$(pane_tail "$sess") || {
+    after2_raw=$(capture_pane "$sess") || {
       echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
+    after2=$(tail_of "$after2_raw")
     if [ "$after2" != "$after" ]; then
       after="$after2"
+      after_raw="$after2_raw"
       continue
     fi
 
@@ -333,8 +409,9 @@ cmd_send() {
       before="$after"
       type_and_enter "$sess" "$prompt"
       sleep "$confirm_delay"
-      after=$(pane_tail "$sess") || {
+      after_raw=$(capture_pane "$sess") || {
         echo "send-prompt: capture-pane failed for live session '$sess'" >&2; exit 6; }
+      after=$(tail_of "$after_raw")
       continue
     fi
 
@@ -411,9 +488,15 @@ cmd_wait() {
   i=0
   while [ "$i" -lt "$iters" ]; do
     session_alive "$1" || { echo "gone"; exit 3; }
-    pane=$(pane_tail "$1") || {
+    raw=$(capture_pane "$1") || {
       echo "send-prompt: capture-pane failed for live session '$1'" >&2; exit 6; }
+    pane=$(tail_of "$raw")
     if ! printf '%s' "$pane" | grep -qF -- "$queued_pat" 2>/dev/null; then
+      if pasted_in_pane "$raw" "$1"; then
+        _adv=$(tail_of "$raw" | tail -n 1)
+        [ -n "$_adv" ] && printf '%s\n' "$_adv" | sed "s/^/send-prompt[$1]: /" >&2
+        echo "unsubmitted"; exit 9
+      fi
       echo "picked-up"; exit 0
     fi
     sleep "$interval"

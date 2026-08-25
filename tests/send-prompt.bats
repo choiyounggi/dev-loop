@@ -48,6 +48,23 @@ mk_busy() {
   sleep 1
 }
 
+# Paint a pane that looks like the CLI holding an unsubmitted paste, with the
+# marker deliberately 7 non-empty lines from the bottom (issue #145's capture).
+mk_unsubmitted_box() {
+  tmux send-keys -t "$S" -l -- "clear; printf '%s\\n' \
+    '────────────────────────' \
+    '> [Pasted text #10]tail-of-the-paste' \
+    'second line of the paste remainder' \
+    'third line of the paste remainder' \
+    'fourth line of the paste remainder' \
+    'fifth line of the paste remainder' \
+    '────────────────────────' \
+    '                    /rc' \
+    'bypass permissions on'"
+  tmux send-keys -t "$S" Enter
+  sleep 1
+}
+
 # ---------------------------------------------------------------- state
 
 @test "state: an idle live session is ready" {
@@ -121,6 +138,60 @@ mk_busy() {
   [ "$status" -eq 4 ]
   [ "$output" = "busy" ]
   case "$stderr" in *BUSYMARK_T3*) : ;; *) return 1 ;; esac
+}
+
+# ------------------------------- state/wait: unsubmitted verdict (issue #145)
+#
+# D6: one token/exit (unsubmitted/9), shared by state and wait. D7: state stays
+# read-only. D8: wait returns 9 immediately, it does not poll to the deadline.
+# D9: the target's own busy/queued indicator outranks the parked-paste check.
+
+@test "state: a pane holding an unsubmitted pasted prompt reports unsubmitted, exit 9" {
+  mk_session
+  mk_unsubmitted_box
+  run --separate-stderr sh "$SP" state "$S"
+  [ "$status" -eq 9 ]
+  [ "$output" = "unsubmitted" ]
+}
+
+@test "wait: a pane holding an unsubmitted pasted prompt reports unsubmitted, exit 9, promptly" {
+  # timeout=6 rather than the 180s default: a regression that polls to the
+  # deadline (D8) shows up as a slow test, not a silent pass.
+  mk_session
+  mk_unsubmitted_box
+  run --separate-stderr sh "$SP" wait "$S" 6
+  [ "$status" -eq 9 ]
+  [ "$output" = "unsubmitted" ]
+}
+
+@test "boundary: state on a pane both busy and holding the marker reports busy, not unsubmitted" {
+  # D9: the busy/queued indicator outranks the parked-paste check — a paste
+  # sitting in the box while the worker is mid-turn is a queued next prompt,
+  # not a stall.
+  mk_session
+  tmux send-keys -t "$S" -l -- "printf '%s\\n' 'BUSYMARK_T3' \
+    '────────────────────────' \
+    '> [Pasted text #9]' \
+    '────────────────────────'; sleep 6"
+  tmux send-keys -t "$S" Enter
+  sleep 1
+  run --separate-stderr env LO_QUEUED_PATTERN=BUSYMARK_T3 sh "$SP" state "$S"
+  [ "$status" -eq 4 ]
+  [ "$output" = "busy" ]
+}
+
+@test "boundary: state on a plain idle session with no box chrome or marker is still ready" {
+  # D5's no-regression guard, re-proven against the new unsubmitted check.
+  mk_session
+  run --separate-stderr sh "$SP" state "$S"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ready" ]
+}
+
+@test "error: state on a session that does not exist still reports gone, unchanged" {
+  run --separate-stderr sh "$SP" state "$S"
+  [ "$status" -eq 3 ]
+  [ "$output" = "gone" ]
 }
 
 # ---------------------------------------------------------------- usage
@@ -308,6 +379,89 @@ _enter_count() { grep -cx -- "-t =$S: Enter" "$FAKE_SEND_LOG"; }
   [ "$status" -eq 4 ]
   [ "$output" = "queued" ]
   [ "$(_enter_count)" -eq 1 ]
+}
+
+# ------------------------------ box-anchored pasted-marker detection (#145) -
+#
+# D1/D2: the pasted-marker scan is anchored on the CLI's input box (the region
+# between the last two horizontal rules of a FULL pane capture), not a fixed
+# tail window — an unsubmitted paste renders its own remainder below the
+# marker, so the marker's distance from the bottom grows with the payload and
+# defeats any fixed `tail -N`. Real tmux sessions running a plain /bin/sh, per
+# testing-mocking-destructive-operations-on-shared-daemons.
+
+@test "send: box-anchored pasted marker (7 lines from bottom) is not reported delivered" {
+  mk_session
+  mk_unsubmitted_box
+  run --separate-stderr sh "$SP" send "$S" 'echo T1_BOX'
+  [ "$output" != "delivered" ]
+  [ "$status" -ne 0 ]
+}
+
+@test "boundary: a pasted marker only 2 lines from the bottom is still detected" {
+  # Proves the box scan did not just trade one fixed window for another: a
+  # short paste (marker close to the bottom) must still be caught.
+  mk_session
+  tmux send-keys -t "$S" -l -- "clear; printf '%s\\n' \
+    '────────────────────────' \
+    '> [Pasted text #2]' \
+    '────────────────────────'"
+  tmux send-keys -t "$S" Enter
+  sleep 1
+  run --separate-stderr sh "$SP" send "$S" 'echo T1_NEAR'
+  [ "$output" != "delivered" ]
+  [ "$status" -ne 0 ]
+}
+
+@test "error: a pasted marker with no box chrome at all still reaches the degraded fallback" {
+  # D4: when the chrome is not locatable (fewer than two rules), fall back to
+  # the last LO_PASTED_TAIL_LINES non-empty lines, and advertise the degraded
+  # path on stderr — "could not look" and "nothing found" are different answers.
+  mk_session
+  tmux send-keys -t "$S" -l -- "clear; printf '%s\\n' '[Pasted text #1]tail'"
+  tmux send-keys -t "$S" Enter
+  sleep 1
+  run --separate-stderr sh "$SP" send "$S" 'echo T1_NOCHROME'
+  [ "$output" != "delivered" ]
+  [ "$status" -ne 0 ]
+  case "$stderr" in *"degraded check"*) : ;; *) return 1 ;; esac
+}
+
+@test "error: a pasted marker only in the transcript above an empty box is not reported unsubmitted" {
+  # D2's regression guard: a whole-pane grep would misread this as unsubmitted;
+  # the box-anchored scan must not, because the box itself (between the two
+  # rules) is empty.
+  mk_session
+  tmux send-keys -t "$S" -l -- "clear; printf '%s\\n' \
+    '> [Pasted text #5] from earlier turn' \
+    '────────────────────────' \
+    '────────────────────────' \
+    '                    /rc'"
+  tmux send-keys -t "$S" Enter
+  sleep 1
+  run --separate-stderr sh "$SP" send "$S" 'echo T1_ABOVE'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+}
+
+@test "error: box-anchored detection still works under LC_ALL=C (locale regression guard, r1 F1)" {
+  # F1 (review r1): a BRE interval applied directly to the multibyte rule
+  # glyph is byte-oriented under a C locale, so the box locator silently
+  # degrades to the 40-line fallback there — exactly the fixed-window
+  # behaviour this whole change exists to remove. Re-run the transcript-above
+  # regression guard under a hostile C locale to prove the locator still
+  # resolves the box (and so still excludes the above-box marker) there too.
+  mk_session
+  tmux send-keys -t "$S" -l -- "clear; printf '%s\\n' \
+    '> [Pasted text #5] from earlier turn' \
+    '────────────────────────' \
+    '────────────────────────' \
+    '                    /rc'"
+  tmux send-keys -t "$S" Enter
+  sleep 1
+  run --separate-stderr env LC_ALL=C sh "$SP" send "$S" 'echo T1_ABOVE_C'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
 }
 
 # ------------------------------------------- send: rc=7 3-way split (issue #7)
@@ -835,4 +989,15 @@ _attempt_count() { wc -l < "$FAKE_ATTEMPTS" | tr -d ' '; }
   [ "$(printf '%s' "$output" | wc -w | tr -d ' ')" = "1" ]
   # The trailing note_pane advisory: pane context for the caller's log.
   case "$stderr" in *FAKE_PANE_LINE*) : ;; *) return 1 ;; esac
+}
+
+# ---------------------------------------------------- drift guard (issue #145)
+
+@test "drift guard: input_box() is byte-identical in send-prompt.sh and launch-session.sh" {
+  LS="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/launch-session.sh"
+  a=$(awk '/^input_box\(\) \{/,/^\}$/' "$SP")
+  b=$(awk '/^input_box\(\) \{/,/^\}$/' "$LS")
+  [ -n "$a" ]
+  [ -n "$b" ]
+  [ "$a" = "$b" ]
 }
