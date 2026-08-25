@@ -8,8 +8,8 @@ sources:
   - https://man.openbsd.org/tmux.1
   - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html
   - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap11.html
-last_verified: 2026-08-05
-related: [platforms-processes-non-interactive-cli-invocation, platforms-processes-background-services, platforms-shells-portable-shell-scripts]
+last_verified: 2026-08-25
+related: [platforms-processes-non-interactive-cli-invocation, platforms-processes-background-services, platforms-shells-portable-shell-scripts, infrastructure-agent-orchestration-pane-delivery-confirmation]
 ---
 
 # Sending Input to a TUI Running in a tmux Pane
@@ -40,7 +40,7 @@ text from a variable rather than a fixed literal.
 
 | Check | What it proves |
 |-------|----------------|
-| The program's own busy/queued indicator in the last N non-empty lines of `capture-pane` | The program has the text but has not consumed it — treat as **not yet delivered** and wait |
+| The program's own busy/queued **indicator**, in the last N non-empty lines of `capture-pane` — this fixed window is scoped to an indicator the TUI paints at a fixed position near the bottom, not to a marker whose position moves with the payload (see edge cases) | The program has the text but has not consumed it — treat as **not yet delivered** and wait |
 | An effect only the program can produce (its output line, a status file it writes, a marker it prints) | Consumed |
 | `capture-pane` output differs from before the send | **Nothing.** The tty line discipline echoes typed characters back to the pane while the foreground process is busy, so the pane changes for input that was never read |
 
@@ -59,6 +59,7 @@ text from a variable rather than a fixed literal.
 | The payload contains a literal newline and must arrive as one paste | Use `tmux load-buffer -` + `paste-buffer -t "$pane"`; `send-keys -l` delivers the newline as a character, which many TUIs treat as submit |
 | Delivery must be confirmed but the program has no busy indicator and no artifact | Add one: have the wrapper echo a unique marker after processing, and search for that marker rather than for the prompt text |
 | The pane's process has exited (shell prompt only) | The keys land on the shell and run as commands — check `#{pane_dead}` / the pane's current command before sending |
+| A collapsed paste placeholder (`[Pasted text #N]`) has the paste's own remainder rendered below it | Not findable in a fixed last-N window — the marker's distance from the bottom grows with the payload; anchor on the **input box** (the region between the last two horizontal rules of the full capture) instead. See [infrastructure-agent-orchestration-pane-delivery-confirmation] for the full detection rule |
 
 ## Instead of
 

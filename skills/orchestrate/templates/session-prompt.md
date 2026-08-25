@@ -46,6 +46,11 @@ and must never be parsed.
 | 4 | queued | — | busy | — |
 | 5 | — | deadline expired | — | — |
 | 7 | unconfirmed | — | — | — |
+| 9 | — | unsubmitted | unsubmitted | — |
+
+Exit 9 means the session is alive and idle while its input box holds an
+unsubmitted prompt; recover with `send-prompt.sh keys <session> Enter`, never
+a re-`send` (that double-pastes).
 
 Shared codes: `1` usage · `2` invalid session name, prompt, or key (injection
 guard / allowlist — nothing sent) · `6` tmux failed against a live session (for

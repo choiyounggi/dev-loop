@@ -308,7 +308,10 @@ so every `launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reus
 exact name for later `send-prompt.sh`); the script also exports the guardrails
 escalation env into each worker. Trust-screen wording drifts between CLI releases —
 if a launch hangs, set `LO_READY_EXTRA` / `LO_TRUST_EXTRA` (substrings) or
-`LO_READY_TIMEOUT`. `status-update.sh` resolves the status file's `session` field
+`LO_READY_TIMEOUT`. `LO_PASTED_TAIL_LINES` (default 40) is `send-prompt.sh`'s
+fallback pasted-marker window, scanned only when it cannot locate the input box
+in the pane capture — raise it if a CLI release changes the input-box chrome so
+the box stops being locatable. `status-update.sh` resolves the status file's `session` field
 from `tmux display-message -p '#S'` only when the caller is itself inside tmux
 (`$TMUX` set) — a coordinator-side call (this shell, not a worker's tmux pane)
 must pass `STATUS_SESSION=<lo-n-runid>` explicitly, or the record's `session`
@@ -555,7 +558,10 @@ reasoning-effort flags) that `worker-start` cannot express.
    submitted; **4** = the REPL never became ready (relaunch); **5** = the prompt was
    sent but submission could NOT be confirmed — the session is alive and may be
    holding an unsubmitted prompt, so read it with `scripts/send-prompt.sh state
-   lo-<n>` and re-send, never launch a second session on top of it.
+   lo-<n>` and branch on its exit: **9** (`unsubmitted`) means the prompt is
+   already in the box — `scripts/send-prompt.sh keys lo-<n> Enter`, never a
+   re-send (that double-pastes); re-send only when `state` reports `ready`/0.
+   Never launch a second session on top of it.
 3. `scripts/watch-status.sh <status-dir> plan_ready <N>` in the background; when it
    exits, collect `plans/<task>.md`. *(Orca substrate: `scripts/orca-wait.sh
    <timeout-ms> <this Wave's task ids>` per O4 instead — same exit-code contract,
@@ -586,8 +592,12 @@ exits — handle, then relaunch watch with the same target:
   the weakest signal — failed(3) and all-reached(0) win over it; driven by
   `tmux-worker-stalled.sh`, silence threshold `LO_STALL_SEC` default 600s; a
   missing script or tmux disables the check): read the pane FIRST
-  (`tmux capture-pane -t "=<session>:" -p | tail`) and classify before acting —
-  interactive chooser → answer with `scripts/send-prompt.sh keys <session>
+  (`tmux capture-pane -t "=<session>:" -p | tail`), classify with
+  `scripts/send-prompt.sh state lo-<n>`, then act — **9** (`unsubmitted`, the
+  input box holds a parked paste) → `scripts/send-prompt.sh keys lo-<n> Enter`,
+  then relaunch watch (this is the exact path a field incident took ~10 minutes
+  to find via the stall timeout instead); interactive chooser → answer with
+  `scripts/send-prompt.sh keys <session>
   <key>...` (allowlist exactly `Up Down Left Right Enter Escape Tab Space 0-9 y n`;
   ALL keys validated before ANY is sent; **0** sent / **2** invalid session or
   key, nothing sent / **3** gone / **6** send failed on a live session);
@@ -599,7 +609,10 @@ exits — handle, then relaunch watch with the same target:
 - **2 — timeout** (prints `[watch] TIMEOUT (<budget>s, source=<source>)`): a
   checkpoint, not a verdict — re-check each session with
   `scripts/tmux-worker-stalled.sh lo-<n>` and `scripts/send-prompt.sh state
-  lo-<n>`, read panes, then relaunch watch with the same target.
+  lo-<n>` — **9** (`unsubmitted`) is now one of the answers: the worker is
+  parked on an unsubmitted prompt, recover with `scripts/send-prompt.sh keys
+  lo-<n> Enter`, never a re-send — read panes, then relaunch watch with the
+  same target.
 
 ## Phase 4 — Implement + review (max 3 rework)
 Deliver §2 (implement) to each session with `scripts/send-prompt.sh send lo-<n>
@@ -610,7 +623,8 @@ safe to re-dispatch), **3** the session is gone, **2** the session name or promp
 was rejected. Branch on the exit code; stdout is exactly one token and stderr is
 advisory context that must never be parsed. On **4**, `scripts/send-prompt.sh wait
 lo-<n> [timeout]` blocks until the worker picks it up (**0** picked-up, **5**
-deadline expired). Then
+deadline expired, **9** the worker is parked on an unsubmitted prompt: press
+`keys lo-<n> Enter`, do not re-send). Then
 `watch-status ... impl_done <N>`. *(Orca
 substrate: `task-create` the implement Task, then `scripts/orca-worker-start.sh
 --task <impl_task> --terminal <handle>` to reuse that task's existing session, and
