@@ -24,9 +24,15 @@ specific tags below as authority.
 
   <!-- consume upstream outputs, never re-create them (avoid compounding errors).
        for a Wave 2+ task the orchestrator pastes the APPROVED preceding Wave's REAL
-       signatures here (Phase 3 step 0) — exact, not paraphrased; treat as a contract -->
+       signatures here (Phase 3 step 0) — exact, not paraphrased; treat as a contract.
+       `stub` is optional: when the upstream output is a shared surface (Phase 2),
+       the coordinator committed its contract stub before dispatch (Contract-first
+       dispatch, Phase 3 step 0) — name that repo-relative path here. Repo-relative,
+       not {ORCH_DIR}: the stub lives in the worktree the worker already has checked
+       out, unlike this run's {ORCH_DIR} artifacts (briefs/plans/reviews), which live
+       outside every worktree. Omit `stub` when there is none. -->
   <dependencies>
-    <upstream task="{UPSTREAM}">consume only: `{exact signature — verbatim from the approved upstream}` (do not re-create)</upstream>
+    <upstream task="{UPSTREAM}" stub="{repo-relative path, omit if none}">consume only: `{exact signature — verbatim from the approved upstream}` (do not re-create)</upstream>
     <i_produce>you own: `{output}` — expose a stable interface for others</i_produce>
   </dependencies>
 

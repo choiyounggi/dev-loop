@@ -766,9 +766,20 @@ tpl_sections_single_line() {
   # form resolved to nothing.
   # Bumped from 2521059482/6502 when Orca rule [3] gained the
   # escalation-record-cleanup obligation.
+  # Bumped from 3279716624/6776 (t2-review-blackboard, issue #152 P2): §O2
+  # gained the blackboard read-then-append checkpoint, and rule [7] added the
+  # append-only obligation for {ORCH_DIR}/notes/decisions.md.
+  # Bumped from 56586708/7358 (t2-review-blackboard r1 rework, F2/F3): §O2's
+  # read checkpoint tolerates an absent file ("if it exists"), and both the
+  # §O2 append instruction and rule [7] now prescribe the atomic
+  # `printf ... >>` shell primitive instead of Write/Edit, which is
+  # read-modify-write and can drop a concurrent worker's line.
+  # Bumped from 568847008/7627 (t2-review-blackboard r1 rework, N1): §O2 now
+  # opens "Approved. First read …" instead of "First read … . Approved.",
+  # same non-blocking wording fix applied to §2.
   run sh -c "sed -n '/^\*\*Orca substrate\.\*\*/,/^## Subagent usage protocol/p' '$TPL' | cksum"
   [ "$status" -eq 0 ]
-  [ "$output" = "3279716624 6776" ]
+  [ "$output" = "3082668569 7627" ]
 }
 
 @test "template: the Orca ask rule forbids deciding a timed-out question" {

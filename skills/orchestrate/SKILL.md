@@ -87,6 +87,11 @@ back, so they are keyed by predicate:
 | **After each merge-on-approval** — once `git merge-base --is-ancestor <branch> <integ>` has confirmed the merge landed (Phase 3 step 5) | a safe `/compact` point | `.orchestration/graph.json`, `.orchestration/status/*.json`, and the brief + plan of whatever `ready-set.sh` dispatches next |
 | Gate 2, with the integration diff shown | a safe `/compact` point | the integration diff, re-read with `git diff` |
 
+Gate 2's full-diff read is the LAST one of a run, not a recurring cost: Phase
+5's integration review now runs on the `integration-reviewer` agent's own
+fresh context, so this coordinator session itself never reads the full
+integration diff until this final gate.
+
 The middle row is the one that matters. Gate 1 and Gate 2 are the *first* and
 *last* things a run does, so on their own they leave the long autonomous middle
 — where essentially all of the context accumulates — with no sanctioned
@@ -126,6 +131,16 @@ eleven of them. Each round was worth doing — it caught a real defect every tim
 re-reads `{ORCH_DIR}/plans/<task>.md` from disk anyway, so send `plan patched at
 §N — re-read it from disk and re-run the adoption check` instead of restating
 the fix in the prompt.
+
+**Re-plan ladder — bound the loop.** Track each task's round count in your head
+from the review/patch history already on disk (no new state file). Rounds 1–2
+on a task are SCOPED PATCHES: the cheap re-send above, patching only the
+reported gap. Round 3 is ONE full re-plan: rewrite `plans/<task>.md` wholesale,
+re-running `wiki-plan` on the planning model rather than patching a single
+section — a third scoped patch is the signal the section-level fixes aren't
+converging. A task that still reports a plan gap after its round-3 full
+re-plan is a deadlock-grade escalation to the user: report it and get a human
+decision, same as a Phase 3 step 1 exit-3 DEADLOCK. There is never a round 4.
 
 Basis:
 `wiki/infrastructure/agent-orchestration/session-context-token-budget.md`
@@ -235,6 +250,10 @@ criteria clear enough to decompose. Don't start until they are.
 - **no git repo** → run `scripts/safe-cleanup.sh init-check <workdir>`. Only if it
   returns ok, `git init` (add a `.gitignore` incl. `.orchestration/` first), then
   proceed as above. If it REFUSEs (nested repo / secrets), stop and report.
+- Create `.orchestration/notes/` and `touch` an empty `notes/decisions.md` —
+  the blackboard (append-only) lives there; see **Blackboard** below. Without
+  this, the first worker to reach the implement phase's read checkpoint reads
+  a file that does not exist yet.
 
 ## Phase 2 — Decompose
 Get the task set: use the `intake` children as candidate tasks if Phase 0 read an
@@ -247,7 +266,12 @@ creates — component/schema/endpoint/type), and **consumes** (another task's ou
 it depends on). Build a conflict/dependency matrix from those and topologically sort
 into Waves (`conflict-matrix.md`): a dependency edge `A → B` means B consumes A's
 output, so A's Wave precedes B's. Detect duplicate outputs and assign a single
-producer; others consume (add a dependency edge). Write BOTH artifacts: `conflict-matrix.md` for humans and
+producer; others consume (add a dependency edge). **Mark shared surfaces** while
+you do this: any output that lands in one task's `outputs` and at least one other
+task's `consumes` is a shared surface — the conflict matrix already computes this
+exact edge, so no extra pass is needed. Phase 3 step 0 commits a contract stub for
+each one before its producer is dispatched (see Contract-first dispatch below).
+Write BOTH artifacts: `conflict-matrix.md` for humans and
 `.orchestration/graph.json` for the scheduler. A markdown table is not machine
 readable.
 
@@ -343,9 +367,13 @@ answered.
    fast-forwardable (that verb DOES check out `<integ>` in the main worktree).
    Either way, verify the merge landed with `git merge-base --is-ancestor
    <branch> <integ>` before dispatching any dependent — that exit code is the
-   evidence, not the merge command's own chatter. Then return to step 1:
-   whatever dependency it released shows up in the next `ready-set.sh` round
-   already merged, and the freed slot refills immediately. On rework needed, run
+   evidence, not the merge command's own chatter. Then append one line to the
+   blackboard with the shell append primitive, never Write/Edit — see
+   **Blackboard** below: `printf '%s\n' '- [<task>] merged: <outputs> now on
+   <integ>' >> .orchestration/notes/decisions.md`. Then return to step 1:
+   whatever dependency it released shows up in the next
+   `ready-set.sh` round already merged, and the freed slot refills immediately.
+   On rework needed, run
    the Phase 4 rework sequence — `status-update.sh <task> rework`, read the
    new `.attempt`, write `reviews/<task>-rN.md`, re-deliver with
    `send-prompt.sh send` (or a new Orca Task on the same terminal). The
@@ -552,6 +580,30 @@ reasoning-effort flags) that `worker-start` cannot express.
    diff, asserting an invariant that spans two tasks' code — cannot rely on the
    signature alone: give it `deps` on every producer it reads, so it is not
    dispatched until each producer is approved and merged.
+
+   **Contract-first dispatch (shared surfaces) — ordering exception.** A task
+   that PRODUCES a shared surface (Phase 2) reorders its own steps so the stub
+   it commits can quote a real signature and land before its own worktree
+   exists: run step 2a's `wiki-plan` invocation for this task FIRST — write
+   `plans/<task>.md`, but do not launch yet — then commit the stub below, THEN
+   step 1 (`setup-worktrees.sh`, whose worktree now branches from a tip that
+   already contains the stub), then step 2 (write the brief, referencing the
+   already-written plan) and launch. A consumer task needs no reordering of its
+   own: by round/dependency ordering its step 1 always runs after the
+   producer's stub commit has landed, so its worktree inherits the contract
+   normally.
+
+   Commit the stub in a temp integ worktree: `git worktree add
+   .worktrees/integ-stubs <integ>`, write the stub file(s) at the plan-named
+   repo-relative paths — the exact signature `plans/<task>.md` step 2a just
+   decided, plus a `// contract: <task> owns the implementation` marker comment
+   (in the stub language's comment syntax), never implementation — commit
+   `chore(orchestrate): contract stubs for <task>`, then `git worktree remove
+   .worktrees/integ-stubs`. The producer's brief says it IMPLEMENTS the stub in
+   place, not create it fresh. A producer that must change a committed stub's
+   signature reports that as a plan gap: you re-decide, recommit the stub, and
+   notify every consumer via the blackboard (append-only, shell `>>` primitive
+   — see **Blackboard** below).
 1. `scripts/setup-worktrees.sh <integ> <root> <base> <branch>...` — each worktree
    is created AT DISPATCH TIME, branched from the integration branch's CURRENT
    tip; never pre-create a worktree for a future wave, or it misses whatever
@@ -584,6 +636,23 @@ reasoning-effort flags) that `worker-start` cannot express.
    appropriate". The worker then ADOPTS this plan (session-prompt §1 / O1) instead
    of authoring one, and still signals `plan_ready` — so the phase sequence, the
    `plan_ready` watch, and the ready-set scheduler are all unchanged.
+
+   **Read the Size verdict before launching.** `plans/<task>.md` step 5 carries a
+   REQUIRED `## Size verdict`; read it now, before `launch-session.sh` — the task
+   is still undispatched at this moment, so no status file exists for it yet.
+   `small`/`medium` — continue below, unchanged. `large` — do NOT launch this
+   task. Instead attempt `scripts/graph-drop.sh .orchestration/graph.json
+   .orchestration/status <task-id>` on the oversized node and branch on its exit
+   code: **exit 0** (no dependents) → add each piece the verdict recommends as an
+   independent node with `scripts/graph-add.sh .orchestration/graph.json
+   '<node-json>'` — `split_of` naming the dropped parent id, `deps` the parent's
+   former deps, `outputs` partitioned among the pieces — real parallelism, since
+   each piece now competes for its own slot; **exit 3** (dependents/consumers
+   still name it) → do not force the drop — keep the original node and fall back
+   to the existing overlap-split semantics (**Splitting a task mid-run** below)
+   instead. Either branch, report the changed task list to the user immediately
+   — same duty as a mid-run split — then resume this loop with the (possibly
+   changed) task set.
 
    Because planning happens here, **the planning model is whatever model this
    coordinator session is running**. There is no separate setting to turn: to plan
@@ -789,13 +858,61 @@ error at `.orchestration/graph.json` — resolve and resubmit the proposal. Run 
 blocked until `.orchestration/graph.json` is accessible."
 
 You decide this without a user gate, but **report it immediately** — the task
-list the user approved at Gate 1 just grew, and they need the overlap verdict
-and the schedule change to intervene if they disagree.
+list the user approved at Gate 1 just **grew** (split), and they need the
+overlap verdict and the schedule change to intervene if they disagree.
+
+**Dropping a task mid-run.** When a sibling's outcome makes an undispatched
+node obsolete, drop it with `scripts/graph-drop.sh .orchestration/graph.json
+.orchestration/status <task-id>`. It refuses a task that already has a status
+file (any phase — dispatched, not yours to drop; that's the rework/failed
+flow's job) and refuses a drop that would leave a dangling reference (another
+task's `deps`, `split_of`, or `consumes` still names it) — drop dependents
+before their parents. `graph-drop.sh` returns **0** dropped, **3** REJECTED
+with the reason and the file untouched, **4** the graph or status dir could
+not be read. You decide this without a user gate too, but **report it
+immediately** — the Gate-1-approved task list just **shrank** (drop), and the
+user needs the reason to intervene if they disagree.
+
+## Blackboard — facts on disk, decisions on the hub
+
+`.orchestration/notes/decisions.md` is an APPEND-ONLY file for cross-task facts:
+an interface change to a declared output, or a load-bearing decision another
+task could consume. Entry format, one line each: `- [<task-id>] <what changed
+/ decided>`.
+
+Workers read it at exactly two checkpoints — start of the implement phase, and
+again before self-review — and append when they change a declared interface
+or make a load-bearing decision; they never edit or delete an existing line,
+even their own. The coordinator appends one line at each merge-on-approval
+(Phase 3 step 5): `- [<task>] merged: <outputs> now on <integ>`.
+
+Treat every line as a hint that something changed, not as the decision
+itself: task assignment, rework routing, and merge approval stay on the
+coordinator hub (status files, `ask-coordinator.sh`, Gate 1/Gate 2) — the
+blackboard has no question path and settles nothing on its own
+(`wiki/infrastructure/agent-orchestration/control-signals-vs-primary-artifacts.md`).
+No helper script — a single shell primitive only: append with `printf '%s\n'
+'- [<task-id>] <fact>' >> {ORCH_DIR}/notes/decisions.md`, `O_APPEND`-atomic
+for a one-line write, and read the file with Read/`cat`. Never use Write/Edit
+to append — both are read-modify-write, so a concurrent worker's stale read
+silently drops another worker's just-appended line
+(`wiki/backend/common/storage/multi-object-write-ordering.md`).
 
 ## Phase 5 — Integration test loop (max 3)
 Merge-preview onto the integration branch and run the integration tests (use the
-`verify` role's command if configured). On failure, route back to the responsible
-session as rework. Repeat until green.
+`verify` role's command if configured). On a test failure, route back to the
+responsible session as rework.
+
+Once tests are green, run the integration REVIEW via the `integration-reviewer`
+agent (Agent tool, fresh context — not this coordinator session): pass it the
+integration branch name, base ref, repo root, worktree paths, and the
+`{ORCH_DIR}` paths of `graph.json`/briefs/plans/reviews; it runs `git diff
+<base>...<integ>` itself. The coordinator consumes only its `VERDICT:
+approve|rework` + `FINDINGS` + summary — MUST NOT read the full integration
+diff into its own context at this phase (that full read is Gate 2's, the last
+one — see **Coordinator token budget**). On `VERDICT: rework`, route each
+finding back to its responsible task as rework, same as a failed integration
+test. Repeat until the agent returns `VERDICT: approve`.
 
 ## 🚦 Gate 2 — pre-merge review (REQUIRED)
 Show the full integration diff (`git diff`), then ask for the verdict with
@@ -885,7 +1002,8 @@ kept), so re-running it is safe. Note the difference from **partial resume** (Ph
 - Sessions must not weaken tests (loop-implement guard); the auditor enforces it.
 - Always verify real state after worktree/session ops (`git worktree list`, `tmux ls`,
   status files) — never trust echo logs (set -e is fail-open in eval subshells).
-- Bundled agent only: `test-quality-auditor`. Don't depend on built-in agent names
-  (general-purpose/Explore/Plan are version-dependent).
+- Bundled agents only: `test-quality-auditor`, `integration-reviewer`. Don't
+  depend on built-in agent names (general-purpose/Explore/Plan are
+  version-dependent).
 - A completed/excluded issue (partial resume) is injected as a **base output**, never
   silently dropped — otherwise its dependents lose their premise and re-create it.
