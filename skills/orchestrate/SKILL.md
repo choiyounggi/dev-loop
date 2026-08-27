@@ -858,8 +858,8 @@ error at `.orchestration/graph.json` — resolve and resubmit the proposal. Run 
 blocked until `.orchestration/graph.json` is accessible."
 
 You decide this without a user gate, but **report it immediately** — the task
-list the user approved at Gate 1 just grew, and they need the overlap verdict
-and the schedule change to intervene if they disagree.
+list the user approved at Gate 1 just **grew** (split), and they need the
+overlap verdict and the schedule change to intervene if they disagree.
 
 **Dropping a task mid-run.** When a sibling's outcome makes an undispatched
 node obsolete, drop it with `scripts/graph-drop.sh .orchestration/graph.json
@@ -870,8 +870,8 @@ task's `deps`, `split_of`, or `consumes` still names it) — drop dependents
 before their parents. `graph-drop.sh` returns **0** dropped, **3** REJECTED
 with the reason and the file untouched, **4** the graph or status dir could
 not be read. You decide this without a user gate too, but **report it
-immediately** — the Gate-1-approved task list just shrank, and the user needs
-the reason to intervene if they disagree.
+immediately** — the Gate-1-approved task list just **shrank** (drop), and the
+user needs the reason to intervene if they disagree.
 
 ## Blackboard — facts on disk, decisions on the hub
 
