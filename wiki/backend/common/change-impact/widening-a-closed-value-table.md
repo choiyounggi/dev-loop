@@ -7,8 +7,8 @@ confidence: verified
 sources:
   - https://refactoring.com/catalog/replaceMagicLiteral.html
   - https://pragprog.com/tips/
-last_verified: 2026-08-06
-related: [backend-common-change-impact-call-site-enumeration, backend-common-api-design-unenforced-declarations]
+last_verified: 2026-08-27
+related: [backend-common-change-impact-call-site-enumeration, backend-common-api-design-unenforced-declarations, backend-common-errors-diagnostics-from-a-shared-code-path, backend-common-change-impact-compiler-as-call-site-inventory]
 ---
 
 # Widening a Closed Value Table Whose Consumers Inlined It
@@ -50,6 +50,24 @@ rather than a parse error.
 5. **Add a test that drives every consumer with every member of the table**,
    parameterized over the table itself. It fails on the next widening if a new
    copy has appeared, which is the only check that survives the next author.
+6. **When the plan is to unify two duplicate tables into one, compute both set
+   differences first and rule on each element before writing the merge.** "Both
+   consumers want the same set" is a claim, and unification defaults to the
+   union — which widens each side by whatever the other carried. For an
+   allowlist that widening *is* the change: a member the other list happened to
+   include becomes newly permitted or newly exposed, and neither type-checking
+   nor the existing tests read set membership as a fact worth failing on.
+
+| A − B / B − A contains | Do |
+|------------------------|----|
+| Nothing (the sets are equal) | Unify; record that the difference was measured and empty |
+| Elements that are an oversight in one list | Unify to the union, and name each added element in the change description |
+| Elements that must legitimately differ per consumer | Keep two names derived from one base (`BASE`, `BASE + EXTRA`), so the difference stays visible instead of being erased |
+| Elements you cannot classify | Leave the duplication in place until each is ruled on — an unexplained difference is the case the union silently resolves |
+
+7. **Record the direction after merging**: diff the resulting set against each
+   original and state whether it widened, narrowed, or held. A widening of an
+   allowlist is a review item on its own, separate from the deduplication.
 
 ## Edge cases
 
@@ -71,9 +89,11 @@ rather than a parse error.
 | Add the entry to the canonical table and run the suite | Reconcile the copies first, then widen | A green suite means the consumers the tests reach accepted the entry; the copied ones were never asked |
 | Leave one inlined copy because it is a hot path or avoids an import cycle | Have that path read the table once at import and keep the local binding | The copy is not cheaper than a module-level lookup, and it is the site that silently defines a different vocabulary |
 | Extend a second same-vocabulary table alongside the first to keep both callers happy | Derive the second from the first in the same module | Two canonical-looking tables make the next author's name grep authoritative and wrong |
+| Replace two duplicate allowlists with one union because they "look the same" | Compute both set differences, rule on each element, then unify or derive | The union grants every consumer the other's extra members; for an allowlist that is a new exposure, and no type or test reports it |
 
 ## Sources
 
 - https://refactoring.com/catalog/replaceMagicLiteral.html — *Replace Magic Literal*, alias "Replace Magic Number with Symbolic Constant": a literal with a particular meaning becomes a named constant. The refactoring exists because the inlined literal is the default state of such values, which is what makes the value the reliable search handle
 - https://pragprog.com/tips/ — Tip 15, DRY: "Every piece of knowledge must have a single, unambiguous, authoritative representation within a system." A copied value table is a second representation, and widening one representation is what produces the divergence
+- Field measurement 2026-08-25 (`rtb-unified`, PR #965): a cleanup proposed folding `DISPLAYABLE_ERROR_CODES` into `USER_FACING_ERROR_CODES` as one SSOT. Computing the set difference before merging showed the union added `UNAUTHORIZED` and `VALIDATION_ERROR` to the displayable set — the path by which raw server messages would have been surfaced as inline UI errors. The sets were kept derived-with-an-explicit-difference instead; nothing in the type system or the suite had flagged the widening
 - Local reproduction 2026-08-06 (`linkly`, Python, macOS): `grep -rn "DURATION_UNITS" impl/lnpl/*.py` returns **1** hit (the definition); `grep -rn "60000" impl/lnpl/*.py` returns **7** across four files — a second named table (`DURATION_UNIT_MS`, `lexer.py:23`), three independently inlined `(("ms",1),("s",1000),("m",60000))` tuples (`condition.py:353`, `interp.py:1020`, `backend.py:446`), and two bare-literal arithmetic sites (`condition.py:269-270`). The predicted divergence was already present: the canonical map carries `h` and `d`, while all three inlined copies stop at `m`, so those paths cannot convert a unit the lexer accepts

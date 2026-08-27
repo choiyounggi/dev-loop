@@ -29,6 +29,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [pipeline-structure](ci-cd/pipeline-structure.md) | Creating or restructuring a CI pipeline; CI is slow, unreliable, or reports failures too late; deciding where a new check/stage belongs |
 | [secrets-handling](ci-cd/secrets-handling.md) | A build or deploy step needs credentials (registry, cloud, private packages, signing); reviewing how secrets flow through CI; a secret leaked (log/chat/commit) and deciding the response |
+| [changed-files-only-gates](ci-cd/changed-files-only-gates.md) | A CI step builds a changed-files list in the shell and passes it to `prettier`/`eslint`/a checker as operands; deciding whether a green gate means "no violations" or "nothing examined"; the list is empty because a base ref did not resolve; the script runs under zsh where an unquoted variable does not word-split; placing a probe file to prove the gate can fail |
 
 ## config
 
@@ -43,6 +44,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [host-cgroup-visibility](containers/host-cgroup-visibility.md) | A container must read the host's full cgroup v2 hierarchy (other pods' CPU/memory stats) via a hostPath/`-v` mount of `/sys/fs/cgroup`; the mounted directory is missing the `kubepods` subtree with no error |
+| [exec-added-processes-and-the-memory-budget](containers/exec-added-processes-and-the-memory-budget.md) | About to `kubectl exec`/`docker exec` an extra process into a pod already running a service (remote CLI worker, debug shell, side job); judging it safe because the app’s own queue or semaphore has free slots; reading `memory.current`/`memory.peak`/`memory.events` as a headroom preflight; deciding between exec and a Job/sidecar with its own limits |
 | [image-builds](containers/image-builds.md) | Writing or reviewing a Dockerfile; images rebuild everything on small changes, build slowly, or are too large; choosing an image tagging scheme |
 | [resource-limits-and-probes](containers/resource-limits-and-probes.md) | Writing or reviewing Kubernetes-style deployment manifests; pods OOMKilled, evicted, or CPU-throttled; a dependency outage triggered a restart storm; traffic hitting pods that are not ready |
 | [failing-pod-on-a-repo-synced-cluster](containers/failing-pod-on-a-repo-synced-cluster.md) | A pod will not start or keeps restarting (`Pending`, `ContainerCreating`, `CrashLoopBackOff`) on a cluster whose manifests a GitOps controller (Argo CD, Flux) applies; choosing between editing the live object and committing the manifest; reading `lastState.terminated` exitCode/reason before logs to separate an OOM kill from an application exit; you hold no cluster access and must hand the diagnosis over |

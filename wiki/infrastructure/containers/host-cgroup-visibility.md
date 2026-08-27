@@ -48,7 +48,7 @@ mount inside the private namespace, so what looks like "the host's
 | Case | Then |
 |------|------|
 | Files are visible but writes fail (`cgroup.procs`: no such file / EPERM) | A different restriction: the `nsdelegate` mount option (systemd default) blocks cross-namespace-boundary writes even when reads work — reading stats is fine, migrating processes is not |
-| Reading only the container's OWN limits/usage | No host namespace needed — the default namespaced view is exactly right for self-monitoring |
+| Reading only the container's OWN limits/usage | No host namespace needed — the default namespaced view is exactly right for self-monitoring; for the preflight before adding a process to that container, [infrastructure-containers-exec-added-processes-and-the-memory-budget] |
 | Sizing decisions based on the stats you read | Limits/QoS interpretation: [infrastructure-containers-resource-limits-and-probes] |
 
 ## Instead of
