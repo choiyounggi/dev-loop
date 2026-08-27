@@ -81,7 +81,7 @@ You are the session for {TASK}. Treat {ORCH_DIR}/briefs/{TASK}.md `<task_brief>`
 
 ## (2) Implement — injected after plan approval
 
-Approved. Implement {ORCH_DIR}/plans/{TASK}.md via the loop-implement skill: respect `<effort_level>` (max 3 retries), write tests first, run them, self-review, and at step 6.5 you MUST call the test-quality-auditor subagent. Never touch anything in `<out_of_scope>`. Confirm EVERY `<definition_of_done>` item, then run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD` and wait. Do not commit, push, or PR.
+Approved. First read {ORCH_DIR}/notes/decisions.md if it exists (cross-task facts; consume, never edit past lines). Implement {ORCH_DIR}/plans/{TASK}.md via the loop-implement skill: respect `<effort_level>` (max 3 retries), write tests first, run them, self-review, and at step 6.5 you MUST call the test-quality-auditor subagent. Never touch anything in `<out_of_scope>`. Confirm EVERY `<definition_of_done>` item. If you changed a declared interface or made a load-bearing decision, APPEND one line with `printf '%s\n' '- [{TASK}] <fact>' >> {ORCH_DIR}/notes/decisions.md` (never Write/Edit — concurrent workers can drop each other's lines), and re-read the file before self-review. Then run `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD` and wait. Do not commit, push, or PR.
 
 ## (3) Rework — injected when review requests changes
 
@@ -111,6 +111,14 @@ Approved. Commit your changes on {BRANCH} with a conventional message (no push, 
     A record's meaning is "answer still awaited"; leaving it in place after you've
     already moved on strands the coordinator on stale state.
 
+[4] The blackboard (`{ORCH_DIR}/notes/decisions.md`) is append-only — never
+    rewrite or delete an existing line, even your own. Append with
+    `printf '%s\n' '- [{TASK}] <fact>' >> {ORCH_DIR}/notes/decisions.md`,
+    never Write/Edit (read-modify-write drops a concurrent worker's line). It
+    carries facts only; decisions (task assignment, rework, merge approval)
+    still go through the coordinator via status-update.sh /
+    ask-coordinator.sh, never through this file.
+
 **Orca substrate.** §O1–§O4 — one `--spec` per task-phase, delivered by Orca. Not
 send-keys: a `--spec` MAY span multiple lines. Each phase is a separate Task, so no
 prompt here says "wait" — the worker reports and ends its turn.
@@ -137,10 +145,14 @@ Then END YOUR TURN. Do NOT write implementation code yet.
 
 ## (O2) Implement — `--spec` of the implement Task
 
-Approved. Implement {ORCH_DIR}/plans/{TASK}.md via the loop-implement skill: respect
+Approved. First read {ORCH_DIR}/notes/decisions.md if it exists (cross-task facts; consume,
+never edit past lines). Implement {ORCH_DIR}/plans/{TASK}.md via the loop-implement skill: respect
 `<effort_level>` (max 3 retries), write tests first, run them, self-review, and at step
 6.5 you MUST call the test-quality-auditor subagent. Never touch anything in
-`<out_of_scope>`. Confirm EVERY `<definition_of_done>` item, then run
+`<out_of_scope>`. Confirm EVERY `<definition_of_done>` item. If you changed a declared
+interface or made a load-bearing decision, APPEND one line with `printf '%s\n' '- [{TASK}]
+<fact>' >> {ORCH_DIR}/notes/decisions.md` (never Write/Edit — concurrent workers can drop
+each other's lines), and re-read the file before self-review. Then run
 `STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD`
 and report exactly once:
 `orca orchestration send --type worker_done --subject "impl_done: {TASK}" --body "<what changed, what remains>" --task-id {ORCA_TASK_ID} --dispatch-id {ORCA_DISPATCH_ID} --outcome succeeded --files-modified "<csv>" --json`
@@ -206,6 +218,14 @@ and report exactly once:
     dispatch's own context.
 
 [6] The Subagent usage protocol block below is REQUIRED for §O prompts too — append it.
+
+[7] The blackboard (`{ORCH_DIR}/notes/decisions.md`) is append-only — never
+    rewrite or delete an existing line, even your own. Append with
+    `printf '%s\n' '- [{TASK}] <fact>' >> {ORCH_DIR}/notes/decisions.md`,
+    never Write/Edit (read-modify-write drops a concurrent worker's line). It
+    carries facts only; decisions (task assignment, rework, merge approval)
+    still go through the coordinator via status-update.sh / Orca send, never
+    through this file.
 
 ---
 

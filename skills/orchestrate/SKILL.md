@@ -87,6 +87,11 @@ back, so they are keyed by predicate:
 | **After each merge-on-approval** — once `git merge-base --is-ancestor <branch> <integ>` has confirmed the merge landed (Phase 3 step 5) | a safe `/compact` point | `.orchestration/graph.json`, `.orchestration/status/*.json`, and the brief + plan of whatever `ready-set.sh` dispatches next |
 | Gate 2, with the integration diff shown | a safe `/compact` point | the integration diff, re-read with `git diff` |
 
+Gate 2's full-diff read is the LAST one of a run, not a recurring cost: Phase
+5's integration review now runs on the `integration-reviewer` agent's own
+fresh context, so this coordinator session itself never reads the full
+integration diff until this final gate.
+
 The middle row is the one that matters. Gate 1 and Gate 2 are the *first* and
 *last* things a run does, so on their own they leave the long autonomous middle
 — where essentially all of the context accumulates — with no sanctioned
@@ -235,6 +240,10 @@ criteria clear enough to decompose. Don't start until they are.
 - **no git repo** → run `scripts/safe-cleanup.sh init-check <workdir>`. Only if it
   returns ok, `git init` (add a `.gitignore` incl. `.orchestration/` first), then
   proceed as above. If it REFUSEs (nested repo / secrets), stop and report.
+- Create `.orchestration/notes/` and `touch` an empty `notes/decisions.md` —
+  the blackboard (append-only) lives there; see **Blackboard** below. Without
+  this, the first worker to reach the implement phase's read checkpoint reads
+  a file that does not exist yet.
 
 ## Phase 2 — Decompose
 Get the task set: use the `intake` children as candidate tasks if Phase 0 read an
@@ -343,9 +352,13 @@ answered.
    fast-forwardable (that verb DOES check out `<integ>` in the main worktree).
    Either way, verify the merge landed with `git merge-base --is-ancestor
    <branch> <integ>` before dispatching any dependent — that exit code is the
-   evidence, not the merge command's own chatter. Then return to step 1:
-   whatever dependency it released shows up in the next `ready-set.sh` round
-   already merged, and the freed slot refills immediately. On rework needed, run
+   evidence, not the merge command's own chatter. Then append one line to the
+   blackboard with the shell append primitive, never Write/Edit — see
+   **Blackboard** below: `printf '%s\n' '- [<task>] merged: <outputs> now on
+   <integ>' >> .orchestration/notes/decisions.md`. Then return to step 1:
+   whatever dependency it released shows up in the next
+   `ready-set.sh` round already merged, and the freed slot refills immediately.
+   On rework needed, run
    the Phase 4 rework sequence — `status-update.sh <task> rework`, read the
    new `.attempt`, write `reviews/<task>-rN.md`, re-deliver with
    `send-prompt.sh send` (or a new Orca Task on the same terminal). The
@@ -804,10 +817,46 @@ You decide this without a user gate, but **report it immediately** — the task
 list the user approved at Gate 1 just grew, and they need the overlap verdict
 and the schedule change to intervene if they disagree.
 
+## Blackboard — facts on disk, decisions on the hub
+
+`.orchestration/notes/decisions.md` is an APPEND-ONLY file for cross-task facts:
+an interface change to a declared output, or a load-bearing decision another
+task could consume. Entry format, one line each: `- [<task-id>] <what changed
+/ decided>`.
+
+Workers read it at exactly two checkpoints — start of the implement phase, and
+again before self-review — and append when they change a declared interface
+or make a load-bearing decision; they never edit or delete an existing line,
+even their own. The coordinator appends one line at each merge-on-approval
+(Phase 3 step 5): `- [<task>] merged: <outputs> now on <integ>`.
+
+Treat every line as a hint that something changed, not as the decision
+itself: task assignment, rework routing, and merge approval stay on the
+coordinator hub (status files, `ask-coordinator.sh`, Gate 1/Gate 2) — the
+blackboard has no question path and settles nothing on its own
+(`wiki/infrastructure/agent-orchestration/control-signals-vs-primary-artifacts.md`).
+No helper script — a single shell primitive only: append with `printf '%s\n'
+'- [<task-id>] <fact>' >> {ORCH_DIR}/notes/decisions.md`, `O_APPEND`-atomic
+for a one-line write, and read the file with Read/`cat`. Never use Write/Edit
+to append — both are read-modify-write, so a concurrent worker's stale read
+silently drops another worker's just-appended line
+(`wiki/backend/common/storage/multi-object-write-ordering.md`).
+
 ## Phase 5 — Integration test loop (max 3)
 Merge-preview onto the integration branch and run the integration tests (use the
-`verify` role's command if configured). On failure, route back to the responsible
-session as rework. Repeat until green.
+`verify` role's command if configured). On a test failure, route back to the
+responsible session as rework.
+
+Once tests are green, run the integration REVIEW via the `integration-reviewer`
+agent (Agent tool, fresh context — not this coordinator session): pass it the
+integration branch name, base ref, repo root, worktree paths, and the
+`{ORCH_DIR}` paths of `graph.json`/briefs/plans/reviews; it runs `git diff
+<base>...<integ>` itself. The coordinator consumes only its `VERDICT:
+approve|rework` + `FINDINGS` + summary — MUST NOT read the full integration
+diff into its own context at this phase (that full read is Gate 2's, the last
+one — see **Coordinator token budget**). On `VERDICT: rework`, route each
+finding back to its responsible task as rework, same as a failed integration
+test. Repeat until the agent returns `VERDICT: approve`.
 
 ## 🚦 Gate 2 — pre-merge review (REQUIRED)
 Show the full integration diff (`git diff`), then ask for the verdict with
@@ -897,7 +946,8 @@ kept), so re-running it is safe. Note the difference from **partial resume** (Ph
 - Sessions must not weaken tests (loop-implement guard); the auditor enforces it.
 - Always verify real state after worktree/session ops (`git worktree list`, `tmux ls`,
   status files) — never trust echo logs (set -e is fail-open in eval subshells).
-- Bundled agent only: `test-quality-auditor`. Don't depend on built-in agent names
-  (general-purpose/Explore/Plan are version-dependent).
+- Bundled agents only: `test-quality-auditor`, `integration-reviewer`. Don't
+  depend on built-in agent names (general-purpose/Explore/Plan are
+  version-dependent).
 - A completed/excluded issue (partial resume) is injected as a **base output**, never
   silently dropped — otherwise its dependents lose their premise and re-create it.
