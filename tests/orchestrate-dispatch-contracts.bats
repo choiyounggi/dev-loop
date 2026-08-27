@@ -95,6 +95,26 @@ brief_dependencies_region() {
   [[ "$section" != *"plan gap"* ]]
 }
 
+# --- r1 F1: step 0 states the producer ordering exception (plan before stub --
+# --- before worktree) so the stub never quotes an unwritten plan and never --
+# --- precedes the producer's own worktree -----------------------------------
+
+@test "step 0 states the producer ordering exception: plan (2a) first, then stub, then worktree (step 1)" {
+  section="$(normalize_ws "$(step0_section "$SKILL")")"
+  [[ "$section" == *"ordering exception"* ]]
+  [[ "$section" == *"run step 2a's \`wiki-plan\` invocation for this task FIRST"* ]]
+  [[ "$section" == *"do not launch yet"* ]]
+  [[ "$section" == *"THEN step 1"* ]]
+  [[ "$section" == *"needs no reordering"* ]]
+}
+
+@test "negative control: a step-0 copy without the ordering exception fails the producer-sequencing check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-ordering-exception.md"
+  grep -v 'ordering exception' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(step0_section "$fixture")")"
+  [[ "$section" != *"ordering exception"* ]]
+}
+
 # --- 3: SKILL.md Phase 2 marks shared surfaces ------------------------------
 
 @test "Phase 2 marks shared surfaces from outputs/consumes at decompose time" {

@@ -581,20 +581,29 @@ reasoning-effort flags) that `worker-start` cannot express.
    signature alone: give it `deps` on every producer it reads, so it is not
    dispatched until each producer is approved and merged.
 
-   **Contract-first dispatch (shared surfaces).** For every shared surface
-   marked at Phase 2, commit its stub to the integration branch BEFORE
-   dispatching the producer, so every worktree created afterwards branches from
-   a tip that already contains the contract instead of a dispatch-time
-   snapshot. Do it in a temp integ worktree: `git worktree add
+   **Contract-first dispatch (shared surfaces) — ordering exception.** A task
+   that PRODUCES a shared surface (Phase 2) reorders its own steps so the stub
+   it commits can quote a real signature and land before its own worktree
+   exists: run step 2a's `wiki-plan` invocation for this task FIRST — write
+   `plans/<task>.md`, but do not launch yet — then commit the stub below, THEN
+   step 1 (`setup-worktrees.sh`, whose worktree now branches from a tip that
+   already contains the stub), then step 2 (write the brief, referencing the
+   already-written plan) and launch. A consumer task needs no reordering of its
+   own: by round/dependency ordering its step 1 always runs after the
+   producer's stub commit has landed, so its worktree inherits the contract
+   normally.
+
+   Commit the stub in a temp integ worktree: `git worktree add
    .worktrees/integ-stubs <integ>`, write the stub file(s) at the plan-named
-   repo-relative paths — the exact signature `plans/<task>.md` step 2a already
-   decided, plus a `// contract: <task> owns the implementation` marker comment,
-   never implementation — commit `chore(orchestrate): contract stubs for
-   <task>`, then `git worktree remove .worktrees/integ-stubs`. The producer's
-   brief says it IMPLEMENTS the stub in place, not create it fresh. A producer
-   that must change a committed stub's signature reports that as a plan gap:
-   you re-decide, recommit the stub, and notify every consumer via the
-   blackboard (append-only, shell `>>` primitive — see **Blackboard** below).
+   repo-relative paths — the exact signature `plans/<task>.md` step 2a just
+   decided, plus a `// contract: <task> owns the implementation` marker comment
+   (in the stub language's comment syntax), never implementation — commit
+   `chore(orchestrate): contract stubs for <task>`, then `git worktree remove
+   .worktrees/integ-stubs`. The producer's brief says it IMPLEMENTS the stub in
+   place, not create it fresh. A producer that must change a committed stub's
+   signature reports that as a plan gap: you re-decide, recommit the stub, and
+   notify every consumer via the blackboard (append-only, shell `>>` primitive
+   — see **Blackboard** below).
 1. `scripts/setup-worktrees.sh <integ> <root> <base> <branch>...` — each worktree
    is created AT DISPATCH TIME, branched from the integration branch's CURRENT
    tip; never pre-create a worktree for a future wave, or it misses whatever
@@ -848,6 +857,10 @@ immediately." Do not add the node. Report immediately to the user: "Graph I/O
 error at `.orchestration/graph.json` — resolve and resubmit the proposal. Run is
 blocked until `.orchestration/graph.json` is accessible."
 
+You decide this without a user gate, but **report it immediately** — the task
+list the user approved at Gate 1 just grew, and they need the overlap verdict
+and the schedule change to intervene if they disagree.
+
 **Dropping a task mid-run.** When a sibling's outcome makes an undispatched
 node obsolete, drop it with `scripts/graph-drop.sh .orchestration/graph.json
 .orchestration/status <task-id>`. It refuses a task that already has a status
@@ -859,10 +872,6 @@ with the reason and the file untouched, **4** the graph or status dir could
 not be read. You decide this without a user gate too, but **report it
 immediately** — the Gate-1-approved task list just shrank, and the user needs
 the reason to intervene if they disagree.
-
-You decide this without a user gate, but **report it immediately** — the task
-list the user approved at Gate 1 just grew, and they need the overlap verdict
-and the schedule change to intervene if they disagree.
 
 ## Blackboard — facts on disk, decisions on the hub
 
