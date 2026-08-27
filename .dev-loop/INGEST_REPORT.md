@@ -1,5 +1,7 @@
 # Knowledge flush — 13 insight(s) ingested (21 claimed, 2 dropped, 6 released)
 
+Cross-Check: 1× independent adversarial `claude` CLI headless pass over the 5 new pages — it refuted the changed-files gate page's "prettier exits 0 on an empty match set" claim; re-measured against Prettier 3.7.4, confirmed the reviewer was right (unmatched operand exits **2**), and rewrote the page, report rows 3/5 and `log.md`. Other 5 claim groups verdicted sound. Limits: the reviewer's sandbox blocked repo reads, so source-quote-supports-directive and self-contradiction dimensions went unaudited (details in `## Cross-Check`).
+
 Queue drained under run id `20260827-125731-38371` (this session is the detached
 `hooks/auto-flush.sh` run; its step-0 acquire resolved re-entrantly to
 `already-owned`, not to a competing holder). 21 rows were claimed; 13 are
