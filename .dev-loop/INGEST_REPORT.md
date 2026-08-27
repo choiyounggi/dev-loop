@@ -16,9 +16,9 @@ Every external claim below was live-fetched this session and quoted in the page'
 |---|-------|-----------------|--------------|------------|
 | 1 | `now()` is `transaction_timestamp()` (fixed at transaction start) while `clock_timestamp()` "changes even within a single SQL statement"; `RETURNING` yields computed defaults "without needing a separate database query" | postgresql.org `functions-datetime`, `dml-returning`, `transaction-iso` | Fetched; both key sentences quoted verbatim into the page | verified |
 | 2 | A boundary recomputed in a follow-up step is a *second, later* `now`, widening a `<= boundary` set | Field: `rtb-unified` `packages/orpc/src/routers/batch.ts` — codifies "one `now` per decision" and passes `now` into the boundary helper; its result type omits the boundary, which is the shape that invites recomputation | Read the invariant and the signature in the cited file | field-tested |
-| 3 | Prettier `--check` prints "All matched files use Prettier code style!" and exits 0 **even when the match set is empty**; `--ignore-unknown` skips unknown files; `--no-error-on-unmatched-pattern` suppresses the unmatched error | prettier.io CLI docs | Fetched; confirms exit 0 + the success sentence, and that the unmatched-pattern error is the only signal and is suppressible | verified |
+| 3 | **[CORRECTED BY CROSS-CHECK]** The vacuous-pass shapes for `prettier --check` are: no operands (rc **0**), all operands ignore-filtered (rc **0**), and unsupported extensions with `--ignore-unknown` (rc **0**). A pattern/operand matching nothing exits **2** — it prints the success sentence *and* an unmatched-pattern error | prettier.io CLI + ignore docs; local measurement, Prettier 3.7.4 | The first draft generalised "empty match set ⇒ exit 0" from a field log where both messages appeared together. The independent reviewer flagged it; I then ran all seven cases against a real binary and rewrote the page around the measured table | verified (re-measured) |
 | 4 | zsh does not word-split unquoted parameter expansions by default, so `cmd $FILES` arrives as **one** operand | zsh FAQ ch. 3 (`SH_WORD_SPLIT`) | Fetched; quoted ("By default, zsh does not have that behaviour: the variable remains intact") | verified |
-| 5 | Reproduction of 3+4 together: the gate is green while examining nothing | Field 2026-08-24 (`rtb-unified`, zsh): `npx prettier --check $FILES` emitted `[error] No files matching the pattern were found: …` **together with** the success sentence; a probe under `.claude/tmp/` passed because Prettier's default ignores include `.gitignore`, while the same probe at `packages/orpc/src/zz-fmt-probe.ts` produced `[warn]` | Both directions observed | verified |
+| 5 | The zsh word-split operand exits **2**, but its log still carries the success sentence — so the log misleads even though the exit code does not | Field 2026-08-24 (`rtb-unified`, zsh) + local measurement 2026-08-27 | Field log showed both messages together; the local run reproduced it as `rc=2`. The page now says explicitly that this row fails loudly *unless* `--no-error-on-unmatched-pattern` is set. Probe placement re-confirmed: `.claude/tmp/` is `.gitignore`d, so a probe there passes at rc 0 | verified (re-measured) |
 | 6 | TypeScript applies excess-property/contextual typing to fresh object literals, so a value of a type can be constructed with the type's name absent from the text | typescriptlang.org handbook, *Object Types* | Fetched; confirmed the check follows from the contextual type, not from a written annotation | verified |
 | 7 | `tsc`'s program is `files` ∪ `include` ∪ transitive imports; `exclude` "only changes which files are included as a result of the `include` setting" and does not stop an imported file entering the program | typescriptlang.org TSConfig `#include`, `#exclude` | Fetched; the `exclude` sentence quoted (it sharpens the rule to "in the program", not "in `include`") | verified |
 | 8 | Consequence of 6+7 measured | Field 2026-08-24/25 (`rtb-unified`): `grep "DealViewer"` reported 3 construction sites, actual 8 — the missed set included production wiring `routers/deal.ts:38`; `ContractScopeActor` 7→~22. Separately, `packages/orpc/tsconfig.json` `include: ["src/**/*"]` produced 3 production + 13 api-test errors and **zero** for `__tests__/routers/deal.test.ts`, whose 6 sites appeared only as 6 failing tests | Counts recorded from the cited runs | verified |
@@ -139,6 +139,86 @@ state; first cycle records a baseline),
 dotenv file the tool loads, before a destructive DB command),
 `f1146adb` (CI ticket-key extraction scoped by changed-file intersection rather
 than by mention).
+
+## Decision Log
+
+**Intent.** Drain the harvested `★ Insight` queue into reviewable wiki knowledge
+without lowering the wiki's evidence bar. The queue held 21 rows accumulated over
+several days; the goal was correct routing and real verification, not a high
+ingest count.
+
+**Alternatives considered and rejected.**
+
+- *Ingest all 21 in this pass.* Rejected: six of them each need their own page,
+  and writing six more pages in one pass would have produced thin, weakly-sourced
+  entries. They are released to `pending`, not dropped, so the next flush takes
+  them with a full budget.
+- *Append the two TypeScript candidates to `call-site-enumeration`.* Rejected:
+  that page is the sibling case (callers of a changed signature, Python
+  positional-vs-keyword). AGENTS.md requires one case per page, so the
+  constructor-enumeration case became its own page, cross-linked both ways.
+- *Add a row to `source-text-wiring-assertions` for the empty-slice nuance.*
+  Rejected: that page is at exactly the documented 120-line body cap, so adding a
+  line would violate maintenance invariant 5. The nuance was merged **in place**
+  into an existing edge row instead; body re-measured at 120.
+- *Drop the comment-stripping candidate entirely as a duplicate.* Rejected: its
+  directive is already the page's step 2, but the empty-slice consequence
+  (vacuous **green**, not the documented noisy red) was genuinely absent.
+- *Claim a cross-check exemption because this PR cannot merge itself.* Rejected —
+  see below; the check found a real error, which is the argument against exempting.
+- *Push to `origin`* as the skill's snippet does. Not available: this contributor
+  has no write access to `choiyounggi/dev-loop` (403). Used the pre-existing
+  `fork` remote, which is how every prior knowledge branch here was published.
+- *Branch name from `git config user.name`.* The skill's ASCII sanitisation of a
+  Korean name yields an empty string → `anon`, defeating the attribution the
+  branch name exists for. Used the gh login, matching existing branch names.
+
+**Where reviewers should look hardest.**
+
+1. `infrastructure/ci-cd/changed-files-only-gates.md` — rewritten after the
+   cross-check. The measured table is the load-bearing part; please sanity-check
+   it against your own Prettier version, since the exit codes are version-visible
+   behaviour rather than a documented contract.
+2. `databases/transactions/application-clock-vs-database-timestamps.md` step 5–6 —
+   the claim that timestamp order is not commit order, and that the remedy is a
+   lock/isolation level rather than finer clock resolution. `[추정]` on the MySQL
+   `NOW()`/`SYSDATE()` row: taken from general MySQL semantics, not fetched this
+   session like the PostgreSQL pages were.
+3. `widening-a-closed-value-table.md` Do-this 6–7 — this inserts a security-shaped
+   concern (allowlist widening) into a page whose original subject was value
+   tables. If that reads as two cases, it should be split.
+4. The 2 dropped candidates — if you consider private-tooling runbooks in scope
+   for this wiki, they should be restored rather than retired.
+
+## Cross-Check
+
+Independent adversarial pass via `claude` CLI headless (separate process, no
+shared context), prompted to refute rather than confirm, over the five new pages'
+technical claims.
+
+**It found a real error, and the page was rewritten because of it.** The reviewer
+challenged the claim that `prettier --check` exits 0 on an empty match set,
+arguing an unmatched pattern errors by default and that exit-0 belongs to the
+ignore-filtered case. I resolved it by measurement rather than by argument —
+running all seven cases against Prettier 3.7.4 — and the reviewer was right:
+an unmatched operand exits **2** (while still printing the success sentence),
+whereas the genuine silent vacuous passes are no-operands, all-ignore-filtered,
+and `--ignore-unknown`-with-unsupported-extensions. The page, this report's
+rows 3 and 5, and the `log.md` entry were all corrected.
+
+Verdicts on the other five claim groups: **sound** (PostgreSQL clock semantics —
+noted as if anything *understated*; zsh word-splitting; TS contextual typing;
+`tsc` program membership incl. `exclude`-does-not-stop-imports; cgroup v2
+`max` vs `oom_kill` and `kubectl exec` cgroup placement).
+
+Stated limits of the check: the reviewer's sandbox denied it read access to
+`~/.dev-loop/repo/wiki`, so it adjudicated the six claims as quoted in its prompt
+and could **not** audit (b) whether each `Sources` quote supports the directive it
+is cited for, or (c) whether any page contradicts its own edge-case rows. Those
+two dimensions remain unreviewed by an independent party and are the residual
+risk in this PR. A first attempt also returned only the session's Stop-hook
+output rather than a verdict; that run was discarded rather than read as
+"no findings".
 
 ## Review notes
 
