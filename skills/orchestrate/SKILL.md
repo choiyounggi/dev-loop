@@ -788,6 +788,18 @@ immediately." Do not add the node. Report immediately to the user: "Graph I/O
 error at `.orchestration/graph.json` — resolve and resubmit the proposal. Run is
 blocked until `.orchestration/graph.json` is accessible."
 
+**Dropping a task mid-run.** When a sibling's outcome makes an undispatched
+node obsolete, drop it with `scripts/graph-drop.sh .orchestration/graph.json
+.orchestration/status <task-id>`. It refuses a task that already has a status
+file (any phase — dispatched, not yours to drop; that's the rework/failed
+flow's job) and refuses a drop that would leave a dangling reference (another
+task's `deps`, `split_of`, or `consumes` still names it) — drop dependents
+before their parents. `graph-drop.sh` returns **0** dropped, **3** REJECTED
+with the reason and the file untouched, **4** the graph or status dir could
+not be read. You decide this without a user gate too, but **report it
+immediately** — the Gate-1-approved task list just shrank, and the user needs
+the reason to intervene if they disagree.
+
 You decide this without a user gate, but **report it immediately** — the task
 list the user approved at Gate 1 just grew, and they need the overlap verdict
 and the schedule change to intervene if they disagree.
