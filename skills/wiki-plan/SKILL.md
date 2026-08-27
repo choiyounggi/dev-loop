@@ -83,9 +83,19 @@ decision now, and write the decision into the task.
    | # | Decision | Choice | Wiki basis |
    |---|----------|--------|------------|
    | D1 | PK type for users | UUIDv7, app-generated | databases-schema-design-primary-key-choice |
+   ## Size verdict
+   size: small | medium | large
    ## Task order
    | Task | Depends on | Parallel-ok |
    ```
+
+   **`## Size verdict` is REQUIRED, not optional.** Judge it against the step-4
+   bounds table, aggregated over the whole plan: `small` = ≤3 tasks, `medium` =
+   ≤8 tasks, `large` = >8 tasks OR any single task still breaking a step-4 bound
+   after you've tried to split it. When the verdict is `large`, the section MUST
+   also carry a recommended pre-dispatch split: per piece, its `files` and
+   `outputs` — the exact fields `graph-add.sh` validates, so the split can be
+   applied as independent graph nodes without another round-trip through you.
 
    `plans/<feature>/tasks/NN-<slug>.md` — one per task:
    ```markdown
@@ -112,7 +122,9 @@ decision now, and write the decision into the task.
    it must choose between two designs, invent a name/type/endpoint, or open an
    unnamed file? Each such point is a planning defect — fix the task, don't hope.
    Then check the seams: every Input names a Deliverable of an earlier task,
-   verbatim.
+   verbatim. Then check the verdict: is the `## Size verdict` present, and is
+   it consistent with the task table — does its `small`/`medium`/`large` call
+   actually match the task count and the step-4 bounds you just checked?
 
 ## Execution handoff
 

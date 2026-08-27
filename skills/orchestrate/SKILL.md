@@ -132,6 +132,16 @@ re-reads `{ORCH_DIR}/plans/<task>.md` from disk anyway, so send `plan patched at
 §N — re-read it from disk and re-run the adoption check` instead of restating
 the fix in the prompt.
 
+**Re-plan ladder — bound the loop.** Track each task's round count in your head
+from the review/patch history already on disk (no new state file). Rounds 1–2
+on a task are SCOPED PATCHES: the cheap re-send above, patching only the
+reported gap. Round 3 is ONE full re-plan: rewrite `plans/<task>.md` wholesale,
+re-running `wiki-plan` on the planning model rather than patching a single
+section — a third scoped patch is the signal the section-level fixes aren't
+converging. A task that still reports a plan gap after its round-3 full
+re-plan is a deadlock-grade escalation to the user: report it and get a human
+decision, same as a Phase 3 step 1 exit-3 DEADLOCK. There is never a round 4.
+
 Basis:
 `wiki/infrastructure/agent-orchestration/session-context-token-budget.md`
 (directives 2–4), plus this skill's own **Re-entry** guarantee for the
@@ -256,7 +266,12 @@ creates — component/schema/endpoint/type), and **consumes** (another task's ou
 it depends on). Build a conflict/dependency matrix from those and topologically sort
 into Waves (`conflict-matrix.md`): a dependency edge `A → B` means B consumes A's
 output, so A's Wave precedes B's. Detect duplicate outputs and assign a single
-producer; others consume (add a dependency edge). Write BOTH artifacts: `conflict-matrix.md` for humans and
+producer; others consume (add a dependency edge). **Mark shared surfaces** while
+you do this: any output that lands in one task's `outputs` and at least one other
+task's `consumes` is a shared surface — the conflict matrix already computes this
+exact edge, so no extra pass is needed. Phase 3 step 0 commits a contract stub for
+each one before its producer is dispatched (see Contract-first dispatch below).
+Write BOTH artifacts: `conflict-matrix.md` for humans and
 `.orchestration/graph.json` for the scheduler. A markdown table is not machine
 readable.
 
@@ -565,6 +580,21 @@ reasoning-effort flags) that `worker-start` cannot express.
    diff, asserting an invariant that spans two tasks' code — cannot rely on the
    signature alone: give it `deps` on every producer it reads, so it is not
    dispatched until each producer is approved and merged.
+
+   **Contract-first dispatch (shared surfaces).** For every shared surface
+   marked at Phase 2, commit its stub to the integration branch BEFORE
+   dispatching the producer, so every worktree created afterwards branches from
+   a tip that already contains the contract instead of a dispatch-time
+   snapshot. Do it in a temp integ worktree: `git worktree add
+   .worktrees/integ-stubs <integ>`, write the stub file(s) at the plan-named
+   repo-relative paths — the exact signature `plans/<task>.md` step 2a already
+   decided, plus a `// contract: <task> owns the implementation` marker comment,
+   never implementation — commit `chore(orchestrate): contract stubs for
+   <task>`, then `git worktree remove .worktrees/integ-stubs`. The producer's
+   brief says it IMPLEMENTS the stub in place, not create it fresh. A producer
+   that must change a committed stub's signature reports that as a plan gap:
+   you re-decide, recommit the stub, and notify every consumer via the
+   blackboard (append-only, shell `>>` primitive — see **Blackboard** below).
 1. `scripts/setup-worktrees.sh <integ> <root> <base> <branch>...` — each worktree
    is created AT DISPATCH TIME, branched from the integration branch's CURRENT
    tip; never pre-create a worktree for a future wave, or it misses whatever
@@ -597,6 +627,23 @@ reasoning-effort flags) that `worker-start` cannot express.
    appropriate". The worker then ADOPTS this plan (session-prompt §1 / O1) instead
    of authoring one, and still signals `plan_ready` — so the phase sequence, the
    `plan_ready` watch, and the ready-set scheduler are all unchanged.
+
+   **Read the Size verdict before launching.** `plans/<task>.md` step 5 carries a
+   REQUIRED `## Size verdict`; read it now, before `launch-session.sh` — the task
+   is still undispatched at this moment, so no status file exists for it yet.
+   `small`/`medium` — continue below, unchanged. `large` — do NOT launch this
+   task. Instead attempt `scripts/graph-drop.sh .orchestration/graph.json
+   .orchestration/status <task-id>` on the oversized node and branch on its exit
+   code: **exit 0** (no dependents) → add each piece the verdict recommends as an
+   independent node with `scripts/graph-add.sh .orchestration/graph.json
+   '<node-json>'` — `split_of` naming the dropped parent id, `deps` the parent's
+   former deps, `outputs` partitioned among the pieces — real parallelism, since
+   each piece now competes for its own slot; **exit 3** (dependents/consumers
+   still name it) → do not force the drop — keep the original node and fall back
+   to the existing overlap-split semantics (**Splitting a task mid-run** below)
+   instead. Either branch, report the changed task list to the user immediately
+   — same duty as a mid-run split — then resume this loop with the (possibly
+   changed) task set.
 
    Because planning happens here, **the planning model is whatever model this
    coordinator session is running**. There is no separate setting to turn: to plan
