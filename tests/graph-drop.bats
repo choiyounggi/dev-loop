@@ -8,6 +8,7 @@ setup() {
   GD="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/graph-drop.sh"
   G="${BATS_TEST_TMPDIR}/graph.json"
   S="${BATS_TEST_TMPDIR}/status"; mkdir -p "$S"
+  SKILL="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
 }
 
 graph() { printf '%s' "$1" > "$G"; }
@@ -130,4 +131,46 @@ graph() { printf '%s' "$1" > "$G"; }
   run sh "$RS" "$G" "$S" 4
   [ "$status" -eq 0 ]
   [ "$output" = "t1" ]
+}
+
+# --- SKILL.md ordering: split keeps its own lead-in -> mechanics -> closing
+# arc intact, drop is appended as its own self-contained coda, and the two
+# closing sentences are self-identifying rather than near-duplicates
+# (review r2 F1).
+
+split_section() {
+  awk '/^## Splitting a task mid-run/{p=1} p && /^## / && !/^## Splitting a task mid-run/{exit} p' "$1"
+}
+
+@test "SKILL.md: split's closing sentence precedes the drop paragraph, not the reverse (order)" {
+  section="$(split_section "$SKILL")"
+  grew_line=$(printf '%s\n' "$section" | grep -n 'just \*\*grew\*\* (split)' | head -1 | cut -d: -f1)
+  drop_line=$(printf '%s\n' "$section" | grep -n '\*\*Dropping a task mid-run\.\*\*' | head -1 | cut -d: -f1)
+  [ -n "$grew_line" ]
+  [ -n "$drop_line" ]
+  [ "$grew_line" -lt "$drop_line" ]
+}
+
+@test "SKILL.md: split and drop closing sentences are self-identifying, not near-duplicates (order)" {
+  section="$(split_section "$SKILL")"
+  [[ "$section" == *"just **grew** (split)"* ]]
+  [[ "$section" == *"just **shrank** (drop)"* ]]
+}
+
+# --- negative control: reproducing the r2 defect (drop's paragraph moved
+# before split's own closing sentence) must fail the order check above ------
+
+@test "negative control: a SKILL.md copy with drop's paragraph swapped ahead of split's closing sentence fails the order check" {
+  swapped="${BATS_TEST_TMPDIR}/skill-swapped-split-drop.md"
+  awk -v RS='' -v ORS='\n\n' '
+    /just \*\*grew\*\* \(split\)/ { grewP = $0; next }
+    /\*\*Dropping a task mid-run\.\*\*/ { print; print grewP; next }
+    { print }
+  ' "$SKILL" > "$swapped"
+  section="$(split_section "$swapped")"
+  grew_line=$(printf '%s\n' "$section" | grep -n 'just \*\*grew\*\* (split)' | head -1 | cut -d: -f1)
+  drop_line=$(printf '%s\n' "$section" | grep -n '\*\*Dropping a task mid-run\.\*\*' | head -1 | cut -d: -f1)
+  [ -n "$grew_line" ]
+  [ -n "$drop_line" ]
+  [ "$grew_line" -gt "$drop_line" ]
 }
