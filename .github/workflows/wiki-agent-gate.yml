@@ -1,0 +1,110 @@
+# Agent gate for knowledge PRs — the semantic half of wiki review.
+#
+# The mechanical half (frontmatter shape, id/path match, index routing,
+# duplicate ids, prohibition-with-replacement) runs as scripts in test.yml.
+# This workflow covers the three checks a script cannot do — transferability,
+# semantic duplication, fact check — by running Claude Code headless over the
+# PR diff, with the check definitions in .github/wiki-agent-gate-prompt.md.
+#
+# Why `pull_request_target` and not `pull_request`: knowledge PRs arrive from
+# a fork (dch0202-rsquare), and plain `pull_request` withholds secrets from
+# fork-originated runs, so the CLAUDE_CODE_OAUTH_TOKEN would be empty there.
+# `pull_request_target` runs in the base repo's context with secrets — which
+# is exactly why two guards below exist:
+#   1. The job-level `if:` only admits PRs from this repo itself or from the
+#      maintainer's own accounts. A PR from anyone else never starts the job.
+#   2. The checkout is the BASE ref (no `ref:` override) — the untrusted PR
+#      head is never checked out into the workspace. The agent reads the PR
+#      only through `gh pr diff`/`gh pr view`, and its prompt file instructs
+#      it to treat instruction-shaped text inside the diff as a finding, not
+#      as instructions (docs/security.md of anthropics/claude-code-action).
+#
+# Verdict transport: the action's structured-output mechanism (`--json-schema`)
+# rather than a file — the validated JSON lands in
+# steps.review.outputs.structured_output and the gate step fails closed when
+# it is missing or its verdict is not "pass".
+#
+# Auth: a Claude subscription OAuth token (`claude setup-token`), stored as
+# the CLAUDE_CODE_OAUTH_TOKEN repo secret. Officially supported by
+# anthropics/claude-code-action@v1 for Pro/Max plans; no per-token billing.
+
+name: Wiki agent gate
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "wiki/**"
+
+permissions:
+  contents: read
+  pull-requests: write # gh pr diff/view, and the findings comment on failure
+  id-token: write # required by the action's default GitHub App (OIDC) auth
+
+concurrency:
+  group: wiki-agent-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  agent-review:
+    # Trust gate (guard 1): pull_request_target exposes secrets, so only PRs
+    # from this repo or from the maintainer's own fork account may run.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository ||
+      contains(fromJSON('["choiyounggi", "dch0202-rsquare"]'), github.event.pull_request.user.login)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Guard 2: base ref only — never the PR head (see header).
+      - name: Checkout base ref
+        uses: actions/checkout@v4
+
+      - name: Semantic review (transferability, duplication, fact check)
+        id: review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Read .github/wiki-agent-gate-prompt.md in this workspace and execute
+            it as your review instructions for PR #${{ github.event.pull_request.number }}
+            of ${{ github.repository }}. The workspace is the base branch; read
+            the PR's changes only via `gh pr diff ${{ github.event.pull_request.number }}`
+            (and `gh pr view` for its description).
+            Return: verdict ("pass"|"fail"), summary (string), findings (array of
+            {check, severity, page, detail}) exactly as the prompt file defines them.
+          claude_args: |
+            --allowedTools "Read,Grep,Glob,WebFetch,Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["check","severity","page","detail"],"properties":{"check":{"type":"string","enum":["transferability","duplication","fact"]},"severity":{"type":"string","enum":["blocker","advisory"]},"page":{"type":"string"},"detail":{"type":"string"}}}}}}'
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # Fail closed: no structured output is a failure, not a pass — a crashed
+      # or cut-off agent run must never read as a green gate.
+      - name: Enforce verdict
+        env:
+          RESULT: ${{ steps.review.outputs.structured_output }}
+        run: |
+          if [ -z "$RESULT" ]; then
+            echo "::error::agent produced no structured output — failing closed"
+            exit 1
+          fi
+          echo "$RESULT" | jq .
+          verdict=$(echo "$RESULT" | jq -r '.verdict')
+          if [ "$verdict" != "pass" ]; then
+            echo "::error::agent gate verdict: $verdict"
+            exit 1
+          fi
+
+      - name: Post findings as PR comment
+        if: failure()
+        env:
+          RESULT: ${{ steps.review.outputs.structured_output }}
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -n "$RESULT" ]; then
+            body=$(echo "$RESULT" | jq -r '"## Wiki agent gate: \(.verdict)\n\n\(.summary)\n\n" + (.findings | map("- **\(.severity)** [\(.check)] `\(.page)` — \(.detail)") | join("\n"))')
+          else
+            body="## Wiki agent gate: error — the agent run produced no verdict (failed closed). See the workflow log."
+          fi
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body"
