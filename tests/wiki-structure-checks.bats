@@ -51,12 +51,17 @@ setup() {
   [[ "$output" == *"orphan-page:"* ]]
   [[ "$output" == *"bad-related:"* ]]
   [[ "$output" == *"related id 'no-such-id'"* ]]
+  [[ "$output" == *"duplicate-frontmatter-key:"* ]]
+  [[ "$output" == *"key 'last_verified' appears 2 times"* ]]
+  [[ "$output" == *"stray-frontmatter-value:"* ]]
+  [[ "$output" == *"has 2 bracket-literal value lines"* ]]
+  [[ "$output" == *"has an inline value followed by a stray '- ' bullet"* ]]
 }
 
 @test "bad fixture: summary goes to stdout, findings go to stderr only" {
   run bash -c "node '$CHECKER' '$FIXTURES/bad' 2>/dev/null"
   [ "$status" -eq 3 ]
-  [ "$output" = "pages: 4, indexes: 2, findings: 15" ]
+  [ "$output" = "pages: 7, indexes: 2, findings: 18" ]
   run bash -c "node '$CHECKER' '$FIXTURES/bad' 2>&1 >/dev/null"
   [ "$status" -eq 3 ]
   [[ "$output" != *"pages:"* ]]

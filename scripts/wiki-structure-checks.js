@@ -35,6 +35,12 @@
 //                      (routing scopes are disjoint — PR #93)
 //   orphan-page        page listed in no index at all
 //   bad-related        `related:` names an id no page carries
+//   duplicate-frontmatter-key  a top-level frontmatter key appears more than
+//                      once in the block (YAML last-key-wins silently drops
+//                      the earlier occurrence)
+//   stray-frontmatter-value  a key's value block has 2+ top-level `[...]`
+//                      bracket literals, or a non-empty inline value followed
+//                      by an indented `- ` bullet that belongs to no key
 'use strict';
 
 const fs = require('fs');
@@ -123,6 +129,38 @@ for (const p of pages) {
 
 for (const [id, owners] of idOwners) {
   if (owners.length > 1) report('duplicate-id', owners[1], `id '${id}' also used by ${owners[0]}`);
+}
+
+// --- frontmatter key hygiene -------------------------------------------------
+for (const [p, fm] of pageMeta) {
+  const lines = fm.split('\n');
+  const keyLineIdx = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/^[A-Za-z_][A-Za-z0-9_-]*:/.test(lines[i])) keyLineIdx.push(i);
+  }
+
+  const keyCounts = new Map();
+  for (const i of keyLineIdx) {
+    const k = lines[i].match(/^([A-Za-z_][A-Za-z0-9_-]*):/)[1];
+    keyCounts.set(k, (keyCounts.get(k) || 0) + 1);
+  }
+  for (const [k, count] of keyCounts) {
+    if (count > 1) report('duplicate-frontmatter-key', p, `key '${k}' appears ${count} times`);
+  }
+
+  for (let ki = 0; ki < keyLineIdx.length; ki++) {
+    const start = keyLineIdx[ki];
+    const end = ki + 1 < keyLineIdx.length ? keyLineIdx[ki + 1] : lines.length;
+    const [, key, rest] = lines[start].match(/^([A-Za-z_][A-Za-z0-9_-]*):(.*)$/);
+    const inline = rest.trim();
+    const body = lines.slice(start + 1, end);
+    const bracketLines = body.filter((l) => /^\s+\[/.test(l));
+    if (bracketLines.length >= 2) {
+      report('stray-frontmatter-value', p, `key '${key}' has ${bracketLines.length} bracket-literal value lines`);
+    } else if (inline !== '' && body.some((l) => /^\s+-\s/.test(l))) {
+      report('stray-frontmatter-value', p, `key '${key}' has an inline value followed by a stray '- ' bullet`);
+    }
+  }
 }
 
 // --- index routing checks ---------------------------------------------------

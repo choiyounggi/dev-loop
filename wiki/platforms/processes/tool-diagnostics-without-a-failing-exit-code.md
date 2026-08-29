@@ -12,9 +12,7 @@ sources:
   - https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html
   - https://rust-unofficial.github.io/patterns/anti_patterns/deny-warnings.html
 last_verified: 2026-08-07
-related: [platforms-processes-non-interactive-cli-invocation, platforms-shells-command-text-inspected-before-execution, testing-quality-checks-that-cannot-pass, backend-common-api-design-unenforced-declarations]
-last_verified: 2026-08-06
-related: [platforms-processes-non-interactive-cli-invocation, platforms-shells-command-text-inspected-before-execution, testing-quality-checks-that-cannot-pass, qa-deliverables-command-transcripts-in-a-document]
+related: [platforms-processes-non-interactive-cli-invocation, platforms-shells-command-text-inspected-before-execution, testing-quality-checks-that-cannot-pass, backend-common-api-design-unenforced-declarations, qa-deliverables-command-transcripts-in-a-document]
 ---
 
 # Feeding a Tool's Warnings Back When It Exits 0
