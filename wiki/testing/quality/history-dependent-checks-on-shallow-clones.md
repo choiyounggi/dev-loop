@@ -8,7 +8,7 @@ sources:
   - https://github.com/actions/checkout
   - https://git-scm.com/docs/git-rev-parse
   - "Local reproduction, git 2.50.1 (Apple Git-155), 2026-08-14: --depth 1 clone of a 306-file repo — the boundary commit reported all 306 tracked files as added"
-last_verified: 2026-08-14
+last_verified: 2026-08-29
 related: [qa-process-scope-purity-checks, testing-quality-checks-that-cannot-pass]
 ---
 
@@ -59,5 +59,5 @@ a single commit by default (`fetch-depth: 1`).
 ## Sources
 
 - https://github.com/actions/checkout — README: "Only a single commit is fetched by default, for the ref/SHA that triggered the workflow"; `fetch-depth: 0` documented as "all history for all branches and tags"
-- https://git-scm.com/docs/git-rev-parse — `--is-shallow-repository`: "True if this is a shallow repository, otherwise false"
+- https://git-scm.com/docs/git-rev-parse — `--is-shallow-repository`: "When the repository is shallow print \"true\", otherwise \"false\""
 - Local reproduction (git 2.50.1, Apple Git-155, 2026-08-14): `git clone --depth 1 file://…` of a 306-file repo → `git rev-parse --is-shallow-repository` = true; `git log -1 --diff-filter=A --name-only` listed 306/306 tracked files as added by the boundary commit

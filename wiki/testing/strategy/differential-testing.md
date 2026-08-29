@@ -8,7 +8,7 @@ sources:
   - https://arxiv.org/pdf/2102.07498
   - https://handwiki.org/wiki/Differential_testing
   - https://arxiv.org/pdf/2212.01748
-last_verified: 2026-08-05
+last_verified: 2026-08-29
 related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-differential-run-agreement, testing-quality-minimum-case-set, qa-process-regression-scope]
 ---
 
@@ -82,6 +82,6 @@ migration needs evidence beyond "the new one's own tests pass".
 
 ## Sources
 
-- https://arxiv.org/pdf/2102.07498 — "Differential Testing for Software" techniques and strategies
+- https://arxiv.org/pdf/2102.07498 — Park et al., "JEST: N+1-version Differential Testing of Both JavaScript Engines and Specification" — N+1-version differential testing applied across JavaScript engines and the ECMAScript spec
 - https://handwiki.org/wiki/Differential_testing — overview of differential testing as a verification method
 - https://arxiv.org/pdf/2212.01748 — modern applications of differential testing in compiler and system software verification

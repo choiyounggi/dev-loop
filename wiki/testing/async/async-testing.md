@@ -10,7 +10,7 @@ sources:
   - https://jestjs.io/docs/expect
   - https://testing-library.com/docs/dom-testing-library/api-async/
   - https://martinfowler.com/articles/nonDeterminism.html
-last_verified: 2026-07-10
+last_verified: 2026-08-29
 related: [testing-quality-tests-that-cannot-fail, testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-injected-clock-duration-assertions]
 ---
 
@@ -80,5 +80,4 @@ un-awaited promises; or an async test intermittently interferes with the next te
 - https://jestjs.io/docs/expect — `expect.assertions` / `expect.hasAssertions` verify callback assertions ran
 - https://testing-library.com/docs/dom-testing-library/api-async/ — `waitFor`/`findBy`: polling on a condition with interval and bounded timeout
 - https://martinfowler.com/articles/nonDeterminism.html — poll/callback on the completion condition instead of bare sleeps
-- https://nodejs.org/api/readline.html — `readline.createInterface` consumes an input stream and delivers a line per `question` callback, emitting `'line'` for input no callback is waiting on
-- Field reproduction 2026-08-04 (Node v25.8.1, `readline` over a `PassThrough`, three sequential `question` calls): a single `input.write('one\ntwo\nthree\n')` yielded `["one"]` and then hung; writing the same three lines one per `setImmediate` turn yielded `["one","two","three"]` and completed
+- Field reproduction 2026-08-04 (Node v25.8.1, `readline` over a `PassThrough`, three sequential `question` calls): a single `input.write('one\ntwo\nthree\n')` yielded `["one"]` and then hung; writing the same three lines one per `setImmediate` turn yielded `["one","two","three"]` and completed — the `question`/`'line'` interaction this behavior implies is not documented by https://nodejs.org/api/readline.html and is grounded only in this reproduction
