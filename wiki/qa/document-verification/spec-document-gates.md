@@ -14,7 +14,6 @@ sources:
   - https://github.com/DavidAnson/markdownlint/blob/main/doc/md056.md
   - https://github.com/DavidAnson/markdownlint/issues/1206
   - https://google.github.io/styleguide/docguide/best_practices.html
-last_verified: 2026-08-08
 last_verified: 2026-08-09
 related:
   [
@@ -120,5 +119,5 @@ Distilled from RFC-authoring sessions in this repo (2026-07): an independent
 auditor built 8 tampered copies of an RFC that a 16-gate token-existence
 checklist accepted — 5 passed all 16 gates, including a copy whose 5-row `type`
 enum had a row removed. After the four axes above plus fail-closed anchors were
-added, all 32 tampered copies failed their designated check while the intact
-document passed 62/62.
+added, a rerun with 32 tampered copies failed every designated check while the
+intact document passed 62/62.

@@ -9,8 +9,9 @@ sources:
   - https://kotlinlang.org/docs/no-arg-plugin.html
   - https://blog.jetbrains.com/idea/2026/01/how-to-avoid-common-pitfalls-with-jpa-and-kotlin/
   - https://kotlinlang.org/docs/annotations.html
+  - https://kotlinlang.org/docs/whatsnew22.html
   - https://docs.spring.io/spring-framework/reference/languages/kotlin/coroutines.html
-last_verified: 2026-07-10
+last_verified: 2026-08-29
 related: [backend-java-spring-proxy-pitfalls, backend-java-jpa-entity-mapping, backend-java-kotlin-coroutines-dispatchers-and-blocking, backend-common-orm-transaction-boundaries, databases-schema-design-nullability-and-defaults]
 ---
 
@@ -89,5 +90,6 @@ classes, Bean Validation annotations not firing, repositories called from corout
 - https://kotlinlang.org/docs/all-open-plugin.html — classes final by default; `kotlin-spring` opens `@Component`/`@Async`/`@Transactional`/`@Cacheable`/`@SpringBootTest` and meta-annotated stereotypes
 - https://kotlinlang.org/docs/no-arg-plugin.html — `kotlin-jpa` generates synthetic no-arg constructors for `@Entity`/`@Embeddable`/`@MappedSuperclass`
 - https://blog.jetbrains.com/idea/2026/01/how-to-avoid-common-pitfalls-with-jpa-and-kotlin/ — data classes a bad fit for entities; regular open classes; nullable generated ids; reflection writes through `val`
-- https://kotlinlang.org/docs/annotations.html — use-site targets; bare primary-constructor annotation targeting (param on ≤2.1, param+field on 2.2+); `@field:` syntax
+- https://kotlinlang.org/docs/annotations.html — use-site target syntax and the target-priority order (`param`, then `property`, then `field`); `@field:` syntax
+- https://kotlinlang.org/docs/whatsnew22.html — "New defaulting rules for use-site annotation targets": "Kotlin 2.2.0 introduces new defaulting rules for propagating annotations to parameters, fields, and properties. Where previously an annotation was applied by default only to one of param, property, or field, defaults are now more in line with what is expected of an annotation" — this is the version split (≤2.1 one target only, 2.2+ multiple), not the general annotations.html reference page
 - https://docs.spring.io/spring-framework/reference/languages/kotlin/coroutines.html — coroutine transactions supported via the programmatic reactive variant only

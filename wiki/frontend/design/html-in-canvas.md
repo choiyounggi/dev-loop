@@ -8,7 +8,7 @@ sources:
   - https://github.com/WICG/html-in-canvas
   - https://groups.google.com/a/chromium.org/g/blink-dev/c/t_nGEmJ_v4s
   - https://tympanus.net/codrops/2026/05/13/exploring-the-html-in-canvas-proposal/
-last_verified: 2026-08-20
+last_verified: 2026-08-29
 related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements]
 ---
 
@@ -37,8 +37,8 @@ copy a shader can distort, blend, or map onto 3D). API surface:
 |-----------|------|
 | `<canvas layoutsubtree>` | Opt-in attribute; the canvas's child elements get layout and participate in hit testing |
 | `ctx.drawElementImage(el, x, y)` | 2D context: paints a live copy of a child element; returns a transform for hit-test alignment |
-| `texElementImage2D` | WebGL: feeds the element into a GPU texture |
-| `copyElementImageToTexture` | WebGPU equivalent |
+| `texElementSubImage2D` | WebGL: feeds the element into a GPU texture |
+| `drawElementImageToTexture` | WebGPU equivalent |
 | `paint` event | Fires when embedded HTML changes (focus, hover, input) — redraw or re-run the shader in the listener |
 
 Hit-test alignment is mandatory: apply the transform returned by

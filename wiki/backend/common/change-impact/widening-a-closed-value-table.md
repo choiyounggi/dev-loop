@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://refactoring.com/catalog/replaceMagicLiteral.html
   - https://pragprog.com/tips/
-last_verified: 2026-08-27
+last_verified: 2026-08-29
 related: [backend-common-change-impact-call-site-enumeration, backend-common-api-design-unenforced-declarations, backend-common-errors-diagnostics-from-a-shared-code-path, backend-common-change-impact-compiler-as-call-site-inventory]
 ---
 
@@ -96,4 +96,4 @@ rather than a parse error.
 - https://refactoring.com/catalog/replaceMagicLiteral.html — *Replace Magic Literal*, alias "Replace Magic Number with Symbolic Constant": a literal with a particular meaning becomes a named constant. The refactoring exists because the inlined literal is the default state of such values, which is what makes the value the reliable search handle
 - https://pragprog.com/tips/ — Tip 15, DRY: "Every piece of knowledge must have a single, unambiguous, authoritative representation within a system." A copied value table is a second representation, and widening one representation is what produces the divergence
 - Field measurement 2026-08-25 (`rtb-unified`, PR #965): a cleanup proposed folding `DISPLAYABLE_ERROR_CODES` into `USER_FACING_ERROR_CODES` as one SSOT. Computing the set difference before merging showed the union added `UNAUTHORIZED` and `VALIDATION_ERROR` to the displayable set — the path by which raw server messages would have been surfaced as inline UI errors. The sets were kept derived-with-an-explicit-difference instead; nothing in the type system or the suite had flagged the widening
-- Local reproduction 2026-08-06 (`linkly`, Python, macOS): `grep -rn "DURATION_UNITS" impl/lnpl/*.py` returns **1** hit (the definition); `grep -rn "60000" impl/lnpl/*.py` returns **7** across four files — a second named table (`DURATION_UNIT_MS`, `lexer.py:23`), three independently inlined `(("ms",1),("s",1000),("m",60000))` tuples (`condition.py:353`, `interp.py:1020`, `backend.py:446`), and two bare-literal arithmetic sites (`condition.py:269-270`). The predicted divergence was already present: the canonical map carries `h` and `d`, while all three inlined copies stop at `m`, so those paths cannot convert a unit the lexer accepts
+- Local reproduction 2026-08-06 (`linkly`, Python, macOS): `grep -rn "DURATION_UNITS" impl/lnpl/*.py` returns **1** hit (the definition); `grep -rn "60000" impl/lnpl/*.py` returns **7** across four files, among them a second named table (`DURATION_UNIT_MS`, `lexer.py:23`), three independently inlined `(("ms",1),("s",1000),("m",60000))` tuples (`condition.py:353`, `interp.py:1020`, `backend.py:446`), and two bare-literal arithmetic sites (`condition.py:269-270`). The predicted divergence was already present: the canonical map carries `h` and `d`, while all three inlined copies stop at `m`, so those paths cannot convert a unit the lexer accepts

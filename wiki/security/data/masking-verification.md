@@ -3,11 +3,11 @@ id: security-data-masking-verification
 domain: security
 category: data
 applies_to: [general]
-confidence: verified
+confidence: field-tested
 sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
   - "Local reproduction (lnpl 0.2.0, 2026-08-05): one `--json` run held the raw planted card number at result.bindings while the trace/log channel showed `***`; an unmasked control field appeared in both"
-last_verified: 2026-08-05
+last_verified: 2026-08-29
 related: [security-data-pii-handling, testing-quality-harness-reverse-controls, qa-exploratory-override-control-pairs]
 ---
 
@@ -65,5 +65,5 @@ PASS" verdict from the platform itself.
 
 ## Sources
 
-- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html — lists "Authentication passwords" and "Bank account or payment card holder data" as data to be "removed, masked, sanitized, hashed, or encrypted" rather than recorded in logs; sanitization is framed as a logging-layer responsibility — which is exactly why other channels stay uncovered
+- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html — scoped to the logging channel only: lists "Authentication passwords" and "Bank account or payment card holder data" as data to be "removed, masked, sanitized, hashed, or encrypted" rather than recorded in logs. It does not address the result payload, pretty output, generated artifacts, or error-report channels, and does not itself prescribe the cross-channel sweep methodology — that comes from the local reproduction below, where the same masking check passed on the log channel while the raw value sat unmasked in the result payload
 - Local reproduction (2026-08-05, lnpl 0.2.0 runner): a `Password`-typed field fed the planted value `4111111111111111`; one `--json` output held the raw value at `.result.bindings.account.cardSecret` and `***` at `.trace.logs[0].payload.cardSecret`; the unmasked control field `label` appeared in both channels. Matches the originating QA case, where the platform's differential check reported "PASS 4/4 masking" while the raw card number sat in `result.bindings`

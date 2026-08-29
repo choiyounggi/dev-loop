@@ -6,11 +6,9 @@ applies_to: [git, general]
 confidence: verified
 sources:
   - https://git-scm.com/docs/git-worktree
-last_verified: 2026-08-13
-related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-shared-run-state, platforms-shells-command-text-inspected-before-execution]
   - https://code.claude.com/docs/en/hooks
 last_verified: 2026-08-17
-related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-shells-command-text-inspected-before-execution]
+related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-shared-run-state, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts]
 ---
 
 # Writing the Brief for a Worker Confined to Its Own Worktree

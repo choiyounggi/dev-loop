@@ -9,10 +9,7 @@ sources:
   - https://learn.openapis.org/best-practices.html — a single OpenAPI description acts as the single source of truth for both the product and its docs
   - https://google.github.io/styleguide/docguide/best_practices.html — keep documentation sources close to the code they describe so they change together
 last_verified: 2026-08-09
-related:
-  [frontend-state-derived-state, qa-document-verification-spec-document-gates, qa-deliverables-command-transcripts-in-a-document]
-  [frontend-state-derived-state, qa-document-verification-spec-document-gates, qa-deliverables-exclusivity-and-absence-claims]
-  [frontend-state-derived-state, qa-document-verification-spec-document-gates, qa-document-verification-generated-reference-drift-gates]
+related: [frontend-state-derived-state, qa-document-verification-spec-document-gates, qa-deliverables-command-transcripts-in-a-document, qa-deliverables-exclusivity-and-absence-claims, qa-document-verification-generated-reference-drift-gates]
 ---
 
 # A Requested Deliverable Duplicating an Artifact the Repo Already Generates
