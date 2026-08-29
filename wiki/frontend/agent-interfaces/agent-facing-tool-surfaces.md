@@ -8,8 +8,10 @@ sources:
   - https://developer.chrome.com/docs/ai/webmcp
   - https://developer.chrome.com/docs/ai/webmcp/imperative-api
   - https://developer.chrome.com/docs/ai/webmcp/declarative-api
+  - https://developer.chrome.com/docs/ai/webmcp/secure-tools
   - https://webmachinelearning.github.io/webmcp/
-last_verified: 2026-08-18
+  - https://chromestatus.com/feature/5117755740913664
+last_verified: 2026-08-29
 related: [security-agent-exposure-in-session-tool-exposure, frontend-accessibility-interactive-elements, backend-common-api-design-agent-tool-granularity]
 ---
 
@@ -35,8 +37,9 @@ registers browser-native agent tools.
    if (document.modelContext?.registerTool) { /* register tools */ }
    ```
 
-   `navigator.modelContext` is deprecated in Chrome 150 — register on
-   `document.modelContext`.
+   The current API surface is `document.modelContext`; an earlier draft
+   exposed this as `navigator.modelContext` — register on `document.modelContext`,
+   not the older name.
 
 2. Pick the API by what the action already is:
 
@@ -93,6 +96,8 @@ registers browser-native agent tools.
 ## Sources
 
 - https://developer.chrome.com/docs/ai/webmcp — origin trial from Chrome 149, testing flag
-- https://developer.chrome.com/docs/ai/webmcp/imperative-api — `document.modelContext.registerTool` shape, `navigator.modelContext` deprecation, `exposedTo`/`signal` options
-- https://developer.chrome.com/docs/ai/webmcp/declarative-api — `toolname`/`tooldescription`/`toolautosubmit`/`toolparamdescription`, label→schema derivation, `:tool-form-active`/`:tool-submit-active`, text budgets
+- https://developer.chrome.com/docs/ai/webmcp/imperative-api — `document.modelContext.registerTool` shape (current API surface is `document.modelContext` only — no `navigator.modelContext` mention), `exposedTo`/`signal` options
+- https://developer.chrome.com/docs/ai/webmcp/declarative-api — `toolname`/`tooldescription`/`toolautosubmit`/`toolparamdescription`, label→schema derivation, `:tool-form-active`/`:tool-submit-active`
+- https://developer.chrome.com/docs/ai/webmcp/secure-tools — character budgets: 500/tool description, 150/parameter description, 30/tool name and parameter name, 1.5K/tool output
 - https://webmachinelearning.github.io/webmcp/ — Draft Community Group Report status (Web Machine Learning CG)
+- https://chromestatus.com/feature/5117755740913664 — official milestone tracker: origin trial desktop first 149, last 156

@@ -9,8 +9,8 @@ sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html
   - https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html
   - https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
-  - https://owasp.org/www-community/attacks/Path_Traversal
-last_verified: 2026-07-10
+  - https://cmu-sei.github.io/secure-coding-standards/sei-cert-oracle-coding-standard-for-java/rules/input-output-fio/fio16-j/
+last_verified: 2026-08-29
 related: [security-authz-resource-level-checks, frontend-security-xss-safe-rendering, security-agent-exposure-in-session-tool-exposure]
 ---
 
@@ -70,4 +70,4 @@ from other services/queues.
 - https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html — bound parameters as the primary defense
 - https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html — avoid shell; argv-form execution
 - https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html — content-based type checks, storage outside webroot, generated names
-- https://owasp.org/www-community/attacks/Path_Traversal — canonicalize-then-prefix-check
+- https://cmu-sei.github.io/secure-coding-standards/sei-cert-oracle-coding-standard-for-java/rules/input-output-fio/fio16-j/ — FIO16-J: canonicalize path names before validating, then confirm the canonical path is within the secure/base directory

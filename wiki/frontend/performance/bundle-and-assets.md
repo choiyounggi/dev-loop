@@ -7,10 +7,10 @@ confidence: verified
 sources:
   - https://react.dev/reference/react/lazy
   - https://web.dev/articles/optimize-lcp
-  - https://web.dev/articles/cls
+  - https://web.dev/articles/optimize-cls
   - https://developer.mozilla.org/en-US/docs/Web/Performance/Guides/Lazy_loading
   - https://web.dev/articles/font-best-practices
-last_verified: 2026-07-10
+last_verified: 2026-08-29
 related: [frontend-rendering-rerender-and-memoization, frontend-design-responsive-layout]
 ---
 
@@ -67,6 +67,6 @@ runtime rendering cost belongs to [frontend-rendering-rerender-and-memoization].
 
 - https://react.dev/reference/react/lazy — dynamic-import components with Suspense fallback; declare at module top level
 - https://web.dev/articles/optimize-lcp — never lazy-load the LCP image; `fetchpriority`; make the LCP resource discoverable early
-- https://web.dev/articles/cls — unsized images/late content cause layout shifts; reserve space
+- https://web.dev/articles/optimize-cls — always include `width`/`height` (or CSS `aspect-ratio`) on images/video so the browser reserves the space before load
 - https://developer.mozilla.org/en-US/docs/Web/Performance/Guides/Lazy_loading — `loading="lazy"` for images/iframes; code splitting via dynamic import
 - https://web.dev/articles/font-best-practices — `font-display` tradeoffs (swap/optional/block), preloading, WOFF2, subsetting
