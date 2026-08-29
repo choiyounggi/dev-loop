@@ -10,7 +10,7 @@ sources:
   - https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html
   - https://nodejs.org/api/fs.html
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/env.html
-last_verified: 2026-08-14
+last_verified: 2026-08-29
 related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-strategy-import-time-side-effects, testing-data-artifact-leakage-from-a-suite, testing-quality-behavior-not-implementation, platforms-filesystems-permissions-and-exec-bits, backend-common-change-impact-call-site-enumeration, testing-data-harness-vs-run-path-fixtures, infrastructure-agent-orchestration-shared-run-state]
 ---
 
@@ -82,7 +82,7 @@ state-leak symptom.
 ## Sources
 
 - https://martinfowler.com/articles/nonDeterminism.html — isolation between tests, wrapping the system clock, callbacks/polling over bare sleeps
-- https://abseil.io/resources/swe-book/html/ch12.html — a test is complete when "its body contains all of the information a reader needs in order to understand how it arrives at its result"; prefer DAMP over DRY, and where a helper is used, give it "descriptive parameters that make dependencies explicit" rather than reusing shared constants
+- https://abseil.io/resources/swe-book/html/ch12.html — a test is complete when "its body contains all of the information a reader needs in order to understand how it arrives at its result"; prefer test code that is DAMP ("Descriptive And Meaningful Phrases") over strictly DRY, and state values a test explicitly cares about directly in the test rather than leaving them to a setup method's defaults
 - https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html — keep the inputs a test's result depends on visible in the test method instead of in shared setup, so the cause-and-effect relationship is readable without jumping elsewhere
 - Field incident 2026-08-04 (`linkly-t1-repo-policy`, Python): `rows_for(doc)` seeded its rows from the module constant `PAYLOAD` while its tests ran payload `{}`; a shape-only migration of the helper fixed 1 of 11 failures, and moving the payload into the helper's signature fixed 11 of 11
 - Field incident 2026-08-14 (dev-loop issue #100): `launch-session.sh` exports `LO_RUN_ID`/`LO_STATUS_DIR`/`LO_TASK_ID` into every worker session; a worker running `bats tests/launch-session.bats` inherited them — 6 deterministic failures absent on a clean shell, reproduced with `env LO_RUN_ID=… bats`, and the live run's `t90.json` status file was found rewritten with bats tempdir paths and a foreign session name

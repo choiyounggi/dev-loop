@@ -9,7 +9,7 @@ sources:
   - https://arxiv.org/abs/2410.21904
   - https://pitest.org/quickstart/basic_concepts/
   - https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/
-last_verified: 2026-08-05
+last_verified: 2026-08-29
 related: [testing-strategy-differential-testing, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-stale-artifact-baselines, testing-data-harness-vs-run-path-fixtures]
 ---
 
@@ -87,6 +87,6 @@ session the other stubs out, omits, or hard-codes.
 ## Sources
 
 - W. M. McKeeman, "Differential Testing for Software", Digital Technical Journal 10(1), 1998, pp. 100-107 — classic foundational work on differential testing methodology
-- https://arxiv.org/abs/2410.21904 — recent work on differential testing applications and interpretation
+- https://arxiv.org/abs/2410.21904 — Mirian-Hosseinabadi, "Formal Analysis of Reachability, Infection and Propagation Conditions in Mutation Testing" (2024) — formalizes the RIP (reachability, infection, propagation) conditions a mutation test must satisfy to detect a fault
 - https://pitest.org/quickstart/basic_concepts/ — mutation testing concepts: no coverage, survived, killed
-- https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/ — reachability, infection, and propagation (RIP) model for fault detection
+- https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/ — mutant states: killed (a test failed while the mutant was active), survived (all tests passed), no coverage (no test reached the mutant)
