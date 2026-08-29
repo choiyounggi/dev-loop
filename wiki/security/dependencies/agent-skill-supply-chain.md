@@ -6,9 +6,9 @@ applies_to: [general]
 confidence: field-tested
 sources:
   - https://github.com/zhaoxuya520/reverse-skill/blob/main/skills/ops/skill-supply-chain.md
-  - https://github.com/virgiliojr94/book-to-skill/blob/main/SECURITY-NOTICE.md
-  - https://github.com/different-ai/openwork/blob/main/skills-lock.json
-last_verified: 2026-08-24
+  - https://github.com/virgiliojr94/book-to-skill/blob/9c207f870adebe20ade4f7d2f11bc3d759c2fd88/SECURITY-NOTICE.md
+  - https://github.com/different-ai/openwork/blob/fda0babb6c7600ed044757515beb374a3f4dc827/skills-lock.json
+last_verified: 2026-08-29
 related: [security-dependencies-supply-chain, security-agent-exposure-in-session-tool-exposure]
 ---
 
@@ -64,5 +64,5 @@ team to consume.
 ## Sources
 
 - https://github.com/zhaoxuya520/reverse-skill/blob/main/skills/ops/skill-supply-chain.md — pre-install MUST checklist (read SKILL.md + scripts, grep exfil patterns, no unreviewed MCP registration), OWASP agentic-skills citation
-- https://github.com/virgiliojr94/book-to-skill/blob/main/SECURITY-NOTICE.md — documented malicious re-upload incident (TLS bypass, wallet collection, C2)
-- https://github.com/different-ai/openwork/blob/main/skills-lock.json — source+hash lockfile for imported skills
+- https://github.com/virgiliojr94/book-to-skill/blob/9c207f870adebe20ade4f7d2f11bc3d759c2fd88/SECURITY-NOTICE.md — documented malicious re-upload incident (TLS bypass, wallet collection, C2)
+- https://github.com/different-ai/openwork/blob/fda0babb6c7600ed044757515beb374a3f4dc827/skills-lock.json — source+hash lockfile for imported skills

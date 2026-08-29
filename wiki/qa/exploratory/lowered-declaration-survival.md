@@ -3,7 +3,7 @@ id: qa-exploratory-lowered-declaration-survival
 domain: qa
 category: exploratory
 applies_to: [general]
-confidence: verified
+confidence: field-tested
 sources:
   - "Local reproduction (lnpl 0.2.0, 2026-08-05): two stacked `when` guards compiled rc=0 with zero diagnostics; Semantic IR and MLIR both held exactly one Guard node — the first guard's id carrying the second guard's condition"
 last_verified: 2026-08-05
