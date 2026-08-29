@@ -39,7 +39,6 @@ on:
 permissions:
   contents: read
   pull-requests: write # gh pr diff/view, and the findings comment on failure
-  id-token: write # required by the action's default GitHub App (OIDC) auth
 
 concurrency:
   group: wiki-agent-gate-${{ github.event.pull_request.number }}
@@ -64,6 +63,12 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Explicit github_token skips the action's default GitHub App (OIDC)
+          # token exchange, which fails with "Invalid OIDC token" when the
+          # Claude GitHub App is not installed on the repo (issue #159). The
+          # workflow token suffices: the gate only reads the workspace, runs
+          # gh pr diff/view, and posts comments — it never pushes.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
             Read .github/wiki-agent-gate-prompt.md in this workspace and execute
             it as your review instructions for PR #${{ github.event.pull_request.number }}
