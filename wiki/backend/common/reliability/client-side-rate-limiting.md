@@ -6,11 +6,11 @@ applies_to: [general]
 confidence: verified
 sources:
   - https://developer.okta.com/docs/reference/rate-limits/
-  - https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy
+  - https://support.auth0.com/center/s/article/What-is-the-rate-limit-applied-for-M2M-authentications-calls
   - https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
   - https://developers.openai.com/api/docs/guides/rate-limits
   - https://www.rfc-editor.org/rfc/rfc6585
-last_verified: 2026-08-05
+last_verified: 2026-08-29
 related: [backend-common-reliability-timeouts-and-retries, backend-common-auth-jwt-server-side, debugging-concurrency-intermittent-failures, backend-common-integrations-externally-owned-defaults]
 ---
 
@@ -80,7 +80,7 @@ requests carry a credential the client itself refreshes.
 ## Sources
 
 - https://developer.okta.com/docs/reference/rate-limits/ — OAuth endpoints carry their own rate-limit buckets; only enumerated public metadata endpoints (`/oauth2/v1/keys`, `.well-known` documents) are exempt
-- https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy — the `/oauth/token` endpoint has a published production rate limit
+- https://support.auth0.com/center/s/article/What-is-the-rate-limit-applied-for-M2M-authentications-calls — "M2M requests count towards the global authentication API rate limits"; example given: "the global authentication API rate limit for Enterprise customers is 100 requests per second (RPS) per tenant" — `/oauth/token` calls (M2M included) draw down this same published bucket
 - https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api — OAuth-app requests count against the user's limit; exemptions are named individually
 - https://developers.openai.com/api/docs/guides/rate-limits — remaining/reset values returned in response headers for the client to consume
 - https://www.rfc-editor.org/rfc/rfc6585 — 429 Too Many Requests and `Retry-After`

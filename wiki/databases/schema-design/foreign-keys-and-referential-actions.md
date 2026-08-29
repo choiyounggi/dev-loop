@@ -6,8 +6,9 @@ applies_to: [postgresql, mysql]
 confidence: verified
 sources:
   - https://www.postgresql.org/docs/current/ddl-constraints.html
+  - https://www.postgresql.org/docs/current/sql-createtable.html
   - https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html
-last_verified: 2026-07-10
+last_verified: 2026-08-29
 related: [databases-schema-design-requirements-to-tables, databases-schema-design-soft-delete, databases-indexing-index-selection]
 ---
 
@@ -61,5 +62,6 @@ relationships FKs cannot express.
 
 ## Sources
 
-- https://www.postgresql.org/docs/current/ddl-constraints.html — FK constraints, referential actions, deferrable
+- https://www.postgresql.org/docs/current/ddl-constraints.html — FK constraints and referential actions (`ON DELETE`/`ON UPDATE`); explicitly defers the deferrable-checking topic itself: "checking of foreign-key constraints can also be deferred to later in the transaction (not covered in this chapter)"
+- https://www.postgresql.org/docs/current/sql-createtable.html — the actual `DEFERRABLE`/`NOT DEFERRABLE`/`INITIALLY DEFERRED`/`INITIALLY IMMEDIATE` explanation: "checking of constraints that are deferrable can be postponed until the end of the transaction (using the SET CONSTRAINTS command)"; "If the constraint is INITIALLY DEFERRED, it is checked only at the end of the transaction"
 - https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html — InnoDB FK behavior and restrictions

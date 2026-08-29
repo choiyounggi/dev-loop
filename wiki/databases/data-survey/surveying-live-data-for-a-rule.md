@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://www.postgresql.org/docs/current/functions-aggregate.html
   - https://greatexpectations.io/blog/exploring-data-quality-volume/
-last_verified: 2026-08-05
+last_verified: 2026-08-29
 related: [databases-data-survey-catalog-statistics-as-current-state, databases-query-optimization-existence-and-count-checks, databases-schema-design-requirements-to-tables, databases-schema-design-nullability-and-defaults]
 ---
 
@@ -77,4 +77,4 @@ what comes back.
 - https://www.postgresql.org/docs/current/functions-aggregate.html — "except for `count`, these functions return a null value when no rows are selected. In particular, `sum` of no rows returns null, not zero as one might expect, and `array_agg` returns null rather than an empty array"
 - https://greatexpectations.io/blog/exploring-data-quality-volume/ — volume (row count) as a first-class data-quality dimension; undetected volume anomalies "skew analyses and lead to flawed decision-making"
 - Reproduced 2026-08-05 (`sqlite3 :memory:`, empty table): `SELECT area_nm, count(*) … GROUP BY area_nm` → 0 rows; `SELECT count(*)` → one row `0`; `SELECT max(area_nm)` → one row `NULL`
-- https://github.com/EveryInc/compound-engineering-plugin — data-migration-expert agent: swapped/inverted ID-enum mapping entries named the single most common and dangerous migration bug; verify each mapping entry against production data individually
+- https://github.com/EveryInc/compound-engineering-plugin/blob/main/skills/ce-code-review/references/personas/data-migration-reviewer.md — data-migration-reviewer persona: "Swapped or inverted ID/enum mappings — `1 => TypeA, 2 => TypeB` in code but production has the reverse. Verify each CASE/IF branch and constant hash entry individually"

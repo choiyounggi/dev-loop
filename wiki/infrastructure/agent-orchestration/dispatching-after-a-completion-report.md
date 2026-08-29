@@ -3,7 +3,7 @@ id: infrastructure-agent-orchestration-dispatching-after-a-completion-report
 domain: infrastructure
 category: agent-orchestration
 applies_to: [orca, general]
-confidence: verified
+confidence: field-tested
 sources:
   - "Orca CLI bundled skill guide: `orca skills get --topic orchestration --full` (app 1.4.177, command schema v1)"
   - "`orca orchestration worker-start --help`, `orca terminal wait --help` (app 1.4.177)"
