@@ -7,7 +7,8 @@ confidence: verified
 sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
   - https://www.rfc-editor.org/rfc/rfc8725
-last_verified: 2026-07-10
+  - https://www.rfc-editor.org/rfc/rfc9700
+last_verified: 2026-08-29
 related: [security-authz-resource-level-checks, security-authn-retiring-a-replaced-auth-gate]
 ---
 
@@ -60,4 +61,5 @@ design refresh around it — not the other way around.
 ## Sources
 
 - https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html — server-side session properties, cookie attributes, revocation
-- https://www.rfc-editor.org/rfc/rfc8725 — JWT Best Current Practices: short lifetimes, algorithm/issuer pinning
+- https://www.rfc-editor.org/rfc/rfc8725 — JWT Best Current Practices: algorithm/issuer pinning (§3.8)
+- https://www.rfc-editor.org/rfc/rfc9700 — OAuth 2.0 Security BCP: short-lived access tokens reduce leak impact (§4.14.1)

@@ -7,11 +7,10 @@ confidence: verified
 sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html
   - https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
-  - https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_Cheat_Sheet.html
   - https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
   - https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies
   - https://datatracker.ietf.org/doc/html/rfc9700
-last_verified: 2026-07-10
+last_verified: 2026-08-29
 related: [frontend-security-xss-safe-rendering]
 ---
 
@@ -78,8 +77,7 @@ implementing silent refresh or logout. The choice of auth approach itself
 ## Sources
 
 - https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html — no session identifiers/sensitive data in Web Storage; readable by any JS, stolen via one XSS
-- https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html — HttpOnly + Secure + SameSite for session cookies; ids in URLs leak via logs/history/Referer
-- https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_Cheat_Sheet.html — token sidejacking; hardened-cookie storage; closure/sessionStorage trade-offs
+- https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html — HttpOnly + Secure + SameSite for session cookies; session hijacking (sidejacking); ids in URLs leak via logs/history/Referer
 - https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html — SameSite as defense-in-depth; CSRF tokens on state-changing requests
 - https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies — HttpOnly/Secure/SameSite attribute semantics
 - https://datatracker.ietf.org/doc/html/rfc9700 — refresh token rotation; revocation on replay of rotated tokens
