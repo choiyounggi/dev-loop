@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://github.com/llvm/llvm-project/issues/137352
   - https://github.com/Homebrew/homebrew-core/issues/197277
-  - https://github.com/llvm/llvm-project/blob/main/clang/test/Driver/darwin-sdkroot.c
+  - https://github.com/llvm/llvm-project/blob/5c29ffda9056e1b4602a46051371f0184ce357b2/clang/test/Driver/darwin-sdkroot.c
   - https://clang.llvm.org/docs/DiagnosticsReference.html
   - https://discourse.llvm.org/t/stdio-h-not-found-on-mac-how-to-add-system-headers-includes-into-clang/77604
 last_verified: 2026-08-29
@@ -80,6 +80,6 @@ printf '#include <stdio.h>\nint main(){return 0;}\n' > probe.c
 
 - https://github.com/llvm/llvm-project/issues/137352 — as of LLVM/Clang 20.1.2 `clang hello.c` on macOS fails with `ld: library 'System' not found` and `'stdio.h' file not found`; "one must manually populate the `SDKROOT` environment variable (or pass `-isysroot`): `export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"`" — the driver selects no default sysroot on macOS
 - https://github.com/Homebrew/homebrew-core/issues/197277 — Homebrew clang "always passes the same value to `ld`'s `-syslibroot`": "the SDK that `llvm` was built with is always selected when linking instead of the value set by `xcrun` / in `SDKROOT` / with `-isysroot`"; compilation respects `-isysroot` while the link step does not (labelled an upstream issue)
-- https://github.com/llvm/llvm-project/blob/main/clang/test/Driver/darwin-sdkroot.c — clang driver test: "Check that SDKROOT is used to define the default for -isysroot on Darwin"
+- https://github.com/llvm/llvm-project/blob/5c29ffda9056e1b4602a46051371f0184ce357b2/clang/test/Driver/darwin-sdkroot.c — clang driver test: "Check that SDKROOT is used to define the default for -isysroot on Darwin"
 - https://clang.llvm.org/docs/DiagnosticsReference.html — `-Wmissing-sysroot` exists and is enabled by default (a warning, not an error)
 - Local reproduction 2026-08-05 (macOS, Homebrew LLVM at `/opt/homebrew/opt/llvm`): `clang probe.c` emitted `warning: no such sysroot directory: '/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk' [-Wmissing-sysroot]` followed by `fatal error: 'stdio.h' file not found`; the same command with `-isysroot "$(xcrun --show-sdk-path)"` (an Xcode SDK path) compiled and linked successfully. A 69-task test suite driven by the toolchain failed en masse with header errors; `clang probe.c` reproduced the identical error; `clang -isysroot "$(xcrun --show-sdk-path)" probe.c` succeeded
