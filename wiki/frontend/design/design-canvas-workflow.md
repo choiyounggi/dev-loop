@@ -3,9 +3,11 @@ id: frontend-design-design-canvas-workflow
 domain: frontend
 category: design
 applies_to: [general]
-confidence: verified
+confidence: field-tested
 sources:
-  - "Claude Code bundled `design` skill (Claude Design canvas preview) — full SKILL text read 2026-08-30 from the local Claude Code 2.1.236 install (bundled-skills payload; re-readable any session via the Skill tool, skill: \"design\")"
+  - "Claude Code bundled `design` skill (early research preview of Claude Design inside Claude Code) — full SKILL text read in-session 2026-08-30 from a Claude Code 2.1.236 install; preview-gated, so it is checkable only in a session whose available-skills list carries `design: Create a design canvas…`, not via a public URL"
+  - "https://www.anthropic.com/news/claude-design-anthropic-labs — Anthropic, official (Claude Design: canvas-based visual design product, research preview for Pro/Max/Team/Enterprise; inline editing, PDF/PPTX/HTML export, handoff to Claude Code; live-fetched 2026-08-30)"
+  - "https://www.explainx.ai/blog/claude-code-design-command-artboards-research-preview-2026 — third-party (documents /design in Claude Code as a research-preview command producing editable UI artboards via the Artifacts runtime; live-fetched 2026-08-30)"
 last_verified: 2026-08-30
 related: [frontend-design-anti-slop-visual-design, frontend-design-responsive-layout, frontend-design-html-in-canvas]
 ---
@@ -21,10 +23,17 @@ a new screen is about to be implemented with no agreed design spec. This page ro
 the DESIGN phase; implementing an already-approved spec routes to
 [frontend-design-anti-slop-visual-design] and [frontend-design-responsive-layout].
 
+The `design` skill is an early research preview and availability-gated: it is
+present when the session's available-skills list carries `design: Create a design
+canvas…`. Every directive below was field-tested by reading the full skill text
+in such a session (2026-08-30); when the list has no `design` entry, apply the
+no-skill edge case below instead of the mandatory routing.
+
 ## Do this
 
-1. **Invoke the `design` skill before authoring any mockup markup.** In a Claude Code
-   session, every design deliverable above goes through the Skill tool
+1. **Invoke the `design` skill before authoring any mockup markup.** In a session
+   whose available-skills list carries `design`, every design deliverable above
+   goes through the Skill tool
    (skill: `design`) — it produces a published multi-artboard canvas the user can
    open, click-edit, and export, and it carries the current canvas format and
    publish flow. A hand-rolled throwaway HTML file gives the user nothing to refine
@@ -74,8 +83,8 @@ the DESIGN phase; implementing an already-approved spec routes to
 | Case | Then |
 |------|------|
 | The task is pure implementation of an already-approved design spec | Skip the canvas; load [frontend-design-anti-slop-visual-design] + [frontend-design-responsive-layout] and build production code |
-| Auditing a live site's visuals rather than designing new ones | That is design review/QA tooling territory (e.g. the design-review skill), not a canvas deliverable |
-| `node`/`bun` missing, or the session has no `design` skill (non-Claude-Code surface) | The canvas cannot be assembled; say so, deliver the design decisions as a written spec, and fall back to [frontend-design-anti-slop-visual-design] for the craft rules |
+| Auditing a live site's visuals rather than designing new ones | That is a live-site QA/visual-audit task — route to whatever audit tooling the session provides, not a canvas deliverable |
+| `node`/`bun` missing, or the session's available-skills list has no `design` entry (preview not enabled, or a non-Claude-Code surface) | The canvas cannot be assembled; say so, deliver the design decisions as a written spec, and fall back to [frontend-design-anti-slop-visual-design] for the craft rules |
 | Asked to recreate another company's distinctive UI | Refuse unless the user states they work there; help design an original equivalent instead (skill's copyrighted-designs rule) |
 | A recreate/extend target's source is reachable (repo, pasted files) | Build from the real source, never training-data memory; screenshots are high-level guidance only — if the source is unreachable, stop and say so |
 | The user asks for a small targeted change to an existing canvas | Change only that element; leave every other layout, color, font, and copy value untouched, and suggest broader changes instead of applying them |
@@ -92,9 +101,17 @@ the DESIGN phase; implementing an already-approved spec routes to
 
 ## Sources
 
-- Claude Code bundled `design` skill (Claude Design canvas preview), v2.1.236
-  bundle, full text read 2026-08-30 — supports every directive above (step-zero
-  pixel-match, settle-aesthetic-with-user, mockup-vs-prototype question,
-  working-file update flow, artboard exploration rules, copy-vs-levers, flex/grid
-  gap survival, 44px/12pt floors, no fake chrome, copyrighted-designs rule,
-  show-it-say-little handoff).
+- Claude Code bundled `design` skill (early research preview of Claude Design in
+  Claude Code), read in full in-session 2026-08-30 from a v2.1.236 install —
+  primary source for every directive above (step-zero pixel-match,
+  settle-aesthetic-with-user, mockup-vs-prototype question, working-file update
+  flow, artboard exploration rules, copy-vs-levers, flex/grid gap survival,
+  44px/12pt floors, no fake chrome, copyrighted-designs rule, show-it-say-little
+  handoff). Preview-gated: checkable only in a session that lists the skill —
+  hence `confidence: field-tested`.
+- https://www.anthropic.com/news/claude-design-anthropic-labs — official; Claude
+  Design exists as a canvas design product (research preview, Pro/Max/Team/
+  Enterprise), with inline editing, exports, and Claude Code handoff.
+- https://www.explainx.ai/blog/claude-code-design-command-artboards-research-preview-2026
+  — third-party; confirms /design ships in Claude Code as a research-preview
+  command producing editable UI artboards through the Artifacts runtime.
