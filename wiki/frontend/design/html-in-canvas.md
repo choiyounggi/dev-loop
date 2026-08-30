@@ -9,7 +9,7 @@ sources:
   - https://groups.google.com/a/chromium.org/g/blink-dev/c/t_nGEmJ_v4s
   - https://tympanus.net/codrops/2026/05/13/exploring-the-html-in-canvas-proposal/
 last_verified: 2026-08-29
-related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements]
+related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements, frontend-design-design-canvas-workflow]
 ---
 
 # Drawing Live HTML into Canvas for Shader and 3D Effect Layers
