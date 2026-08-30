@@ -20,7 +20,7 @@ sources:
   - https://developer.mozilla.org/en-US/docs/Web/CSS/@media/hover
   - https://webkit.org/blog/7929/designing-websites-for-iphone-x/
 last_verified: 2026-08-21
-related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements, frontend-performance-bundle-and-assets]
+related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements, frontend-performance-bundle-and-assets, frontend-design-design-canvas-workflow]
 ---
 
 # Making One Layout Work From 320px Phones to Desktop

@@ -9,7 +9,7 @@ sources:
   - "https://claude.com/blog/improving-frontend-design-through-skills — Anthropic Engineering, 2025-11-12 (distributional-convergence mechanism, font avoid-list + taxonomy, extreme-contrast thresholds, domain-derived aesthetic direction, second-order convergence warning; Korean translation: velog.io/@xxziiko)"
   - "https://github.com/pbakaus/impeccable — README (gray-text-on-colored-background and bounce/elastic-easing anti-patterns; command list unstable across versions, cited for README-level rules only)"
 last_verified: 2026-08-21
-related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements, frontend-design-responsive-layout]
+related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements, frontend-design-responsive-layout, frontend-design-design-canvas-workflow]
 ---
 
 # Making Web UI Look Designed, Not Generated
