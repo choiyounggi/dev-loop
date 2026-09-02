@@ -21,7 +21,10 @@ See [Orca integration](#orca-integration--supervision-not-just-spawning).
 **The one change from upstream loop-orchestrator:** the plan step is no longer an
 optional, pluggable role. It is **fixed to the bundled `wiki-plan` methodology** —
 every non-trivial task plans by routing each design decision to a page in the
-bundled `wiki/` before any code is written. The rest of the loop is unchanged.
+bundled `wiki/` before any code is written. Since v1.17.0 that planning itself
+runs as **three gated phases — Analyze → Design → Decompose** — each judged
+mechanically before the next may start (see below). The rest of the loop is
+unchanged.
 
 On top of that, dev-loop adds a **knowledge-capture loop**: your sessions emit
 verified insights, and `knowledge-flush` researches, de-dups, routes, and opens a
@@ -75,14 +78,37 @@ Run it two ways:
   guardrails `ask` instead of blocking, and a dead worker is detected fast rather
   than stalling the run.
 
-### Step 2 is fixed to `wiki-plan`
+### Step 2 is fixed to `wiki-plan` — three gated phases
 
-`wiki-plan` makes the planner do a **wiki routing sweep**: read `INDEX.md`, then
-each touched domain's `index.md`, and for every design decision find the page
-that owns it — recording a `decision → wiki page` map. Decisions are written as
-concrete values/code (never "as appropriate"), so the implementing pass executes
-instead of guessing. A decision no page covers is marked `[no-wiki]` and becomes
-an ingest candidate. This is not a configurable role and cannot be turned off.
+`wiki-plan` runs **Phase A (Analyze) → gate-A → Phase B (Design) → gate-B →
+Phase C (Decompose)**. Every exit condition is machine-checkable — `plan-gate.sh
+emit` writes a gates ledger and `gate-check.sh --run` judges it — so "the plan
+is ready" is never a self-report:
+
+- **Phase A — Analyze** (`plans/<feature>/analysis.md`): requirements as an
+  Example-Mapping table (an unresolved `OPEN:` question blocks entry to Phase B —
+  Definition of Ready); ground truth with evidence attached (a re-runnable
+  baseline test command, affected files each with the search that proved them,
+  pinned-file constraints); time-boxed spikes for load-bearing unknowns; and an
+  external best-practice search via the `research` role.
+- **Phase B — Design** (`plans/<feature>/design.md`): the **wiki routing sweep** —
+  read `INDEX.md`, then each touched domain's `index.md`, and for every design
+  decision find the page that owns it. Each decision row carries its choice, its
+  wiki basis as a real path (gate-B greps that the page exists), the rejected
+  alternative, and the test that would catch it being wrong. A decision no page
+  covers is marked `[no-wiki]` and becomes an ingest candidate. The design is
+  then reviewed by the **`plan-reviewer` subagent** — read-only, fresh context,
+  so the session that wrote the plan never grades its own design.
+- **Phase C — Decompose**: ordered, small-model-sized tasks, each naming the
+  exact wiki pages that ground it and the requirement (`covers: R<n>`) its
+  verification proves — coverage is checked in both directions. Decisions are
+  written as concrete values/code (never "as appropriate"), so the implementing
+  pass executes instead of guessing.
+
+Small tasks take a **lite mode** (machine-judged: small size, no `[no-wiki]`, no
+pins touched) that keeps the baseline pin and grounding grep but skips the
+reviewer — recorded as an open `ABANDON` on the ledger, never a silent skip.
+This is not a configurable role and cannot be turned off.
 
 The wiki lives at the plugin root (`wiki/`, `INDEX.md`, `AGENTS.md`,
 `templates/`); the wiki skills resolve their paths against `${CLAUDE_PLUGIN_ROOT}`.
@@ -100,6 +126,7 @@ can map its **capability roles** to your real tools so the loop uses them:
 | `tacit` | past incidents / danger-zone lore |
 | `design` | Figma / visual-spec MCP (UI work) |
 | `intake` | issue tracker (orchestrate's work-list) |
+| `research` | external best-practice/pitfall search (wiki-plan Phase A/B). Fixed fallback when unset: brave-search MCP if present → built-in WebSearch → open `ABANDON` |
 
 (`plan` is **not** a role — the plan step is fixed to `wiki-plan`. And the bundled
 best-practice `wiki/` needs no config; `knowledge` is a *separate* external wiki.)
@@ -230,7 +257,7 @@ ordinary `gh pr create` in any repo.
 |-------|------|
 | `loop-implement` | **The single implementer** — consumes the wiki-plan and executes its tasks in order (loading each task's named wiki pages) through the verification loop. Plan step = wiki-plan. |
 | `orchestrate` | **The multi-session orchestrator** — split one goal into parallel worker sessions, each running loop-implement — over **Orca when detected** (Task/Dispatch tracking, event-driven `worker_done`/`ask`/`escalation` waits, native liveness), else tmux with a hardened watch (worker question channel, stall surfacing, allowlisted chooser keys). Scheduling is a dependency graph plus slot accounting, not wave barriers: `ready-set.sh` says what may start now, the slot count is proposed at Gate 1 and bounded by `LO_MAX_SESSIONS`, and a failed dependency surfaces as a reported deadlock rather than a silent wait. Per-role model selection: a cheap worker model, a strong planner/auditor. Workers escalate guardrails `ask`s instead of blocking, may propose splitting an over-large task mid-run, and dead workers are detected. Both human gates (task split + substrate, pre-merge) are put to you as **AskUserQuestion choosers**, enforced by `orchestrate-ask-gate.sh`. |
-| `wiki-plan` | **The fixed plan methodology** — route each decision to a wiki page, decompose into ordered, page-navigated tasks. |
+| `wiki-plan` | **The fixed plan methodology** — three gated phases (Analyze → Design → Decompose): evidence-backed analysis, wiki-routed decisions independently reviewed by the `plan-reviewer` subagent, then ordered, page-navigated tasks. Gates are judged mechanically (`plan-gate.sh` + `gate-check.sh`); orchestrate refuses to dispatch a plan without gate evidence. |
 | `wiki-ingest` | Add verified knowledge to the right semantic layer (used by knowledge-flush). |
 | `wiki-query` | Answer a question from the wiki with citations. |
 | `wiki-lint` | Health-check the wiki. |
