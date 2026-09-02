@@ -1,0 +1,116 @@
+# Auto version bump on every push to main.
+#
+# Closes the last manual step of the release pipeline. The chain is:
+#   feature merge lands on main
+#     -> this workflow computes the next semver from the conventional-commit
+#        messages since the current version's tag (scripts/auto-release.sh),
+#        bumps BOTH version files, and pushes the bump commit to main
+#     -> auto-tag.yml (triggered by that push) creates tag vX.Y.Z + Release
+#     -> auto-tag.yml dispatches groundwork's sync-dev-loop-pin.yml, which
+#        bumps the marketplace pin and auto-merges (hourly schedule remains
+#        as the backstop)
+#
+# Why the bump commit is a DIRECT push, not a PR: main's ruleset requires a
+# PR but grants the repo owner bypass, and merging a PR here needs
+# `gh pr merge --admin`, which the default GITHUB_TOKEN can never do. The
+# push therefore uses RELEASE_AUTOMATION_TOKEN — a fine-grained PAT of the
+# owner (dev-loop: contents r/w; groundwork: actions r/w) — which also
+# matters for the chain itself: a push made with GITHUB_TOKEN triggers NO
+# follow-up workflows (GitHub's recursion guard), so auto-tag.yml would
+# silently never fire. The bump content is mechanical (two version fields,
+# verified by scripts/check-versions.sh before pushing) and the commits
+# being released already passed CI on their own PRs.
+#
+# Loop safety, twice over: scripts/auto-release.sh reports `skip: awaiting
+# tag` whenever plugin.json is ahead of the tags (the exact state the bump
+# push re-triggers this workflow in), and the job-level `if` skips any push
+# whose head commit is itself a release commit.
+name: Auto version bump
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read # the push uses RELEASE_AUTOMATION_TOKEN, not GITHUB_TOKEN
+
+concurrency:
+  group: auto-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release)') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full tag history for auto-release.sh
+
+      - name: Compute, bump, and push the release commit
+        env:
+          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_AUTOMATION_TOKEN }}
+        run: |
+          # MUST run under bash, never sh: ubuntu's /bin/sh is dash, and
+          # auto-release.sh relies on `set -o pipefail` (bash-only).
+          output=$(bash scripts/auto-release.sh)
+          echo "$output"
+
+          case "$output" in
+            need:*)
+              current=$(echo "$output" | awk '{print $2}')
+              next=$(echo "$output" | awk '{print $3}')
+
+              if [ -z "${RELEASE_AUTOMATION_TOKEN:-}" ]; then
+                echo "::error::RELEASE_AUTOMATION_TOKEN secret is not set —" \
+                  "cannot push the bump commit (GITHUB_TOKEN cannot bypass the" \
+                  "PR-required ruleset, and its push would not trigger" \
+                  "auto-tag.yml). Create a fine-grained PAT (dev-loop:" \
+                  "contents r/w; groundwork: actions r/w) and add it with:" \
+                  "gh secret set RELEASE_AUTOMATION_TOKEN"
+                exit 1
+              fi
+
+              # Surgical bump of exactly the two version fields, then verify
+              # both files agree before anything is committed.
+              sed -i "s/\"version\": \"$current\"/\"version\": \"$next\"/" \
+                .claude-plugin/plugin.json .claude-plugin/marketplace.json
+              hits=$(grep -c "\"version\": \"$next\"" \
+                .claude-plugin/plugin.json .claude-plugin/marketplace.json | \
+                awk -F: '{s+=$2} END {print s}')
+              if [ "$hits" -ne 2 ]; then
+                echo "::error::expected exactly 2 bumped version fields, found $hits"
+                exit 1
+              fi
+              bash scripts/check-versions.sh
+
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git add .claude-plugin/plugin.json .claude-plugin/marketplace.json
+              git commit -m "chore(release): $next [auto-release]"
+              # Back-to-back merges: this run is pinned to its own push event's
+              # sha, so if main moved on while we ran, the push is rejected as
+              # non-fast-forward. That is a benign supersede — the run queued
+              # for the newer push recomputes the bump against the true tip —
+              # so log it and succeed instead of raising a false-alarm failure.
+              if git push \
+                "https://x-access-token:${RELEASE_AUTOMATION_TOKEN}@github.com/${{ github.repository }}.git" \
+                HEAD:main; then
+                echo "Pushed chore(release): $next — auto-tag.yml takes it from here."
+              else
+                git fetch origin main
+                if [ "$(git rev-parse origin/main)" != "${{ github.sha }}" ]; then
+                  echo "main moved past ${{ github.sha }} while this run computed the bump —" \
+                    "superseded; the run queued for the newer push will release."
+                  exit 0
+                fi
+                echo "::error::push to main failed and main has NOT moved — a real push failure."
+                exit 1
+              fi
+              ;;
+            skip:*)
+              echo "Nothing to do."
+              ;;
+          esac

@@ -41,6 +41,7 @@ jobs:
       - name: Detect and create release tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_AUTOMATION_TOKEN }}
         run: |
           # MUST run under bash, never sh: ubuntu's /bin/sh is dash, and
           # this script relies on `set -o pipefail` (bash-only) — running it
@@ -54,6 +55,20 @@ jobs:
               git tag "$tag"
               git push origin "$tag"
               gh release create "$tag" --generate-notes
+
+              # Chain: bump groundwork's marketplace pin right away instead of
+              # waiting for its hourly sync-dev-loop-pin.yml schedule (which
+              # stays in place as the backstop). Cross-repo dispatch needs the
+              # PAT — GITHUB_TOKEN is scoped to this repo — so without the
+              # secret this just defers to the schedule, never fails the tag.
+              if [ -n "${RELEASE_AUTOMATION_TOKEN:-}" ]; then
+                GH_TOKEN="$RELEASE_AUTOMATION_TOKEN" gh workflow run \
+                  sync-dev-loop-pin.yml --repo choiyounggi/groundwork \
+                  && echo "groundwork pin sync dispatched." \
+                  || echo "::warning::groundwork pin sync dispatch failed — the hourly schedule will cover it."
+              else
+                echo "RELEASE_AUTOMATION_TOKEN not set — groundwork's hourly pin sync will pick this release up."
+              fi
               ;;
             skip:*)
               echo "Nothing to do."
