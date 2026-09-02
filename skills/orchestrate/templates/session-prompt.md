@@ -127,6 +127,10 @@ Approved. Commit your changes on {BRANCH} with a conventional message (no push, 
     a cross-worktree access can hit a permission prompt no human is watching
     (issue #167).
 
+[6] NEVER `git stash` — refs/stash is shared across all worktrees of this
+    repo; a parallel worker's stash pop can take your uncommitted work.
+    Snapshot with `git diff > <file>` or a WIP commit instead.
+
 **Orca substrate.** §O1–§O4 — one `--spec` per task-phase, delivered by Orca. Not
 send-keys: a `--spec` MAY span multiple lines. Each phase is a separate Task, so no
 prompt here says "wait" — the worker reports and ends its turn.
@@ -240,6 +244,10 @@ and report exactly once:
     under the coordinator's checkout. The coordinator collects your records;
     a cross-worktree access can hit a permission prompt no human is watching
     (issue #167).
+
+[9] NEVER `git stash` — refs/stash is shared across all worktrees of this
+    repo; a parallel worker's stash pop can take your uncommitted work.
+    Snapshot with `git diff > <file>` or a WIP commit instead.
 
 ---
 

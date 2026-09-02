@@ -35,6 +35,30 @@ cat > "$wt/.groundwork/guardrails.json" <<'GRJSON'
 {"rules":{"rm_rf":{"mode":"off"},"git_discard":{"mode":"off"},"system_tmp_write":{"mode":"off"},"cloud_delete":{"mode":"ask"},"sql_drop":{"mode":"ask"},"git_force_push":{"mode":"ask"},"secret_export":{"mode":"ask"},"curl_pipe_shell":{"mode":"ask"},"worktree_escape":{"mode":"ask","allowPaths":[".orchestration"]}}}
 GRJSON
 
+# Deny `git stash` (any subcommand) in the worker's own Claude settings —
+# refs/stash is repository-global, so a stash by one worktree worker can
+# silently swap another worker's uncommitted work (issue #166). Deny rules
+# block in EVERY permission mode, including bypassPermissions, and `:*`
+# covers the bare command plus every subcommand (code.claude.com/docs/en/
+# permissions.md, /permission-modes.md, verified 2026-09-02). Create the file
+# if absent; merge (dedup) into an existing valid one; never touch a
+# malformed one — warn instead of destroying a user file.
+settings="$wt/.claude/settings.local.json"
+mkdir -p "$wt/.claude"
+if [ ! -f "$settings" ]; then
+  printf '%s\n' '{"permissions":{"deny":["Bash(git stash:*)"]}}' > "$settings"
+elif jq empty "$settings" >/dev/null 2>&1; then
+  stmp="$settings.tmp.$$"
+  if jq '.permissions.deny = ((.permissions.deny // []) + ["Bash(git stash:*)"] | unique)' "$settings" > "$stmp"; then
+    mv "$stmp" "$settings"
+  else
+    rm -f "$stmp"
+    echo "worker-guardrails: warn — failed to merge git-stash deny rule into $settings" >&2
+  fi
+else
+  echo "worker-guardrails: warn — $settings is malformed JSON; left untouched, git-stash deny rule NOT added" >&2
+fi
+
 # Keep the sandbox config out of commits (worktree-local git exclude). Create the
 # exclude file if it does not exist, and never let an append failure abort the
 # caller (set -e) — warn instead. A non-git path is fine: the config still applies.

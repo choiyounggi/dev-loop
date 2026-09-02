@@ -781,9 +781,30 @@ tpl_sections_single_line() {
   # STATUS_DIR={STATUS_DIR} on a status-update.sh call became worker-local
   # STATUS_DIR=.orchestration/status, and rule [8] added the collect-don't-
   # deposit obligation (never write/read the coordinator's checkout).
+  # Bumped from 3052262382/7974 (t2-stash-prohibition, issue #166): rule [9]
+  # added the git-stash prohibition — refs/stash is repository-global, so a
+  # parallel worker's stash pop can take another worker's uncommitted work.
   run sh -c "sed -n '/^\*\*Orca substrate\.\*\*/,/^## Subagent usage protocol/p' '$TPL' | cksum"
   [ "$status" -eq 0 ]
-  [ "$output" = "3052262382 7974" ]
+  [ "$output" = "2063842636 8186" ]
+}
+
+@test "template: both worker protocol blocks forbid git stash (issue #166)" {
+  # Names what the checksums above only pin, and covers both substrates:
+  # a reword or a drop in only one block would slip past a byte-count check
+  # that only compares totals.
+  tmux_section="$(awk '/^## tmux worker protocol/{p=1} p && /^\*\*Orca substrate/{exit} p' "$TPL")"
+  orca_section="$(awk '/^## Orca worker protocol/{p=1} p && /^## Subagent usage protocol/{exit} p' "$TPL")"
+  [[ "$tmux_section" == *'NEVER `git stash`'* ]]
+  [[ "$orca_section" == *'NEVER `git stash`'* ]]
+  grep -qF 'refs/stash is shared across all worktrees' "$TPL"
+}
+
+@test "negative control: the git-stash rule check fails when the rule is stripped from one block" {
+  stripped="${BATS_TEST_TMPDIR}/no-stash-rule.md"
+  awk '!/NEVER `git stash`/' "$TPL" > "$stripped"
+  tmux_section="$(awk '/^## tmux worker protocol/{p=1} p && /^\*\*Orca substrate/{exit} p' "$stripped")"
+  [[ "$tmux_section" != *'NEVER `git stash`'* ]]
 }
 
 @test "template: the Orca ask rule forbids deciding a timed-out question" {

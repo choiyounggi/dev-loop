@@ -13,6 +13,7 @@ setup() {
   SKILL="${REPO_ROOT}/skills/orchestrate/SKILL.md"
   TPL="${REPO_ROOT}/skills/orchestrate/templates/session-prompt.md"
   AGENT="${REPO_ROOT}/agents/integration-reviewer.md"
+  AGENT2="${REPO_ROOT}/agents/test-quality-auditor.md"
 }
 
 # Collapses embedded newlines to a single space so a substring assertion
@@ -130,6 +131,21 @@ orca_protocol_section() {
   [[ "$section" != *"integration-reviewer"* ]]
 }
 
+# --- 4b: Guardrails states the git-stash prohibition for sessions and review agents (D5, issue #166) ---
+
+@test "Guardrails states the git-stash prohibition for sessions and review agents" {
+  section="$(guardrails_section "$SKILL")"
+  [[ "$section" == *"git stash"* ]]
+  [[ "$section" == *"refs/stash is repository-global"* ]]
+}
+
+@test "negative control: a Guardrails copy without the git-stash line fails the check" {
+  stripped="${BATS_TEST_TMPDIR}/skill-no-stash-guardrail.md"
+  sed '/No session or review agent may `git stash`/,+2d' "$SKILL" > "$stripped"
+  section="$(guardrails_section "$stripped")"
+  [[ "$section" != *"git stash"* ]]
+}
+
 # --- 5: SKILL.md names the blackboard file + append-only convention --------
 
 @test "Blackboard section names .orchestration/notes/decisions.md as append-only" {
@@ -159,6 +175,41 @@ orca_protocol_section() {
   sed '/^## (2) Implement/,/^## (3)/ s/notes\/decisions\.md//g' "$TPL" > "$stripped"
   section="$(section2_body "$stripped")"
   [[ "$section" != *"notes/decisions.md"* ]]
+}
+
+# --- 6b: both review agents prohibit git stash, with the refs/stash rationale (issue #166) ---
+
+@test "both agent files carry the git-stash prohibition and refs/stash rationale" {
+  for f in "$AGENT" "$AGENT2"; do
+    content="$(cat "$f")"
+    [[ "$content" == *'NEVER `git stash`'* ]]
+    [[ "$content" == *"refs/stash"* ]]
+  done
+}
+
+@test "negative control: an agent copy without the git-stash prohibition fails the check" {
+  stripped="${BATS_TEST_TMPDIR}/agent-no-stash.md"
+  grep -v 'NEVER `git stash`' "$AGENT" > "$stripped"
+  content="$(cat "$stripped")"
+  [[ "$content" != *'NEVER `git stash`'* ]]
+}
+
+# --- 6c: both review agents' read-only claim is honest about temporary tree
+# mutation during test/check runs (D2) ---
+
+@test "both agent files' read-only claim is qualified: repo-state only, checks may temporarily mutate the tree" {
+  for f in "$AGENT" "$AGENT2"; do
+    content="$(cat "$f")"
+    [[ "$content" == *"read-only with respect to repo state"* ]]
+    [[ "$content" == *"temporarily mutate the working tree"* ]]
+  done
+}
+
+@test "negative control: an agent copy without the mutation caveat fails the honesty check" {
+  stripped="${BATS_TEST_TMPDIR}/agent-no-caveat.md"
+  sed 's/temporarily mutate the working tree//' "$AGENT" > "$stripped"
+  content="$(cat "$stripped")"
+  [[ "$content" != *"temporarily mutate the working tree"* ]]
 }
 
 # --- 7: session-prompt §O2 has the blackboard read checkpoint --------------

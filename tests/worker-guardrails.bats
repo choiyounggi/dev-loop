@@ -145,6 +145,65 @@ setup() {
   [ ! -f "$plain/.git/info/exclude" ]
 }
 
+# ---------------------------------------------------------------------------
+# Task t2 — #166: deny `git stash` in the worker's own settings.local.json.
+# refs/stash is repository-global, so a parallel worker's stash pop can
+# retrieve another worker's uncommitted work (D3).
+# ---------------------------------------------------------------------------
+
+@test "settings.local.json: fresh worktree gets the git-stash deny rule created" {
+  run sh "$WG" "$wt"
+  [ "$status" -eq 0 ]
+  cfg="$wt/.claude/settings.local.json"
+  [ -f "$cfg" ]
+  run jq -r '.permissions.deny | length' "$cfg"
+  [ "$output" -eq 1 ]
+  run jq -r '.permissions.deny[0]' "$cfg"
+  [ "$output" = "Bash(git stash:*)" ]
+}
+
+@test "settings.local.json: an existing file with other keys is merged, not replaced" {
+  mkdir -p "$wt/.claude"
+  cat > "$wt/.claude/settings.local.json" <<'EOF'
+{"permissions":{"allow":["Bash(npm test:*)"]},"otherKey":"value"}
+EOF
+  run sh "$WG" "$wt"
+  [ "$status" -eq 0 ]
+  cfg="$wt/.claude/settings.local.json"
+  run jq -r '.permissions.allow[0]' "$cfg"
+  [ "$output" = "Bash(npm test:*)" ]
+  run jq -r '.otherKey' "$cfg"
+  [ "$output" = "value" ]
+  run jq -r '.permissions.deny[0]' "$cfg"
+  [ "$output" = "Bash(git stash:*)" ]
+}
+
+@test "settings.local.json: re-run does not duplicate the deny entry (idempotent)" {
+  sh "$WG" "$wt"
+  run sh "$WG" "$wt"
+  [ "$status" -eq 0 ]
+  cfg="$wt/.claude/settings.local.json"
+  run jq -r '[.permissions.deny[] | select(. == "Bash(git stash:*)")] | length' "$cfg"
+  [ "$output" -eq 1 ]
+}
+
+@test "settings.local.json: a malformed existing file is left untouched, with a warning" {
+  mkdir -p "$wt/.claude"
+  printf '{not valid json' > "$wt/.claude/settings.local.json"
+  before=$(cat "$wt/.claude/settings.local.json")
+  run sh "$WG" "$wt"
+  [ "$status" -eq 0 ]
+  after=$(cat "$wt/.claude/settings.local.json")
+  [ "$before" = "$after" ]
+  [[ "$output" == *"malformed"* ]]
+}
+
+@test "settings.local.json: is excluded from commits via the existing .claude/ exclude rule" {
+  sh "$WG" "$wt"
+  run git -C "$wt" check-ignore -q .claude/settings.local.json
+  [ "$status" -eq 0 ]
+}
+
 # The real orchestrator shape. Note (measured): for a LINKED worktree git resolves
 # `--git-path info/exclude` to an ABSOLUTE path inside the MAIN repo, so the
 # exclusion is shared across worktrees rather than per-worktree — which is why the

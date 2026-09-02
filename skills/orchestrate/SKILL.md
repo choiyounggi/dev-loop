@@ -1033,6 +1033,9 @@ kept), so re-running it is safe. Note the difference from **partial resume** (Ph
 - No remote push, no PR, no force-push. Destructive cleanup only after Gate 2, via
   safe-cleanup (never --force).
 - Sessions must not weaken tests (loop-implement guard); the auditor enforces it.
+- No session or review agent may `git stash` — refs/stash is repository-global, so a
+  parallel worker's stash pop can silently swap another worker's uncommitted work
+  (issue #166); worker worktrees also carry a mechanical `Bash(git stash:*)` deny.
 - Always verify real state after worktree/session ops (`git worktree list`, `tmux ls`,
   status files) — never trust echo logs (set -e is fail-open in eval subshells).
 - Bundled agents only: `test-quality-auditor`, `integration-reviewer`. Don't
