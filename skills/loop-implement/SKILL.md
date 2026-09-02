@@ -44,9 +44,10 @@ pass executes decisions instead of guessing them. See step 2 below.
 The *other* steps can use environment-specific tools through named **capability
 roles**: `knowledge` (domain facts / policy / code values), `tacit` (past
 incidents, edge cases, danger zones), `verify` (the project's test / build / QA
-command), `explore` (code/symbol search), and `design` (visual/UI spec for a UI
-task, e.g. a Figma link). (`plan` is intentionally absent — see above.) Resolve
-them once at the start:
+command), `explore` (code/symbol search), `design` (visual/UI spec for a UI
+task, e.g. a Figma link), and `research` (external best-practice/pitfall search
+for wiki-plan Phase A4/A3 and `[no-wiki]` grounding in Phase B — see below).
+(`plan` is intentionally absent — see above.) Resolve them once at the start:
 
 ```
 sh ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh --summary
@@ -60,9 +61,25 @@ config; it always runs `wiki-plan`. Schema, precedence, and examples:
 `references/tool-profile.md`.
 
 A role is a tool injected into one step — never a loop. Do NOT map a role (esp.
-`verify`) to a tool that runs its own implement/verify/retry loop or another
-orchestrator; that nests loops and muddies the retry/DoD/auditor ownership. There
-is no `implement` role — step 4 below is the single owner of the implement cycle.
+`verify`, and — same rule — `research`) to a tool that runs its own
+implement/verify/retry loop or another orchestrator; that nests loops and
+muddies the retry/DoD/auditor ownership. There is no `implement` role — step 4
+below is the single owner of the implement cycle.
+
+**`research` interpretation order (fixed, unlike the other roles).** A shell
+script cannot detect whether an MCP tool exists in the calling environment, so
+`resolve-tools.sh` only reports "configured" vs "default" for `research`; when
+it resolves to `default`, follow this fallback chain, in order:
+
+1. The tool configured for `research` in the tool profile, if any.
+2. `mcp__brave-search__brave_web_search`, if it exists in the environment.
+3. The built-in WebSearch.
+4. If none of the above are available: ABANDON the `research-evidenced` gate
+   (an open, recorded abandonment — never a silent skip).
+
+Record which tool actually answered each query in the plan's `## Research`
+section (query -> source -> what it changed). See `references/tool-profile.md`
+(`research`) for the config schema and an example mapping.
 
 ## The loop
 
@@ -119,6 +136,10 @@ starting the next, so a downstream task always builds on a verified upstream one
 7b. Reflect + retry  — say why it failed. If it is a PLAN defect (a decision/name/
                         input the task+pages+inputs never gave), repair the plan/
                         task via step 2, don't guess; else retry from step 3.
+                        A PLAN defect routes by cause: requirement/acceptance-
+                        example gap -> wiki-plan Phase A repair; decision/
+                        grounding gap -> Phase B repair; task-cut/input-output
+                        gap -> Phase C repair (re-run wiki-plan's matching phase).
                         Bounded: ≤3 attempts per task; 3rd failure STOPs + escalates. [Reflexion / bounded retry]
 ```
 
