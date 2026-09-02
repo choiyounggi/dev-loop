@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # install-permission-rules.sh — consent-gated coordinator permission installer.
 #
-# The script merges the orchestrate coordinator's permission rules (three
+# The script merges the orchestrate coordinator's permission rules (four
 # path allows + one autoMode classifier rule) into a Claude Code settings.json.
 # It must be idempotent, refuse malformed targets, back up before writing, and
 # never touch the file in --check mode. HOME is overridden per test so the
@@ -29,13 +29,15 @@ expected_rule1() {
   [ "$status" -eq 0 ]
   [ -f "$TARGET" ]
   jq -e . "$TARGET" >/dev/null
-  # three path rules present, keyed on the real (fake) home dir
-  [ "$(jq -r '.permissions.allow | length' "$TARGET")" -eq 3 ]
+  # four path rules present, keyed on the real (fake) home dir
+  [ "$(jq -r '.permissions.allow | length' "$TARGET")" -eq 4 ]
   jq -e --arg r "$(expected_rule1)" '.permissions.allow | index($r) != null' "$TARGET" >/dev/null
+  jq -e '.permissions.allow | any(endswith("resolve-escalation.sh *)"))' "$TARGET" >/dev/null
   # autoMode gets $defaults first, then our context rule
   [ "$(jq -r '.autoMode.allow[0]' "$TARGET")" = '$defaults' ]
   jq -e '.autoMode.allow[1] | contains("bypassPermissions")' "$TARGET" >/dev/null
   jq -e '.autoMode.allow[1] | contains("safe-cleanup.sh")' "$TARGET" >/dev/null
+  jq -e '.autoMode.allow[1] | contains("resolve-escalation.sh")' "$TARGET" >/dev/null
 }
 
 @test "idempotent: second run reports already installed, changes nothing, makes no backup" {
@@ -57,7 +59,7 @@ expected_rule1() {
   [ "$(jq -r '.permissions.allow[0]' "$TARGET")" = 'Bash(git:*)' ]
   [ "$(jq -r '.permissions.defaultMode' "$TARGET")" = 'default' ]
   [ "$(jq -r '.model' "$TARGET")" = 'opus' ]
-  [ "$(jq -r '.permissions.allow | length' "$TARGET")" -eq 4 ]
+  [ "$(jq -r '.permissions.allow | length' "$TARGET")" -eq 5 ]
 }
 
 @test "merge: existing autoMode.allow gets our rule appended without injecting \$defaults" {
@@ -118,7 +120,31 @@ expected_rule1() {
   run env HOME="$FAKE_HOME" sh "$IPR"
   [ "$status" -eq 0 ]
   [ -f "$FAKE_HOME/.claude/settings.json" ]
-  [ "$(jq -r '.permissions.allow | length' "$FAKE_HOME/.claude/settings.json")" -eq 3 ]
+  [ "$(jq -r '.permissions.allow | length' "$FAKE_HOME/.claude/settings.json")" -eq 4 ]
+}
+
+@test "upgrade: a settings file with only the old 3 rules + old sentence is absent (4), then installer appends r4 and the new sentence, leaving the old sentence in place" {
+  old_am='Running the dev-loop orchestrate plugin'"'"'s worker-management scripts (launch-session.sh, send-prompt.sh, watch-status.sh) is allowed, including launch-session.sh starting a tmux worker with `claude --permission-mode bypassPermissions`: the user sanctioned this orchestration workflow, and each worker worktree is sandboxed by groundwork guardrails, which still blocks dangerous commands in bypass mode and escalates `ask` rules to the coordinator. This does NOT extend to safe-cleanup.sh or other destructive commands, which keep their normal review.'
+  old_r1=$(expected_rule1)
+  old_r2="Bash(sh $FAKE_HOME/.claude/plugins/cache/*/dev-loop/*/skills/orchestrate/scripts/send-prompt.sh *)"
+  old_r3="Bash(sh $FAKE_HOME/.claude/plugins/cache/*/dev-loop/*/skills/orchestrate/scripts/watch-status.sh *)"
+  jq -n --arg r1 "$old_r1" --arg r2 "$old_r2" --arg r3 "$old_r3" --arg am "$old_am" \
+    '{"permissions":{"allow":[$r1,$r2,$r3]},"autoMode":{"allow":["$defaults",$am]}}' > "$TARGET"
+
+  run env HOME="$FAKE_HOME" sh "$IPR" --check "$TARGET"
+  [ "$status" -eq 4 ]
+
+  run env HOME="$FAKE_HOME" sh "$IPR" "$TARGET"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.permissions.allow | length' "$TARGET")" -eq 4 ]
+  jq -e '.permissions.allow | any(endswith("resolve-escalation.sh *)"))' "$TARGET" >/dev/null
+  [ "$(jq -r '.autoMode.allow | length' "$TARGET")" -eq 3 ]
+  # the old sentence survives untouched, alongside the new one
+  jq -e --arg am "$old_am" '.autoMode.allow | index($am) != null' "$TARGET" >/dev/null
+  jq -e '.autoMode.allow | any(contains("resolve-escalation.sh clearing"))' "$TARGET" >/dev/null
+
+  run env HOME="$FAKE_HOME" sh "$IPR" --check "$TARGET"
+  [ "$status" -eq 0 ]
 }
 
 @test "usage: an unknown flag is rejected with exit 1" {

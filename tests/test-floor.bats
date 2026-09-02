@@ -235,3 +235,54 @@ EOF
   [ "$status" -eq 0 ]
   [ "$output" = "pass" ]
 }
+
+@test "committed empty range HEAD...HEAD -> exit 2 unknown, stderr empty-range:" {
+  run --separate-stderr sh "$TF" "$REPO" "HEAD...HEAD"
+  [ "$status" -eq 2 ]
+  [ "$output" = "unknown" ]
+  [[ "$stderr" == *"empty-range:HEAD...HEAD"* ]]
+}
+
+@test "working-tree mode: tracked source edit + untracked new bats with 3 asserting cases -> exit 0 pass" {
+  printf '#!/bin/sh\necho hi\n' > "$REPO/app.sh"
+  commit "add app.sh"
+  printf '#!/bin/sh\necho bye\n' > "$REPO/app.sh"
+  wt_bats=$'@test "case one" {\n  run echo hi\n  [ "$status" -eq 0 ]\n}\n\n@test "case two" {\n  [ 1 -eq 1 ]\n}\n\n@test "case three" {\n  run echo bye\n  assert_success\n}\n'
+  printf '%s' "$wt_bats" > "$REPO/app.bats"
+  run --separate-stderr sh "$TF" "$REPO" "HEAD"
+  [ "$status" -eq 0 ]
+  [ "$output" = "pass" ]
+}
+
+@test "working-tree mode: tracked source edit, no test files anywhere -> exit 3 fail, stderr no-tests" {
+  printf '#!/bin/sh\necho hi\n' > "$REPO/app.sh"
+  commit "add app.sh"
+  printf '#!/bin/sh\necho bye\n' > "$REPO/app.sh"
+  run --separate-stderr sh "$TF" "$REPO" "HEAD"
+  [ "$status" -eq 3 ]
+  [ "$output" = "fail" ]
+  [[ "$stderr" == *"no-tests"* ]]
+}
+
+@test "working-tree mode: untracked new bats with only 2 cases -> exit 3 fail, stderr case-count:<file>:2" {
+  wt_two_bats=$'@test "case one" {\n  run echo hi\n  [ "$status" -eq 0 ]\n}\n\n@test "case two" {\n  [ 1 -eq 1 ]\n}\n'
+  printf '%s' "$wt_two_bats" > "$REPO/wt-two.bats"
+  run --separate-stderr sh "$TF" "$REPO" "HEAD"
+  [ "$status" -eq 3 ]
+  [ "$output" = "fail" ]
+  [[ "$stderr" == *"case-count:wt-two.bats:2"* ]]
+}
+
+@test "working-tree mode: clean worktree, single-ref HEAD -> exit 2 unknown, stderr empty-range:" {
+  run --separate-stderr sh "$TF" "$REPO" "HEAD"
+  [ "$status" -eq 2 ]
+  [ "$output" = "unknown" ]
+  [[ "$stderr" == *"empty-range:HEAD"* ]]
+}
+
+@test "wiring: SKILL.md Phase 4 invokes test-floor.sh with the single-ref working-tree form" {
+  skill_md="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
+  run grep -n "test-floor.sh <wt> '<integ>'" "$skill_md"
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
+}

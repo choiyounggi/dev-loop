@@ -8,13 +8,24 @@
 #
 # usage: test-floor.sh <repo-dir> <diff-range>
 #
+# <diff-range> is either a range (contains `..`, e.g. `A...B` / `A..B`) — diff
+# between two committed refs, unchanged since before untracked/empty-range
+# handling was added — or a single ref (e.g. `<integ>`) — working-tree mode:
+# diffs the ref against the working tree (so uncommitted TRACKED changes are
+# included) and additionally treats every untracked file as newly added (`A`),
+# since at review time a worker has not committed yet and a brand-new test
+# file only exists on disk.
+#
 # exit 0  stdout `pass`    — floor met
 # exit 3  stdout `fail`    — floor failed; stderr: one reason per line, each
 #                            `no-tests` | `case-count:<file>:<n>` |
 #                            `no-assertion:<file>:<case>`
-# exit 2  stdout `unknown` — every new test file the floor needed was
-#                            unrecognized by the framework table; caller
-#                            proceeds to the auditor with full scope
+# exit 2  stdout `unknown` — could not judge: either every new test file the
+#                            floor needed was unrecognized by the framework
+#                            table, or the diff enumeration was empty (stderr
+#                            `empty-range:<range>` — nothing was measured, so
+#                            floor-met cannot be claimed); caller proceeds to
+#                            the auditor with full scope
 # exit 4  stdout (nothing) — bad args / repo-dir / diff-range; reason on stderr
 #
 # Read-only: never executes tests, never writes files. Runtime deps: sh + git
@@ -34,6 +45,26 @@ git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || {
 
 name_status=$(git -C "$repo" diff --name-status "$range" 2>/dev/null) || {
   echo "test-floor: diff range '$range' did not resolve" >&2; exit 4; }
+
+case "$range" in
+  *..*) ;;  # A...B / A..B range mode — behavior unchanged
+  *)
+    # single-ref working-tree mode: append untracked files as newly-added
+    others=$(git -C "$repo" ls-files --others --exclude-standard 2>/dev/null)
+    if [ -n "$others" ]; then
+      while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        name_status="${name_status}${name_status:+
+}A${TAB}${path}"
+      done <<OTHERS
+$others
+OTHERS
+    fi
+    ;;
+esac
+
+[ -n "$name_status" ] || {
+  echo "test-floor: empty-range:$range" >&2; echo unknown; exit 2; }
 
 # classify $1=path -> test|doc|config|source (D3: first match wins)
 classify() {
