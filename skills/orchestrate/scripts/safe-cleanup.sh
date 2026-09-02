@@ -270,18 +270,53 @@ sweep() {
   return 0
 }
 
-# Archive one worktree's untracked scratch (including info/exclude-excluded
-# files, e.g. the .claude/ scratch worker-guardrails.sh excludes — `ls-files
-# --others` WITHOUT --exclude-standard still lists them) into this run's
-# dated archive dir, then delete exactly the archived files from the
-# worktree, pruning directories left empty by that deletion. Tracked files
-# are never touched here. Copy-before-delete: a mkdir/cp failure aborts this
-# worktree's archive without deleting anything, so the caller's
-# remove_worktrees below still SKIPs it as dirty rather than half-deleting.
+# Scratch that is intentionally excluded on purpose (info/exclude, e.g. the
+# .claude/ worker-guardrails.sh excludes) and so is NOT covered by
+# --exclude-standard's ignore-aware enumeration below — archived separately,
+# dir-level. Space-separated if this ever grows beyond one entry.
+SCRATCH_WHITELIST=".claude"
+
+# Archive one worktree's untracked scratch into this run's dated archive dir,
+# then delete exactly what was archived from the worktree, pruning
+# directories left empty by that deletion. Tracked files are never touched
+# here.
+#
+# Enumeration is `ls-files --others --exclude-standard` (untracked AND not
+# ignored), so gitignored dependency trees (node_modules/, target/, dist/...)
+# are never swept into the archive — the prior WITHOUT-exclude-standard
+# enumeration is what caused issue #170's 512MB/12,519-file teardown hang.
+#
+# Scratch that IS ignored on purpose is not caught by that enumeration, so
+# each SCRATCH_WHITELIST entry is archived separately, dir-level (cp -Rp),
+# but ONLY when `git check-ignore` confirms it is actually ignored —
+# otherwise it is untracked-and-not-ignored, already covered by the
+# enumeration above, and a whitelist copy would double-archive it.
+#
+# Copy-before-delete: a mkdir/cp failure aborts this worktree's archive
+# (whitelist dirs first, then the per-file loop) without deleting anything,
+# so the caller's remove_worktrees below still SKIPs it as dirty rather than
+# half-deleting.
 # $1: worktree path  $2: this branch's worker-scratch destination dir
 archive_scratch() {
   wt="$1"; adest="$2"
-  files=$("$GIT" -C "$wt" ls-files --others 2>/dev/null) || return 0
+
+  for w in $SCRATCH_WHITELIST; do
+    [ -e "$wt/$w" ] || continue
+    "$GIT" -C "$wt" check-ignore -q "$w" || continue
+    if [ "$DRY" -eq 1 ]; then
+      find "$wt/$w" -type f 2>/dev/null | while IFS= read -r wf; do
+        echo "would archive: $wf"
+      done
+      continue
+    fi
+    if ! mkdir -p "$adest" || ! cp -Rp "$wt/$w" "$adest/$w"; then
+      echo "teardown: FAILED to archive $wt/$w — worktree left in place" >&2
+      return 1
+    fi
+    rm -rf "$wt/$w"
+  done
+
+  files=$("$GIT" -C "$wt" ls-files --others --exclude-standard 2>/dev/null) || return 0
   [ -n "$files" ] || return 0
   oldifs=$IFS; IFS='
 '

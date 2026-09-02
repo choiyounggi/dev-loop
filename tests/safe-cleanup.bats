@@ -738,6 +738,106 @@ lo-1-runB'
 }
 
 # ---------------------------------------------------------------------------
+# Task t3 — #170: archive_scratch must not archive gitignored dependency
+# trees (node_modules etc.); intentionally-excluded scratch (.claude/) is
+# still collected, via an explicit whitelist, dir-level.
+# ---------------------------------------------------------------------------
+
+@test "teardown: a gitignored node_modules/ is never archived" {
+  _use_fake_tmux
+  root="$(_mkteardownrun td12)"
+  wt="$root/.worktrees/feat-own"
+  echo "node_modules/" > "$wt/.gitignore"
+  git -C "$wt" add .gitignore; git -C "$wt" commit -qm gitignore
+  mkdir -p "$wt/node_modules"
+  echo "module.exports = {}" > "$wt/node_modules/dep.js"
+  export FAKE_ROSTER='lo-1-runA'
+  export LO_RUN_ID=runA
+  run sh "$SC" teardown "$root"
+  [ "$status" -eq 0 ]
+  [ ! -d "$wt" ]
+  archived="$root/.orchestration/archive-$(date +%Y%m%d)-runA/worker-scratch/feat-own"
+  [ ! -d "$archived" ]
+}
+
+@test "teardown: info/exclude'd .claude/ scratch is still archived dir-level, then removed" {
+  _use_fake_tmux
+  root="$(_mkteardownrun td13)"
+  wt="$root/.worktrees/feat-own"
+  excl=$(git -C "$wt" rev-parse --git-path info/exclude)
+  echo ".claude" >> "$excl"
+  mkdir -p "$wt/.claude"
+  echo "scratch" > "$wt/.claude/scratch.txt"
+  export FAKE_ROSTER='lo-1-runA'
+  export LO_RUN_ID=runA
+  run sh "$SC" teardown "$root"
+  [ "$status" -eq 0 ]
+  [ ! -d "$wt" ]
+  archived="$root/.orchestration/archive-$(date +%Y%m%d)-runA/worker-scratch/feat-own"
+  [ -f "$archived/.claude/scratch.txt" ]
+  run cat "$archived/.claude/scratch.txt"
+  [ "$output" = "scratch" ]
+}
+
+@test "teardown: a plain untracked file is still archived (regression guard)" {
+  _use_fake_tmux
+  root="$(_mkteardownrun td14)"
+  wt="$root/.worktrees/feat-own"
+  echo "hi" > "$wt/notes.txt"
+  export FAKE_ROSTER='lo-1-runA'
+  export LO_RUN_ID=runA
+  run sh "$SC" teardown "$root"
+  [ "$status" -eq 0 ]
+  [ ! -d "$wt" ]
+  archived="$root/.orchestration/archive-$(date +%Y%m%d)-runA/worker-scratch/feat-own"
+  [ -f "$archived/notes.txt" ]
+  run cat "$archived/notes.txt"
+  [ "$output" = "hi" ]
+}
+
+@test "teardown: dry-run reports .claude and plain scratch but never node_modules, and archives/deletes nothing" {
+  _use_fake_tmux
+  root="$(_mkteardownrun td15)"
+  wt="$root/.worktrees/feat-own"
+  echo "node_modules/" > "$wt/.gitignore"
+  git -C "$wt" add .gitignore; git -C "$wt" commit -qm gitignore
+  mkdir -p "$wt/node_modules"
+  echo "module.exports = {}" > "$wt/node_modules/dep.js"
+  excl=$(git -C "$wt" rev-parse --git-path info/exclude)
+  echo ".claude" >> "$excl"
+  mkdir -p "$wt/.claude"
+  echo "scratch" > "$wt/.claude/scratch.txt"
+  echo "hi" > "$wt/notes.txt"
+  export FAKE_ROSTER='lo-1-runA'
+  export LO_RUN_ID=runA
+  run sh "$SC" teardown --dry-run "$root"
+  [ "$status" -eq 0 ]
+  _has "$output" "would archive: $wt/.claude/scratch.txt"
+  _has "$output" "would archive: $wt/notes.txt"
+  _hasnt "$output" "node_modules"
+  [ -d "$wt/node_modules" ]
+  [ -f "$wt/.claude/scratch.txt" ]
+  [ -f "$wt/notes.txt" ]
+  [ -d "$wt" ]
+  [ ! -d "$root/.orchestration/archive-$(date +%Y%m%d)-runA" ]
+}
+
+@test "teardown: boundary — no .claude present, plain untracked scratch still archives cleanly" {
+  _use_fake_tmux
+  root="$(_mkteardownrun td16)"
+  wt="$root/.worktrees/feat-own"
+  echo "hi" > "$wt/notes.txt"
+  export FAKE_ROSTER='lo-1-runA'
+  export LO_RUN_ID=runA
+  run sh "$SC" teardown "$root"
+  [ "$status" -eq 0 ]
+  [ ! -d "$wt" ]
+  archived="$root/.orchestration/archive-$(date +%Y%m%d)-runA/worker-scratch/feat-own"
+  [ -f "$archived/notes.txt" ]
+  [ ! -d "$archived/.claude" ]
+}
+
+# ---------------------------------------------------------------------------
 # Task 06 — `list-orphans --stale`: read-only staleness annotation.
 # yes = every status record matching the session's run id is done|failed;
 # no = at least one is not; unknown = no matching record (archived, foreign
