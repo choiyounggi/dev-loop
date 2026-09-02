@@ -252,3 +252,37 @@ brief_dependencies_region() {
   section="$(normalize_ws "$(token_budget_section "$fixture")")"
   [[ "$section" != *"Re-plan ladder"* ]]
 }
+
+# --- 11: SKILL.md step 2a confirms plan-gate evidence before dispatch -------
+# (cycle-hardening design.md §4 row 6; t1-plan-gate's ledger-name convention
+# and gate-check.sh --run verdict, consumed not re-created)
+
+@test "step 2a requires the plan-A/plan-B gate ledgers and a gate-check.sh --run exit 0 before dispatch" {
+  section="$(normalize_ws "$(step2a_section "$SKILL")")"
+  [[ "$section" == *"plan-A-"* ]]
+  [[ "$section" == *"plan-B-"* ]]
+  [[ "$section" == *"gate-check.sh --run"* ]]
+  [[ "$section" == *"exit 0"* ]]
+}
+
+@test "negative control: a step-2a copy without the gate-evidence paragraph fails the ledger check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-gate-evidence.md"
+  grep -v 'plan-A-' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(step2a_section "$fixture")")"
+  [[ "$section" != *"plan-A-"* ]]
+}
+
+@test "step 2a treats a reasoned lite-mode ABANDON as passing and sends unevidenced plans back to the phase" {
+  section="$(normalize_ws "$(step2a_section "$SKILL")")"
+  [[ "$section" == *"ABANDON"* ]]
+  [[ "$section" == *"UNMET"* ]]
+  [[ "$section" == *"CLAIMED"* ]]
+  [[ "$section" == *"must not be dispatched"* ]]
+}
+
+@test "negative control: a step-2a copy without the UNMET/CLAIMED clause fails the unevidenced-plan check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-unmet-clause.md"
+  grep -v 'UNMET' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(step2a_section "$fixture")")"
+  [[ "$section" != *"UNMET"* ]]
+}
