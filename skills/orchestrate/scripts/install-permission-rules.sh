@@ -10,9 +10,10 @@
 # also what lets an auto-mode permission classifier pass the write at all.)
 #
 # What it installs into a Claude Code settings.json:
-#   - permissions.allow: three path rules for launch-session.sh /
-#     send-prompt.sh / watch-status.sh (safe-cleanup.sh is deliberately
-#     absent — destructive verbs keep their normal review)
+#   - permissions.allow: four path rules for launch-session.sh /
+#     send-prompt.sh / watch-status.sh / resolve-escalation.sh
+#     (safe-cleanup.sh is deliberately absent — destructive verbs keep
+#     their normal review)
 #   - autoMode.allow: one context rule teaching the classifier why the
 #     bypassPermissions worker spawn is sanctioned. On a fresh list it is
 #     seeded as ["$defaults", <rule>]; an existing list only gets the rule
@@ -47,7 +48,8 @@ base="$HOME/.claude/plugins/cache/*/dev-loop/*/skills/orchestrate/scripts"
 r1="Bash(sh $base/launch-session.sh *)"
 r2="Bash(sh $base/send-prompt.sh *)"
 r3="Bash(sh $base/watch-status.sh *)"
-am='Running the dev-loop orchestrate plugin'"'"'s worker-management scripts (launch-session.sh, send-prompt.sh, watch-status.sh) is allowed, including launch-session.sh starting a tmux worker with `claude --permission-mode bypassPermissions`: the user sanctioned this orchestration workflow, and each worker worktree is sandboxed by groundwork guardrails, which still blocks dangerous commands in bypass mode and escalates `ask` rules to the coordinator. This does NOT extend to safe-cleanup.sh or other destructive commands, which keep their normal review.'
+r4="Bash(sh $base/resolve-escalation.sh *)"
+am='Running the dev-loop orchestrate plugin'"'"'s worker-management scripts (launch-session.sh, send-prompt.sh, watch-status.sh, resolve-escalation.sh) is allowed, including launch-session.sh starting a tmux worker with `claude --permission-mode bypassPermissions` and resolve-escalation.sh clearing a guardrails escalation record and delivering the coordinator'"'"'s verdict to the waiting worker: the user sanctioned this orchestration workflow, and each worker worktree is sandboxed by groundwork guardrails, which still blocks dangerous commands in bypass mode and escalates `ask` rules to the coordinator. This does NOT extend to safe-cleanup.sh or other destructive commands, which keep their normal review.'
 
 if [ -f "$target" ]; then
   if ! "$JQ" -e . "$target" >/dev/null 2>&1; then
@@ -60,8 +62,8 @@ else
 fi
 
 installed=0
-if printf '%s' "$cur" | "$JQ" -e --arg r1 "$r1" --arg r2 "$r2" --arg r3 "$r3" --arg am "$am" '
-    ((.permissions.allow // []) | (index($r1) != null and index($r2) != null and index($r3) != null))
+if printf '%s' "$cur" | "$JQ" -e --arg r1 "$r1" --arg r2 "$r2" --arg r3 "$r3" --arg r4 "$r4" --arg am "$am" '
+    ((.permissions.allow // []) | (index($r1) != null and index($r2) != null and index($r3) != null and index($r4) != null))
     and ((.autoMode.allow // []) | index($am) != null)' >/dev/null 2>&1; then
   installed=1
 fi
@@ -80,8 +82,8 @@ if [ "$installed" = 1 ]; then
   exit 0
 fi
 
-new=$(printf '%s' "$cur" | "$JQ" --arg r1 "$r1" --arg r2 "$r2" --arg r3 "$r3" --arg am "$am" '
-  .permissions.allow = ((.permissions.allow // []) + ([$r1, $r2, $r3] - (.permissions.allow // [])))
+new=$(printf '%s' "$cur" | "$JQ" --arg r1 "$r1" --arg r2 "$r2" --arg r3 "$r3" --arg r4 "$r4" --arg am "$am" '
+  .permissions.allow = ((.permissions.allow // []) + ([$r1, $r2, $r3, $r4] - (.permissions.allow // [])))
   | .autoMode.allow =
       (if (.autoMode.allow // []) == [] then ["$defaults", $am]
        elif (.autoMode.allow | index($am)) == null then .autoMode.allow + [$am]

@@ -174,8 +174,10 @@ DENIED. Handle this at onboarding, not at the first failure:
    (surface that to the user; fix before anything else).
 2. **On 4, ask the user — never install silently.** One question: "orchestrate's
    tmux workers launch with permission prompts off (guardrails-sandboxed);
-   pre-approve the three worker-management scripts in ~/.claude/settings.json?"
-   Show what it adds (the snippet below). A plugin that widens permissions
+   pre-approve the four worker-management scripts in ~/.claude/settings.json?"
+   Show what it adds (the snippet below) — this also covers the exit-5
+   escalation recovery path (`resolve-escalation.sh`), executable by an
+   auto-mode coordinator without any bare `rm`. A plugin that widens permissions
    without a fresh explicit yes is the supply-chain pattern guardrails exists
    to stop — and the fresh consent is also what lets the classifier pass the
    write at all.
@@ -199,11 +201,12 @@ their normal review):
   "permissions": { "allow": [
     "Bash(sh /Users/<you>/.claude/plugins/cache/*/dev-loop/*/skills/orchestrate/scripts/launch-session.sh *)",
     "Bash(sh /Users/<you>/.claude/plugins/cache/*/dev-loop/*/skills/orchestrate/scripts/send-prompt.sh *)",
-    "Bash(sh /Users/<you>/.claude/plugins/cache/*/dev-loop/*/skills/orchestrate/scripts/watch-status.sh *)"
+    "Bash(sh /Users/<you>/.claude/plugins/cache/*/dev-loop/*/skills/orchestrate/scripts/watch-status.sh *)",
+    "Bash(sh /Users/<you>/.claude/plugins/cache/*/dev-loop/*/skills/orchestrate/scripts/resolve-escalation.sh *)"
   ]},
   "autoMode": { "allow": [
     "$defaults",
-    "Running the dev-loop orchestrate plugin's worker-management scripts (launch-session.sh, send-prompt.sh, watch-status.sh) is allowed, including launch-session.sh starting a tmux worker with `claude --permission-mode bypassPermissions`: the user sanctioned this orchestration workflow, and each worker worktree is sandboxed by groundwork guardrails, which still blocks dangerous commands in bypass mode and escalates `ask` rules to the coordinator. This does NOT extend to safe-cleanup.sh or other destructive commands, which keep their normal review."
+    "Running the dev-loop orchestrate plugin's worker-management scripts (launch-session.sh, send-prompt.sh, watch-status.sh, resolve-escalation.sh) is allowed, including launch-session.sh starting a tmux worker with `claude --permission-mode bypassPermissions` and resolve-escalation.sh clearing a guardrails escalation record and delivering the coordinator's verdict to the waiting worker: the user sanctioned this orchestration workflow, and each worker worktree is sandboxed by groundwork guardrails, which still blocks dangerous commands in bypass mode and escalates `ask` rules to the coordinator. This does NOT extend to safe-cleanup.sh or other destructive commands, which keep their normal review."
   ]}
 }
 ```
@@ -417,11 +420,13 @@ record naming its `recorded <ts>` next to the task's current `phase @<updatedAt>
 triage from that line alone: if the phase transition is LATER than the record, the
 worker already moved on by bypassing the denial, so `rm` the record WITHOUT
 delivering an answer (nothing is waiting for it). Otherwise the worker is still
-waiting: approve/deny, clear `.orchestration/escalations/`, then DELIVER the
-outcome to the now-idle worker with `scripts/send-prompt.sh send lo-<n> "approved —
-re-run: <cmd>, then continue"` or `"denied — <alternative>"` — the guardrails deny
-message told the worker the orchestrator would re-run it, so a cleared escalation
-without a delivered answer leaves it waiting forever — then relaunch. Exits **3** on a failed
+waiting: approve/deny, then `sh {SKILL}/scripts/resolve-escalation.sh <escdir>
+<task> lo-<n> "approved — re-run: <cmd>, then continue"` (or `"denied —
+<alternative>"`) — it clears the record(s) and delivers in one pre-approved
+call; the guardrails deny message told the worker the orchestrator would
+re-run it, so a cleared escalation without a delivered answer leaves it
+waiting forever. On exit 6, retry delivery directly with
+`scripts/send-prompt.sh send lo-<n> "<same message>"` — then relaunch. Exits **3** on a failed
 OR a *dead* worker (a non-terminal task whose tmux session vanished — recorded via
 the status file's `session` field) — both abort fast instead of waiting the
 timeout. It also exits **6** on a pending worker question and **7** on a live
@@ -523,9 +528,11 @@ you instead of making you poll. Replace steps 1–3 below with O1–O5:
   run `orca status --json` before waiting again, and restart nothing on this code
   alone, because a dead runtime does not stop a worker session (measured: workers
   kept committing and pushing while the runtime was down), **5** escalation
-  pending (approve/deny, **clear
-  `.orchestration/escalations/`**, then re-run — like watch-status, code 5 recurs
-  while a record is still on disk, by design), **6** question pending
+  pending (approve/deny, then **`sh {SKILL}/scripts/resolve-escalation.sh
+  .orchestration/escalations <task>`** — no delivery args on the Orca path,
+  since answers go through orca, not send-prompt.sh; use the 2-arg form — then
+  re-run — like watch-status, code 5 recurs while a record is still on disk,
+  by design), **6** question pending
   (`orca orchestration reply --id <msg_id> --body "<answer>" --json`, re-run).
   **Always pass this Wave's task ids — that is correctness, not a progress
   nicety.** Heartbeats reach this mailbox despite `--types`, and so do completions
