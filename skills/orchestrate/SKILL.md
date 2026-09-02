@@ -360,7 +360,9 @@ answered.
 3. For each planned task, deliver §2 (implement) with `scripts/send-prompt.sh
    send lo-<n> "<prompt>"` (tmux, see Phase 4 for exit-code branch logic), or
    `orca orchestration task-create` the implement Task then
-   `scripts/orca-worker-start --task <impl_task> --terminal <handle>` (Orca).
+   `scripts/orca-worker-start --task <impl_task> --terminal <handle> --worktree
+   id:<repoId>::<path>` (Orca; a bare `--terminal` with no `--worktree` is
+   rejected — `terminal_worktree_mismatch`, see O3).
    On delivery failure, re-run step 3 after fixing the error.
 4. Wait for event. tmux: `scripts/watch-status.sh --tasks <running ids>
    <status-dir> impl_done <N>` — without `--tasks` the tasks approved in
@@ -484,8 +486,12 @@ you instead of making you poll. Replace steps 1–3 below with O1–O5:
   `GROUNDWORK_ESCALATION_DIR=<abs> GROUNDWORK_TASK_ID=<task>
   scripts/orca-worker-start.sh --task <task_id> --worktree id:<repoId>::<path>
   --agent claude` → prints `dispatch=<id>` and `handle=<agent-handle>`. For this
-  task's **next** phase pass `--terminal <handle>` instead, so the session keeps its
-  context. `worker-start --agent` alone cannot carry environment variables, so with
+  task's **next** phase pass `--terminal <handle>` **together with** `--worktree
+  id:<repoId>::<path>` instead, so the session keeps its context — a bare
+  `--terminal` with no `--worktree` is rejected with `terminal_worktree_mismatch`,
+  because Orca resolves a bare terminal handle against the *caller's* own
+  checkout, not the worker's (measured: run_08cb6f65cbfa, 2026-08-29, and one
+  prior run). `worker-start --agent` alone cannot carry environment variables, so with
   the escalation env set the script creates the agent terminal itself
   (`terminal create --command`, the escalation contract + `--permission-mode`) and
   binds the Dispatch to it; that is why the worktree must exist first and why
@@ -499,6 +505,11 @@ you instead of making you poll. Replace steps 1–3 below with O1–O5:
   every later attempt on it returns `task_not_startable`. Do not retry the same
   Task — create a fresh one with the same spec. (Seen with `runtime_unavailable`,
   which is what you get when that terminal is still busy with another Dispatch.)
+  The **not-spent exception**: `terminal_worktree_mismatch` (above) fires
+  *before* dispatch — Orca rejects the bad `--terminal`/`--worktree` pair before
+  ever handing the Task to a worker — so the Task stays `ready`, not `failed`,
+  and MAY be retried on the same Task with corrected args. The spent rule
+  applies to failures at or after dispatch (e.g. `runtime_unavailable`).
 - **O4 — wait on pushed mail, not on a timer.** Workers on this substrate also
   write status worker-locally (issue #167) — Orca's own mailbox is not that
   channel, so after EVERY `orca-wait.sh` return, before acting on the events,
@@ -779,9 +790,10 @@ deadline expired, **9** the worker is parked on an unsubmitted prompt: press
 `keys lo-<n> Enter`, do not re-send). Then
 `watch-status ... impl_done <N>`. *(Orca
 substrate: `task-create` the implement Task, then `scripts/orca-worker-start.sh
---task <impl_task> --terminal <handle>` to reuse that task's existing session, and
-wait with `scripts/orca-wait.sh`. Rework rounds are further Tasks on the same
-`--terminal`.)*
+--task <impl_task> --terminal <handle> --worktree id:<repoId>::<path>` to reuse
+that task's existing session — a bare `--terminal` is rejected with
+`terminal_worktree_mismatch` (see O3) — and wait with `scripts/orca-wait.sh`.
+Rework rounds are further Tasks on the same `--terminal`+`--worktree` pair.)*
 
 Before the four-lens pass, run the floor: `scripts/test-floor.sh <wt>
 '<integ>...HEAD'`. **Exit 3** — skip the four-lens pass and the auditor
@@ -870,7 +882,9 @@ against every task that is currently dispatched and every task still pending in
   and the next free slot picks it up, so the split buys real parallelism.
 - **Overlap** — add it with `deps: ["<parent>"]` and give it to the **same worker**
   in the **same worktree** when the parent settles (Orca:
-  `worker-start --task <new> --terminal <handle>`; tmux: `send-prompt.sh send
+  `worker-start --task <new> --terminal <handle> --worktree id:<repoId>::<path>`
+  — a bare `--terminal` is rejected with `terminal_worktree_mismatch` (see O3);
+  tmux: `send-prompt.sh send
   lo-<n>`). Do **not** create a second worktree: the parent's code is not on the
   integration branch until Phase 6, so a second checkout would be editing files
   it cannot see. This split buys a smaller review and rework unit, not
@@ -966,6 +980,15 @@ Show the full integration diff (`git diff`), then ask for the verdict with
    prune`, then report (never delete) any `.worktrees/` directory git does not know.
    `sweep` REFUSES with exit 1, touching nothing, when `LO_RUN_ID` is unset or is not
    `[A-Za-z0-9_-]+` — with no scope it would match every concurrent run's sessions.
+
+**Orca substrate:** step 2 does not apply as written — an Orca-created worktree
+is removed with `orca worktree rm --id <worktree.id> --json`, not
+`remove-worktrees`, so Orca's own Run/Task state stays consistent with the
+filesystem. `orca worktree rm` **also deletes the git branch**, so for every
+branch `git merge-base --is-ancestor <branch> <integ>` MUST pass (exit 0)
+**before** any `rm` — the same check an unforced `git branch -d` performs
+internally — and there is no separate branch-deletion step afterward
+(verified: 4 branches already gone after `rm`). Steps 1, 3, 4 are unchanged.
 4. `scripts/safe-cleanup.sh list-orphans <root>` is read-only (kills, deletes and
    prunes nothing; needs no `LO_RUN_ID`) — the census across ALL run ids, and the way
    to read a dead run's id before sweeping it deliberately.
@@ -987,7 +1010,11 @@ final step is the same: `LO_RUN_ID=<run-id> scripts/safe-cleanup.sh teardown
 `.orchestration/status/*.json`, removes them (dirty ones SKIPped, never
 `--force`), sweeps this run's tmux sessions, and archives `.orchestration/`
 artifacts to `archive-<date>-<runid>/`. A run that ends without teardown is
-exactly the leak `list-orphans --stale` exists to find.
+exactly the leak `list-orphans --stale` exists to find. On the Orca substrate
+the same merge-verify-before-`worktree rm` rule applies to worktree removal
+(see Phase 6's Orca substrate note); `safe-cleanup.sh teardown` still
+archives `.orchestration/` and sweeps tmux-side leftovers regardless of
+substrate.
 
 After teardown, audit the run's token efficiency: `sh {SKILL}/scripts/token-report.sh
 --cwd <root> .` for the coordinator's own session, plus one more `--cwd

@@ -11,12 +11,24 @@ setup() {
   # Declare the precondition here rather than depending on the ambient shell.
   unset GROUNDWORK_ESCALATION_DIR GROUNDWORK_TASK_ID
   OWS="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/orca-worker-start.sh"
+  SKILL="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
   OK_RECEIPT='{"ok":true,"result":{"runId":"run_1","taskId":"task_1","dispatchId":"ctx_abc","state":"ready","stage":"input_accepted","setup":{"state":"running"},"effects":[{"kind":"terminal","role":"agent","action":"created","id":"term_agent"},{"kind":"dispatch_input","role":"agent","id":"term_agent","state":"accepted"}]}}'
   # re-entry probe fixtures — payload shapes verified against the live Orca CLI:
   # an unknown task answers ok:true/dispatch:null, so a first start is not a probe failure.
   DSP_PREV='{"ok":true,"result":{"dispatch":{"assignee_handle":"term_prev"}}}'
   DSP_NONE='{"ok":true,"result":{"dispatch":null}}'
   TL_LIVE='{"ok":true,"result":{"terminals":[{"handle":"term_prev","orphaned":false,"connected":true}]}}'
+}
+
+# Collapses embedded newlines (and the whitespace runs they leave behind) to
+# a single space so a substring assertion survives prose hard-wrapped across
+# physical lines (wiki/testing/quality/checks-that-cannot-pass.md).
+normalize_ws() {
+  printf '%s' "$1" | tr '\n' ' ' | tr -s ' '
+}
+
+flat_skill() {
+  normalize_ws "$(cat "$SKILL")"
 }
 
 # --- worker mode (escalation contract active) ---------------------------------
@@ -437,4 +449,47 @@ setup() {
   [ "$status" -eq 2 ]
   [[ "$output" == *"invalid model"* ]]
   [[ "$output" != *"[terminal] [create]"* ]]
+}
+
+# --- doc-gate: D1 --terminal phase-reuse requires --worktree, else --------
+# --- terminal_worktree_mismatch (issue #161) -------------------------------
+
+@test "doc-gate: O3's --terminal reuse sentence requires --worktree and names terminal_worktree_mismatch" {
+  flat="$(flat_skill)"
+  printf '%s' "$flat" | grep -qF "together with"
+  printf '%s' "$flat" | grep -qF "terminal_worktree_mismatch"
+  printf '%s' "$flat" | grep -qF "Orca resolves a bare terminal handle against the"
+  printf '%s' "$flat" | grep -qF "run_08cb6f65cbfa"
+}
+
+@test "doc-gate can fail: a fixture without the --worktree-required sentence does not match" {
+  fixture="${BATS_TEST_TMPDIR}/o3-without-worktree-required.md"
+  cat > "$fixture" <<'EOF'
+For this task's next phase pass --terminal <handle> instead, so the session
+keeps its context.
+EOF
+  count="$(grep -cF "terminal_worktree_mismatch" "$fixture" || true)"
+  [ "$count" -eq 0 ]
+}
+
+# --- doc-gate: D2 a pre-dispatch terminal_worktree_mismatch does NOT spend -
+# --- the Task (the not-spent exception, issue #161) ------------------------
+
+@test "doc-gate: the not-spent exception distinguishes pre-dispatch from at/after-dispatch failures" {
+  flat="$(flat_skill)"
+  printf '%s' "$flat" | grep -qF "not-spent exception"
+  printf '%s' "$flat" | grep -qF "fires *before* dispatch"
+  printf '%s' "$flat" | grep -qF "the Task stays"
+  printf '%s' "$flat" | grep -qF "MAY be retried on the same Task with corrected args"
+  printf '%s' "$flat" | grep -qF "The spent rule applies to failures at or after dispatch"
+}
+
+@test "doc-gate can fail: a fixture without the not-spent exception does not match" {
+  fixture="${BATS_TEST_TMPDIR}/o3-without-not-spent.md"
+  cat > "$fixture" <<'EOF'
+A worker-start that fails spends the Task: it goes to status=failed and every
+later attempt on it returns task_not_startable.
+EOF
+  count="$(grep -cF "not-spent exception" "$fixture" || true)"
+  [ "$count" -eq 0 ]
 }

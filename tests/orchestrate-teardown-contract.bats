@@ -100,6 +100,48 @@ EOF
   [ "$count" -eq 0 ]
 }
 
+# --- doc-gate 5: Phase 6 Orca substrate variant (merge-verify before -----
+# --- orca worktree rm, which also deletes the branch, issue #161) --------
+
+@test "doc-gate: Phase 6 Orca substrate note requires merge-verify before orca worktree rm" {
+  flat="$(flat_skill)"
+  printf '%s' "$flat" | grep -qF "worktree rm --id <worktree.id> --json"
+  printf '%s' "$flat" | grep -qF "also deletes the git branch"
+  printf '%s' "$flat" | grep -qF "MUST pass (exit 0)"
+  printf '%s' "$flat" | grep -qF "no separate branch-deletion step afterward"
+}
+
+@test "doc-gate can fail: a fixture without the Phase 6 Orca substrate note does not match" {
+  fixture="${BATS_TEST_TMPDIR}/phase6-without-orca-substrate.md"
+  cat > "$fixture" <<'EOF'
+2. `scripts/safe-cleanup.sh remove-worktrees <root> <branch>...` (after merge
+   verified; skips any dirty worktree).
+3. `scripts/safe-cleanup.sh kill-sessions lo-<n>...`
+4. `scripts/safe-cleanup.sh list-orphans <root>` is read-only.
+EOF
+  count="$(grep -cF "also deletes the git branch" "$fixture" || true)"
+  [ "$count" -eq 0 ]
+}
+
+# --- doc-gate 6: End-of-run contract points to the Orca substrate variant -
+
+@test "doc-gate: End-of-run contract points to the Orca substrate merge-verify rule" {
+  flat="$(flat_skill)"
+  printf '%s' "$flat" | grep -qF "On the Orca substrate the same merge-verify-before-"
+  printf '%s' "$flat" | grep -qF "rule applies to worktree removal"
+}
+
+@test "doc-gate can fail: a fixture without the End-of-run Orca sentence does not match" {
+  fixture="${BATS_TEST_TMPDIR}/eorc-without-orca-sentence.md"
+  cat > "$fixture" <<'EOF'
+## End-of-run contract
+Every orchestration run terminates in exactly one of three outcomes: merged,
+aborted, or escalated-and-abandoned. The final step is the same: teardown.
+EOF
+  count="$(grep -cF "merge-verify-before-" "$fixture" || true)"
+  [ "$count" -eq 0 ]
+}
+
 # --- sibling-pin boundary check: this task must not break the merge-on- ---
 # --- approval doc-gate's Phase 6 idempotence note ---
 
