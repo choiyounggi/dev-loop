@@ -48,6 +48,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # need full tag history for auto-release.sh
+          # The PAT must be the PERSISTED credential: checkout writes an
+          # http.extraheader auth (basic <token>) into the repo's git config,
+          # and that header overrides any credential embedded in a push URL —
+          # first live run pushed as github-actions[bot] and got 403 exactly
+          # because of this. Falls back to github.token when the secret is
+          # absent so the checkout itself never breaks (the push step then
+          # fails with its own setup instructions).
+          token: ${{ secrets.RELEASE_AUTOMATION_TOKEN || github.token }}
 
       - name: Compute, bump, and push the release commit
         env:
@@ -95,9 +103,7 @@ jobs:
               # non-fast-forward. That is a benign supersede — the run queued
               # for the newer push recomputes the bump against the true tip —
               # so log it and succeed instead of raising a false-alarm failure.
-              if git push \
-                "https://x-access-token:${RELEASE_AUTOMATION_TOKEN}@github.com/${{ github.repository }}.git" \
-                HEAD:main; then
+              if git push origin HEAD:main; then
                 echo "Pushed chore(release): $next — auto-tag.yml takes it from here."
               else
                 git fetch origin main
