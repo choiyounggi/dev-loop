@@ -74,9 +74,11 @@ specific tags below as authority.
        repo path would target the main worktree instead of the worker's own. -->
   <plan>{ORCH_DIR}/plans/{TASK}.md — written by the coordinator; adopt, verify against this brief, do not re-author</plan>
 
-  <!-- output contract: how to signal completion -->
+  <!-- output contract: how to signal completion. STATUS_DIR is worktree-
+       relative (issue #167) — the worker's own cwd IS its worktree root, so
+       this never targets the coordinator's checkout. -->
   <output_contract>
-    signal -> STATUS_DIR={STATUS_DIR} sh {SKILL}/scripts/status-update.sh {TASK} <phase> worktree=$PWD
+    signal -> STATUS_DIR=.orchestration/status sh {SKILL}/scripts/status-update.sh {TASK} <phase> worktree=$PWD
   </output_contract>
 
   <!-- If this task turns out to be much larger than the brief assumed, you may

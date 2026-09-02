@@ -18,6 +18,12 @@
 #   exit 7: a live non-terminal worker's pane is stalled (tmux-worker-stalled.sh
 #           reported 1 — a wedged/idle worker; inspect or nudge the session)
 #
+# LO_GRAPH + LO_WORKTREES_ROOT (both required together, issue #167): workers
+# write status/questions worker-locally now, never into this checkout. When
+# both are set, every poll iteration runs `collect-status.sh $LO_GRAPH <dir>
+# $LO_WORKTREES_ROOT` first to pull those records in; a collector failure
+# warns on stderr and the wait continues. Either unset -> unchanged behavior.
+#
 # Per-phase deadlines: one flat timeout gave a plan phase and a long implement
 # phase the same budget. LO_PHASE_TIMEOUTS carries a per-phase budget keyed on
 # the TARGET phase of this wait, so one exported value serves every call:
@@ -150,6 +156,16 @@ classify_stall() {
 }
 
 while [ "$elapsed" -lt "$budget" ]; do
+  # Workers write status/questions worker-locally now (issue #167); when both
+  # LO_GRAPH and LO_WORKTREES_ROOT are set, pull those records into this
+  # canonical dir before scanning it. A transient collector failure must not
+  # kill a long wait — warn on stderr and keep polling. Either env unset ->
+  # behavior is byte-identical to before this existed (no collector call).
+  if [ -n "${LO_GRAPH:-}" ] && [ -n "${LO_WORKTREES_ROOT:-}" ]; then
+    sh "$(dirname "$0")/collect-status.sh" "$LO_GRAPH" "$dir" "$LO_WORKTREES_ROOT" >/dev/null \
+      || echo "[watch] collect failed (rc=$?) — continuing" >&2
+  fi
+
   # A worker's guardrails `ask`, recorded as an escalation, wakes the coordinator
   # immediately rather than waiting out the timeout. The coordinator MUST resolve
   # (approve/deny) and clear these records before relaunching watch; exit 5 recurs

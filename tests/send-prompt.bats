@@ -777,9 +777,13 @@ tpl_sections_single_line() {
   # Bumped from 568847008/7627 (t2-review-blackboard r1 rework, N1): §O2 now
   # opens "Approved. First read …" instead of "First read … . Approved.",
   # same non-blocking wording fix applied to §2.
+  # Bumped from 3082668569/7627 (t1-status-protocol, issue #167): every
+  # STATUS_DIR={STATUS_DIR} on a status-update.sh call became worker-local
+  # STATUS_DIR=.orchestration/status, and rule [8] added the collect-don't-
+  # deposit obligation (never write/read the coordinator's checkout).
   run sh -c "sed -n '/^\*\*Orca substrate\.\*\*/,/^## Subagent usage protocol/p' '$TPL' | cksum"
   [ "$status" -eq 0 ]
-  [ "$output" = "3082668569 7627" ]
+  [ "$output" = "3052262382 7974" ]
 }
 
 @test "template: the Orca ask rule forbids deciding a timed-out question" {

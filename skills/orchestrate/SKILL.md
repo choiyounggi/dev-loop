@@ -12,10 +12,15 @@ decompose, distribute, review, integrate, and merge. Autonomy lives inside the
 implementation loop; two human gates bracket it (task-split, pre-merge).
 
 Scripts referenced below live in `${CLAUDE_PLUGIN_ROOT}/skills/orchestrate/scripts/`.
-Communication: session→orchestrator via `.orchestration/status/<task>.json`;
-orchestrator→session via `launch-session.sh` (the first prompt) then
-`send-prompt.sh` (every later one), carrying templates/session-prompt.md §1–§4 on
-tmux, or the Task `--spec` (same file, §O1–§O4) on Orca.
+Communication: session→orchestrator via each worker's OWN worktree-local
+`.orchestration/status/<task>.json` (never the coordinator's checkout — a
+worker writing there can hit a guardrails permission prompt no human is
+watching, issue #167), collected into the canonical `.orchestration/status/`
+by `scripts/collect-status.sh` (Phase 3 step 1, and automatically each poll
+via `watch-status.sh` — see **Session knobs**); orchestrator→session via
+`launch-session.sh` (the first prompt) then `send-prompt.sh` (every later
+one), carrying templates/session-prompt.md §1–§4 on tmux, or the Task `--spec`
+(same file, §O1–§O4) on Orca.
 
 ## Asking the user — every question is a chooser (REQUIRED)
 Every question this skill puts to the **user** is delivered with the
@@ -330,7 +335,10 @@ answered.
 ## Phase 3 — Launch + plan (dispatch loop)
 **Phases 3–4 are one dispatch loop, not a per-Wave repeat.** Each round:
 
-1. `scripts/ready-set.sh .orchestration/graph.json .orchestration/status <cap>`
+1. First `scripts/collect-status.sh .orchestration/graph.json .orchestration/status
+   .worktrees` (pulls in any worker-local record `watch-status.sh` has not yet
+   polled since the last round — `ready-set.sh` reads the status dir directly, it
+   does not poll). Then `scripts/ready-set.sh .orchestration/graph.json .orchestration/status <cap>`
    → **0** dispatch the printed ids, **2** nothing dispatchable but work is in
    flight (go wait for an event), **3** **DEADLOCK** — a failed dependency or a
    cycle: **do not wait**, report it and get a human decision (with no worker
@@ -384,7 +392,14 @@ answered.
 **Session knobs (tmux substrate, set once per run):** `export LO_RUN_ID=<short-run-id>`
 so every `launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reuse that
 exact name for later `send-prompt.sh`); the script also exports the guardrails
-escalation env into each worker. Trust-screen wording drifts between CLI releases —
+escalation env into each worker. Also export `LO_GRAPH=.orchestration/graph.json
+LO_WORKTREES_ROOT=<root>/.worktrees` once per run: with both set, every
+`watch-status.sh` call pulls each worker's worktree-local `.orchestration/status`
+(and `questions/`) records into the canonical dir automatically, once per poll
+(issue #167 — workers never write into this checkout). `ready-set.sh` reads the
+status dir directly and does not poll, so before every `ready-set.sh` round also
+run `scripts/collect-status.sh .orchestration/graph.json .orchestration/status
+.worktrees` yourself (Phase 3 step 1). Trust-screen wording drifts between CLI releases —
 if a launch hangs, set `LO_READY_EXTRA` / `LO_TRUST_EXTRA` (substrings) or
 `LO_READY_TIMEOUT`. `LO_PASTED_TAIL_LINES` (default 40) is `send-prompt.sh`'s
 fallback pasted-marker window, scanned only when it cannot locate the input box
@@ -484,7 +499,11 @@ you instead of making you poll. Replace steps 1–3 below with O1–O5:
   every later attempt on it returns `task_not_startable`. Do not retry the same
   Task — create a fresh one with the same spec. (Seen with `runtime_unavailable`,
   which is what you get when that terminal is still busy with another Dispatch.)
-- **O4 — wait on pushed mail, not on a timer.**
+- **O4 — wait on pushed mail, not on a timer.** Workers on this substrate also
+  write status worker-locally (issue #167) — Orca's own mailbox is not that
+  channel, so after EVERY `orca-wait.sh` return, before acting on the events,
+  run `scripts/collect-status.sh .orchestration/graph.json .orchestration/status
+  .worktrees` to pull those records into the canonical dir.
   `GROUNDWORK_ESCALATION_DIR=<abs> scripts/orca-wait.sh [--until-all] <timeout-ms>
   [<task_id,task_id,...>]` → **0** completions arrived (acked — process them),
   **2** window elapsed *or* the ack did not land (checkpoint, just re-run), **3** a
@@ -509,7 +528,10 @@ you instead of making you poll. Replace steps 1–3 below with O1–O5:
   delivery is **at-least-once**: a replayed batch must be processed idempotently
   (key off `taskId`, never off a local counter). `ORCA_WAIT_RECHECK_MS` (default
   15000) slices the wait so a guardrails record written *while* you are blocked
-  surfaces within one interval instead of one full `<timeout-ms>`.
+  surfaces within one interval instead of one full `<timeout-ms>`. When polling
+  ANY inbox on this substrate, diff the SET of message ids you have already
+  processed, never the count — a new message can arrive in the same interval
+  another one leaves, leaving the count unchanged while the content changed.
 - **O5 — liveness, in two questions.** `scripts/orca-worktree-alive.sh <wt>`
   (0 alive / 1 dead / 2 unknown — treat unknown as *not* dead) replaces watch's
   tmux check. It only asks whether a terminal is attached, which a wedged worker
@@ -520,7 +542,11 @@ you instead of making you poll. Replace steps 1–3 below with O1–O5:
   A stall is not a failure to act on blindly: read the worker's screen
   (`orca orchestration worker-read --dispatch <id> --limit 40 --json`) before you
   decide, because "wedged on a prompt" and "finished but never reported" look the
-  same from the outside and need opposite responses.
+  same from the outside and need opposite responses. When the screen shows the
+  worker parked on a permission dialog, `orca terminal send --terminal <handle>
+  --text "2" --enter` clears it — decline (2) is the safe answer; granting the
+  permission on the user's behalf is not something the coordinator does
+  unattended.
 
 **You cannot steer a running worker.** `orchestration send --to dispatch:<id>`
 lands in the worker's mailbox, which a Claude worker never polls, and a new
@@ -618,9 +644,12 @@ reasoning-effort flags) that `worker-start` cannot express.
 
    The brief and plan are what the worker reads, not what it writes, so every
    reference to them inside a composed prompt uses the `{ORCH_DIR}` token
-   (absolute path to this run's `.orchestration` dir, substituted like
-   `{STATUS_DIR}`) — the worker's cwd is its own worktree, which does not
-   contain `.orchestration/`. Repo files (source, tests, tracked docs) stay
+   (absolute path to this run's `.orchestration` dir, substituted like every
+   other `{...}` token) — the worker's cwd is its own worktree, which does not
+   contain `.orchestration/`. Status/questions are the opposite case: a worker
+   writes those worktree-locally via the RELATIVE `STATUS_DIR=.orchestration/status`
+   (issue #167), never through `{ORCH_DIR}` — the coordinator's own checkout is
+   never a target a worker writes to. Repo files (source, tests, tracked docs) stay
    relative to that cwd instead: an absolute repo path would make the worker
    edit the main worktree rather than its own. This coordinator's own
    `briefs/<task>.md` / `plans/<task>.md` references above stay relative — the
@@ -699,8 +728,12 @@ exits — handle, then relaunch watch with the same target:
 - **6 — question pending** (prints `[watch] question pending — <task>: <question>`;
   recurs while `questions/<task>.json` exists, like exit 5; exit 5 wins when both
   are pending): read the record (`{ts, taskId, question, options, worktree}`),
-  answer with `scripts/send-prompt.sh send lo-<n> "<answer>"`, delete the record
-  file. If the task's status was recorded `phase=failed` when it asked the
+  answer with `scripts/send-prompt.sh send lo-<n> "<answer>"`, then delete BOTH
+  the canonical `.orchestration/questions/<task>.json` AND the worker-side copy
+  at `<record.worktree>/.orchestration/questions/<task>.json` — the collector
+  only copies a question record when the canonical one is absent (copy-if-
+  absent), so leaving the worker-side file behind re-collects the
+  already-answered question on the very next poll. If the task's status was recorded `phase=failed` when it asked the
   question, reset it to the phase you actually observe (read the worker pane
   first) BEFORE relaunching watch — the reset IS a normal status write, not a
   new phase word: `STATUS_DIR=<dir> STATUS_SESSION=<lo-n-runid> sh

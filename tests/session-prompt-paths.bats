@@ -5,7 +5,11 @@
 # resolves to nothing when a worker's cwd is its own worktree. These tests
 # assert every such reference is expressed via {ORCH_DIR} instead, and that
 # no bare form (including the ad-hoc `$(dirname {STATUS_DIR})/...` form) is
-# left behind in the worker-facing sections.
+# left behind in the worker-facing sections. The one exception (issue #167):
+# `STATUS_DIR=.orchestration/status` is a deliberately bare, worktree-relative
+# path — workers write status/questions worker-locally now, never into the
+# coordinator's checkout — so the negative gate below exempts that one string
+# and nothing else.
 
 setup() {
   SP_TEMPLATE="${BATS_TEST_DIRNAME}/../skills/orchestrate/templates/session-prompt.md"
@@ -101,14 +105,36 @@ normalize_ws() {
 
 # --- error/negative: no bare .orchestration/ path in worker-facing text ----
 
-@test "negative gate: no bare .orchestration/ path in session-prompt.md worker-facing sections" {
+@test "negative gate: no bare .orchestration/ path in session-prompt.md worker-facing sections, other than the sanctioned worker-local STATUS_DIR" {
+  # issue #167: workers now write status/questions worker-locally via a
+  # RELATIVE `STATUS_DIR=.orchestration/status` (their own worktree cwd
+  # resolves it) — that is the one sanctioned bare `.orchestration/`
+  # reference. Every other one (briefs/plans/reviews/escalations, which live
+  # in the coordinator's checkout) must still go through {ORCH_DIR}.
   region="$(worker_facing_region "$SP_TEMPLATE")"
-  count="$(printf '%s\n' "$region" | grep -cF '.orchestration/' || true)"
+  stripped="$(printf '%s\n' "$region" | sed 's#\.orchestration/status##g')"
+  count="$(printf '%s\n' "$stripped" | grep -cF '.orchestration/' || true)"
   [ "$count" -eq 0 ]
 }
 
-@test "negative gate: no bare .orchestration/ path anywhere in brief.md" {
-  count="$(grep -cF '.orchestration/' "$BRIEF_TEMPLATE" || true)"
+@test "negative control: the sanctioned-path gate still fires on an unrelated bare .orchestration/ path" {
+  # Proves the strip above only exempts .orchestration/status, not every path.
+  stripped="${BATS_TEST_TMPDIR}/bad-section.md"
+  cat > "$stripped" <<'EOF'
+## (1) Plan
+
+Read .orchestration/reviews/{TASK}-r1.md before you start.
+EOF
+  region="$(cat "$stripped")"
+  count="$(printf '%s\n' "$region" | sed 's#\.orchestration/status##g' | grep -cF '.orchestration/' || true)"
+  [ "$count" -gt 0 ]
+}
+
+@test "negative gate: no bare .orchestration/ path anywhere in brief.md, other than the sanctioned worker-local STATUS_DIR" {
+  # Same exemption as session-prompt.md's gate above: brief.md's
+  # <output_contract> line uses STATUS_DIR=.orchestration/status (issue #167).
+  stripped="$(sed 's#\.orchestration/status##g' "$BRIEF_TEMPLATE")"
+  count="$(printf '%s\n' "$stripped" | grep -cF '.orchestration/' || true)"
   [ "$count" -eq 0 ]
 }
 

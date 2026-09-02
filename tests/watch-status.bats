@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for watch-status.sh escalation surfacing (exit 5).
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   WS="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/watch-status.sh"
   ORCH="${BATS_TEST_TMPDIR}/.orchestration"
@@ -592,4 +594,55 @@ SCRIPT
       sh "$WS" "$ORCH/status" impl_done 1 2 1
   [ "$status" -eq 2 ]
   refute_output_has "worker stalled"
+}
+
+# ---- collector integration (LO_GRAPH + LO_WORKTREES_ROOT, issue #167) -------
+# Workers write status worker-locally now; watch pulls those records into the
+# canonical dir via collect-status.sh once per poll iteration, but only when
+# BOTH envs are set. Either env unset must be byte-identical to old behavior:
+# a worker-local-only record is invisible and the wait times out as before.
+
+@test "collector: both envs set — a worker-local record is collected and the target is reached" {
+  GRAPH="$BATS_TEST_TMPDIR/graph.json"
+  printf '{"tasks":[{"id":"t1","deps":[]}]}' > "$GRAPH"
+  WROOT="$BATS_TEST_TMPDIR/worktrees"
+  mkdir -p "$WROOT/wt1/.orchestration/status"
+  printf '{"task":"t1","phase":"impl_done","updatedAt":"2026-01-01T00:05:00Z"}' \
+    > "$WROOT/wt1/.orchestration/status/t1.json"
+  run env LO_GRAPH="$GRAPH" LO_WORKTREES_ROOT="$WROOT" \
+      sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 0 ]
+  [ -f "$ORCH/status/t1.json" ]
+  [ "$(jq -r '.phase' "$ORCH/status/t1.json")" = "impl_done" ]
+}
+
+@test "collector: envs unset — a worker-local-only record is NOT seen (old behavior)" {
+  WROOT="$BATS_TEST_TMPDIR/worktrees"
+  mkdir -p "$WROOT/wt1/.orchestration/status"
+  printf '{"task":"t1","phase":"impl_done","updatedAt":"2026-01-01T00:05:00Z"}' \
+    > "$WROOT/wt1/.orchestration/status/t1.json"
+  run sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 2 ]
+  assert_output_has "TIMEOUT"
+  [ ! -e "$ORCH/status/t1.json" ]
+}
+
+@test "collector: only LO_GRAPH set (LO_WORKTREES_ROOT unset) — old behavior, no collector call" {
+  GRAPH="$BATS_TEST_TMPDIR/graph.json"
+  printf '{"tasks":[{"id":"t1","deps":[]}]}' > "$GRAPH"
+  WROOT="$BATS_TEST_TMPDIR/worktrees"
+  mkdir -p "$WROOT/wt1/.orchestration/status"
+  printf '{"task":"t1","phase":"impl_done","updatedAt":"2026-01-01T00:05:00Z"}' \
+    > "$WROOT/wt1/.orchestration/status/t1.json"
+  run env LO_GRAPH="$GRAPH" sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 2 ]
+  [ ! -e "$ORCH/status/t1.json" ]
+}
+
+@test "collector: a bad LO_GRAPH path warns on stderr and the watch still times out normally, not an abort (error)" {
+  run --separate-stderr env LO_GRAPH="$BATS_TEST_TMPDIR/does-not-exist.json" \
+      LO_WORKTREES_ROOT="$BATS_TEST_TMPDIR/worktrees" \
+      sh "$WS" "$ORCH/status" done 1 5 1
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"collect failed"* ]]
 }
