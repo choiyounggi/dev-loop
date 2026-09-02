@@ -1,0 +1,4 @@
+Intentionally empty plan-dir (no review-verdict.md) — fixture for the
+reviewer-verdict target-missing (exit 4) test case. Keep this directory free
+of any file named review-verdict.md; this placeholder only exists because
+git does not track empty directories.
