@@ -98,3 +98,29 @@ setup() {
   echo "$output" | grep -q "tacit: mcp rtb-lore"
   echo "$output" | grep -q "knowledge: default"
 }
+
+@test "research role appears in summary exactly once (default when unset)" {
+  run bash "$RT" --summary
+  [ "$status" -eq 0 ]
+  count=$(printf '%s\n' "$output" | grep -c "^research:")
+  [ "$count" -eq 1 ]
+  echo "$output" | grep -q "^research: default (built-in behavior)"
+}
+
+@test "research role is configurable and shows as configured, not default" {
+  printf '{"research":{"kind":"mcp","ref":"brave-search"}}' > "$PROJ_CFG"
+  run bash "$RT" --role research
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.kind')" = "mcp" ]
+  [ "$(printf '%s' "$output" | jq -r '.ref')" = "brave-search" ]
+  run bash "$RT" --summary
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q "^research: mcp brave-search"
+}
+
+@test "research role with an empty override object behaves like other roles: stays default" {
+  printf '{"research":{}}' > "$PROJ_CFG"
+  run bash "$RT" --role research
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.kind')" = "default" ]
+}

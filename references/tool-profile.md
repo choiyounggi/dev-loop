@@ -16,6 +16,7 @@ the generic built-in behavior. Nothing breaks when nothing is configured.
 | `verify`    | running the project's tests / build / QA checks   | loop-implement step 5 (Run); orchestrate Phase 5 (integration) |
 | `explore`   | locating code, symbols, call sites (read-only)    | loop-implement step 1 (Analyze) |
 | `design`    | visual/UI spec for FE/UI tasks (e.g. a Figma link in the issue) | orchestrate Phase 0/2 + brief; loop-implement step 1 (Analyze) |
+| `research`  | external best-practice/pitfall search for a feature's domain, and evidence for `[no-wiki]` decisions | wiki-plan Phase A4 (external research), Phase A3 (spike research), Phase B (`[no-wiki]` grounding) |
 
 Roles are optional and extensible — you may add custom keys; the resolver passes
 them through, and a skill uses a role only if it knows that role by name.
@@ -35,6 +36,34 @@ tasks skip it even when configured. Example mapping to a Figma MCP:
 { "design": { "kind": "mcp", "ref": "rtb-figma",
               "how": "get_spec_links -> inspect_node / get_dev_ready / get_design_tokens",
               "when": "issue has a Figma link AND the change touches UI; skip for backend-only tasks" } }
+```
+
+### `research` — external best-practice/pitfall search (optional, fixed interpretation order)
+
+`research` backs `wiki-plan`'s Phase A4 (external research: best practices and
+known pitfalls for the feature's domain, at least one search recorded in
+`## Research`), Phase A3 spike research, and grounding a Phase B `[no-wiki]`
+decision. Unlike the other roles, its **interpretation order is fixed** — a
+shell script cannot detect whether an MCP tool exists in the calling
+environment, so `resolve-tools.sh` only tells you "configured" vs "default";
+the fallback chain when it resolves to `default` is owned by the
+`loop-implement` SKILL text, in this order:
+
+1. The tool configured for `research` in the tool profile, if any.
+2. `mcp__brave-search__brave_web_search`, if it exists in the environment.
+3. The built-in WebSearch.
+4. If none of the above are available: ABANDON the `research-evidenced` gate
+   (open abandonment, not a silent skip).
+
+Whichever tool actually answered the query is recorded in `## Research`
+alongside the query and source. Example mapping (explicit override — with
+`research` unset it still resolves to `default` and step 2–3 of the chain
+above apply):
+
+```json
+{ "research": { "kind": "mcp", "ref": "brave-search",
+                "how": "brave_web_search(query, count, freshness)",
+                "when": "Phase A4 best-practice/pitfall search; Phase B [no-wiki] grounding" } }
 ```
 
 ### `intake` — the issue-tracker entry (optional)

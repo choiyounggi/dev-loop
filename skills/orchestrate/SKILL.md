@@ -677,6 +677,14 @@ reasoning-effort flags) that `worker-start` cannot express.
    of authoring one, and still signals `plan_ready` — so the phase sequence, the
    `plan_ready` watch, and the ready-set scheduler are all unchanged.
 
+   **Confirm gate evidence before dispatching.** If this task's `wiki-plan`
+   invocation ran Phase A/B, `.dev-loop/gates/plan-A-<task>.md` and
+   `plan-B-<task>.md` must exist and `gate-check.sh --run` must exit 0 against
+   each — a lite-mode `ABANDON` entry with a recorded reason still counts as
+   passing that gate. A plan with no evidence — the ledger is missing, or any
+   gate reads `UNMET` or `CLAIMED` — must not be dispatched: send the task
+   back to `wiki-plan`'s corresponding Phase instead of launching a worker on it.
+
    **Read the Size verdict before launching.** `plans/<task>.md` step 5 carries a
    REQUIRED `## Size verdict`; read it now, before `launch-session.sh` — the task
    is still undispatched at this moment, so no status file exists for it yet.
