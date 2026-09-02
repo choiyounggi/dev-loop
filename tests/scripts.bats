@@ -112,8 +112,11 @@ setup() {
 
 @test "SKILL.md: the dispatch loop structure pins step order and error handling" {
   SKILL="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
-  # Step 1 must run ready-set.sh first to decide what is dispatchable.
-  grep -qF '1. `scripts/ready-set.sh' "$SKILL"
+  # Step 1 collects worker-local status/questions records first (issue #167 —
+  # workers never write into the coordinator's checkout), THEN ready-set.sh
+  # decides what is dispatchable from the now-current status dir.
+  grep -qF '1. First `scripts/collect-status.sh' "$SKILL"
+  grep -qF 'Then `scripts/ready-set.sh' "$SKILL"
   # Step 1 exit codes 3 and 4 must explicitly return to step 1, not just report
   # errors. Look for phrases showing re-entry after human intervention or fix.
   grep -q 'return to' "$SKILL" && grep -q 'step 1' "$SKILL"
