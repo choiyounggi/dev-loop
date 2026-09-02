@@ -1,0 +1,4 @@
+Intentionally empty plan-dir (no analysis.md, design.md, or
+review-verdict.md) — fixture for the "required file entirely absent" (exit
+4) test cases. Keep this directory free of those three filenames; this
+placeholder only exists because git does not track empty directories.

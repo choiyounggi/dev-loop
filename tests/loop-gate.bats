@@ -230,3 +230,44 @@ EOF
   [ "$status" -eq 2 ]
   [[ "$output" == *"phase=implementing"* ]]
 }
+
+# --- plan-gate ledgers (plan-A-*.md / plan-B-*.md, t1-plan-gate) ---
+# gate-check.sh's --status/--run glob every *.md under .dev-loop/gates with
+# no filename-prefix special-casing (verified by reading gate-check.sh and
+# hooks/loop-gate.sh directly), so a plan-A-<feature>.md ledger produced by
+# `plan-gate.sh emit` is expected to block/allow a Stop exactly like any
+# existing task ledger — these two cases prove that unmodified behavior.
+
+_write_unmet_plan_ledger() { # <dir>
+  mkdir -p "$1"
+  cat > "$1/plan-A-x.md" <<'EOF'
+- [ ] baseline-tests-ran: tests pass
+  CHECK: false
+  EXPECT: ok
+  EVIDENCE: pending
+EOF
+}
+
+_write_met_plan_ledger() { # <dir>
+  mkdir -p "$1"
+  cat > "$1/plan-A-x.md" <<'EOF'
+- [x] baseline-tests-ran: tests pass
+  CHECK: true
+  EXPECT: ok
+  EVIDENCE: exit=0 matched: ok
+EOF
+}
+
+@test "plan-gate ledger: UNMET plan-A-x.md blocks stop like any other ledger" {
+  _write_unmet_plan_ledger "$WS/.dev-loop/gates"
+  run _run_gate "$WS" false
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"UNMET"* ]]
+  [[ "$output" == *"plan-A-x.md:baseline-tests-ran"* ]]
+}
+
+@test "plan-gate ledger: all-MET plan-A-x.md allows stop like any other ledger" {
+  _write_met_plan_ledger "$WS/.dev-loop/gates"
+  run _run_gate "$WS" false
+  [ "$status" -eq 0 ]
+}
