@@ -810,8 +810,12 @@ that task's existing session — a bare `--terminal` is rejected with
 `terminal_worktree_mismatch` (see O3) — and wait with `scripts/orca-wait.sh`.
 Rework rounds are further Tasks on the same `--terminal`+`--worktree` pair.)*
 
-Before the four-lens pass, run the floor: `scripts/test-floor.sh <wt>
-'<integ>...HEAD'`. **Exit 3** — skip the four-lens pass and the auditor
+Before the four-lens pass, run the floor: `scripts/test-floor.sh <wt> '<integ>'`.
+At review time the worker has not committed (§2 forbids it; §4 commits
+later), so the single-ref form measures the working tree — including
+untracked new test files — instead of an empty `<integ>...HEAD` range; an
+empty measurement now exits 2 (`unknown`, stderr `empty-range`), never
+`pass`. **Exit 3** — skip the four-lens pass and the auditor
 entirely; the itemized stderr reasons (`no-tests` / `case-count:<file>:<n>` /
 `no-assertion:<file>:<case>`) become the findings of `reviews/<task>-rN.md` —
 this consumes a rework round exactly like any other finding (run the rework
