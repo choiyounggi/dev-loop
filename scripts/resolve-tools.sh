@@ -9,7 +9,7 @@
 #  configs keep working after the rename.)
 #
 # Each capability role (intake / knowledge / tacit / verify / explore /
-# design, plus any custom role) is merged independently and field-wise, so a project file can
+# design / research, plus any custom role) is merged independently and field-wise, so a project file can
 # override one role — or just one field of a role — and inherit everything else.
 # To drop an inherited value, set that field to null.
 #
@@ -40,7 +40,8 @@ DEFAULTS='{
   "tacit":     {"kind":"default","when":"past incidents, edge cases, danger zones (step 1/6)"},
   "verify":    {"kind":"default","when":"running tests / build / QA checks (step 5)"},
   "explore":   {"kind":"default","when":"locating code, symbols, call sites (step 1)"},
-  "design":    {"kind":"default","when":"visual/UI spec for FE/UI tasks, e.g. a Figma link in the issue — read the referenced design before implementing (orchestrate Phase 0/2; loop-implement step 1)"}
+  "design":    {"kind":"default","when":"visual/UI spec for FE/UI tasks, e.g. a Figma link in the issue — read the referenced design before implementing (orchestrate Phase 0/2; loop-implement step 1)"},
+  "research":  {"kind":"default","when":"external best-practice/insight search during plan phases A/B; resolution order owned by loop-implement SKILL (configured tool -> brave-search MCP -> built-in WebSearch -> ABANDON)"}
 }'
 
 # Per-user config: explicit env wins; else the dev-loop path; else the legacy
