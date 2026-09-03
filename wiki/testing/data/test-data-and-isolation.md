@@ -10,7 +10,7 @@ sources:
   - https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html
   - https://nodejs.org/api/fs.html
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/env.html
-last_verified: 2026-08-29
+last_verified: 2026-09-03
 related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-strategy-import-time-side-effects, testing-data-artifact-leakage-from-a-suite, testing-quality-behavior-not-implementation, platforms-filesystems-permissions-and-exec-bits, backend-common-change-impact-call-site-enumeration, testing-data-harness-vs-run-path-fixtures, infrastructure-agent-orchestration-shared-run-state]
 ---
 
@@ -66,6 +66,7 @@ state-leak symptom.
 | The machine runs endpoint security (EDR) that flags an executable created under the system temp directory | Keep the fixture inside the repo's gitignored build-output tree and set the bit at creation; that path is what a "+x file dropped in a temp dir" heuristic looks for, and the fixture only needs the bit, not the location ([platforms-filesystems-permissions-and-exec-bits]) |
 | Leftover test artifacts (temp dirs/files) accumulate in the repo and the producers look diffuse | Count leftovers by name prefix (`ls \| sed 's/-[a-z0-9]*$//' \| sort \| uniq -c`) and match the distribution against the sites that create such files — a match closes the attribution; fix those sites, then enforce the cleanup convention with a static check proven red against the unfixed code first |
 | The code under test is the harness that spawned the session now running its suite (an orchestration worker runs the orchestrator's own tests in its worktree) | Treat the leak as two failures: reproduce the test failures with `env VAR=… bats <file>` on a clean checkout to confirm the mechanism, then check the live run's state files for writes stamped with test-fixture values — a leaked state path corrupts the running orchestration ([infrastructure-agent-orchestration-shared-run-state]), which surfaces later as a watcher monitoring the wrong session |
+| The code under test also discovers its config by walking up from the cwd (a `.groundwork/`, `.editorconfig`, `.npmrc`-style file), and the suite runs from a worktree that carries a sandbox copy | Tests that never `cd` into their own temp directory inherit the runner's invocation cwd and read the sandbox config, so they fail from the worktree and pass from a clean checkout. Make every such test `cd "$BATS_TEST_TMPDIR"` (or pin the discovery root explicitly), and override the exported state directory (`GROUNDWORK_ESCALATION_DIR`) to a scratch path in `setup()` — a run that inherits it writes one real record per fixture command into the live run's directory |
 
 ## Instead of
 
@@ -86,3 +87,5 @@ state-leak symptom.
 - https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html — keep the inputs a test's result depends on visible in the test method instead of in shared setup, so the cause-and-effect relationship is readable without jumping elsewhere
 - Field incident 2026-08-04 (`linkly-t1-repo-policy`, Python): `rows_for(doc)` seeded its rows from the module constant `PAYLOAD` while its tests ran payload `{}`; a shape-only migration of the helper fixed 1 of 11 failures, and moving the payload into the helper's signature fixed 11 of 11
 - Field incident 2026-08-14 (dev-loop issue #100): `launch-session.sh` exports `LO_RUN_ID`/`LO_STATUS_DIR`/`LO_TASK_ID` into every worker session; a worker running `bats tests/launch-session.bats` inherited them — 6 deterministic failures absent on a clean shell, reproduced with `env LO_RUN_ID=… bats`, and the live run's `t90.json` status file was found rewritten with bats tempdir paths and a foreign session name
+- https://bats-core.readthedocs.io/en/stable/writing-tests.html — `BATS_RUN_TMPDIR` defaults to `$BATS_TMPDIR/bats-run-$BATS_ROOT_PID-XXXXXX` and `BATS_TEST_TMPDIR` is per test; a record carrying that prefix was produced by the suite
+- Field reproduction 2026-09-02 (guardrails bats suite run from a dev-loop worker worktree): 65 of 102 tests failed from the worktree cwd in one run while 166/166 passed from a clean checkout; the two named failures (`non-interactive turns ask into deny`, `self-test exits 0`) are the tests that do not `cd` into their tmpdir, so they read the worktree's sandbox `.groundwork/guardrails.json` through the guard's upward config walk; the same run left 175 escalation records with `bats-run-*` paths in the live run's exported escalation directory

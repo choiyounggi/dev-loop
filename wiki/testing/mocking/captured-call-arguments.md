@@ -17,6 +17,7 @@ related:
     testing-quality-tests-that-cannot-fail,
     testing-quality-behavior-not-implementation,
     backend-common-change-impact-call-site-enumeration,
+    testing-mocking-extracted-method-this-binding,
   ]
 ---
 

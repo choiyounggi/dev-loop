@@ -12,7 +12,7 @@ sources:
   - https://www.sudo.ws/docs/man/sudoers.man/
   - https://docs.brew.sh/FAQ
 last_verified: 2026-08-04
-related: [platforms-toolchains-version-management, platforms-processes-background-services, platforms-shells-env-var-off-switches, platforms-toolchains-compiler-sysroot-on-macos]
+related: [platforms-toolchains-version-management, platforms-processes-background-services, platforms-shells-env-var-off-switches, platforms-toolchains-compiler-sysroot-on-macos, infrastructure-agent-orchestration-verify-command-in-a-worker-brief]
 ---
 
 # The Wrong Binary (or None) Resolving From PATH

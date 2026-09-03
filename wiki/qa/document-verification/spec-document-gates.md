@@ -14,7 +14,7 @@ sources:
   - https://github.com/DavidAnson/markdownlint/blob/main/doc/md056.md
   - https://github.com/DavidAnson/markdownlint/issues/1206
   - https://google.github.io/styleguide/docguide/best_practices.html
-last_verified: 2026-08-09
+last_verified: 2026-09-03
 related:
   [
     qa-process-acceptance-criteria,
@@ -88,6 +88,7 @@ what this gate must assert about the document and stays here.
 | The check restates the expected values as its own literals                      | Import or read the owning symbol and iterate it. A literal list is a third copy that drifts with the other two, and it makes the check pass when the constant changes but the document does not |
 | The check must run where the owning code cannot be imported (docs-only CI job)  | Have the code-side job emit the constant as a data file and diff the document against that file; keep the emit step in the same pipeline as the code                                       |
 | A row exists in the document but not in the constant (or vice versa)            | FAIL naming the direction — a removed constant leaves a documented row nothing checks, which reads as covered                          |
+| The gate proves a name (CLI subcommand, config key, rule id) is documented by grepping it as a bare substring anywhere in the file | Scope the match to heading lines with a word boundary (`^#+ .*\bgrammar\b`) or to the parsed section list, so a passing mention in prose cannot satisfy it; then take the step-2 negative control from a known-bad revision — the pre-fix commit of the document — and require FAIL on it before trusting PASS on the current one |
 
 ## Instead of
 
@@ -99,6 +100,7 @@ what this gate must assert about the document and stays here.
 | Skip a check whose anchor sentence was not found                       | Report FAIL and name the missing anchor                            | A skipped check is indistinguishable from a passed one in the summary line                                                   |
 | Verify a cross-section value by matching the number as written         | Recompute it from its inputs and compare                           | Matching the written number passes when both sections were edited to the same wrong value                                    |
 | Assert a documented table satisfies the property the table itself claims | Resolve the owning constant and compare the table's cells to it, row by row | The document is both subject and oracle, so the check is a tautology; when the constant moves, the gate built to catch drift is what pins the stale claim green |
+| Prove coverage of N names with `grep -q <name> doc.md` per name | Match each name on heading lines with word boundaries, and run the gate against the pre-fix revision | A substring gate is green exactly when the section is missing and the name survives in a sentence elsewhere |
 
 ## Sources
 
@@ -111,6 +113,8 @@ what this gate must assert about the document and stays here.
 - https://github.com/DavidAnson/markdownlint/blob/main/doc/md056.md — MD056 flags tables whose rows disagree with the header's column count (structural table checking)
 - https://github.com/DavidAnson/markdownlint/issues/1206 — MD056 counts pipes inside backticks as separators: a delimiter count is not a parse
 - https://google.github.io/styleguide/docguide/best_practices.html — "Change your documentation in the same CL as the code change"; and where a fact lives elsewhere, "Link to it instead" of restating it — the external-agreement axis is what enforces that when a table restates the fact anyway
+- https://testing.googleblog.com/2020/08/code-coverage-best-practices.html — a line counted as covered is not a line whose behavior was checked; "Mutation testing can help detect such false coverage" — the same presence-versus-verification gap a substring gate has
+- Field reproduction 2026-09-02 (linkly, review t162-r1, commit 7bdbb1c): a doc-coverage test grepped subcommand names as bare substrings and passed while the `grammar` section was absent (the word appeared in prose elsewhere); re-scoped to heading lines with word-boundary matches, the same test run against the pre-fix document reported `missing: ['grammar']` and passed on the fixed one
 - Local reproduction 2026-08-08 (`linkly`, `docs/ENFORCEMENT-MATRIX.md` §C vs `lnpl.diagnostics.SEVERITY_OF`): the document's severity column reads `warning` in all five rows and its summary sentence says so, while the constant grades three of them `info`. A gate asserting "every documented code is a warning" passes on this pair; resolving each row against `SEVERITY_OF` returns three mismatches (`declared-not-enforced`, `declared-measured-only`, `authorization-not-verified`: documented `warning`, code `info`). The repo's `references/declarations.md`, whose same column is generated from the constant, agreed
 
 ## Field context

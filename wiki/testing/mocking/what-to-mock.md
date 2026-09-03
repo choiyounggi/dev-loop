@@ -11,7 +11,7 @@ sources:
   - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import
   - https://nodejs.org/api/test.html
 last_verified: 2026-08-06
-related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-tests-that-cannot-fail, testing-mocking-captured-call-arguments]
+related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-tests-that-cannot-fail, testing-mocking-captured-call-arguments, testing-mocking-extracted-method-this-binding]
 ---
 
 # Deciding Whether to Mock, Fake, or Use the Real Dependency

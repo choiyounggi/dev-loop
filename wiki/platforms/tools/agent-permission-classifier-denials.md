@@ -9,7 +9,7 @@ sources:
   - https://github.com/anthropics/claude-code/issues/58222
   - https://github.com/anthropics/claude-code/issues/64128
 last_verified: 2026-08-12
-related: [platforms-tools-harness-mediated-tool-results, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-worktree-isolated-workers]
+related: [platforms-tools-harness-mediated-tool-results, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-worktree-isolated-workers, platforms-tools-deny-rules-under-bypassed-permissions]
 ---
 
 # A Classifier Denies a Tool Call the Agent Was Told to Make

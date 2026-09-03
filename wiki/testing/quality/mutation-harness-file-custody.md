@@ -18,6 +18,7 @@ related:
     testing-quality-completion-predicates,
     testing-data-artifact-leakage-from-a-suite,
     qa-process-scope-purity-checks,
+    qa-process-completion-claims,
   ]
 ---
 
