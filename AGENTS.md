@@ -125,6 +125,7 @@ confidence: verified | field-tested | unverified
 sources:
   - <url or citation>
 last_verified: YYYY-MM-DD
+verified_model: <model-id>            # optional
 related: [<page id>, ...]
 ---
 ```
@@ -132,6 +133,11 @@ related: [<page id>, ...]
 `confidence` meanings — `verified`: backed by cited official docs or reproducible
 measurement. `field-tested`: worked in real production use; context described in the
 page. `unverified`: candidate knowledge; lint reports it until upgraded or removed.
+
+`verified_model` (optional) names the model generation the page's guidance was
+verified against (e.g. `claude-fable-5`); model-coupled pages missing it, or
+carrying an outdated one, are surfaced by lint as re-verification candidates —
+see `scripts/wiki-lint-model-era.js`.
 
 ### Section skeleton
 

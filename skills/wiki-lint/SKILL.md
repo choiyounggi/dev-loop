@@ -2,7 +2,7 @@
 name: wiki-lint
 effort: medium
 argument-hint: "[optional: changed pages]"
-description: Health-check the bundled wiki. Detect unsourced claims, bare prohibitions, broken links, index and page trigger mismatches, vague qualifiers, oversized pages, and stale dates, then fix them; reports a numeric health score (0-100). Use to keep the wiki healthy before drift compounds.
+description: Health-check the bundled wiki. Detect unsourced claims, bare prohibitions, broken links, index and page trigger mismatches, vague qualifiers, oversized pages, stale dates, and model-era re-verification candidates, then fix them; reports a numeric health score (0-100). Use to keep the wiki healthy before drift compounds.
 ---
 
 # Lint
@@ -23,6 +23,8 @@ output in the report header:
   `index.md` files)
 - Checker baselines: `node scripts/wiki-lint-prohibitions.js wiki` and
   `node scripts/wiki-structure-checks.js wiki`
+- Model-era candidates: `node scripts/wiki-lint-model-era.js wiki` (report-only;
+  exit 3 with candidates is the normal live-corpus state, not a failure)
 - Recent history: `tail -5 log.md`
 
 An assessment produced without the Phase 0 output pasted in its header is non-compliant.
@@ -44,6 +46,7 @@ Run all of these; report findings grouped by severity.
 | 9 | `contradiction` entries in `log.md` still unresolved | warn |
 | 10 | `gap` entries in `log.md` with no page created after 30 days | info |
 | 11 | Bare 2-word prohibition cell (e.g. `Never read`) — undecidable by shape between a state value and a real directive, so it is surfaced rather than judged; reported by `node scripts/wiki-lint-prohibitions.js` | info |
+| 12 | Model-coupled page (body references model/LLM behavior) whose `verified_model` frontmatter is absent or outside the current model generation — a re-verification candidate, report-only; detected by `node scripts/wiki-lint-model-era.js` (override the current set with `--current <csv>` or `DEV_LOOP_CURRENT_MODELS`) | info |
 
 ## Health score
 
@@ -53,9 +56,9 @@ After running all checks, compute `score = round(100 × passed_weight / total_we
 |----------|--------|--------|
 | error | 3 | 1–4 |
 | warn | 2 | 5–9 |
-| info | 1 | 10–11 |
+| info | 1 | 10–12 |
 
-`total_weight = 24` (4×3 + 5×2 + 2×1). Report `health: NN/100 (errors E, warns W, infos I)` at the top of the report. This score never gates — no exit-code change, no blocking threshold; it exists only so two runs are comparable.
+`total_weight = 25` (4×3 + 5×2 + 3×1). Report `health: NN/100 (errors E, warns W, infos I)` at the top of the report. This score never gates — no exit-code change, no blocking threshold; it exists only so two runs are comparable.
 
 ## Fix protocol
 
@@ -67,5 +70,9 @@ After running all checks, compute `score = round(100 × passed_weight / total_we
   one. Do not invent a replacement — report it if none is known with certainty.
 - For 5: rewrite the sentence as a conditional ("When X, do A") only when the
   condition is stated elsewhere in the page; otherwise report it.
+- For 12: report-only — never stamp `verified_model` without actually
+  re-verifying the page's directives against a current-generation model; after
+  re-verifying, update `verified_model` + `last_verified` together, or
+  rewrite/retire the guidance that no longer applies.
 - Append `## [YYYY-MM-DD] lint | <n> errors fixed, <m> reported | health NN/100` to `log.md`.
 - End the report with up to 3 suggested research questions from recurring gaps.
