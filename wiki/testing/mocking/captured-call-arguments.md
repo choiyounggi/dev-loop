@@ -9,7 +9,7 @@ sources:
   - https://jestjs.io/docs/expect
   - https://github.com/mockito/mockito/blob/main/mockito-core/src/main/java/org/mockito/ArgumentMatchers.java
   - https://pitest.org/quickstart/basic_concepts/
-last_verified: 2026-08-10
+last_verified: 2026-09-03
 related:
   [
     testing-mocking-what-to-mock,
@@ -17,6 +17,7 @@ related:
     testing-quality-tests-that-cannot-fail,
     testing-quality-behavior-not-implementation,
     backend-common-change-impact-call-site-enumeration,
+    backend-common-api-design-unenforced-declarations,
   ]
 ---
 
@@ -94,6 +95,7 @@ Deciding whether to stub this dependency at all →
 | The mutated argument has a default in the callee, so the mutation changes nothing observable | Classify it before strengthening the assertion: an argument whose two values behave identically at this level needs the assertion at the level where they diverge |
 | The stub is a fake with behavior, not a recorder | Keep the recording separate from the behavior: a fake that computes a result and also stores its inputs tends to store only the inputs it computes from |
 | The argument is a deployment-visible value (bind host, port, path) | Add one assertion at the level the platform reads it — a bind host mutated from `0.0.0.0` to `127.0.0.1` passes every in-process test and fails only a container's readiness probe |
+| A CLI flag is declared on a long-lived server subcommand too, but only a boot-time probe reads it and nothing threads its value to the object that consumes the resource (the request handler, an executor's constructor) | Follow the call chain from the entry point to the consuming constructor (serve → app wiring → executor) before trusting the probe; a green "invalid value is rejected at boot" test proves only the rejection path. Add a state assertion at the consumer showing the configured resource is the one in use at runtime (which driver instance executed), not only that a bad value is refused ([backend-common-change-impact-call-site-enumeration]) |
 
 ## Instead of
 
@@ -105,6 +107,7 @@ Deciding whether to stub this dependency at all →
 | Write the expected value as a literal in the assertion (`port=8914`) | Read the constant in the assertion (`port=DEFAULT_PORT`) | A literal makes the test fail on every legitimate change to the constant, which trains the next author to update the literal rather than to read the failure |
 | Drop an argument from the assertion because its value is uninteresting | Keep it with a placeholder matcher | A dropped argument and an unpinned one are indistinguishable later; the placeholder records that the omission was a decision |
 | Accept a green suite as proof the fixed argument is now guarded | Mutate that argument alone and require the owning test red | A test can be green because it never reads the argument; the red run is what distinguishes the two |
+| Trust a boot-time probe that rejects an invalid flag value as proof the flag is wired | Assert, at the object that consumes the resource, that a valid flag value is the one in use at runtime | A validate-only probe passes while the app keeps building its default; the rejection test never observes what the request path does |
 
 ## Sources
 
@@ -114,3 +117,4 @@ Deciding whether to stub this dependency at all →
 - https://pitest.org/quickstart/basic_concepts/ — "'Survived' means the mutation was not detected by the covering test"; step 5 reads a per-argument green run as this verdict for that argument
 - Reproduction 2026-08-10 (Python 3, `unittest.mock`): a stub storing only `kw["port"]` reported `assertion_passes=True` both for the correct call and for one whose `host` was mutated `0.0.0.0` → `127.0.0.1`; a `Mock(spec=…)` with `assert_called_with(host=…, port=…, tls=…)` reported `True` for the correct call and `False` for the mutated one — the no-op control that shows the stronger assertion discriminates rather than always failing. A second run held `DEFAULT_PORT == 8914` green across three call-site variants (reads the constant, reads an extracted `resolve_port()`, hardcodes `8770`) while the recorded-call assertion was green for the first two and red only for the hardcoded one
 - Field measurement 2026-08-10 (a Python service's startup wiring, 6-round audit): a `DEFAULT_PORT` value assertion left `main()`'s `port = resolve_port()` free — a `8770` mutation survived; after extracting the resolver, the same mutation survived again because no assertion said `main()` calls it; after adding the wiring assertion for `port`, the same call's `host` argument was still unasserted and `"0.0.0.0"` → `"127.0.0.1"` survived, a change whose only failure surface is a Kubernetes readiness probe. Each surviving mutant sat inside the previous round's own fix
+- Field review 2026-08-28 (a CLI task adding a cache-driver flag to a `serve` subcommand): the flag reached only a boot-time probe that rejected unknown driver names, while the request-handling object's constructor still built its default in-process cache whatever the flag said. The worker's tests covered only the rejection path; the plan-conformance review lens caught the missing wiring, and the fix threaded the value through `serve` → WSGI app → executor with a state assertion on the constructed driver

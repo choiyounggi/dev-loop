@@ -3,7 +3,8 @@
 Route here for: app-side iOS/Android/cross-platform concerns — process lifecycle
 and state survival, offline storage and sync, network calls from the device,
 store releases/rollout/hotfix strategy, startup performance, deep-link/push
-entry routing, runtime permissions, and sensitive data stored on the device.
+entry routing, modal presentation (sheets/covers contending for one host),
+runtime permissions, and sensitive data stored on the device.
 Server-side API patterns (idempotency storage, retry contracts, error bodies)
 stay in the backend domain (pages link there).
 
@@ -44,6 +45,12 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [deep-links-and-entry-points](navigation/deep-links-and-entry-points.md) | Implementing deep links / universal links / app links or push-notification tap routing; links open the browser (or a disambiguation chooser) instead of the app; deep-linked screens crash or strand users on cold start; back navigation from a deep-linked screen exits the app |
+
+## presentation
+
+| Page | Load when |
+|------|-----------|
+| [gating-nested-sheet-presentation](presentation/gating-nested-sheet-presentation.md) | A SwiftUI host attaches several `.sheet`/`.fullScreenCover` modifiers including a screen-level error sheet bound to a shared store's error state; an error silently fails to appear while a form/cover is open; an error sheet from one screen appears over a different tab; a container keeps every tab mounted and each can trigger the same sheet |
 
 ## permissions
 
