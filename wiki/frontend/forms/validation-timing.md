@@ -8,7 +8,7 @@ sources:
   - https://www.nngroup.com/articles/errors-forms-design-guidelines/
   - https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Forms/Form_validation
 last_verified: 2026-07-10
-related: [frontend-state-derived-state]
+related: [frontend-state-derived-state, frontend-forms-dropzone-copy-without-drop-handlers]
 ---
 
 # When to Validate Form Fields and Show Errors

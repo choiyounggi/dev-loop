@@ -19,7 +19,9 @@ sources:
   - https://developer.mozilla.org/en-US/docs/Web/CSS/length#relative_length_units_based_on_viewport
   - https://developer.mozilla.org/en-US/docs/Web/CSS/@media/hover
   - https://webkit.org/blog/7929/designing-websites-for-iphone-x/
-last_verified: 2026-08-21
+  - https://developer.mozilla.org/en-US/docs/Web/CSS/position
+  - https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_cascade/Specificity
+last_verified: 2026-09-03
 related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements, frontend-performance-bundle-and-assets, frontend-design-design-canvas-workflow]
 ---
 
@@ -57,6 +59,7 @@ Work through these in order — each later item assumes the earlier ones hold:
 | UI is revealed only on hover | Gate it behind `@media (hover: hover)` and give touch users a tap-visible path — `hover: none` devices can only emulate hover via long-tap |
 | Edge-to-edge layout on notched/rounded-corner phones | Add `viewport-fit=cover` to the viewport meta, then `padding: max(<base>, env(safe-area-inset-left))` (and the other three insets) so content clears the sensor housing without losing its baseline padding |
 | A grid/flex track overflows the viewport because of one long unbreakable child (URL, image, `<pre>`) | Items default to `min-width: auto` ≈ their `min-content` size, so the track cannot shrink below the child. Use `minmax(0, 1fr)` for the track or `min-width: 0` on the item |
+| A media query overrides `position` (`sticky` → `static`) on a container a third-party SDK (Kakao/Google map, a chat or payment widget) mounts into | Reset the inset properties in the same override: `top: auto; right: auto; bottom: auto; left: auto` (and `z-index` when set). Under `position: static` those declarations are inert, but the SDK sets an inline `style="position:relative"` on its container, and an inline declaration beats any author-stylesheet rule — the dormant `top` then applies as a live relative offset. A static preview without the SDK never shows it, so verify with the SDK mounted at the mobile width |
 | The layout passes but still "reads AI-generated" | Responsiveness is the floor, not the design — apply [frontend-design-anti-slop-visual-design] (its narrow-viewport row assumes this page's overflow fixes) |
 
 ## Instead of
@@ -67,6 +70,7 @@ Work through these in order — each later item assumes the earlier ones hold:
 | Add `maximum-scale=1` to stop iOS input-focus zoom | Set the input's `font-size` to ≥16px so iOS has no reason to zoom | The attribute blocks low-vision zoom (WCAG ≥2×) and iOS ignores it since iOS 10 anyway |
 | Write one media query per column count for a card grid | `repeat(auto-fit, minmax(<min>, 1fr))` | The intrinsic grid covers every width, including ones you didn't test |
 | Give a track a fixed-px minimum: `minmax(200px, 1fr)` on a container that can be <200px | `minmax(0, 1fr)` plus `min-width` on the content that truly needs it | The px floor forces horizontal overflow on viewports narrower than the sum of floors |
+| Override only `position` in the mobile media query and leave the desktop `top`/`left` values in place | Reset the inset properties to `auto` in the same media-query block | A third-party script's inline `position:relative` outranks the stylesheet's `static`, so an inset left behind becomes a real offset the moment the SDK mounts |
 | Fix mobile layout bugs desktop-first, per bug report | Run the 320px no-horizontal-scroll gate once and fix what it surfaces | The gate is the WCAG 1.4.10 reflow criterion — piecemeal fixes miss views nobody reported |
 
 ## Sources
@@ -85,3 +89,6 @@ Work through these in order — each later item assumes the earlier ones hold:
 - https://developer.mozilla.org/en-US/docs/Web/CSS/length#relative_length_units_based_on_viewport — vh ≈ lvh; svh/dvh semantics
 - https://developer.mozilla.org/en-US/docs/Web/CSS/@media/hover — hover:none on touch (long-tap emulation only)
 - https://webkit.org/blog/7929/designing-websites-for-iphone-x/ — viewport-fit=cover + env(safe-area-inset-*) + max() pattern
+- https://developer.mozilla.org/en-US/docs/Web/CSS/position — `static`: "The top, right, bottom, left, and z-index properties have no effect"; `relative`: the element is laid out in normal flow "and then offset relative to itself based on the values of top, right, bottom, and left"
+- https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_cascade/Specificity — inline styles "always overwrite any normal styles in author stylesheets"; only `!important` overrides them
+- Field reproduction 2026-08-21 (chungyak-alimi, production at 390×844 emulation, fix commit d5e119b): a Kakao Maps container carried desktop `position:sticky; top:<n>px` and a mobile override of `position:static` only; the SDK set inline `position:relative`, producing a 217px gap; forcing `position:static` in the console restored the expected 22px; adding `top:auto` to the mobile override fixed it
