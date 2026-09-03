@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://bugzilla.mozilla.org/page.cgi?id=bug-writing.html
 last_verified: 2026-07-10
-related: [qa-exploratory-exploratory-sessions, qa-process-severity-and-priority]
+related: [qa-exploratory-exploratory-sessions, qa-process-severity-and-priority, qa-environments-element-crop-screenshots]
 ---
 
 # Writing a Bug Report a Stranger Can Reproduce

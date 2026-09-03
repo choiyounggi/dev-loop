@@ -8,7 +8,7 @@ sources:
   - https://martinfowler.com/articles/practical-test-pyramid.html
   - https://abseil.io/resources/swe-book/html/ch12.html
   - https://martinfowler.com/bliki/TestDrivenDevelopment.html
-last_verified: 2026-07-10
+last_verified: 2026-09-03
 related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-checks-that-cannot-pass, testing-quality-unasserted-return-fields, testing-quality-value-preserving-refactor-assertions, qa-exploratory-guard-true-path-coverage, testing-quality-default-values-under-test]
 ---
 
@@ -58,6 +58,7 @@ sufficient.
 | The boundary is unreachable through the public interface (guarded upstream) | Test at the level that owns the guard; do not force unreachable inputs through the unit ([testing-quality-behavior-not-implementation]) |
 | Reviewing a change that only adds a case to existing behavior | Require the new case's test; the existing normal/error/boundary set stands |
 | The observable outcome is a composite of several computed fields | "The return value" is then a set of fields plus the invariants binding them — cover the fields and assert the relations ([testing-quality-unasserted-return-fields]) |
+| A task's Steps prose states a resilience guarantee ("one item's failure must not halt the batch") that is not among the plan's enumerated Verify cases | Write it as its own behavior — one normal case, one error case — before treating the enumerated list as complete; the list is a floor, not a ceiling |
 
 ## Instead of
 
@@ -67,9 +68,12 @@ sufficient.
 | Assert only `toThrow()` with no error type | Assert the error type and the message/code callers depend on | The test passes when the wrong error fires for the wrong reason |
 | Fix a bug and add the test after the fix, never seeing it fail | Write the reproducing test first, watch it fail, then fix | A test that never failed can pass vacuously and guard nothing |
 | Chase a coverage percentage by touching lines without assertions | Add normal/error/boundary cases per behavior | Line coverage without outcome assertions detects nothing |
+| Treat a plan's enumerated Verify cases as the full required coverage | Test every behavior the task's Steps describe, named or not, before calling a test-quality audit | An auditor grades against everything the diff changes and the Steps describe, not only the plan's named case list |
 
 ## Sources
 
 - https://martinfowler.com/articles/practical-test-pyramid.html — test one condition per test; cover happy path and edge cases
 - https://abseil.io/resources/swe-book/html/ch12.html — test behaviors (guarantees), not methods; clear assertions per behavior
 - https://martinfowler.com/bliki/TestDrivenDevelopment.html — write the failing test first (red–green–refactor)
+- https://abseil.io/resources/swe-book/html/ch12.html — "A behavior is any guarantee that a system makes about how it will respond to a series of inputs while in a particular state" — a guarantee stated in Steps prose is a behavior whether or not the Verify list names it
+- Field evidence 2026-08-29 (repo wt-t4-event-push, task 03 reminder-sweep): the task's Steps stated "전체 try/catch — 한 사용자의 실패가 스윕 전체를 멈추지 않게 할 것" (one user's failure must not stop the whole sweep), not among the plan's 6 enumerated Verify cases; the first test-quality-auditor call returned VERDICT: FAIL for exactly this missing case, and adding one test (two members, one's `prefs.get` throws) then re-running the auditor returned VERDICT: PASS

@@ -8,7 +8,7 @@ sources:
   - https://github.com/alibaba/open-code-review
   - https://github.com/alibaba/open-code-review/blob/main/skills/open-code-review/SKILL.md
 last_verified: 2026-08-24
-related: [qa-process-evaluating-review-feedback]
+related: [qa-process-evaluating-review-feedback, backend-common-llm-vendor-benchmark-claims-for-an-llm-tool]
 ---
 
 # Structuring an Automated LLM Code-Review Pipeline
