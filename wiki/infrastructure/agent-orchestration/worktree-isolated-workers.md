@@ -47,6 +47,13 @@ wait loop keeps escalating with no error from the task itself.
    write commands from the brief inside a worktree and require them to complete
    without an escalation — one probe costs a minute and a bad brief costs every
    worker's first phase.
+7. **Name every tool-owned gate/state directory (`.dev-loop/`, `.orchestration/`)
+   as worktree-relative in the brief, before the worker's first write.** A tool
+   that derives its repository root from `git rev-parse --git-common-dir` (the
+   main checkout's `.git`, shared by every linked worktree) instead of
+   `--show-toplevel` (the current worktree's own root) computes its state path
+   under the main checkout even while running inside a worktree — the relative
+   rule in the brief is what stops the worker from acting on that path.
 
 ## Edge cases
 
@@ -64,6 +71,7 @@ wait loop keeps escalating with no error from the task itself.
 | The brief points the worker at a coordinator-state directory that is gitignored (`.orchestration/`, `.state/`) via a repo-relative path | The path resolves only in the main checkout: `git worktree add` checks out tracked files, so an ignored directory never materializes in a worktree. Substitute the absolute main-checkout path into the brief and state that the directory is gitignored and absent from the worktree — a capable worker otherwise hides the miss by searching for the file instead of failing |
 | The guardrail is a Bash-command hook and the worker edits files through its native Edit/Write tool | The hook never runs — tool hooks match on the tool name, so a `Bash` matcher does not fire for Edit/Write calls, and an absolute-path edit into the main checkout lands with no block and no log. State in the brief that **all** file operations, whatever the tool, use worktree-relative paths, and `git status` the protected tree before merging any worker's branch — discovery otherwise depends on luck |
 | A `worktree_escape` escalation arrives, or the main checkout's `git status --porcelain -uall` shows modifications while workers run | Read the Bash escalation as the visible part and check the main tree in the same step. When it holds files a worker's task owns, transfer them before touching either branch: in the main checkout `git diff -- <paths> > <patch>`, in that worker's worktree `git apply --check <patch>` then `git apply <patch>` (untracked files: copy them across), then in the main checkout `git checkout -- <paths>` and delete the copied untracked files, and re-run `git status` there to confirm it is clean. A hook that also guards the file tools registers a PreToolUse matcher of `Bash\|Write\|Edit\|MultiEdit` |
+| A `worktree_escape` escalation arrives for a write that has **not yet executed** (`rm -rf <main_root>/.dev-loop`, `mkdir <main_root>/.dev-loop/gates`) | Deny it — nothing has landed, so there is nothing to transfer — and hand the worker the same path rewritten worktree-relative (`.dev-loop/gates`) to retry with. A write that already landed through a non-Bash tool is the recovery case above, not this one |
 
 ## Instead of
 
@@ -75,12 +83,15 @@ wait loop keeps escalating with no error from the task itself.
 | Reuse the coordinator's repo-relative path to a gitignored state directory in a worker's prompt template | Expand it to the absolute path at substitution time and note the directory is absent from the worktree | Ignored files exist only where they were created; the relative form silently resolves to a nonexistent path in every worker, and reads of absolute main-root paths pass the guardrail |
 | Trust a Bash-hook guardrail as the only isolation for workers with native file tools | Pair it with a relative-paths-only instruction in the brief and a pre-merge `git status` of the main checkout | The hook inspects only the tool its matcher names; an Edit-tool write to an absolute main-checkout path passes silently — the worker need not be routing around anything for the escape to happen |
 | Answer a worktree-escape escalation and move on | Check the main checkout's `git status` in the same step and transfer any worker-owned changes by patch | The Bash hook sees one channel; file-tool edits into the main checkout raise no escalation and are found only by looking |
+| Approve a pre-write `worktree_escape` for a state directory because "the tool needs it" | Deny, and reply with the worktree-relative equivalent of the same path | The tool resolved its root against the shared `.git` common dir; the same directory inside the worktree serves it, and approving lets N workers write one shared state tree in main |
 
 ## Sources
 
 - https://git-scm.com/docs/git-worktree — linked worktrees are separate checkouts sharing one repository; each has its own working directory
 - https://code.claude.com/docs/en/hooks — tool-event hook matchers filter on the tool name ("`Bash` matches only the Bash tool"); a hook registered for Bash does not run on Edit/Write calls; the documented matcher form `Edit|Write` fires on both file tools
 - https://git-scm.com/docs/git-apply — `--check`: "Instead of applying the patch, see if the patch is applicable to the current working tree and/or the index file and detects errors"
+- https://git-scm.com/docs/git-rev-parse — `--show-toplevel` shows the top-level directory of the working tree; `--git-common-dir` shows `$GIT_COMMON_DIR` (the repository shared by all linked worktrees). Reproduction 2026-09-03 (git 2.x, macOS): from a linked worktree the first returned the worktree's own root and the second the main checkout's `.git`
+- Field evidence 2026-08-24 (linkly, second orchestration run): escalations lo-19 (`rm -rf <main_root>/.dev-loop`) and lo-22 (`mkdir <main_root>/.dev-loop/gates`) arrived back to back from workers whose tool resolved its state directory against the main checkout; both were denied with the worktree-relative path in the reply and the workers proceeded without touching main
 - Field reproduction 2026-08-21 (dev-loop orchestrate, task hide-color-nudge): on a `worktree_escape` escalation, the main checkout held three files belonging to worker lo-2 whose own worktree was clean; `git diff > patch` in main, `git apply --check` (rc 0) and `git apply` in lo-2's worktree, then `git checkout --` in main left the main tree clean (`MAIN_CLEAN` confirmed) with the work preserved on the worker branch
 - Field observation 2026-08-17 (linkly run, worker under a `worktree_escape` Bash-hook guard): the worker modified two `examples/*.lnpl` files in the **main checkout** via its native Edit tool with absolute paths — no block, no log; discovered only when the coordinator's `git pull` failed on local changes (contents happened to match the merged branch, so no damage). The same paths written via Bash redirection would have escalated
 - Field reproduction 2026-08-05 (groundwork guardrails 1.0.0 `hooks/bash-guard.sh`, `worktree_escape` rule, macOS): from a linked worktree, `cp ./a <main_root>/b` and `echo z > <main_root>/f` were both stopped; `cat <main_root>/f`, `ls <main_root>/.orchestration`, and `grep -n x <main_root>/f` all passed. The rule matches an absolute main-root mention together with a write verb (`rm|mv|cp|tee|mkdir|touch|install|dd`) or a redirect to an absolute path
