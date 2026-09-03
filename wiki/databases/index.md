@@ -1,10 +1,20 @@
 # databases — Domain Index
 
-Route here for: schema/table/key design, index decisions, query writing and
+Route here for: datastore/database-type selection, schema/table/key design,
+index decisions, query writing and
 optimization, transaction/concurrency behavior. Datastore backup/restore and
 data-loss planning → wiki/infrastructure/data/backup-and-restore.md.
 
 Match your situation to a "load when" line; load only matching pages.
+
+## selection
+
+| Page | Load when |
+|------|-----------|
+| [choosing-a-datastore-by-workload](selection/choosing-a-datastore-by-workload.md) | Designing a new system and picking its database(s); a design adds a second datastore (document/vector/graph/search/cache) next to an existing one; weighing one general-purpose DB vs per-workload stores (polyglot persistence) |
+| [relational-jsonb-vs-document-store](selection/relational-jsonb-vs-document-store.md) | Records carry per-record-varying or fast-changing fields and you're choosing JSONB in the relational DB vs a document database (MongoDB); a design says "MongoDB for schema flexibility" (picking the column type itself → schema-design/column-data-types) |
+| [vector-search-engine-selection](selection/vector-search-engine-selection.md) | Adding semantic/RAG/similarity search over embeddings and choosing pgvector vs a dedicated vector engine (Qdrant/Pinecone/Weaviate); pgvector hitting RAM/rebuild/contention limits and judging when to move |
+| [graph-workloads-relational-vs-graph-db](selection/graph-workloads-relational-vs-graph-db.md) | Connection-centric domain (social/fraud/lineage/org/knowledge graph) and choosing relational joins + recursive CTEs vs a graph database; a self-join or recursive CTE over an edge table is slow or unreadable |
 
 ## indexing
 

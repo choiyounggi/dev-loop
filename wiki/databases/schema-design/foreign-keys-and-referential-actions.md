@@ -9,7 +9,7 @@ sources:
   - https://www.postgresql.org/docs/current/sql-createtable.html
   - https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html
 last_verified: 2026-08-29
-related: [databases-schema-design-requirements-to-tables, databases-schema-design-soft-delete, databases-indexing-index-selection]
+related: [databases-schema-design-requirements-to-tables, databases-schema-design-soft-delete, databases-indexing-index-selection, databases-selection-graph-workloads-relational-vs-graph-db]
 ---
 
 # Foreign Keys and Referential Actions
