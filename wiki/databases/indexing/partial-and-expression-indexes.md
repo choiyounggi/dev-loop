@@ -8,7 +8,7 @@ sources:
   - https://www.postgresql.org/docs/current/indexes-partial.html
   - https://www.postgresql.org/docs/current/indexes-expressional.html
 last_verified: 2026-07-10
-related: [databases-indexing-index-selection, databases-schema-design-soft-delete]
+related: [databases-indexing-index-selection, databases-schema-design-soft-delete, databases-selection-relational-jsonb-vs-document-store]
 ---
 
 # Partial and Expression Indexes
