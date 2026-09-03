@@ -12,7 +12,7 @@ sources:
   - https://docs.oracle.com/en/java/javase/21/docs/specs/man/java.html
   - https://www.netdata.cloud/guides/docker/docker-jvm-memory-tuning/
 last_verified: 2026-07-10
-related: [backend-common-concurrency-shared-state-and-pools]
+related: [backend-common-concurrency-shared-state-and-pools, backend-java-kotlin-compiler-daemon-heap-pressure]
 ---
 
 # JVM Threading Model Choice and Process-Memory Diagnosis

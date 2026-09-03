@@ -9,7 +9,7 @@ sources:
   - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html
   - https://docs.pytest.org/en/stable/how-to/skipping.html
 last_verified: 2026-08-04
-related: [testing-quality-minimum-case-set, testing-mocking-what-to-mock, testing-data-test-data-and-isolation, testing-strategy-import-time-side-effects, testing-strategy-cross-layer-effect-tests]
+related: [testing-quality-minimum-case-set, testing-mocking-what-to-mock, testing-data-test-data-and-isolation, testing-strategy-import-time-side-effects, testing-strategy-cross-layer-effect-tests, testing-mocking-extracted-method-this-binding]
 ---
 
 # Choosing the Test Level for a Behavior
