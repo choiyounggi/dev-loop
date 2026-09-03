@@ -7,6 +7,7 @@ confidence: unverified
 sources:
   - <url or citation — required before confidence can be verified>
 last_verified: YYYY-MM-DD
+# optional: verified_model: <model-id the guidance was verified against>
 related: []
 ---
 

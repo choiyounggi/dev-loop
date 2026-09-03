@@ -20,18 +20,18 @@ section_body() {
 
 # --- normal: Phase 0 exists, precedes Checks, names the three commands -----
 
-@test "Phase 0 exists, precedes Checks, and names all three read-only command families" {
+@test "Phase 0 exists, precedes Checks, and names all four read-only command families" {
   p0="$(grep -n '^## Phase 0' "$SKILL" | head -1 | cut -d: -f1)"
   chk="$(grep -n '^## Checks' "$SKILL" | head -1 | cut -d: -f1)"
   section="$(section_body "$SKILL" '^## Phase 0')"
-  [ -n "$p0" ] && [ -n "$chk" ] && [ "$p0" -lt "$chk" ] && [[ "$section" == *"wc -l"* ]] && [[ "$section" == *"wiki-lint-prohibitions.js"* ]] && [[ "$section" == *"wiki-structure-checks.js"* ]]
+  [ -n "$p0" ] && [ -n "$chk" ] && [ "$p0" -lt "$chk" ] && [[ "$section" == *"wc -l"* ]] && [[ "$section" == *"wiki-lint-prohibitions.js"* ]] && [[ "$section" == *"wiki-structure-checks.js"* ]] && [[ "$section" == *"wiki-lint-model-era.js"* ]]
 }
 
 # --- normal: score formula constants are spelled out -----------------------
 
-@test "Health score section states total_weight=24, weights 3/2/1, and the health: NN/100 format" {
+@test "Health score section states total_weight=25, weights 3/2/1, and the health: NN/100 format" {
   section="$(section_body "$SKILL" '^## Health score')"
-  [[ "$section" == *"total_weight = 24"* ]] && [[ "$section" == *"| error | 3 |"* ]] && [[ "$section" == *"| warn | 2 |"* ]] && [[ "$section" == *"| info | 1 |"* ]] && [[ "$section" == *"health: NN/100 (errors E, warns W, infos I)"* ]]
+  [[ "$section" == *"total_weight = 25"* ]] && [[ "$section" == *"| error | 3 |"* ]] && [[ "$section" == *"| warn | 2 |"* ]] && [[ "$section" == *"| info | 1 |"* ]] && [[ "$section" == *"health: NN/100 (errors E, warns W, infos I)"* ]]
 }
 
 # --- error/negative: the compliance clause must be present verbatim --------
