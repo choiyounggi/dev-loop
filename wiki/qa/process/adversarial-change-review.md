@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://github.com/EveryInc/compound-engineering-plugin
 last_verified: 2026-08-22
-related: [qa-process-evaluating-review-feedback, qa-process-regression-scope, qa-process-post-release-verification]
+related: [qa-process-evaluating-review-feedback, qa-process-regression-scope, qa-process-post-release-verification, infrastructure-agent-orchestration-inbound-validation-ownership-in-task-decomposition]
 ---
 
 # Constructing Failure Scenarios for a High-Risk Diff
