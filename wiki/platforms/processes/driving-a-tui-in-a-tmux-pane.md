@@ -9,7 +9,7 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html
   - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap11.html
 last_verified: 2026-08-25
-related: [platforms-processes-non-interactive-cli-invocation, platforms-processes-background-services, platforms-shells-portable-shell-scripts, infrastructure-agent-orchestration-pane-delivery-confirmation]
+related: [platforms-processes-non-interactive-cli-invocation, platforms-processes-background-services, platforms-shells-portable-shell-scripts, infrastructure-agent-orchestration-pane-delivery-confirmation, platforms-processes-sentinel-driven-repl-payloads]
 ---
 
 # Sending Input to a TUI Running in a tmux Pane

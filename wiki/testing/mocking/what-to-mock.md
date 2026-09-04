@@ -10,7 +10,7 @@ sources:
   - https://abseil.io/resources/swe-book/html/ch12.html
   - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import
   - https://nodejs.org/api/test.html
-last_verified: 2026-08-06
+last_verified: 2026-09-04
 related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-tests-that-cannot-fail, testing-mocking-captured-call-arguments]
 ---
 
@@ -32,6 +32,7 @@ where mocks are breaking on refactors.
 | Pure in-process collaborators you own (domain objects, helpers, services without I/O) | Use the real objects — replacing them tests your guess of your own code |
 | External I/O you don't control: third-party HTTP APIs, payment providers, email/SMS gateways | Stub/mock at the boundary **you own** — your client wrapper interface — with canned responses per case (success, error, timeout) |
 | Nondeterminism sources: clock, randomness, UUID generation | Inject them and substitute a fixed clock / seeded generator in tests |
+| A mock or simulated source that replays several events over an interval (event-stream/SSE mock, scripted fixture timeline) | Stamp each event's timestamp immediately before delivery, inside the per-event emit/`setTimeout` callback, rather than once when the whole event array is built; a build-time stamp gives every event the same instant regardless of when it is actually delivered |
 | Your own DB, when the test's subject is query behavior (SQL shape, mapping, constraints) | Real test database — a mocked DB asserts your assumption of the contract, not the contract ([testing-strategy-test-level-choice]) |
 | A dependency that is real-capable but too slow/stateful for every unit test (your DB behind a repository, a queue) | An in-memory **fake** implementing the same interface, kept honest by running the contract's own integration tests against the real one |
 | Command sent to an external boundary is itself the behavior (charge card, publish event) | Mock the owned boundary interface and assert the **outbound contract**: which command, with what arguments — not internal call sequences leading up to it. Assert the recorded call whole, so no argument of it stays unchecked ([testing-mocking-captured-call-arguments]) |
@@ -73,3 +74,4 @@ where mocks are breaking on refactors.
 - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import — imported bindings are read-only live bindings; reassignment by the importer throws
 - https://nodejs.org/api/test.html — `mock.module()` requires the `--experimental-test-module-mocks` CLI flag
 - Field evidence 2026-08-06 (ESM CLI, `node:test`; the two ESM/tripwire rows are field-tested on top of the doc-verified mechanism): boundary test passed with `PATH=""` while a real `spawnSync("npm")` under the same emptied PATH returned ENOENT; 365/365 suite green
+- Field evidence 2026-08-28 (measured in a linkly-crew orchestration run, commit `530e7e2`): a mock event source computed its entire replay array — including each event's `ts` — in one synchronous build pass, so injecting a fixed or mocked clock at test time could not have separated correct from broken behavior; the defect was in *when* the source's own stamping ran relative to delivery, not in whether the clock was real or injected ([testing-quality-unasserted-return-fields] carries the assertion-side fix)

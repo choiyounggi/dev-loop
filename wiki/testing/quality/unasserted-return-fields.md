@@ -10,8 +10,8 @@ sources:
   - https://arxiv.org/abs/2211.12003
   - https://hypothesis.works/articles/what-is-property-based-testing/
   - https://abseil.io/resources/swe-book/html/ch12.html
-last_verified: 2026-08-06
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-harness-reverse-controls, testing-quality-write-path-assertions, testing-quality-value-preserving-refactor-assertions, testing-quality-expectation-sets-with-one-distinct-value]
+last_verified: 2026-09-04
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-harness-reverse-controls, testing-quality-write-path-assertions, testing-quality-value-preserving-refactor-assertions, testing-quality-expectation-sets-with-one-distinct-value, testing-mocking-what-to-mock]
 ---
 
 # Return Fields No Assertion Reads
@@ -85,6 +85,7 @@ count for such a function and you are judging whether that count is coverage.
 | Two fields are computed by the same expression | Assert each field's value independently, and either drop the relation between them or record it as non-discriminating with that reason — a relation between two copies of one expression cannot fail on a defect that moves both, so keeping it unlabelled adds an assertion that cannot fail |
 | The invariant is violated on inputs the caller cannot produce | Fix the field's domain guard or narrow the grid to reachable inputs, and state which it was — a violation on unreachable input is not a bug in the formula |
 | The composite is returned across a boundary you own (HTTP/JSON) | Assert the fields on the deserialized response, not the internal object, so the serialization is covered too ([testing-quality-write-path-assertions]) |
+| The composite is one of many objects emitted over time by a mock or simulated source (a replayed event stream, an SSE mock, a scripted fixture timeline) rather than a single call's return | Assert the temporal relation across the sequence — timestamps strictly increase in delivery order — in addition to each event's own field existence; a source that stamps every event at build time rather than at emit time passes an existence-only assertion while every event carries the identical value |
 
 ## Instead of
 
@@ -103,3 +104,4 @@ count for such a function and you are judging whether that count is coverage.
 - https://hypothesis.works/articles/what-is-property-based-testing/ — property-based testing as "the construction of tests such that, when these tests are fuzzed, failures in the test reveal problems with the system under test that could not have been revealed by direct fuzzing of that system" — why an invariant plus generated inputs finds what per-case assertions miss
 - https://abseil.io/resources/swe-book/html/ch12.html — test the behaviors (guarantees) a unit makes; a cross-field invariant is one such guarantee and needs its own assertion
 - Field reproduction 2026-08-05 (manday estimation engine): the suite held 58 passing assertions over a function returning `lo`/`sp`/`hi`; `lo` and `hi` appeared in none of them. Four mutations of their formulas (percentile `p25`→`p75`, `p75`→`p25`, scope factor large→small) each left all 58 assertions passing, while the no-op control survived — confirming the harness discriminated. Adding `lo ≤ sp ≤ hi` over the full discrete input grid surfaced 13 combinations with `sp > hi`
+- Field evidence 2026-08-28 (measured in a linkly-crew orchestration run, commit `530e7e2` "stamp MockEventSource ts at delivery, not build time"): a mock event source's `buildScenario()` stamped every event's `ts` synchronously at build time, so 30–60 replayed events showed an identical timestamp instead of progressing over a ~10 s replay; the existing 63-test suite asserted only that `ts` was present, never that it progressed. The fix left `ts` as a placeholder at build time and stamped the real clock in the per-event delivery callback immediately before each event fired; the added regression test asserts two delivered events' `ts` values differ and increase in delivery order, and was confirmed to fail against the pre-fix code before merging
