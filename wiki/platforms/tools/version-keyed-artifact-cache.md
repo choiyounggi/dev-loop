@@ -9,7 +9,8 @@ sources:
   - https://github.com/anthropics/claude-code/issues/45542
   - https://github.com/anthropics/claude-code/issues/17361
   - https://github.com/anthropics/claude-code/issues/61954
-last_verified: 2026-08-04
+  - https://github.com/mattpocock/skills/blob/main/scripts/sync-plugin-version.mjs
+last_verified: 2026-09-04
 related: [platforms-toolchains-version-management, platforms-tools-plugin-mcp-server-registration, platforms-tools-unpacked-extension-source-reload]
 ---
 
@@ -48,6 +49,21 @@ consumer's "update" to deliver the new code. The update runs, reports success or
    reinstall. Known updater bugs leave the cache stale even after a version bump;
    a manual clear is the reliable fallback.
 
+5. **Prefer one manifest as the version's source of truth; gate the pair with
+   CI only if you keep both.** Claude Code reads `plugin.json`'s version and
+   ignores `marketplace.json`'s when both are set, so declaring it in one
+   place removes the drift risk entirely. If you keep both anyway — for
+   example so the marketplace listing shows a version without an install —
+   add a script with a `--check` mode that compares the two, matched by
+   plugin **name** (a self-referential marketplace's own entry has a git-URL
+   `source`, not a local path, so a path-keyed comparison resolves nothing),
+   and run it in CI on every push and before any automated release bump.
+
+| Case | Do |
+|------|----|
+| You control only `plugin.json` | Leave `version` unset in the marketplace entry; there is nothing left to drift |
+| You need both fields populated (display, tooling) | Add a `--check`-mode sync/compare script and run it in CI; treat a mismatch or a missing matching entry as a build failure, not a warning |
+
 ## Edge cases
 
 | Case | Then |
@@ -71,3 +87,6 @@ consumer's "update" to deliver the new code. The update runs, reports success or
 - https://github.com/anthropics/claude-code/issues/17361 — cache never refreshes; Claude reads the stale cached copy even with autoUpdate
 - https://github.com/anthropics/claude-code/issues/61954 — `plugin update` reports "at latest" while the cache stays stale vs. a refreshed marketplace
 - Observed 2026-08-04: `~/.claude/plugins/cache/` holds per-version sibling dirs (`figma/2.2.81`, `2.2.87`, `2.2.88`; `dev-loop/0.8.0`…`0.11.0`), confirming the cache is keyed by version string
+- https://code.claude.com/docs/en/plugin-marketplaces — "Avoid setting `version` in both `plugin.json` and the marketplace entry. Claude Code always uses the `plugin.json` value without warning, so a stale manifest version can mask a version you set in `marketplace.json`" — the single-source-of-truth alternative to gating
+- https://github.com/mattpocock/skills/blob/main/scripts/sync-plugin-version.mjs — public reference implementation: `--check` mode compares `plugin.json`'s version against `package.json`'s and exits 1 with a fix-it message on drift, wired as `npm run check-plugin-version`
+- Local observation 2026-09-04 (this repo, dev-loop): `scripts/check-versions.sh` implements this gate — matches `marketplace.json` entries to `plugin.json` by plugin name (not source path, since this marketplace's one entry is self-referential with a git-URL source), fails the build on any mismatch or on zero matching entries, and runs as a named "Version gate" step in `.github/workflows/test.yml` and inside `auto-release.yml`'s automated bump; the workflow step's comment records that "this pair has drifted unenforced before (a real release incident)"
