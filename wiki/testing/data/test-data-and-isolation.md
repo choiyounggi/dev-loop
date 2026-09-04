@@ -6,11 +6,13 @@ applies_to: [general]
 confidence: verified
 sources:
   - https://martinfowler.com/articles/nonDeterminism.html
+  - https://docs.python.org/3/library/unittest.mock.html
+  - https://docs.pytest.org/en/stable/how-to/monkeypatch.html
   - https://abseil.io/resources/swe-book/html/ch12.html
   - https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html
   - https://nodejs.org/api/fs.html
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/env.html
-last_verified: 2026-08-29
+last_verified: 2026-09-03
 related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-strategy-import-time-side-effects, testing-data-artifact-leakage-from-a-suite, testing-quality-behavior-not-implementation, platforms-filesystems-permissions-and-exec-bits, backend-common-change-impact-call-site-enumeration, testing-data-harness-vs-run-path-fixtures, infrastructure-agent-orchestration-shared-run-state]
 ---
 
@@ -44,6 +46,7 @@ state-leak symptom.
 | Unique-constrained values (emails, usernames, external ids) | Generate per test (counter, UUID suffix) inside the factory — hardcoded constants collide across tests and across parallel runs |
 | Filesystem / temp files | Create a fresh per-test temp directory and remove it in teardown; when directories are already accumulating, attribute them to their creators first ([testing-data-artifact-leakage-from-a-suite]) |
 | Global config / environment variables / singletons mutated by a test | Set in setup, restore in teardown that runs on failure too (`finally`/fixture teardown) |
+| A test sets an env var by direct assignment (`os.environ[k] = v`) rather than through `unittest.mock.patch.dict` or pytest `monkeypatch.setenv`/`delenv` | Record the prior value **or its absence** in setup and restore that exact state in teardown; or switch to `patch.dict(os.environ, {...})` / `monkeypatch`, which restore the dictionary to its pre-test state on exit — a teardown that only `pop`s the key removes what the test added and never puts back a value that was already there |
 | Code under test derives a write path from the environment (`~/...`, `$HOME`, `$XDG_CONFIG_HOME`, `%APPDATA%`) and would touch the real machine | Point that environment variable at a per-test scratch directory in setup and restore it in `finally`; the production path expression then resolves inside the scratch tree with no signature change. Assert afterwards that the real location gained no files |
 | A case whose behavior depends on a variable being **absent** (`run env VAR=x cmd`, `subprocess(env={...})`) | `unset` it in setup — `env` merges into the inherited environment unless given `-i`, so running the suite from a session that exports it silently flips that case to the opposite branch; CI's clean environment stays green and hides it |
 | A fixture file must carry the executable bit (permission checks, PATH/binary-resolution code) | Create it with the mode set at creation time (`writeFileSync(p, body, { mode: 0o755 })`, `open` with a mode) inside a per-test directory under an already-gitignored build-output path of the repo, and remove it in teardown |
@@ -60,6 +63,7 @@ state-leak symptom.
 | A seeded reference dataset is genuinely shared (country codes, static enums) | Load it once per suite and treat it as immutable; tests still create their own mutable rows |
 | Suite is too slow because every test builds a deep object graph | Move the invariant graph into a per-suite setup that tests never mutate; keep mutated entities per-test |
 | Failure appears only in the full suite, never alone | Run the suite in random order to expose the order dependency, then bisect to the polluting test; fix the polluter's ownership, not the victim ([testing-flaky-diagnosing-flaky-tests]) |
+| The suite is green locally after an env-mutating test, and you are about to cite that as proof the teardown restores state | A fallback in the code under test can absorb the leaked value (a tool resolved through a Homebrew path when the overridden `PATH`/`*_BIN` variable is wrong), so local green is silent on the leak. Add a regression test that reads the variable after the mutating test's teardown and asserts the caller's original value, and run the suite once on a runner without the fallback |
 | Test needs "now"-relative data but the code reads the system clock directly | Refactor the code to accept an injected clock; that seam is the fix — assertions with tolerance windows around real time stay flaky |
 | A group of tests fails as a lookup miss, an empty result, or a "not found" far from any fixture code | Compare each factory's defaulted values against the input the test actually runs before migrating fixture shape; when the two disagree, the fixture was built for a different input and only the signature change fixes the group |
 | The executable fixture is rewritten between tests | Delete and recreate it: a write to an existing path keeps the original mode, so a second write with a different mode leaves the first one in place (measured on Node v25.8.1) |
@@ -78,11 +82,15 @@ state-leak symptom.
 | Let a factory seed itself from a module-level constant while the test passes a different value to the code under test | Take that value as a factory parameter and name it at every call site | The fixture is then built for the input the test actually runs; a defaulted constant makes the two drift apart with nothing in the test body showing it |
 | Add a directory parameter to a production function so a test can redirect its writes | Redirect the environment variable that function already reads, restoring it in `finally` | A test-only parameter widens a public signature the callers are pinned to and lets a caller inject a wrong directory; the env var is a seam the production code already has |
 | Add cleanup at every temp-file call site a grep finds | Attribute first by prefix counts, fix the dominant producers, then add a static check for the convention the compliant files already follow | Leak volume concentrates in a few sites; matching counts to call sites confirms the cause, and the static check stops the recurrence an instance-only fix invites |
+| Write `os.environ.pop(KEY, None)` in `tearDown` to clean up a variable the test set | Save the prior value or absence in `setUp` and restore it, or use `patch.dict`/`monkeypatch` | `pop` restores nothing: when the key already existed, every later test runs with it missing; a fallback path in the code under test keeps the local suite green while a runner without the fallback fails in bulk |
 
 ## Sources
 
 - https://martinfowler.com/articles/nonDeterminism.html — isolation between tests, wrapping the system clock, callbacks/polling over bare sleeps
 - https://abseil.io/resources/swe-book/html/ch12.html — a test is complete when "its body contains all of the information a reader needs in order to understand how it arrives at its result"; prefer test code that is DAMP ("Descriptive And Meaningful Phrases") over strictly DRY, and state values a test explicitly cares about directly in the test rather than leaving them to a setup method's defaults
 - https://testing.googleblog.com/2017/01/testing-on-toilet-keep-cause-and-effect.html — keep the inputs a test's result depends on visible in the test method instead of in shared setup, so the cause-and-effect relationship is readable without jumping elsewhere
+- https://docs.python.org/3/library/unittest.mock.html — `patch.dict`: "Patch a dictionary, or dictionary like object, and restore the dictionary to its original state after the test, where the restored dictionary is a copy of the dictionary as it was before the test"
+- https://docs.pytest.org/en/stable/how-to/monkeypatch.html — `setenv`/`delenv`: "All modifications will be undone after the requesting test function or fixture has finished"
+- Field incident 2026-09-03 (linkly, fix commit d778e31, regression test `TestLlvmBinOverrideRestoresCallerEnv`): a test overrode the LLVM binary env var and its `tearDown` only popped the key; on macOS the Homebrew fallback resolved the tools anyway and the full local suite stayed green, while a runner without that fallback reported 122 cascading failures
 - Field incident 2026-08-04 (`linkly-t1-repo-policy`, Python): `rows_for(doc)` seeded its rows from the module constant `PAYLOAD` while its tests ran payload `{}`; a shape-only migration of the helper fixed 1 of 11 failures, and moving the payload into the helper's signature fixed 11 of 11
 - Field incident 2026-08-14 (dev-loop issue #100): `launch-session.sh` exports `LO_RUN_ID`/`LO_STATUS_DIR`/`LO_TASK_ID` into every worker session; a worker running `bats tests/launch-session.bats` inherited them — 6 deterministic failures absent on a clean shell, reproduced with `env LO_RUN_ID=… bats`, and the live run's `t90.json` status file was found rewritten with bats tempdir paths and a foreign session name
