@@ -10,7 +10,7 @@ sources:
   - https://docs.semgrep.dev/writing-rules/testing-rules
   - https://docs.pytest.org/en/stable/reference/exit-codes.html
 last_verified: 2026-08-06
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, backend-common-change-impact-call-site-enumeration, platforms-processes-tool-diagnostics-without-a-failing-exit-code, qa-process-scope-purity-checks, testing-quality-history-dependent-checks-on-shallow-clones]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, backend-common-change-impact-call-site-enumeration, platforms-processes-tool-diagnostics-without-a-failing-exit-code, qa-process-scope-purity-checks, testing-quality-history-dependent-checks-on-shallow-clones, testing-quality-assertion-scanner-false-positive-on-unittest-convention]
 ---
 
 # Validating a Check Whose Target Does Not Exist Yet

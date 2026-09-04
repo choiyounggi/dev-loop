@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://github.com/velopert/velog-server/blob/master/src/lib/token.ts
 last_verified: 2026-08-14
-related: [debugging-methodology-hypothesis-testing, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts]
+related: [debugging-methodology-hypothesis-testing, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, debugging-methodology-silent-registration-failure-in-a-finder-launched-app]
 ---
 
 # A Passing Precondition Probe for a Failing Operation
