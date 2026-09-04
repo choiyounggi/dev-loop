@@ -26,9 +26,9 @@
   },
   "explore": {
     "kind": "cli",
-    "ref": "rtb-sourcecode",
-    "how": "find-references / read-definition for external repos and symbols",
-    "when": "step 1 — locating code, symbols, call sites (read-only)"
+    "ref": "graphify",
+    "how": "graphify explain \"<Symbol>\" --graph <root>/graphify-out/graph.json | head -40; graphify path \"<A>\" \"<B>\" --graph <root>/graphify-out/graph.json",
+    "when": "step 1 before opening source, and orchestrate Phase 2 leads — only after scripts/graph-freshness.sh printed fresh; a hit is a lead to confirm by search"
   },
   "design": {
     "kind": "mcp",

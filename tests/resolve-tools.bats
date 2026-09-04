@@ -124,3 +124,22 @@ setup() {
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r '.kind')" = "default" ]
 }
+
+# --- explore: graphify code graph as the optional orientation layer ----------
+# (wiki/infrastructure/agent-orchestration/code-graph-as-orientation-layer.md)
+
+@test "explore role is configurable as the graphify cli (lead-not-evidence orientation layer)" {
+  printf '{"explore":{"kind":"cli","ref":"graphify","how":"graphify explain \\"<Symbol>\\" --graph <root>/graphify-out/graph.json | head -40"}}' > "$PROJ_CFG"
+  run bash "$RT" --role explore
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.kind')" = "cli" ]
+  [ "$(printf '%s' "$output" | jq -r '.ref')" = "graphify" ]
+  [[ "$(printf '%s' "$output" | jq -r '.how')" == *'graphify explain'* ]]
+}
+
+@test "no config: explore default text points at the graphify option without changing kind" {
+  run bash "$RT" --role explore
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.kind')" = "default" ]
+  [[ "$(printf '%s' "$output" | jq -r '.when')" == *'graphify'* ]]
+}

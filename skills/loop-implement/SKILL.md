@@ -44,9 +44,12 @@ pass executes decisions instead of guessing them. See step 2 below.
 The *other* steps can use environment-specific tools through named **capability
 roles**: `knowledge` (domain facts / policy / code values), `tacit` (past
 incidents, edge cases, danger zones), `verify` (the project's test / build / QA
-command), `explore` (code/symbol search), `design` (visual/UI spec for a UI
-task, e.g. a Figma link), and `research` (external best-practice/pitfall search
-for wiki-plan Phase A4/A3 and `[no-wiki]` grounding in Phase B — see below).
+command), `explore` (code/symbol search — a fresh graphify graph is the
+recommended cli; call the binary directly and never load the graphify skill
+document (1,300+ lines), see `references/tool-profile.md`), `design`
+(visual/UI spec for a UI task, e.g. a Figma link), and `research` (external
+best-practice/pitfall search for wiki-plan Phase A4/A3 and `[no-wiki]`
+grounding in Phase B — see below).
 (`plan` is intentionally absent — see above.) Resolve them once at the start:
 
 ```
@@ -107,7 +110,12 @@ starting the next, so a downstream task always builds on a verified upstream one
                         task's Inputs (confirm each exists; a missing Input is a
                         plan defect -> 7b, not a stand-in). List the test
                         scenarios. Consult `knowledge`/`tacit`/`explore` if
-                        configured; for a UI task read the `<design_spec>`/`design`. [TDD step 1 / PDCA Plan]
+                        configured; when `explore` is graphify, run
+                        `graphify explain "<Symbol>" --graph <root>/graphify-out/graph.json | head -40`
+                        (and `graphify path "<A>" "<B>"` for a suspected edge)
+                        BEFORE opening source files — its hits are leads to
+                        confirm by search, never evidence; for a UI task read
+                        the `<design_spec>`/`design`.                          [TDD step 1 / PDCA Plan]
 3. Write tests (Red) — failing test(s) BEFORE code, from the task's Verify/Objective.
                         If test-first is impractical (exploratory UI), fix the
                         acceptance criteria / verify command first.             [TDD test-first]
@@ -119,7 +127,11 @@ starting the next, so a downstream task always builds on a verified upstream one
                         preserve failure output. Use the `verify` role if set.    [PDCA Check / self-testing code]
 6. Self-review + refactor — bugs, edge cases, resource leaks, input validation,
                         unused code; re-check against the named pages' edge-case
-                        rows and the `tacit` danger zones if configured.          [TDD Refactor / self-review]
+                        rows and the `tacit` danger zones if configured; when
+                        `explore` is graphify, list every assumption taken from
+                        the graph and not confirmed by a search as
+                        `graph-derived: <assumption>` (or `graph-derived: none`)
+                        on the task report's NOTES line.                        [TDD Refactor / self-review]
 6.5 Floor + independent audit — REQUIRED: run the test-floor.sh mechanical
                         pre-gate first; exit 3 is an immediate VERDICT: FAIL
                         (loop to step 3) without spending the auditor call.

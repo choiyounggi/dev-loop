@@ -14,7 +14,7 @@ the generic built-in behavior. Nothing breaks when nothing is configured.
 | `knowledge` | domain facts, business policy, code/status values | loop-implement step 1 (Analyze); orchestrate Phase 0/2 |
 | `tacit`     | past incidents, edge cases, coupling/danger zones | loop-implement step 1 (Analyze) + step 6 (Self-review) |
 | `verify`    | running the project's tests / build / QA checks   | loop-implement step 5 (Run); orchestrate Phase 5 (integration) |
-| `explore`   | locating code, symbols, call sites (read-only)    | loop-implement step 1 (Analyze) |
+| `explore`   | locating code, symbols, call sites (read-only); optionally a fresh graphify code graph as a lead | loop-implement step 1 (Analyze) + step 6; orchestrate Preflight (freshness) + Phase 2 (leads) |
 | `design`    | visual/UI spec for FE/UI tasks (e.g. a Figma link in the issue) | orchestrate Phase 0/2 + brief; loop-implement step 1 (Analyze) |
 | `research`  | external best-practice/pitfall search for a feature's domain, and evidence for `[no-wiki]` decisions | wiki-plan Phase A4 (external research), Phase A3 (spike research), Phase B (`[no-wiki]` grounding) |
 
@@ -37,6 +37,41 @@ tasks skip it even when configured. Example mapping to a Figma MCP:
               "how": "get_spec_links -> inspect_node / get_dev_ready / get_design_tokens",
               "when": "issue has a Figma link AND the change touches UI; skip for backend-only tasks" } }
 ```
+
+### `explore` — a graphify code graph as the orientation layer (optional)
+
+With graphify installed (`pipx install graphifyy`) and a graph built once
+(`/graphify <root>` in any assistant, or `graphify update <root>` for the
+AST-only refresh), configure:
+
+```json
+{
+  "explore": {
+    "kind": "cli",
+    "ref": "graphify",
+    "how": "graphify explain \"<Symbol>\" --graph <root>/graphify-out/graph.json | head -40; graphify path \"<A>\" \"<B>\" --graph <root>/graphify-out/graph.json",
+    "when": "step 1 before opening source, and orchestrate Phase 2 — only after scripts/graph-freshness.sh printed fresh"
+  }
+}
+```
+
+Rules the skills apply (basis:
+`wiki/infrastructure/agent-orchestration/code-graph-as-orientation-layer.md`):
+
+- **Freshness first.** `sh ${CLAUDE_PLUGIN_ROOT}/scripts/graph-freshness.sh <root>`
+  exits 0 `fresh`, 2 `stale <N>`, 3 `absent`, 4 `cannot-evaluate <reason>`;
+  the graph is used only on 0. On 2 the human chooses whether to run
+  `graphify update <root>`; the plugin never runs a build itself.
+- **Lead, not evidence.** A graph hit enters a plan only paired with a search:
+  `graphify explain <Symbol> -> <N> connections; grep -rn <Symbol> src -> <n>
+  hits`. Unconfirmed assumptions are reported as `graph-derived:`.
+- **CLI only, bounded output.** `explain`/`path` through `head -40`, `query`
+  with `--budget 800`; the graphify skill document is never loaded.
+- **Worktrees.** Workers point `--graph` at the main checkout's
+  `graphify-out/graph.json` (gitignored, so no worktree carries it); the graph
+  reflects the integration base.
+
+Unset, `explore` resolves to `default` and nothing above runs.
 
 ### `research` — external best-practice/pitfall search (optional, fixed interpretation order)
 
