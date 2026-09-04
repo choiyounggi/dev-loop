@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html
   - https://git-scm.com/docs/git-check-ignore
-last_verified: 2026-09-03
+last_verified: 2026-09-04
 related: [qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-unattended-worker-questions]
 ---
 
@@ -54,6 +54,15 @@ task in it.
    a transcription error as easy for the planner to make as any other
    bookkeeping slip. Trust the prose and treat the table as defective:
    report it rather than implementing tasks in the table's stated order.
+7. **When a plan for one target repo is copied from a sibling plan written
+   for a different target under the same gate** (the same version-comparison
+   gate, ported to a new repo or component), read the one manifest field the
+   copied comparison depends on in the target's real config before dispatch —
+   one `jq` or grep read is cheaper than a re-plan round. A pairing assumed
+   from the sibling (for example "compare against the local-path source
+   field") silently compares nothing when the target's actual entry has a
+   different shape (a `url`-sourced self-reference has no local-path field),
+   and a gate comparing nothing still reports a pass.
 
 | Finding | Do |
 |---------|----|
@@ -61,6 +70,7 @@ task in it.
 | A number, ordering, or collision disagrees | Escalate with the recomputation attached; do not encode either value in a test until the plan owner rules |
 | A deliverable is gitignored or a decision has no enactment | Escalate as a plan defect; it blocks every consumer, not only you |
 | A task's Steps prose names another task's not-yet-built symbol in a direction the dependency table contradicts | Escalate as a plan defect with both readings attached; do not implement in the table's order until the plan owner rules |
+| A plan's structural premise (a manifest field's shape, a source type) was copied from a sibling repo's or task's plan rather than read from this target | Read the target's real manifest field once before dispatch; escalate if it differs from the copied premise instead of implementing a gate that would compare nothing |
 
 ## Edge cases
 
@@ -85,3 +95,4 @@ task in it.
 - https://git-scm.com/docs/git-check-ignore — checks "whether the file is excluded by .gitignore … and output the path if it is excluded"; `-v` prints the matching exclude pattern with the path
 - Field evidence 2026-08-25 (wt-t1-foundation, coordinator-authored design-system plan): recomputing WCAG luminance from the plan's hex codes showed the neutral scale's stated monotonic ordering broke at 2 of 11 positions while every pairwise ratio was correct; two new canonical symbol names duplicated names marked "keep as deprecated alias" (a Swift duplicate-declaration error); one decision in the plan's decision→page map had no enacted rule; `git check-ignore -v DESIGN.md` matched a pre-existing rule, hiding the core deliverable from every downstream task. All four were escalated and fixed on the plan side
 - Field evidence 2026-08-29 (wt-t4-event-push, plan `.orchestration/plans/t4-event-push.md`): Task 03 (reminder-sweep)'s Steps section said "call Task 04's formatReminderBody", but the plan's Task order table listed Task 04 as depending on Task 03, the reverse of what the prose required. Reported instead of implementing in the table's order; the coordinator patched the plan with an explicit execution-order column, re-verified it consistent, and implementation then proceeded without a broken build
+- Field evidence 2026-08-23 (dev-loop mpa1 orchestration run, dl-version-gate task): a coordinator wrote the version-gate plan for dev-loop by copying a sibling task's plan for a different repo, carrying over a local-path source pairing. dev-loop's own marketplace entry is a `url`-source self-reference, not a local path, so the copied pairing would have compared nothing and the gate would always pass. The worker's adopt-or-report gate flagged the premise instead of implementing it; the coordinator re-planned to a name-match pairing (r2), approved on 6 green bats cases — a full re-plan round that one `jq` read of the real `source` field would have avoided
