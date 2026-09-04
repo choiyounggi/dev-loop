@@ -50,7 +50,7 @@ specific tags below as authority.
   <!-- which tools/sources to use; subagent usage is in the session prompt protocol.
        fill the resolved tool-profile roles here (resolve-tools.sh) so the session
        inherits them: knowledge=<tool|default>, tacit=<tool|default>, plan=<tool|default> -->
-  <tools_guidance>{e.g. docs/specs to read, how to explore; DB read-only if any; resolved roles — knowledge/tacit/plan}</tools_guidance>
+  <tools_guidance>{e.g. docs/specs to read, how to explore; DB read-only if any; resolved roles — knowledge/tacit/explore; when explore=graphify: "explore: graphify — graphify explain \"<Symbol>\" --graph <main-root>/graphify-out/graph.json | head -40 (lead, not evidence; graph reflects the integration base)"}</tools_guidance>
 
   <constraints>{local rules; surgical changes only on shared files}
   token hygiene: bound tool output (tail/head, ranged reads); delegate visual checks to a subagent — see wiki/infrastructure/agent-orchestration/session-context-token-budget.md</constraints>

@@ -83,7 +83,12 @@ token remains, so leaving a question unresolved is what blocks entry to Phase B
   record one command that can be copy-pasted and re-run as-is; gate-A re-runs
   this exact command.
 - `### Affected files` — every bullet needs an `evidence:` token backed by a
-  real search (`<path> — evidence: <search command> -> <n> hits`).
+  real search (`<path> — evidence: <search command> -> <n> hits`). A
+  code-graph hit (`explore` = graphify) may be cited only in the same bullet
+  as that search, as a lead: `<path> — evidence: graphify explain <Symbol> ->
+  <N> connections; <search command> -> <n> hits` — the graph chooses where to
+  look, the search decides what is true
+  (`wiki/infrastructure/agent-orchestration/code-graph-as-orientation-layer.md`).
 - `Constraints` — every pinned file, protected span, and CI requirement this
   feature touches, each with the command used to check it; if none apply, say
   so explicitly (an empty section fails the gate).

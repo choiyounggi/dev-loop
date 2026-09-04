@@ -39,7 +39,7 @@ DEFAULTS='{
   "knowledge": {"kind":"default","when":"domain facts, policy, code/status values (step 1)"},
   "tacit":     {"kind":"default","when":"past incidents, edge cases, danger zones (step 1/6)"},
   "verify":    {"kind":"default","when":"running tests / build / QA checks (step 5)"},
-  "explore":   {"kind":"default","when":"locating code, symbols, call sites (step 1)"},
+  "explore":   {"kind":"default","when":"locating code, symbols, call sites (step 1); with a fresh graphify graph, configure {\"kind\":\"cli\",\"ref\":\"graphify\"} — see references/tool-profile.md"},
   "design":    {"kind":"default","when":"visual/UI spec for FE/UI tasks, e.g. a Figma link in the issue — read the referenced design before implementing (orchestrate Phase 0/2; loop-implement step 1)"},
   "research":  {"kind":"default","when":"external best-practice/insight search during plan phases A/B; resolution order owned by loop-implement SKILL (configured tool -> brave-search MCP -> built-in WebSearch -> ABANDON)"}
 }'

@@ -64,7 +64,8 @@ Resolve the pluggable tool profile once up front:
 `sh ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh --summary`. It maps capability
 roles — `intake` (issue-tracker work-list source), `knowledge` (domain/policy),
 `tacit` (incidents/danger zones), `verify` (test/build/QA
-command), `explore` (code search), `design` (visual/UI spec, e.g. Figma) — to
+command), `explore` (code search; a fresh graphify graph when Preflight says
+so), `design` (visual/UI spec, e.g. Figma) — to
 whatever tools this installation has, or to generic defaults when unset (optional,
 layered per-user then per-repo; see `references/tool-profile.md`). Use
 `knowledge`/`tacit` yourself during Clarify/Decompose, and write each task's
@@ -159,6 +160,22 @@ missing, stop and ask the user to install it (the SessionStart preflight hook is
 advisory only; this skill must hard-require them). For a missing tmux: with the
 user's consent, install it (macOS: `brew install tmux`; otherwise advise) before
 launching sessions. Never auto-install without consent.
+
+**Code-graph freshness (optional `explore` lead).** Run
+`sh ${CLAUDE_PLUGIN_ROOT}/scripts/graph-freshness.sh <root>` once, bare (read
+its exit code on the next line, never in a pipe). It never runs graphify
+itself. Branch on the code: **0** (`fresh`) — set `explore` to graphify for
+this run and write the row from Phase 3 step 2 into every brief; **2**
+(`stale <N>`) — ask ONE chooser (§ Asking the user): "graphify graph is stale
+(<N> files changed since it was built) — run `graphify update <root>` now
+(AST-only, seconds, no LLM), or continue without the graph?" with *update* as
+the recommended answer; run the update only on an explicit yes and re-run the
+freshness check afterwards; **3**/**4** (`absent` / `cannot-evaluate <reason>`)
+— print one line saying the graph is not in use and continue exactly as
+before. The coordinator never runs a full `/graphify` build and never loads
+the graphify skill document: the CLI is the whole interface
+(`graphify --help`). Basis:
+`wiki/infrastructure/agent-orchestration/code-graph-as-orientation-layer.md`.
 
 **Coordinator permissions (tmux substrate).** `launch-session.sh` starts each
 worker as `claude --permission-mode bypassPermissions` — the exact surface an
@@ -283,6 +300,21 @@ Write BOTH artifacts: `conflict-matrix.md` for humans and
 `.orchestration/graph.json` for the scheduler. A markdown table is not machine
 readable.
 
+**Graph leads (only when Preflight set `explore` to graphify).** For each
+candidate task, run `graphify explain "<Symbol>" --graph
+<root>/graphify-out/graph.json | head -40` on the symbols the task names, and
+`graphify path "<A>" "<B>" --graph <root>/graphify-out/graph.json` for a
+suspected edge between two tasks. The printed connections seed the task's
+affected files and its shared surfaces; the disjointness test in the conflict
+matrix runs on the confirmed sets, never on the graph's guesses. A graph hit is
+a lead, not evidence: every file it suggests is confirmed by a search before it
+enters `files`, and the record pairs both in one line —
+`graphify explain <Symbol> -> <N> connections; grep -rn <Symbol> src -> <n> hits`.
+Ask symbol-anchored questions only; a free-text `graphify query` is for
+orientation (`--budget 800`) and never derives a file set. Any assumption taken
+from the graph and not confirmed is recorded on the blackboard as
+`graph-derived: <assumption>`.
+
 ```json
 { "tasks": [
     { "id": "t1", "deps": [],     "files": ["src/auth/**"], "outputs": ["AuthToken"] },
@@ -358,7 +390,12 @@ answered.
      `<tools_guidance>` and `<design_spec>` — then launch session and watch
      until `plan_ready` (step 3 below). **Write the brief at dispatch time.**
      It only needs the signatures this task consumes, and by then those are
-     `approved`, so they're settled.
+     `approved`, so they're settled. When `explore` is graphify, the
+     `<tools_guidance>` row is: `explore: graphify — graphify explain
+     "<Symbol>" --graph <main-root>/graphify-out/graph.json | head -40 (lead,
+     not evidence; the graph reflects the integration base, and a worktree
+     carries no graphify-out)` with `<main-root>` the absolute main-checkout
+     path.
    - **3** Collect `plans/<task>.md` when each session reaches `plan_ready`.
 3. For each planned task, deliver §2 (implement) with `scripts/send-prompt.sh
    send lo-<n> "<prompt>"` (tmux, see Phase 4 for exit-code branch logic), or
