@@ -5,7 +5,7 @@ three stack subtrees — route by concern first, stack second:
 
 | Subtree | Route there when |
 |---------|------------------|
-| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, enumerating call sites before a contract change, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, consuming LLM APIs (completion validation, context budgeting), MAPE-aligned point-prediction calibration, consuming external-API responses, externally-owned defaults, object-storage references, sync-vs-async integration choice, WebSocket/SSE connection lifecycle |
+| [common](#common-language-agnostic) (below) | The concern is language-agnostic: API contracts, enumerating call sites before a contract change, idempotency, JWT issuance, outbound calls, caching, jobs, transactions in app code, shared state/pools, exception structure, consuming LLM APIs (completion validation, context budgeting), MAPE-aligned point-prediction calibration, benchmark-relative signal rating, consuming external-API responses, externally-owned defaults, object-storage references, sync-vs-async integration choice, WebSocket/SSE connection lifecycle |
 | [java](java/index.md) | You are writing/reviewing JVM backend code (Java/Kotlin, Spring, JPA/Hibernate) and the concern is stack-specific: entity mapping, persistence context, proxy pitfalls, JVM threads/memory |
 | [node](node/index.md) | You are writing/reviewing Node.js/TypeScript backend code: event-loop blocking, promise error handling, runtime validation at boundaries, graceful shutdown |
 | [python](python/index.md) | You are writing/reviewing Python backend code: GIL/concurrency model, pydantic validation, WSGI/ASGI workers, language traps, packaging data files and resolving them after install |
@@ -103,6 +103,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [mape-aligned-point-prediction](common/ml/mape-aligned-point-prediction.md) | A regression model evaluated by MAPE was trained as a median predictor (log target + L1 loss, or quantile q50) — deciding what point value to emit, or the model systematically overpredicts on MAPE despite fitting well; choosing between a global scale factor and per-row variance-based correction |
+| [benchmark-relative-signal-classification](common/ml/benchmark-relative-signal-classification.md) | Code grades a per-entity observation (a stock's move or buy-flow, a store's sales jump, a cohort's lift, a service's latency change) as entity-specific strength while a driver shared by the whole population (market index, holiday, platform-wide release, seasonality) moves every entity; the same "strong" label fires across most of the population on one day; choosing the benchmark and the window a signal grader needs; the benchmark feed is missing |
 
 ### integrations
 

@@ -85,6 +85,7 @@ an orchestrated run.
 | A subagent's result must reach the main session | Have it return only a text summary — the verbose intermediate output stays in the subagent's own context and is never itself pasted into the caller |
 | Several images must stay referenceable across a long session | Upload each through the Files API and pass its `file_id` instead of inlining base64 bytes on every turn |
 | The session is a single chat interaction rather than an orchestrated run | The 4x/15x/7x multipliers above do not apply; the accumulated-context mechanism in directive 1 still does |
+| Measuring a live session's own context from the transcript store (Claude Code writes one `<session-id>.jsonl` per session under `~/.claude/projects/<escaped-cwd>/`) | Pass the newest-mtime transcript file, not the directory: the directory accumulates every past session of that project, so a directory-wide report aggregates them all and old sessions past the threshold emit warnings unrelated to the run — the live session is the only file being written, so the newest file is it |
 
 ## Instead of
 
@@ -105,3 +106,4 @@ an orchestrated run.
 - https://platform.claude.com/docs/en/build-with-claude/vision — current image-token formula `⌈width / 28⌉ × ⌈height / 28⌉` (28x28-pixel patches); base64 images resent in full on every turn; Files API `file_id` keeps payload size flat
 - https://www.anthropic.com/engineering/multi-agent-research-system — multi-agent systems measured at ~15x the tokens of a single chat interaction (~4x per individual agent); reserved for high-value, parallelizable, or context-exceeding tasks
 - Field evidence 2026-08-21 (dev-loop orchestration run): the coordinator session ended a run at approximately 501k tokens of accumulated context over 593 API calls, with approximately 164M cumulative cache-read tokens billed across the run; a post-run review found approximately 2.2MB of screenshot PNGs had been Read directly into the coordinator's own context over the run instead of delegated to a subagent per directive 3 — a measured instance of that directive's cost when skipped
+- https://code.claude.com/docs/en/sessions — transcripts are stored as `<project>/<session-id>.jsonl`, where `<project>` is the working-directory path with non-alphanumeric characters replaced by `-`. Measured 2026-08-25 (dev-loop repo): the project's directory held 49 `.jsonl` files and a directory-wide report printed 10 `warn:` lines, none for the live coordinator session (peak 216,403, under threshold); the newest-file form returned a 2-row table with empty stderr
