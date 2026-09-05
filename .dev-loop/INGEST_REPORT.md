@@ -1,237 +1,69 @@
-# Knowledge flush — 13 insight(s) ingested (21 claimed, 2 dropped, 6 released)
+# Knowledge flush — 12 insight(s)
 
-Cross-Check: 1× independent adversarial `claude` CLI headless pass over the 5 new pages — it refuted the changed-files gate page's "prettier exits 0 on an empty match set" claim; re-measured against Prettier 3.7.4, confirmed the reviewer was right (unmatched operand exits **2**), and rewrote the page, report rows 3/5 and `log.md`. Other 5 claim groups verdicted sound. Limits: the reviewer's sandbox blocked repo reads, so source-quote-supports-directive and self-contradiction dimensions went unaudited (details in `## Cross-Check`).
-
-Queue drained under run id `20260827-125731-38371` (this session is the detached
-`hooks/auto-flush.sh` run; its step-0 acquire resolved re-entrantly to
-`already-owned`, not to a competing holder). 21 rows were claimed; 13 are
-ingested below, 2 are retired as out-of-layer, and 6 are released back to
-`pending` for a later flush because each needs its own page rather than a row,
-and rushing six more pages in one pass would have lowered the bar on all of them.
+Run `20260906-013758-50852` (headless auto-flush), claimed 12 of 41 pending rows via `queue-claim.js claim --max 12`. Outcome: 5 new pages, 3 merges into existing pages, 3 folds pushed onto open PR #181, 1 pending-duplicate drop (PR #185). Lint on this branch: `wiki-structure-checks` findings 0 (281 pages), `wiki-lint-prohibitions` violations 0, `wiki-lint-model-era` 22 coupled / 21 candidates (the new model-era page carries `verified_model`).
 
 ## Verified best-practice
 
-Every external claim below was live-fetched this session and quoted in the page's
-`Sources` block. Field evidence carries the repo, date, and the measured numbers.
-
-| # | Claim | Sources checked | How verified | Confidence |
-|---|-------|-----------------|--------------|------------|
-| 1 | `now()` is `transaction_timestamp()` (fixed at transaction start) while `clock_timestamp()` "changes even within a single SQL statement"; `RETURNING` yields computed defaults "without needing a separate database query" | postgresql.org `functions-datetime`, `dml-returning`, `transaction-iso` | Fetched; both key sentences quoted verbatim into the page | verified |
-| 2 | A boundary recomputed in a follow-up step is a *second, later* `now`, widening a `<= boundary` set | Field: `rtb-unified` `packages/orpc/src/routers/batch.ts` — codifies "one `now` per decision" and passes `now` into the boundary helper; its result type omits the boundary, which is the shape that invites recomputation | Read the invariant and the signature in the cited file | field-tested |
-| 3 | **[CORRECTED BY CROSS-CHECK]** The vacuous-pass shapes for `prettier --check` are: no operands (rc **0**), all operands ignore-filtered (rc **0**), and unsupported extensions with `--ignore-unknown` (rc **0**). A pattern/operand matching nothing exits **2** — it prints the success sentence *and* an unmatched-pattern error | prettier.io CLI + ignore docs; local measurement, Prettier 3.7.4 | The first draft generalised "empty match set ⇒ exit 0" from a field log where both messages appeared together. The independent reviewer flagged it; I then ran all seven cases against a real binary and rewrote the page around the measured table | verified (re-measured) |
-| 4 | zsh does not word-split unquoted parameter expansions by default, so `cmd $FILES` arrives as **one** operand | zsh FAQ ch. 3 (`SH_WORD_SPLIT`) | Fetched; quoted ("By default, zsh does not have that behaviour: the variable remains intact") | verified |
-| 5 | The zsh word-split operand exits **2**, but its log still carries the success sentence — so the log misleads even though the exit code does not | Field 2026-08-24 (`rtb-unified`, zsh) + local measurement 2026-08-27 | Field log showed both messages together; the local run reproduced it as `rc=2`. The page now says explicitly that this row fails loudly *unless* `--no-error-on-unmatched-pattern` is set. Probe placement re-confirmed: `.claude/tmp/` is `.gitignore`d, so a probe there passes at rc 0 | verified (re-measured) |
-| 6 | TypeScript applies excess-property/contextual typing to fresh object literals, so a value of a type can be constructed with the type's name absent from the text | typescriptlang.org handbook, *Object Types* | Fetched; confirmed the check follows from the contextual type, not from a written annotation | verified |
-| 7 | `tsc`'s program is `files` ∪ `include` ∪ transitive imports; `exclude` "only changes which files are included as a result of the `include` setting" and does not stop an imported file entering the program | typescriptlang.org TSConfig `#include`, `#exclude` | Fetched; the `exclude` sentence quoted (it sharpens the rule to "in the program", not "in `include`") | verified |
-| 8 | Consequence of 6+7 measured | Field 2026-08-24/25 (`rtb-unified`): `grep "DealViewer"` reported 3 construction sites, actual 8 — the missed set included production wiring `routers/deal.ts:38`; `ContractScopeActor` 7→~22. Separately, `packages/orpc/tsconfig.json` `include: ["src/**/*"]` produced 3 production + 13 api-test errors and **zero** for `__tests__/routers/deal.test.ts`, whose 6 sites appeared only as 6 failing tests | Counts recorded from the cited runs | verified |
-| 9 | cgroup v2: `memory.peak` is max usage since creation/reset; at `memory.max` "the OOM killer is invoked in the cgroup"; in `memory.events`, `max` counts times usage "was about to go over the max boundary" — **distinct** from `oom_kill` | docs.kernel.org cgroup-v2 admin guide | Fetched; all four quoted. This corrected the candidate, which had read a non-zero `max` as a kill; the page now states the distinction explicitly | verified |
-| 10 | An `exec`'d process joins the container's cgroup and is invisible to the application's own semaphore | kubernetes.io `manage-resources-containers`, `assign-memory-resource`, `kubectl exec` reference + field 2026-08-26 (review-bot pod, `limits.memory: 3Gi`): `memory.current` 2.54 GiB, `memory.peak` 3.0 GiB (at the limit), `memory.events: max 5`, while `maxConcurrentAgents: 20` reported free slots | Docs fetched; pod numbers from the cited measurement | verified |
-| 11 | Basename-keyed mutation backups collide across directories and restore cross-writes; an untracked file's `git diff` is empty whether restored or destroyed | Field 2026-08-21 (`rtb-unified`, NEWRTB-2936): restore wrote `schemas/deal.ts` into `routers/deal.ts` → `Cannot find module './common.js'`, `grep -c dealRouter` = 0; **both files were 154 lines**, so a line-count check passed; after re-keying, M9/M10 flipped SURVIVED→KILLED. Plus stryker mutant-states / pitest for the verdict vocabulary | Reproduced end to end in the cited run | field-tested |
-| 12 | A negative assertion is vacuous when the fixture never supplies the triggering input | Field 2026-08-25 (`rtb-unified`): with `staleQueuedJobIds: []` the code early-returned; the widening the assertion claimed to catch survived 116/116 green | Mutation applied and observed | field-tested |
-| 13 | A body-level (non-inline) review finding cites no file, so rebutting from an assumed file rejects real defects | Field 2026-08-19 (PR #327 r16): quote matched `report.py:393/416/425`, not the assumed `fill_plan.py:307` — sibling modules, one already fixed | Grep resolved the quote to the real site | field-tested |
-| 14 | Unifying two duplicate allowlists defaults to the union and silently widens each side | Field 2026-08-25 (`rtb-unified` PR #965): folding `DISPLAYABLE_ERROR_CODES` into `USER_FACING_ERROR_CODES` would have added `UNAUTHORIZED` + `VALIDATION_ERROR`, exposing raw server messages as inline UI errors; caught only by computing the difference first | Difference computed before the merge | field-tested |
-
-Not upgraded: nothing was marked `verified` on field evidence alone. Two pages
-carry `confidence: field-tested` (`mutation-harness-file-custody`,
-plus the pre-existing `evaluating-review-feedback`), and no candidate was
-recorded as `verified` without a fetched primary source.
+1. **SwiftPM: test an executable target directly** (`8cfed7ce6d1fb5dc`) — claim: since tools-version 5.5 a test target may depend on an `.executableTarget` and `@testable import` it. Sources fetched and quote-checked by curl: swift-package-manager CHANGELOG (`#3316` "Test targets can now link against executable targets as if they were libraries … tools version of `5.5` or newer"; `#4119` `--disable-testable-imports`), SE-0294 (Implemented Swift 5.4), TSPL AccessControl.md (`@testable` needs "compiled with testing enabled"), SPMBuildCore `BuildParameters+Testing.swift` (`explicitlyEnabledTestability ?? (configuration == .debug)`), swift-package-manager#6367 (works on macOS/Linux; Windows `duplicate symbol: main`), Swift Forums 52351. Field: desk-bat 49/49. **verified**.
+2. **macOS off-screen capture without Screen Recording** (`49e0bd8194f59531`) — claim: render the app's own content (`SKView.texture(from:)`, `NSView.cacheDisplay`) and assemble GIFs with ImageIO instead of `screencapture` when the TCC grant is unavailable. Apple doc JSON endpoints quote-checked: `texture(from:)` ("does not need to appear in the view's presented scene"), `SKRenderer`, `cacheDisplay(in:to:)`, `kCGImagePropertyGIFDelayTime` ("clamped to a minimum of 100 milliseconds" — this corrected the candidate's 15 fps cadence to 10 fps), macOS 15.1 release notes ("deprecated content capture technologies now have enhanced user awareness policies"), WWDC19 701 transcript ("preapprove apps to record the entire screen or the contents of windows other than their own"), Apple Platform Security guide (Screen recording is TCC-gated). The literal `could not create image` text and the relaunch-after-grant step are field evidence only and labelled so. **verified**.
+3. **Testcontainers reaper on Docker Desktop macOS** (`2bea722bd3446ce7`) — candidate said "disable Ryuk". Research (testcontainers-python README, java/go configuration docs, Rancher Desktop + Colima guides, docs.docker.com Advanced settings, testcontainers-java#8170/#7678, testcontainers-go#399, all quote-checked) shows the documented fixes are the Desktop "Allow the default Docker socket to be used" setting or `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock` with Ryuk kept on; disabling Ryuk is the last resort and "will prevent testcontainers from automatically cleaning up resources". Page orders the rows accordingly; the candidate's 0 tests → 27/27 measurement is kept as field evidence. **verified**.
+4. **Ciphertext orphaned by a regenerated key** (`83a8c321f97b084c`) — sources quote-checked: OWASP Cryptographic Storage Cheat Sheet (key-id-with-ciphertext, retain old keys, rotation procedures in place beforehand), Node crypto docs (`decipher.final()` throws on failed authentication — a wrong key is indistinguishable from tampering), Rails ActiveRecord Encryption `previous:`, Tink 5-byte key-id prefix. OWASP Key Management sheet and NIST SP 800-57 were fetched but yielded no quotable rotation text and are not cited. Field: 124/124 unrecoverable. **verified**.
+5. **Model-coupled guidance aging detector** (`75447f854be33d2d`) — sources: Anthropic prompting best practices (guidance ages per generation: "Tools that undertriggered in previous models are likely to trigger appropriately now"), dev-loop `scripts/wiki-lint-model-era.js` (merged PR #178, whose body records 3/271 phrase hits vs ~27/271 subject hits). Reproduced on this checkout: `pages: 276, model-coupled: 21, candidates: 21`, exit 3; whole-file grep 32 vs scoped 21 (supports the prose-only scoping directive). **verified**.
+6. **CORS preflight silently drops an injected probe's JSON POST** (`bac1bbff54ea37c6`) — mechanism already sourced on the existing page (MDN CORS, Fetch spec: `application/json` is not safelisted → `OPTIONS` preflight); added the diagnostic rows and the field reproduction (0 → 6 reports after handling `OPTIONS`). Page stays **verified**.
+7. **Queued candidate already landed in the store** (`694be184a03a9676`) — evidence checked in `~/.dev-loop/queue/.processed.jsonl` (row `f1ba9bf617fbd101` status `dropped-already-merged`), `code-graph-as-orientation-layer.md` line 102 on `main`, PR #184 merged 2026-09-04. Generalised as a control-signal-vs-primary-artifact row. **field-tested** row on a verified page.
+8. **Literal re-assertion of a layout constant** (`ea0d83f672d08fa2`) — the never-fails pattern is an instance of tests-that-cannot-fail's thesis; field evidence (LinklyTabBar 96 vs 80 pt, fix 4e584cc) added as a row + Sources bullet. **field-tested** row on a verified page.
+9. **Grep both ends of a threaded value** (`9a3ec3b23171ebdd`) and 10. **enumerate contract-test contrast pairs** (`204952e682bc7e76`) — plan-authoring lenses; folded as author-side rows into #181's checkable-claims page whose WCAG source already covers the ratio arithmetic. **field-tested** rows.
+11. **CJK label + pill wraps after padding change** (`418bcb06dbb3562e`) — CSS Text 3 ("line breaking conventions allow the line to break anywhere except between certain character combinations"), MDN word-break `keep-all` contrast, MDN flex-shrink, quote-checked. **verified** rows, folded into #181's responsive-layout.
+12. **Prisma `CREATE INDEX CONCURRENTLY` in a multi-statement migration** (`11c6ad7b2166e611`) — not re-researched: open PR #185 already carries the same directive and the same 2026-08-31 field evidence in `online-schema-changes.md`. Dropped.
 
 ## Existing-layer check
 
-Method: routed via `INDEX.md` → domain `index.md`; then built a full id+title
-index of all 265 pre-existing pages and probed it with concept greps
-(`clock_timestamp|clock skew`, `changed[- ]files|--ignore-unknown`, `tsconfig`,
-`contextual typ|excess property`, `set difference|allowlist`, `cgroup`,
-`basename|backup.*restore`, `2>&1`, `delta|baseline`) before deciding new vs merge.
+Pages read: infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, backend-common-api-design-cors-and-preflight, qa-environments-browser-console-capture-gaps, debugging-methodology-probe-path-vs-operation-path, frontend-design-responsive-layout, backend-common-change-impact-call-site-enumeration, testing-quality-tests-that-cannot-fail, testing-quality-value-preserving-refactor-assertions, security-secrets-secrets-in-code, databases-schema-design-online-schema-changes, qa-document-verification-editing-a-gated-document, testing-quality-guard-shape-vs-consequence, qa-environments-test-environment-parity, mobile-security-sensitive-data-on-device
 
-Pages read: testing-quality-source-text-wiring-assertions, testing-quality-tests-that-cannot-fail, backend-common-change-impact-call-site-enumeration, backend-common-change-impact-widening-a-closed-value-table, qa-process-evaluating-review-feedback, infrastructure-containers-host-cgroup-visibility, testing-quality-behavior-not-implementation
+Also read on open-PR branches only (not on this checkout's `main`): `checkable-claims-in-an-adopted-plan` (#181), `element-crop-screenshots` (#182), `online-schema-changes` as changed by #185. All ten domain `index.md` files and `INDEX.md` were read for routing.
 
-Findings:
-
-- **Zero coverage** (→ new pages): changed-files-only gates, tsconfig/contextual
-  typing, allowlist set-difference, app-clock-vs-DB-timestamp, exec-into-a-running-container.
-  The concept greps returned no hits for these; the clock hits were incidental
-  (offline sync, token handling) and none compared an app clock to a DB column.
-- **Already covered — one candidate all but retired.** The comment-stripping
-  insight is `source-text-wiring-assertions` step 2 verbatim ("Make the
-  assertion's subject the file with comments removed"), and its false-RED and
-  negative/count false-GREEN shapes are already edge rows. Only the *empty-slice*
-  consequence was new, so that alone was merged.
-- **Line-cap conflict handled without breaking the invariant.**
-  `source-text-wiring-assertions` sits at exactly **120** body lines (the
-  documented cap). Rather than add a row and violate maintenance invariant 5, the
-  new nuance and the new field evidence were merged **in place** into an existing
-  edge row and an existing source bullet. Body count re-measured after editing:
-  still 120.
-- **No conflicts found.** Nothing ingested contradicts an existing directive.
-  The one correction made was to a *candidate*, not to the wiki (item 9: the
-  `memory.events` `max` counter is approaches-to-limit, not kills).
-- **Related links added both ways**: `tests-that-cannot-fail` ↔
-  `mutation-harness-file-custody`; `widening-a-closed-value-table` ↔
-  `compiler-as-call-site-inventory` (+ `errors-diagnostics-from-a-shared-code-path`);
-  `host-cgroup-visibility` → `exec-added-processes-and-the-memory-budget`
-  (from its existing self-monitoring row).
-- **Indexes/log updated**: 4 domain indexes (+5 "load when" rows), `log.md`
-  appended. Root `INDEX.md` unchanged — no new domain.
-
-Gates run (the exact CI commands from `.github/workflows/test.yml`):
-`node scripts/wiki-structure-checks.js wiki` → **pages: 270, indexes: 13,
-findings: 0**; `node scripts/wiki-lint-prohibitions.js wiki` → **directives 72,
-compliant 72, violations 0** (the 1 `info` is pre-existing in
-`config/keys-ahead-of-their-consumer.md`, untouched); `bash scripts/check-versions.sh`
-→ `ok: dev-loop 1.11.2`. The `bats tests/` job was **not** run — bats is not
-installed on this machine, and this change touches only wiki markdown (no
-scripts or hooks), so that suite's subject is unchanged.
+Overlaps and decisions:
+- CORS: `cors-and-preflight` already states the `application/json` → preflight mechanism; merged the diagnostic angle (probe silence) as an edge-case row + Instead-of row + field source, and linked `debugging-methodology-probe-path-vs-operation-path` and `qa-environments-browser-console-capture-gaps` from its `related:`. Back-links onto those two pages skipped because #180 and #182 rewrite their frontmatter.
+- Queue lag: `control-signals-vs-primary-artifacts` item 1 ("confirm the claim against the primary artifact") is the exact frame; added a Confirm-with row, an edge-case row and an Instead-of row. Body-only — #179 rewrites this page's `related:`.
+- Literal constant: `tests-that-cannot-fail` never-fails table is the home; `value-preserving-refactor-assertions` covers the adjacent (literal moved to config) case and was read to confirm no overlap. Body-only — #179/#180 rewrite the frontmatter.
+- SwiftPM: no page mentions SwiftPM/`@testable`/executable targets (grep). New page under testing/strategy; related to `test-level-choice` (subprocess vs import level).
+- Off-screen capture: no page mentions TCC/screencapture/SpriteKit (grep; `sensitive-data-on-device` mentions app-switcher screenshots only). New page under qa/environments beside the console-capture and element-crop pages; back-link added on `sensitive-data-on-device`.
+- Testcontainers: no page mentions testcontainers/ryuk (grep); `test-data-and-isolation` covers fixtures/isolation, not the container runtime. New page under testing/data (no new category — re-checked qa/environments `test-environment-parity`, which is about staging parity, and linked it both ways).
+- Key mismatch: security/secrets has only `secrets-in-code` (leak/storage); no encryption-at-rest page. New page; back-link added on `secrets-in-code`; `related:` to hypothesis-testing and probe-path (back-links skipped: #179/#180 touch those frontmatters).
+- Model-era detector: no page on `main` covers it (grep for model-era/model-coupled: 0). New page under qa/document-verification; back-links added on `editing-a-gated-document` and `guard-shape-vs-consequence`.
+- Conflicts flagged: none. No existing directive is contradicted; the testcontainers page demotes the candidate's own directive (disable Ryuk) to the last row, recorded in `log.md`.
 
 ## Open-PR check
 
-`gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`
-returned **no open PRs**, and a second unfiltered `gh pr list --state open`
-returned none either — the repository has zero open PRs at flush time. There
-were therefore no in-flight sibling branches to diff against, and no
-`git fetch origin <head>` / `git diff origin/main origin/<head> -- wiki/`
-comparisons to run.
+Open `knowledge/*` heads listed with `gh pr list --search "head:knowledge/"`: #185 `knowledge/choiyounggi-20260906-003745`, #183 `…20260904-133717`, #182 `…20260903-214027`, #181 `…20260903-203836`, #180 `…20260903-184706`, #179 `…20260903-172728`. Each head was fetched and `git diff origin/main origin/<head> -- wiki/` inspected.
 
-Per-candidate verdict: **all 21 = `new`.** No `fold`, no `drop-as-pending-duplicate`.
-(The 2 drops recorded below are out-of-layer drops, not pending-duplicate drops.)
+| Candidate | Overlapping open head | Verdict |
+|-----------|-----------------------|---------|
+| `11c6ad7b2166e611` Prisma CONCURRENTLY | #185 rewrites `online-schema-changes.md` with the same two rows and the same 2026-08-31 field evidence | **drop** (pending duplicate) |
+| `9a3ec3b23171ebdd` grep both ends | #181 adds `checkable-claims-in-an-adopted-plan.md` (plan claims to check) | **fold** — rows pushed to #181 (commit on that branch + PR comment) |
+| `204952e682bc7e76` contrast pairs | #181 same page (WCAG recomputation item 1) | **fold** — row pushed to #181 |
+| `418bcb06dbb3562e` CJK pill | #181 rewrites `responsive-layout.md` frontmatter + rows | **fold** — rows pushed to #181 to avoid a sibling conflict; #181 did not previously carry the insight |
+| `694be184a03a9676` queue lag | #179 rewrites `control-signals-vs-primary-artifacts` `related:` only | **new** (body-only merge here) |
+| `ea0d83f672d08fa2` literal constant | #179/#180 rewrite `tests-that-cannot-fail` `related:` only | **new** (body-only merge here) |
+| `bac1bbff54ea37c6` CORS probe | none touch `cors-and-preflight.md` | **new** |
+| `8cfed7ce6d1fb5dc`, `49e0bd8194f59531`, `2bea722bd3446ce7`, `83a8c321f97b084c`, `75447f854be33d2d` | none (grep of every open head's wiki diff for swiftpm/testable, TCC/screencapture/SpriteKit, ryuk/testcontainers, AES/decrypt/ciphertext, model-era/verified_model: 0 hits) | **new** |
+
+Index files (`wiki/*/index.md`, `INDEX.md`) are also touched by every open PR; those are additive-row conflicts for the owner to resolve at merge, as in the previous flushes.
 
 ## Routing decision
 
-**New pages (5)**
+| Candidate | Target |
+|-----------|--------|
+| `8cfed7ce6d1fb5dc` | testing/strategy — new `executable-target-tests-in-swiftpm` (level/structure decision: import vs subprocess) |
+| `49e0bd8194f59531` | qa/environments — new `offscreen-render-capture-without-screen-recording` (evidence capture environment, beside console-capture and element-crop pages; platforms rejected because the directive is about producing QA/doc evidence, not OS portability) |
+| `2bea722bd3446ce7` | testing/data — new `testcontainers-reaper-on-docker-desktop-macos` (test-infrastructure containers; no new `testing/environments` category — qa/environments `test-environment-parity` linked instead) |
+| `83a8c321f97b084c` | security/secrets — new `ciphertext-orphaned-by-a-regenerated-key` (key lifecycle; debugging linked via `related:`) |
+| `75447f854be33d2d` | qa/document-verification — new `model-coupled-guidance-aging-detector` (a gate over documents; `verified_model: claude-fable-5-1` set because the page is itself model-coupled) |
+| `bac1bbff54ea37c6` | backend/common/api-design — merged into `cors-and-preflight` |
+| `694be184a03a9676` | infrastructure/agent-orchestration — merged into `control-signals-vs-primary-artifacts` |
+| `ea0d83f672d08fa2` | testing/quality — merged into `tests-that-cannot-fail` |
+| `9a3ec3b23171ebdd`, `204952e682bc7e76` | infrastructure/agent-orchestration — folded into #181's `checkable-claims-in-an-adopted-plan` |
+| `418bcb06dbb3562e` | frontend/design — folded into #181's `responsive-layout` |
+| `11c6ad7b2166e611` | dropped (pending duplicate of #185) |
 
-| Page | Domain/category | From | Why not an existing page |
-|------|-----------------|------|--------------------------|
-| `application-clock-vs-database-timestamps` | databases / transactions | `2b27d15d` + `bea92fdd` | No page compares an app clock to a DB column. `transactions` chosen over `schema-design` because the decisive content is transaction-time semantics (`now()` = transaction start ⇒ stamp order ≠ commit order) and the fix is a lock/isolation choice |
-| `changed-files-only-gates` | infrastructure / ci-cd | `ff041061` + `4b9af3a0` | Zero grep hits. Both candidates are the same defect (a gate green with an empty subject) from two directions, so they became one page rather than two |
-| `compiler-as-call-site-inventory` | backend / common / change-impact | `702dcf4e` + `94d55f2f` | `call-site-enumeration` is the sibling case (callers of a changed signature, Python positional-vs-keyword) and is at 80 body lines; the TS mechanism is *constructors of a type* with its own workflow, so per "one case per page" it is a separate page, cross-linked |
-| `mutation-harness-file-custody` | testing / quality | `6a9de235` + `41fa1c87` | `harness-reverse-controls` covers scoring a harness; nothing covers the harness's custody of the tree. Both candidates are that one case (keying, and the read window) |
-| `exec-added-processes-and-the-memory-budget` | infrastructure / containers | `7b9e8788` | `host-cgroup-visibility` is cross-pod read mechanics and explicitly routes self-monitoring elsewhere; `resource-limits-and-probes` is manifest authoring. This is a runtime preflight before adding load |
-
-No new category was created — all five landed in existing categories.
-
-**Merged into existing pages (5 candidates)**
-
-| Candidate | Merged into | Shape |
-|-----------|-------------|-------|
-| `91ef5d53` | `testing-quality-tests-that-cannot-fail` | +1 never-fails row, +1 Instead-of row, +1 source |
-| `f189f423` | `testing-quality-source-text-wiring-assertions` | In-place extension of 1 edge row + 1 source bullet (page at the 120-line cap) |
-| `bb6d8539` | `backend-common-change-impact-widening-a-closed-value-table` | +Do-this 6 & 7 (incl. a set-difference ruling table), +1 Instead-of row, +1 source |
-| `60a817ee` | `qa-process-evaluating-review-feedback` | +2 edge rows, +1 Instead-of row, +1 source |
-| `7b9e8788` | `infrastructure-containers-host-cgroup-visibility` | Cross-link from its self-monitoring row to the new page |
-
-**Dropped — out of layer (2, retired)**
-
-- `094dedf3` — a Figma MCP `inspect_node` → `get_dev_ready` children-fetch
-  workaround. The server is a private, org-internal MCP plugin; the behavior is
-  not publicly verifiable and the directive does not transfer to any other reader.
-- `e165a365` — an `/rtb:review` remote-fallback runbook naming
-  `~/.claude/tools/rtb-remote-review.sh` and an internal pod. The transferable
-  kernel ("a two-provider review gate degraded to one provider is not a passed
-  gate") is already the subject of `qa-process-llm-review-pipelines`; what remains
-  is machine-specific paths.
-
-**Released back to `pending` (6)** — each needs its own page, not a row, and is
-better served by a dedicated pass than by being appended here:
-`81dc1f98` (naming the carrier field/type when a plan says "wire A to B"),
-`b9ae304a` (`VAR="$(cmd 2>&1)"` mixing stderr into a value used as a path),
-`fdd0b3c6` (monitor markers anchored at line start; delta rather than absolute
-state; first cycle records a baseline),
-`c2adb2be` (positional-order assertions on rendered SQL predicates),
-`815e8cb9` (grep only *active* `DATABASE_URL` assignments, and confirm which
-dotenv file the tool loads, before a destructive DB command),
-`f1146adb` (CI ticket-key extraction scoped by changed-file intersection rather
-than by mention).
-
-## Decision Log
-
-**Intent.** Drain the harvested `★ Insight` queue into reviewable wiki knowledge
-without lowering the wiki's evidence bar. The queue held 21 rows accumulated over
-several days; the goal was correct routing and real verification, not a high
-ingest count.
-
-**Alternatives considered and rejected.**
-
-- *Ingest all 21 in this pass.* Rejected: six of them each need their own page,
-  and writing six more pages in one pass would have produced thin, weakly-sourced
-  entries. They are released to `pending`, not dropped, so the next flush takes
-  them with a full budget.
-- *Append the two TypeScript candidates to `call-site-enumeration`.* Rejected:
-  that page is the sibling case (callers of a changed signature, Python
-  positional-vs-keyword). AGENTS.md requires one case per page, so the
-  constructor-enumeration case became its own page, cross-linked both ways.
-- *Add a row to `source-text-wiring-assertions` for the empty-slice nuance.*
-  Rejected: that page is at exactly the documented 120-line body cap, so adding a
-  line would violate maintenance invariant 5. The nuance was merged **in place**
-  into an existing edge row instead; body re-measured at 120.
-- *Drop the comment-stripping candidate entirely as a duplicate.* Rejected: its
-  directive is already the page's step 2, but the empty-slice consequence
-  (vacuous **green**, not the documented noisy red) was genuinely absent.
-- *Claim a cross-check exemption because this PR cannot merge itself.* Rejected —
-  see below; the check found a real error, which is the argument against exempting.
-- *Push to `origin`* as the skill's snippet does. Not available: this contributor
-  has no write access to `choiyounggi/dev-loop` (403). Used the pre-existing
-  `fork` remote, which is how every prior knowledge branch here was published.
-- *Branch name from `git config user.name`.* The skill's ASCII sanitisation of a
-  Korean name yields an empty string → `anon`, defeating the attribution the
-  branch name exists for. Used the gh login, matching existing branch names.
-
-**Where reviewers should look hardest.**
-
-1. `infrastructure/ci-cd/changed-files-only-gates.md` — rewritten after the
-   cross-check. The measured table is the load-bearing part; please sanity-check
-   it against your own Prettier version, since the exit codes are version-visible
-   behaviour rather than a documented contract.
-2. `databases/transactions/application-clock-vs-database-timestamps.md` step 5–6 —
-   the claim that timestamp order is not commit order, and that the remedy is a
-   lock/isolation level rather than finer clock resolution. `[추정]` on the MySQL
-   `NOW()`/`SYSDATE()` row: taken from general MySQL semantics, not fetched this
-   session like the PostgreSQL pages were.
-3. `widening-a-closed-value-table.md` Do-this 6–7 — this inserts a security-shaped
-   concern (allowlist widening) into a page whose original subject was value
-   tables. If that reads as two cases, it should be split.
-4. The 2 dropped candidates — if you consider private-tooling runbooks in scope
-   for this wiki, they should be restored rather than retired.
-
-## Cross-Check
-
-Independent adversarial pass via `claude` CLI headless (separate process, no
-shared context), prompted to refute rather than confirm, over the five new pages'
-technical claims.
-
-**It found a real error, and the page was rewritten because of it.** The reviewer
-challenged the claim that `prettier --check` exits 0 on an empty match set,
-arguing an unmatched pattern errors by default and that exit-0 belongs to the
-ignore-filtered case. I resolved it by measurement rather than by argument —
-running all seven cases against Prettier 3.7.4 — and the reviewer was right:
-an unmatched operand exits **2** (while still printing the success sentence),
-whereas the genuine silent vacuous passes are no-operands, all-ignore-filtered,
-and `--ignore-unknown`-with-unsupported-extensions. The page, this report's
-rows 3 and 5, and the `log.md` entry were all corrected.
-
-Verdicts on the other five claim groups: **sound** (PostgreSQL clock semantics —
-noted as if anything *understated*; zsh word-splitting; TS contextual typing;
-`tsc` program membership incl. `exclude`-does-not-stop-imports; cgroup v2
-`max` vs `oom_kill` and `kubectl exec` cgroup placement).
-
-Stated limits of the check: the reviewer's sandbox denied it read access to
-`~/.dev-loop/repo/wiki`, so it adjudicated the six claims as quoted in its prompt
-and could **not** audit (b) whether each `Sources` quote supports the directive it
-is cited for, or (c) whether any page contradicts its own edge-case rows. Those
-two dimensions remain unreviewed by an independent party and are the residual
-risk in this PR. A first attempt also returned only the session's Stop-hook
-output rather than a verdict; that run was discarded rather than read as
-"no findings".
-
-## Review notes
-
-- PR-only, as required: no merge, no push to `main`.
-- Commit is under the contributor's own ambient git identity
-  (`최영기 <dch0202@rsquare.co.kr>`, gh `dch0202-rsquare`); no assistant identity
-  and no `Co-Authored-By` trailer. The branch uses the gh login because
-  sanitizing the Korean `user.name` to ASCII yields an empty string, which the
-  skill's snippet would have turned into `anon` — that would have defeated the
-  attribution the branch name exists for.
-- Scope purity: only `wiki/**`, four domain indexes, `log.md`, and this report.
-  Two untracked leftovers from earlier flushes
-  (`.dev-loop/CROSSCHECK_FINDINGS.md`, `.dev-loop/fold-note-73.md`) were left
-  untouched and unstaged.
+No new category was added. `INDEX.md` route-here lines for qa, testing and security were extended by one clause each; domain `index.md` rows added for the five new pages and load-when lines extended for the three merged pages. `log.md` carries one entry per page plus the fold and drop entries.

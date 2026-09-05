@@ -10,7 +10,7 @@ sources:
   - https://docs.vale.sh/checks/existence
   - https://github.com/DavidAnson/markdownlint/blob/main/doc/md013.md
 last_verified: 2026-08-14
-related: [qa-process-acceptance-criteria, qa-process-regression-scope, testing-quality-tests-that-cannot-fail]
+related: [qa-process-acceptance-criteria, qa-process-regression-scope, testing-quality-tests-that-cannot-fail, qa-document-verification-model-coupled-guidance-aging-detector]
 ---
 
 # Editing a Document That Automated Text Gates Check

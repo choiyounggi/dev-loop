@@ -47,6 +47,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [secrets-in-code](secrets/secrets-in-code.md) | Code needs an API key/password/private key; a secret was just committed/pasted/logged (leak response, rotation); setting up repo secret hygiene (scanners, env files); deciding whether a value may ship in client code (CI/build secrets → infrastructure/ci-cd/secrets-handling) |
+| [ciphertext-orphaned-by-a-regenerated-key](secrets/ciphertext-orphaned-by-a-regenerated-key.md) | Rows encrypted at rest (AES-GCM or similar) stop decrypting while the service logs that the key loaded, and an env-init/bootstrap script can regenerate the key; deciding what to check before deleting unreadable rows; storing a key id/version with ciphertext; making key generation in a setup script idempotent |
 
 ## dependencies
 
