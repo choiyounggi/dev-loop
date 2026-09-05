@@ -1,237 +1,78 @@
-# Knowledge flush — 13 insight(s) ingested (21 claimed, 2 dropped, 6 released)
+# Knowledge flush — 12 insight(s) claimed: 8 ingested on this branch, 3 folded onto open PRs, 1 dropped as already merged
 
-Cross-Check: 1× independent adversarial `claude` CLI headless pass over the 5 new pages — it refuted the changed-files gate page's "prettier exits 0 on an empty match set" claim; re-measured against Prettier 3.7.4, confirmed the reviewer was right (unmatched operand exits **2**), and rewrote the page, report rows 3/5 and `log.md`. Other 5 claim groups verdicted sound. Limits: the reviewer's sandbox blocked repo reads, so source-quote-supports-directive and self-contradiction dimensions went unaudited (details in `## Cross-Check`).
-
-Queue drained under run id `20260827-125731-38371` (this session is the detached
-`hooks/auto-flush.sh` run; its step-0 acquire resolved re-entrantly to
-`already-owned`, not to a competing holder). 21 rows were claimed; 13 are
-ingested below, 2 are retired as out-of-layer, and 6 are released back to
-`pending` for a later flush because each needs its own page rather than a row,
-and rushing six more pages in one pass would have lowered the bar on all of them.
+Run id `20260906-003715-45485` (headless auto-flush), branch `knowledge/choiyounggi-20260906-003745`, base `origin/main` at `6dcda6f` (1.21.0). Claimed with `queue-claim.js claim --max 12`; 40 rows remain pending for later flushes.
 
 ## Verified best-practice
 
-Every external claim below was live-fetched this session and quoted in the page's
-`Sources` block. Field evidence carries the repo, date, and the measured numbers.
+| # | Queue hash | Claim | Sources checked | How verified | Confidence |
+|---|-----------|-------|-----------------|--------------|------------|
+| 1 | `fbb4ea0373ad14b6` | OKLCH lightness steps below L 30% collapse to ~1.1–1.3:1 contrast in sRGB; gate state cues on the measured ratio, carry identification on outline/chroma/shape | https://www.w3.org/TR/WCAG21/ (ratio formula), https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast.html (3:1 for UI components), https://www.w3.org/TR/css-color-4/ (OKLCH lightness is visual lightness; sRGB transfer function) | Recomputed WCAG ratios from the candidate's measured rgb bytes in Python: 13% vs 19% = 1.091, 13% vs 27% = 1.339 (exact match to the candidate). Re-derived OKLCH→sRGB with the CSS Color 4 matrices: all five rungs within ±2 bytes of the engine measurement. Agents confirmed all three URLs 200 with quotes | verified |
+| 2 | `2232cfdc9e06a8b7` | Grade a per-entity signal on excess return over the benchmark for the same window; a population-wide burst is a shared driver | https://corporatefinanceinstitute.com/resources/equities/abnormal-return/ ("Excess Return = Actual Return − Expected Return", market index as expected), https://www.wallstreetprep.com/knowledge/information-ratio/ ("excess return over a benchmark") | Both URLs 200 with verbatim quotes; arithmetic in the field data checked (1,531,000→1,599,000 = +4.44%). Investopedia returned 402 and was excluded | verified |
+| 3 | `5a6ea1bb69d16261` | Multi-row rewrite on a shared resource: parent-row lock in one transaction, deferrable unique position, explicit final-state rule, two-writer test | https://www.postgresql.org/docs/current/explicit-locking.html (FOR UPDATE), https://www.postgresql.org/docs/current/sql-createtable.html (DEFERRABLE), https://www.postgresql.org/docs/current/sql-set-constraints.html (DEFERRED checked at commit), https://www.postgresql.org/docs/current/sql-insert.html (ON CONFLICT DO UPDATE = UPSERT) | All four URLs 200 with quotes; field fix (pessimistic lock + single transaction + upsert) from the linkly-calendar review findings | verified |
+| 4 | `1c1a26a8abae7532` | Check a DDL rule's premise (large live table) and the runner's ability to execute it (Prisma wraps multi-statement migrations in an implicit transaction, so `CONCURRENTLY` fails) | https://github.com/prisma/orm/issues/22922 (title and body read via `gh api`; the reporter's reproduction: two-statement file fails, one-statement passes; a later comment shows a single statement split across lines also wrapped), https://github.com/prisma/orm/discussions/10601 (title "Disable transactions for a single migration", error 25001 quoted), https://github.com/prisma/orm/issues/14456, https://github.com/prisma/prisma-engines/blob/main/schema-engine/ARCHITECTURE.md ("Why does Migrate not run migrations in a transaction by default?"), https://www.postgresql.org/docs/current/sql-createindex.html ("CREATE INDEX CONCURRENTLY cannot" run in a transaction block) | The candidate's `prisma/prisma` URLs redirect to `prisma/orm`; recorded the canonical URLs. Issue is still open (no fix), which the row reflects | verified |
+| 5 | `c20328d15c5d637f` | `graphify update` on >5,000 nodes fails only at the HTML export; graph.json and the report are already written; no `--no-viz` on `update` | Installed source, graphifyy 0.4.23 (`~/.local/pipx/venvs/graphifyy`): `watch.py` `_rebuild_code` writes `GRAPH_REPORT.md`, `to_json`, then `to_html`; `export.py` `MAX_NODES_FOR_VIZ = 5_000` raises `ValueError("... Use --no-viz ...")`; `__main__.py` `update` exits 1 on `False`; `grep no-viz` over the CLI finds only the error string. PyPI JSON API: latest is 0.9.54 | Read the code paths directly; the row is version-scoped to 0.4.23 with a re-check instruction. The candidate's monkeypatch directive is kept as the "hook must exit 0" branch only | verified (0.4.23) |
+| 6 | `aae0d53b3d306e5e` | Measure a live session's context from the newest transcript file, not the project directory | https://code.claude.com/docs/en/sessions (`<project>/<session-id>.jsonl`, project = cwd with non-alphanumerics replaced by `-`); dev-loop's own `skills/orchestrate/scripts/token-report.sh` header and SKILL.md lines 108–122 already encode the same rule | URL 200 with quote; field measurement (49 files, 10 spurious `warn:` lines, live session under threshold) from the candidate | verified |
+| 7 | `3bb4937f1288fef0` | With fake timers, a "lock explicitly cleared" test whose wait ≥ TTL cannot fail; rewind the clock to before expiry and mutation-check the clear | https://vitest.dev/api/vi.html (`vi.setSystemTime` "simulates a user changing the system clock") | URL 200 with quote; field mutation check (commenting out `lockouts.clear()` reddened exactly the target test) from the candidate | verified |
+| 8 | `ef088fd050a74454` | Alert on the primary source's success count reaching zero when a fallback silently takes over | https://sre.google/sre-book/monitoring-distributed-systems/ (symptoms vs causes; already the page's source). The agent found no primary text stating "fallback success must emit a signal" — the row is field-derived | 7-day incident (pykrx dead, Naver fallback 29/30, 0 signals, runs logged green) from korea-data-suite / stock-signal-bot | field-tested (row); page stays `verified` for its existing content |
+| 9 | `00297bb2452bb72c` | Worker done with a clean worktree, or "unexplained resets": the edits escaped to the main checkout; recover with `git diff` → `git apply --3way` | https://git-scm.com/docs/git-apply (`--3way`: "Attempt 3-way merge if the patch records the identity of blobs") | URL 200 with quote (agent + my own curl); field run i168 t2 (bats 21/21 after transplant) | verified |
+| 10 | `18392e61e52d0b0f` | After merging worker branches into the integration worktree, re-sync installed deps and codegen before diagnosing "module not found" / undefined generated model as a regression | https://pnpm.io/cli/install (frozen lockfile "fails to install if the lockfile is out of sync"), https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/generating-prisma-client ("whenever you add models, change fields…"), https://git-scm.com/docs/git-worktree (already on the page) | URLs 200 with quotes; field run trip3 (7 suites `Cannot find module 'undici'`, 2 e2e `prisma.trip` undefined, fixed by install + generate with no code change) | verified |
+| 11 | `13ce23861664767e` | Before writing "reuse component X" in a design doc, grep the implementation and consumer count and record the command | No external source needed (the mechanism is the grep itself); field: `LinklyModal.swift` was a bottom sheet with one consumer, `LinklyCalendarRangeLozenge` had zero | Field evidence from the candidate; verifiable by re-running the recorded grep | field-tested |
+| 12 | `f1ba9bf617fbd101` | graphify CLI exits 0 on missing node / missing file / JSON error; validate the artifact and branch on stdout | — | Already on `main` verbatim: `code-graph-as-orientation-layer.md` edge row "The CLI exits 0 on a missing node, a missing graph file, or a JSON decode error" plus the 0.4.23 source line, merged via #184 on 2026-09-04 from the same session | dropped — already merged |
 
-| # | Claim | Sources checked | How verified | Confidence |
-|---|-------|-----------------|--------------|------------|
-| 1 | `now()` is `transaction_timestamp()` (fixed at transaction start) while `clock_timestamp()` "changes even within a single SQL statement"; `RETURNING` yields computed defaults "without needing a separate database query" | postgresql.org `functions-datetime`, `dml-returning`, `transaction-iso` | Fetched; both key sentences quoted verbatim into the page | verified |
-| 2 | A boundary recomputed in a follow-up step is a *second, later* `now`, widening a `<= boundary` set | Field: `rtb-unified` `packages/orpc/src/routers/batch.ts` — codifies "one `now` per decision" and passes `now` into the boundary helper; its result type omits the boundary, which is the shape that invites recomputation | Read the invariant and the signature in the cited file | field-tested |
-| 3 | **[CORRECTED BY CROSS-CHECK]** The vacuous-pass shapes for `prettier --check` are: no operands (rc **0**), all operands ignore-filtered (rc **0**), and unsupported extensions with `--ignore-unknown` (rc **0**). A pattern/operand matching nothing exits **2** — it prints the success sentence *and* an unmatched-pattern error | prettier.io CLI + ignore docs; local measurement, Prettier 3.7.4 | The first draft generalised "empty match set ⇒ exit 0" from a field log where both messages appeared together. The independent reviewer flagged it; I then ran all seven cases against a real binary and rewrote the page around the measured table | verified (re-measured) |
-| 4 | zsh does not word-split unquoted parameter expansions by default, so `cmd $FILES` arrives as **one** operand | zsh FAQ ch. 3 (`SH_WORD_SPLIT`) | Fetched; quoted ("By default, zsh does not have that behaviour: the variable remains intact") | verified |
-| 5 | The zsh word-split operand exits **2**, but its log still carries the success sentence — so the log misleads even though the exit code does not | Field 2026-08-24 (`rtb-unified`, zsh) + local measurement 2026-08-27 | Field log showed both messages together; the local run reproduced it as `rc=2`. The page now says explicitly that this row fails loudly *unless* `--no-error-on-unmatched-pattern` is set. Probe placement re-confirmed: `.claude/tmp/` is `.gitignore`d, so a probe there passes at rc 0 | verified (re-measured) |
-| 6 | TypeScript applies excess-property/contextual typing to fresh object literals, so a value of a type can be constructed with the type's name absent from the text | typescriptlang.org handbook, *Object Types* | Fetched; confirmed the check follows from the contextual type, not from a written annotation | verified |
-| 7 | `tsc`'s program is `files` ∪ `include` ∪ transitive imports; `exclude` "only changes which files are included as a result of the `include` setting" and does not stop an imported file entering the program | typescriptlang.org TSConfig `#include`, `#exclude` | Fetched; the `exclude` sentence quoted (it sharpens the rule to "in the program", not "in `include`") | verified |
-| 8 | Consequence of 6+7 measured | Field 2026-08-24/25 (`rtb-unified`): `grep "DealViewer"` reported 3 construction sites, actual 8 — the missed set included production wiring `routers/deal.ts:38`; `ContractScopeActor` 7→~22. Separately, `packages/orpc/tsconfig.json` `include: ["src/**/*"]` produced 3 production + 13 api-test errors and **zero** for `__tests__/routers/deal.test.ts`, whose 6 sites appeared only as 6 failing tests | Counts recorded from the cited runs | verified |
-| 9 | cgroup v2: `memory.peak` is max usage since creation/reset; at `memory.max` "the OOM killer is invoked in the cgroup"; in `memory.events`, `max` counts times usage "was about to go over the max boundary" — **distinct** from `oom_kill` | docs.kernel.org cgroup-v2 admin guide | Fetched; all four quoted. This corrected the candidate, which had read a non-zero `max` as a kill; the page now states the distinction explicitly | verified |
-| 10 | An `exec`'d process joins the container's cgroup and is invisible to the application's own semaphore | kubernetes.io `manage-resources-containers`, `assign-memory-resource`, `kubectl exec` reference + field 2026-08-26 (review-bot pod, `limits.memory: 3Gi`): `memory.current` 2.54 GiB, `memory.peak` 3.0 GiB (at the limit), `memory.events: max 5`, while `maxConcurrentAgents: 20` reported free slots | Docs fetched; pod numbers from the cited measurement | verified |
-| 11 | Basename-keyed mutation backups collide across directories and restore cross-writes; an untracked file's `git diff` is empty whether restored or destroyed | Field 2026-08-21 (`rtb-unified`, NEWRTB-2936): restore wrote `schemas/deal.ts` into `routers/deal.ts` → `Cannot find module './common.js'`, `grep -c dealRouter` = 0; **both files were 154 lines**, so a line-count check passed; after re-keying, M9/M10 flipped SURVIVED→KILLED. Plus stryker mutant-states / pitest for the verdict vocabulary | Reproduced end to end in the cited run | field-tested |
-| 12 | A negative assertion is vacuous when the fixture never supplies the triggering input | Field 2026-08-25 (`rtb-unified`): with `staleQueuedJobIds: []` the code early-returned; the widening the assertion claimed to catch survived 116/116 green | Mutation applied and observed | field-tested |
-| 13 | A body-level (non-inline) review finding cites no file, so rebutting from an assumed file rejects real defects | Field 2026-08-19 (PR #327 r16): quote matched `report.py:393/416/425`, not the assumed `fill_plan.py:307` — sibling modules, one already fixed | Grep resolved the quote to the real site | field-tested |
-| 14 | Unifying two duplicate allowlists defaults to the union and silently widens each side | Field 2026-08-25 (`rtb-unified` PR #965): folding `DISPLAYABLE_ERROR_CODES` into `USER_FACING_ERROR_CODES` would have added `UNAUTHORIZED` + `VALIDATION_ERROR`, exposing raw server messages as inline UI errors; caught only by computing the difference first | Difference computed before the merge | field-tested |
-
-Not upgraded: nothing was marked `verified` on field evidence alone. Two pages
-carry `confidence: field-tested` (`mutation-harness-file-custody`,
-plus the pre-existing `evaluating-review-feedback`), and no candidate was
-recorded as `verified` without a fetched primary source.
+Nothing was upgraded to `verified` without a cited document or a reproduction I ran; #8 and #11 are labelled field-tested in the pages.
 
 ## Existing-layer check
 
-Method: routed via `INDEX.md` → domain `index.md`; then built a full id+title
-index of all 265 pre-existing pages and probed it with concept greps
-(`clock_timestamp|clock skew`, `changed[- ]files|--ignore-unknown`, `tsconfig`,
-`contextual typ|excess property`, `set difference|allowlist`, `cgroup`,
-`basename|backup.*restore`, `2>&1`, `delta|baseline`) before deciding new vs merge.
+Pages read: infrastructure-agent-orchestration-code-graph-as-orientation-layer, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-session-context-token-budget, infrastructure-observability-alerting, testing-quality-tests-that-cannot-fail, testing-quality-injected-clock-duration-assertions, testing-async-async-testing, frontend-design-anti-slop-visual-design, databases-schema-design-online-schema-changes, databases-transactions-optimistic-vs-pessimistic-locking, databases-transactions-isolation-level-selection, backend-common-integrations-estimate-derived-thresholds
 
-Pages read: testing-quality-source-text-wiring-assertions, testing-quality-tests-that-cannot-fail, backend-common-change-impact-call-site-enumeration, backend-common-change-impact-widening-a-closed-value-table, qa-process-evaluating-review-feedback, infrastructure-containers-host-cgroup-visibility, testing-quality-behavior-not-implementation
+Also read `INDEX.md`, the domain indexes for infrastructure, testing, frontend, databases, backend, qa and debugging, `AGENTS.md`, `templates/page.md`, and, on the open PR branches only (not on this checkout), `semantic-conflicts-after-parallel-merge` (#179) and `checkable-claims-in-an-adopted-plan` (#181).
 
-Findings:
+Overlaps and outcomes:
 
-- **Zero coverage** (→ new pages): changed-files-only gates, tsconfig/contextual
-  typing, allowlist set-difference, app-clock-vs-DB-timestamp, exec-into-a-running-container.
-  The concept greps returned no hits for these; the clock hits were incidental
-  (offline sync, token handling) and none compared an app clock to a DB column.
-- **Already covered — one candidate all but retired.** The comment-stripping
-  insight is `source-text-wiring-assertions` step 2 verbatim ("Make the
-  assertion's subject the file with comments removed"), and its false-RED and
-  negative/count false-GREEN shapes are already edge rows. Only the *empty-slice*
-  consequence was new, so that alone was merged.
-- **Line-cap conflict handled without breaking the invariant.**
-  `source-text-wiring-assertions` sits at exactly **120** body lines (the
-  documented cap). Rather than add a row and violate maintenance invariant 5, the
-  new nuance and the new field evidence were merged **in place** into an existing
-  edge row and an existing source bullet. Body count re-measured after editing:
-  still 120.
-- **No conflicts found.** Nothing ingested contradicts an existing directive.
-  The one correction made was to a *candidate*, not to the wiki (item 9: the
-  `memory.events` `max` counter is approaches-to-limit, not kills).
-- **Related links added both ways**: `tests-that-cannot-fail` ↔
-  `mutation-harness-file-custody`; `widening-a-closed-value-table` ↔
-  `compiler-as-call-site-inventory` (+ `errors-diagnostics-from-a-shared-code-path`);
-  `host-cgroup-visibility` → `exec-added-processes-and-the-memory-budget`
-  (from its existing self-monitoring row).
-- **Indexes/log updated**: 4 domain indexes (+5 "load when" rows), `log.md`
-  appended. Root `INDEX.md` unchanged — no new domain.
+- **#1 OKLCH** — `anti-slop-visual-design` has the "+3% lightness per elevation level" rule; not a conflict (elevation is decorative), but a reader could over-apply it to state cues. Created a new page and appended a pointer to that row plus a `related:` link both ways.
+- **#2 benchmark-relative** — no existing page; `estimate-derived-thresholds` (same bot, integrations) and `mape-aligned-point-prediction` (ml) are the neighbours. New page; back-link added on `estimate-derived-thresholds`.
+- **#3 multi-row reorder** — `isolation-level-selection` has the multi-row-invariant row (SERIALIZABLE or parent lock) and `optimistic-vs-pessimistic-locking` the version-column path, but neither covers the unique-position constraint or the final-state rule. New page; both existing pages gained a `related:` back-link.
+- **#4 Prisma CONCURRENTLY** — `online-schema-changes` already says "Never inside a transaction block" for `CONCURRENTLY`; merged two edge rows (implicit runner transaction; premise absent on an empty table), five sources, `applies_to` widened to prisma.
+- **#5 graphify viz failure** — merged as one edge row into `code-graph-as-orientation-layer` next to the exit-0 row it extends.
+- **#6 newest transcript** — merged as one edge row into `session-context-token-budget`. Body-only edit: PR #183 rewrites that page's `related:` line, so the frontmatter was left untouched to avoid a conflict; the source is recorded in the body's Sources list.
+- **#7 fake-timer TTL** — `injected-clock-duration-assertions` is about float tolerance, not this; `tests-that-cannot-fail` is at 114 body lines and its `related:` line is rewritten by #179 and #183. Merged into `async-testing` (fake-timer mechanics page) as one edge row, body-only for the same reason (#183 rewrites its `related:`), with an inline link to `tests-that-cannot-fail` for the mutation proof.
+- **#8 fallback alert** — merged into `alerting` as one edge row + one Instead-of row, body-only (#181 rewrites its `related:` line).
+- **#9, #10, #11** — folded onto open PRs (next section), no main-branch page touched.
+- **#12** — duplicate of a merged row; nothing written.
 
-Gates run (the exact CI commands from `.github/workflows/test.yml`):
-`node scripts/wiki-structure-checks.js wiki` → **pages: 270, indexes: 13,
-findings: 0**; `node scripts/wiki-lint-prohibitions.js wiki` → **directives 72,
-compliant 72, violations 0** (the 1 `info` is pre-existing in
-`config/keys-ahead-of-their-consumer.md`, untouched); `bash scripts/check-versions.sh`
-→ `ok: dev-loop 1.11.2`. The `bats tests/` job was **not** run — bats is not
-installed on this machine, and this change touches only wiki markdown (no
-scripts or hooks), so that suite's subject is unchanged.
+No contradictions found. Lint: `wiki-structure-checks.js wiki` → 0 findings (281 pages); `wiki-lint-prohibitions.js wiki` → 0 violations; new pages 83/78/88 total lines (all bodies ≤ 120).
 
 ## Open-PR check
 
-`gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`
-returned **no open PRs**, and a second unfiltered `gh pr list --state open`
-returned none either — the repository has zero open PRs at flush time. There
-were therefore no in-flight sibling branches to diff against, and no
-`git fetch origin <head>` / `git diff origin/main origin/<head> -- wiki/`
-comparisons to run.
+Open `knowledge/*` heads listed with `gh pr list --search "head:knowledge/"`: #183 (`knowledge/choiyounggi-20260904-133717`), #182 (`…-20260903-214027`), #181 (`…-20260903-203836`), #180 (`…-20260903-184706`), #179 (`…-20260903-172728`). Each was fetched and diffed against `origin/main -- wiki/`.
 
-Per-candidate verdict: **all 21 = `new`.** No `fold`, no `drop-as-pending-duplicate`.
-(The 2 drops recorded below are out-of-layer drops, not pending-duplicate drops.)
+| Candidate | Overlapping open head | Verdict | Action |
+|-----------|----------------------|---------|--------|
+| #9 `00297bb2452bb72c` worker done / clean worktree / "resets" | #179 rewrites `worktree-isolated-workers` with the patch-transfer recovery rows (`git diff` → `git apply --check` → `git checkout --`) | **fold** | Added one edge-case row (the clean-worktree-at-done and "external resets" symptoms are the same incident; `git apply --3way`), extended the git-apply source bullet with `--3way`, added the i168 t2 field line. Pushed to #179 and commented |
+| #10 `18392e61e52d0b0f` stale install/codegen after merge | #179 adds `semantic-conflicts-after-parallel-merge` (merged-tree result table) | **fold** | Added a row to the merged-tree result table, one Instead-of row, two doc sources (pnpm, Prisma generate) and the trip3 field line. Pushed to #179 and commented |
+| #11 `13ce23861664767e` grep before writing "reuse X" | #181 adds `checkable-claims-in-an-adopted-plan` (adopter-side recomputation of a plan's claims) | **fold** | Added one edge-case row for the plan's author, the field line, and extended the page's load-when line in `infrastructure/index.md` on that branch. Pushed to #181 and commented |
+| #6 newest transcript | #183 touches `session-context-token-budget` `related:` only | **new** (body-only edit here) | — |
+| #7 fake-timer TTL | #183 touches `async-testing` `related:` only; #179/#183 touch `tests-that-cannot-fail` `related:` only | **new** (body-only edit here) | — |
+| #8 fallback alert | #181 touches `alerting` `related:` only | **new** (body-only edit here) | — |
+| #1, #2, #3, #4, #5 | none of the five heads touch `anti-slop-visual-design`, `online-schema-changes`, `code-graph-as-orientation-layer`, the transactions pages, or the ml category | **new** | — |
+| #12 | not an open-PR overlap — already on `main` via #184 | **drop** (pending-duplicate of merged content) | Retired |
+
+Expected merge friction: every open head appends to `log.md`, and #179/#180 touch `INDEX.md` (2 lines each); this branch appends nine `log.md` lines and edits the databases and backend rows of `INDEX.md`. `frontend/index.md` and `infrastructure/index.md` are touched by #181/#179/#183 in other rows. These are line-adjacent, not semantic, conflicts.
 
 ## Routing decision
 
-**New pages (5)**
+| Candidate | Target | New page? | Why here |
+|-----------|--------|-----------|----------|
+| #1 OKLCH steps | `frontend/design/lightness-steps-on-dark-surfaces.md` | yes | frontend/design owns color/token decisions; trigger (dark ladder below L 30%, state cue) is new |
+| #2 benchmark-relative | `backend/common/ml/benchmark-relative-signal-classification.md` | yes | No category for analytics exists; `ml` already holds the evaluation/calibration page (MAPE) and this is a grading-input rule of the same kind. Creating an `analytics` category for one page was rejected in favour of the closest fit; INDEX.md backend row now names it |
+| #3 multi-row reorder | `databases/transactions/multi-row-reorder-on-a-shared-resource.md` | yes | Transaction boundary + constraint deferral + locking are DB-side mechanics; the app-side wrapper is linked (`backend-common-orm-transaction-boundaries`) |
+| #4 Prisma CONCURRENTLY | `databases/schema-design/online-schema-changes.md` | merge (2 edge rows) | The page already owns `CONCURRENTLY`; the runner constraint and the empty-table premise are its edge cases |
+| #5 graphify viz | `infrastructure/agent-orchestration/code-graph-as-orientation-layer.md` | merge (1 edge row) | Same tool, same page, adjacent to the exit-0 row |
+| #6 newest transcript | `infrastructure/agent-orchestration/session-context-token-budget.md` | merge (1 edge row) | Measuring a session's context is that page's subject |
+| #7 fake-timer TTL | `testing/async/async-testing.md` | merge (1 edge row) | Fake-timer mechanics live there; the cannot-fail proof is linked |
+| #8 fallback alert | `infrastructure/observability/alerting.md` | merge (1 edge + 1 Instead-of row) | Alert design; sits beside the "absence of success" batch-job row |
+| #9, #10 | PR #179 pages | fold | see Open-PR check |
+| #11 | PR #181 page + its index line | fold | see Open-PR check |
+| #12 | — | drop | already merged (#184) |
 
-| Page | Domain/category | From | Why not an existing page |
-|------|-----------------|------|--------------------------|
-| `application-clock-vs-database-timestamps` | databases / transactions | `2b27d15d` + `bea92fdd` | No page compares an app clock to a DB column. `transactions` chosen over `schema-design` because the decisive content is transaction-time semantics (`now()` = transaction start ⇒ stamp order ≠ commit order) and the fix is a lock/isolation choice |
-| `changed-files-only-gates` | infrastructure / ci-cd | `ff041061` + `4b9af3a0` | Zero grep hits. Both candidates are the same defect (a gate green with an empty subject) from two directions, so they became one page rather than two |
-| `compiler-as-call-site-inventory` | backend / common / change-impact | `702dcf4e` + `94d55f2f` | `call-site-enumeration` is the sibling case (callers of a changed signature, Python positional-vs-keyword) and is at 80 body lines; the TS mechanism is *constructors of a type* with its own workflow, so per "one case per page" it is a separate page, cross-linked |
-| `mutation-harness-file-custody` | testing / quality | `6a9de235` + `41fa1c87` | `harness-reverse-controls` covers scoring a harness; nothing covers the harness's custody of the tree. Both candidates are that one case (keying, and the read window) |
-| `exec-added-processes-and-the-memory-budget` | infrastructure / containers | `7b9e8788` | `host-cgroup-visibility` is cross-pod read mechanics and explicitly routes self-monitoring elsewhere; `resource-limits-and-probes` is manifest authoring. This is a runtime preflight before adding load |
-
-No new category was created — all five landed in existing categories.
-
-**Merged into existing pages (5 candidates)**
-
-| Candidate | Merged into | Shape |
-|-----------|-------------|-------|
-| `91ef5d53` | `testing-quality-tests-that-cannot-fail` | +1 never-fails row, +1 Instead-of row, +1 source |
-| `f189f423` | `testing-quality-source-text-wiring-assertions` | In-place extension of 1 edge row + 1 source bullet (page at the 120-line cap) |
-| `bb6d8539` | `backend-common-change-impact-widening-a-closed-value-table` | +Do-this 6 & 7 (incl. a set-difference ruling table), +1 Instead-of row, +1 source |
-| `60a817ee` | `qa-process-evaluating-review-feedback` | +2 edge rows, +1 Instead-of row, +1 source |
-| `7b9e8788` | `infrastructure-containers-host-cgroup-visibility` | Cross-link from its self-monitoring row to the new page |
-
-**Dropped — out of layer (2, retired)**
-
-- `094dedf3` — a Figma MCP `inspect_node` → `get_dev_ready` children-fetch
-  workaround. The server is a private, org-internal MCP plugin; the behavior is
-  not publicly verifiable and the directive does not transfer to any other reader.
-- `e165a365` — an `/rtb:review` remote-fallback runbook naming
-  `~/.claude/tools/rtb-remote-review.sh` and an internal pod. The transferable
-  kernel ("a two-provider review gate degraded to one provider is not a passed
-  gate") is already the subject of `qa-process-llm-review-pipelines`; what remains
-  is machine-specific paths.
-
-**Released back to `pending` (6)** — each needs its own page, not a row, and is
-better served by a dedicated pass than by being appended here:
-`81dc1f98` (naming the carrier field/type when a plan says "wire A to B"),
-`b9ae304a` (`VAR="$(cmd 2>&1)"` mixing stderr into a value used as a path),
-`fdd0b3c6` (monitor markers anchored at line start; delta rather than absolute
-state; first cycle records a baseline),
-`c2adb2be` (positional-order assertions on rendered SQL predicates),
-`815e8cb9` (grep only *active* `DATABASE_URL` assignments, and confirm which
-dotenv file the tool loads, before a destructive DB command),
-`f1146adb` (CI ticket-key extraction scoped by changed-file intersection rather
-than by mention).
-
-## Decision Log
-
-**Intent.** Drain the harvested `★ Insight` queue into reviewable wiki knowledge
-without lowering the wiki's evidence bar. The queue held 21 rows accumulated over
-several days; the goal was correct routing and real verification, not a high
-ingest count.
-
-**Alternatives considered and rejected.**
-
-- *Ingest all 21 in this pass.* Rejected: six of them each need their own page,
-  and writing six more pages in one pass would have produced thin, weakly-sourced
-  entries. They are released to `pending`, not dropped, so the next flush takes
-  them with a full budget.
-- *Append the two TypeScript candidates to `call-site-enumeration`.* Rejected:
-  that page is the sibling case (callers of a changed signature, Python
-  positional-vs-keyword). AGENTS.md requires one case per page, so the
-  constructor-enumeration case became its own page, cross-linked both ways.
-- *Add a row to `source-text-wiring-assertions` for the empty-slice nuance.*
-  Rejected: that page is at exactly the documented 120-line body cap, so adding a
-  line would violate maintenance invariant 5. The nuance was merged **in place**
-  into an existing edge row instead; body re-measured at 120.
-- *Drop the comment-stripping candidate entirely as a duplicate.* Rejected: its
-  directive is already the page's step 2, but the empty-slice consequence
-  (vacuous **green**, not the documented noisy red) was genuinely absent.
-- *Claim a cross-check exemption because this PR cannot merge itself.* Rejected —
-  see below; the check found a real error, which is the argument against exempting.
-- *Push to `origin`* as the skill's snippet does. Not available: this contributor
-  has no write access to `choiyounggi/dev-loop` (403). Used the pre-existing
-  `fork` remote, which is how every prior knowledge branch here was published.
-- *Branch name from `git config user.name`.* The skill's ASCII sanitisation of a
-  Korean name yields an empty string → `anon`, defeating the attribution the
-  branch name exists for. Used the gh login, matching existing branch names.
-
-**Where reviewers should look hardest.**
-
-1. `infrastructure/ci-cd/changed-files-only-gates.md` — rewritten after the
-   cross-check. The measured table is the load-bearing part; please sanity-check
-   it against your own Prettier version, since the exit codes are version-visible
-   behaviour rather than a documented contract.
-2. `databases/transactions/application-clock-vs-database-timestamps.md` step 5–6 —
-   the claim that timestamp order is not commit order, and that the remedy is a
-   lock/isolation level rather than finer clock resolution. `[추정]` on the MySQL
-   `NOW()`/`SYSDATE()` row: taken from general MySQL semantics, not fetched this
-   session like the PostgreSQL pages were.
-3. `widening-a-closed-value-table.md` Do-this 6–7 — this inserts a security-shaped
-   concern (allowlist widening) into a page whose original subject was value
-   tables. If that reads as two cases, it should be split.
-4. The 2 dropped candidates — if you consider private-tooling runbooks in scope
-   for this wiki, they should be restored rather than retired.
-
-## Cross-Check
-
-Independent adversarial pass via `claude` CLI headless (separate process, no
-shared context), prompted to refute rather than confirm, over the five new pages'
-technical claims.
-
-**It found a real error, and the page was rewritten because of it.** The reviewer
-challenged the claim that `prettier --check` exits 0 on an empty match set,
-arguing an unmatched pattern errors by default and that exit-0 belongs to the
-ignore-filtered case. I resolved it by measurement rather than by argument —
-running all seven cases against Prettier 3.7.4 — and the reviewer was right:
-an unmatched operand exits **2** (while still printing the success sentence),
-whereas the genuine silent vacuous passes are no-operands, all-ignore-filtered,
-and `--ignore-unknown`-with-unsupported-extensions. The page, this report's
-rows 3 and 5, and the `log.md` entry were all corrected.
-
-Verdicts on the other five claim groups: **sound** (PostgreSQL clock semantics —
-noted as if anything *understated*; zsh word-splitting; TS contextual typing;
-`tsc` program membership incl. `exclude`-does-not-stop-imports; cgroup v2
-`max` vs `oom_kill` and `kubectl exec` cgroup placement).
-
-Stated limits of the check: the reviewer's sandbox denied it read access to
-`~/.dev-loop/repo/wiki`, so it adjudicated the six claims as quoted in its prompt
-and could **not** audit (b) whether each `Sources` quote supports the directive it
-is cited for, or (c) whether any page contradicts its own edge-case rows. Those
-two dimensions remain unreviewed by an independent party and are the residual
-risk in this PR. A first attempt also returned only the session's Stop-hook
-output rather than a verdict; that run was discarded rather than read as
-"no findings".
-
-## Review notes
-
-- PR-only, as required: no merge, no push to `main`.
-- Commit is under the contributor's own ambient git identity
-  (`최영기 <dch0202@rsquare.co.kr>`, gh `dch0202-rsquare`); no assistant identity
-  and no `Co-Authored-By` trailer. The branch uses the gh login because
-  sanitizing the Korean `user.name` to ASCII yields an empty string, which the
-  skill's snippet would have turned into `anon` — that would have defeated the
-  attribution the branch name exists for.
-- Scope purity: only `wiki/**`, four domain indexes, `log.md`, and this report.
-  Two untracked leftovers from earlier flushes
-  (`.dev-loop/CROSSCHECK_FINDINGS.md`, `.dev-loop/fold-note-73.md`) were left
-  untouched and unstaged.
+No new category was created. Indexes updated: `frontend/index.md`, `backend/index.md`, `databases/index.md`, `INDEX.md` (databases and backend route lines); `log.md` gained nine entries.

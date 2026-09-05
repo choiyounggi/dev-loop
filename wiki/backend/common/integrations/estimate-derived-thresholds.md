@@ -9,7 +9,7 @@ sources:
   - https://en.wikipedia.org/wiki/Slippage_(finance)
   - "Live incident 2026-08-13/14 (KIS auto-trading bot): 6 positions exited TAKE_PROFIT at +0.06%–+0.42% against a +2% design; re-anchor in mark_filled() restored the band, regression tests red on pre-fix code"
 last_verified: 2026-08-14
-related: []
+related: [backend-common-ml-benchmark-relative-signal-classification]
 ---
 
 # Absolute Thresholds Derived from a Pre-Execution Estimate
