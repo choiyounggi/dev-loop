@@ -9,8 +9,12 @@ sources:
   - https://www.debuggingbook.org/html/DeltaDebugger.html
   - https://sre.google/sre-book/effective-troubleshooting/
   - https://github.com/mattpocock/skills/blob/main/skills/engineering/diagnosing-bugs/SKILL.md
-last_verified: 2026-08-24
-related: [debugging-methodology-hypothesis-testing, debugging-concurrency-intermittent-failures, debugging-signals-logs-and-correlation]
+  - https://www.gnu.org/software/bash/manual/html_node/Aliases.html
+  - https://www.gnu.org/software/bash/manual/html_node/Bash-Startup-Files.html
+  - https://zsh.sourceforge.io/Doc/Release/Files.html
+  - https://en.wikipedia.org/wiki/Regression_testing
+last_verified: 2026-09-06
+related: [debugging-methodology-hypothesis-testing, debugging-concurrency-intermittent-failures, debugging-signals-logs-and-correlation, platforms-environment-path-resolution, qa-process-completion-claims]
 ---
 
 # Building a Reproduction Before Investigating a Bug
@@ -83,6 +87,8 @@ When a full local reproduction is impossible, capture evidence instead:
 | Bug reproduces only on the reporter's machine | Diff the two environments one variable at a time — versions, locale, config — moving your environment toward theirs until it fails ([debugging-methodology-isolate-by-bisection]) |
 | Prod-only failure with no visible error — the client swallows it (a `.catch()` that ignores, an empty error handler) and the action just "does nothing" | Grep the production service logs for the endpoint path before reading more code: from the UI a 500 and a no-op are indistinguishable, and one server-side exception line kills whole families of hypotheses that local code reading cannot ([debugging-signals-logs-and-correlation]) |
 | No loop can be built after working down the whole construction ladder | Stop before forming hypotheses: state that plainly, list what was tried, and ask for one of — environment access, a redacted artifact, or temporary instrumentation shipped to capture the next occurrence |
+| The bug is in a shell script (or a command it runs) and the command pasted into your interactive shell does not reproduce it — or reproduces the opposite | Run it the way production runs it: `sh -c '…'` for a `#!/bin/sh` script, `bash script.sh` for the script itself, `env -i sh -c '…'` for a daemon or CI context — then compare `command -v <tool>` / `type <tool>` in both contexts. An interactive shell expands aliases and has loaded `~/.zshrc`/`~/.bashrc`; a non-interactive `sh` does neither, so a bare name such as `grep` can resolve to a different program with different regex semantics ([platforms-environment-path-resolution]) |
+| A green test already covers the failing path and you are about to cite it as "that stage is healthy" | Read where its last assertion sits relative to the symptom: a test that waits for events 1–2 says nothing about event 3. When the assertions stop before the symptom, build the reproduction that asserts past it (step 3) before trusting the stage ([qa-process-completion-claims]) |
 
 ## Instead of
 
@@ -91,6 +97,8 @@ When a full local reproduction is impossible, capture evidence instead:
 | Write a fix based on the report's stated cause | Reproduce first, then diagnose from the reproduction | The reporter's diagnosis is an untested hypothesis; a fix for an unreproduced bug cannot be verified |
 | Verify the fix only against the full original scenario | Keep the minimal reproduction as an automated test and run it against the fix | The full scenario can pass for unrelated reasons; the minimal repro checks the exact failing mechanism |
 | Keep a 40-step reproduction because it "works" | Shrink until every remaining step is required | Every removable step is noise that widens the search space for the cause |
+| Paste a failing script's command into your terminal to reproduce it | Invoke it under the script's own interpreter (`sh -c`, or run the script) and diff `command -v` between the two contexts | The interactive shell's aliases and rc-set `PATH` can pick a different binary than the script's `sh` does, giving a false "works for me" or a false failure |
+| Treat an existing passing test as the reproduction | Check its assertion boundary against the symptom; add the assertion past the symptom | A test that stops asserting before the failure point is green on the broken build |
 
 ## Sources
 
@@ -99,3 +107,6 @@ When a full local reproduction is impossible, capture evidence instead:
 - https://sre.google/sre-book/effective-troubleshooting/ — "simplify and reduce"; reproduction as the basis of diagnosis
 - Field context 2026-08 (silent-swallow row, field-tested): a prod-only bookmark bug where backend code, proxy, and browser click were all verified normal from the outside; one `journalctl | grep bookmark` surfaced PostgreSQL's "no unique or exclusion constraint matching the ON CONFLICT specification", pinning the cause to a deployed DB left on an old schema — a cause invisible in the repo's code
 - https://github.com/mattpocock/skills/blob/main/skills/engineering/diagnosing-bugs/SKILL.md — feedback-loop-first debugging discipline: the red-capable/deterministic/fast/agent-runnable loop criteria, the construction ladder, the tighten step, and the higher-reproduction-rate directive for non-deterministic bugs
+- https://www.gnu.org/software/bash/manual/html_node/Aliases.html — "Aliases are not expanded when the shell is not interactive"; https://www.gnu.org/software/bash/manual/html_node/Bash-Startup-Files.html — a non-interactive bash reads only `$BASH_ENV`, not `~/.bashrc`; https://zsh.sourceforge.io/Doc/Release/Files.html — `.zshrc` is read only "if the shell is interactive"
+- Field reproduction 2026-08-25 (dev-loop issue #145, `t1-detect`, macOS): `printf … \| LC_ALL=C grep -n '^[[:space:]]*─\{3,\}[[:space:]]*$'` typed into the interactive zsh matched 2 lines (`grep` resolved to `ugrep`); the same pipeline under `sh -c` matched 0 (`grep` resolved to `/usr/bin/grep`, byte-oriented under `LC_ALL=C`) — the production bug, invisible from the interactive shell
+- https://en.wikipedia.org/wiki/Regression_testing — "when a bug is located and fixed, to record a test that exposes the bug and re-run that test regularly"; https://github.com/choiyounggi/linkly-crew/pull/10 — field reproduction 2026-09-02: the existing pump test (`core.rs:426-431`) awaited `RunStarted` + `SpecReady` and was cited as "core is fine" while the app stopped right after `SpecReady`; a new test asserting `TaskStateChanged` and a message after `SpecReady` reproduced the stall
