@@ -36,7 +36,7 @@ under the newer toolchain a project requires.
 | You control | Do |
 |-------------|-----|
 | The compile command | Pass `-isysroot "$(xcrun --show-sdk-path)"` on the command line |
-| Only the environment (a build script, generator, or test harness invokes the compiler internally) | Export `SDKROOT="$(xcrun --show-sdk-path)"`; clang reads it as the default sysroot |
+| Only the environment (a build script, generator, or test harness invokes the compiler internally) | Export `SDKROOT="$(xcrun --show-sdk-path)"`; clang reads it as the default sysroot **when no `-isysroot` reaches the driver**. Homebrew LLVM ships a default config file that already passes `-isysroot` (Edge cases), so there also pass `--no-default-config` through the harness's flag variable (`CFLAGS`), or rewrite that config file |
 | Neither, and headers still are not found | Export `CPATH="$SDK/usr/include"`, which the driver adds to the include search path regardless of the sysroot the driver picked |
 | Neither, and the **link** step fails (Homebrew LLVM specifically) | Export `LIBRARY_PATH="$SDK/usr/lib"` (or pass `-L`) — Homebrew clang passes the SDK it was built with to `ld -syslibroot` and ignores `-isysroot`/`SDKROOT` for linking ([#197277 upstream issue]) |
 
@@ -67,6 +67,7 @@ printf '#include <stdio.h>\nint main(){return 0;}\n' > probe.c
 | `xcrun` itself errors | The active developer directory is unset or points at a removed install; fix with `xcode-select` before touching compiler flags |
 | A subset of a test suite fails only on the compiled path | Reproduce the same failure on an unmodified checkout of the base branch first; when it reproduces there, it is an environment precondition, not a regression in the change under review |
 | Apple's `/usr/bin/clang` works but Homebrew's does not | That differential is the signature of this problem: the Apple driver resolves the SDK via xcrun automatically; the Homebrew build trusts its baked-in path |
+| `SDKROOT` is exported and Homebrew clang still reports the missing SDK | The bottle installs `etc/clang/<triple>.cfg` holding `-isysroot <SDK the bottle was built against>`; a config-file flag counts as a command-line `-isysroot`, and clang consults `SDKROOT` only when none is given. Confirm with `clang -### x.c 2>&1 \| grep -e 'Configuration file' -e isysroot`. Then pass `-isysroot` on the command line (it overrides), run with `--no-default-config` (then `SDKROOT` is honored), or rewrite the `.cfg` to the current SDK path |
 
 ## Instead of
 
@@ -75,6 +76,7 @@ printf '#include <stdio.h>\nint main(){return 0;}\n' > probe.c
 | Hardcode `/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk` (or a versioned SDK path) into a build script | Resolve it with `xcrun --show-sdk-path` at build time | The versioned directory disappears on the next toolchain update, and the compiler degrades to a warning rather than failing at the point of the missing SDK |
 | Report "N tests fail on this branch" from a run whose compile step warned about a missing sysroot | Fix the sysroot, or reproduce on the base branch and report it as an environment precondition | The failures are one step removed from their cause and read as a code regression |
 | Set only `CPATH` and treat the toolchain as configured | Set the sysroot too, and check the link step separately | `CPATH` adds include directories; it does not give the linker a library search root |
+| Export `SDKROOT` for a Homebrew LLVM and retry the build | Pass `-isysroot "$(xcrun --show-sdk-path)"`, or `--no-default-config` together with `SDKROOT` | The bottle's config file already supplies `-isysroot`, and `SDKROOT` is ignored once any `-isysroot` is present |
 
 ## Sources
 
@@ -83,3 +85,6 @@ printf '#include <stdio.h>\nint main(){return 0;}\n' > probe.c
 - https://github.com/llvm/llvm-project/blob/5c29ffda9056e1b4602a46051371f0184ce357b2/clang/test/Driver/darwin-sdkroot.c — clang driver test: "Check that SDKROOT is used to define the default for -isysroot on Darwin"
 - https://clang.llvm.org/docs/DiagnosticsReference.html — `-Wmissing-sysroot` exists and is enabled by default (a warning, not an error)
 - Local reproduction 2026-08-05 (macOS, Homebrew LLVM at `/opt/homebrew/opt/llvm`): `clang probe.c` emitted `warning: no such sysroot directory: '/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk' [-Wmissing-sysroot]` followed by `fatal error: 'stdio.h' file not found`; the same command with `-isysroot "$(xcrun --show-sdk-path)"` (an Xcode SDK path) compiled and linked successfully. A 69-task test suite driven by the toolchain failed en masse with header errors; `clang probe.c` reproduced the identical error; `clang -isysroot "$(xcrun --show-sdk-path)" probe.c` succeeded
+- https://clang.llvm.org/docs/UsersManual.html#configuration-files — default configuration files (`<triple>-<driver>.cfg` and similar) are loaded from the config directories and their flags are treated as command-line options; `--no-default-config` disables loading them
+- https://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/l/llvm.rb — `write_config_files` installs per-triple config files under `etc/clang/`; the formula's own test compiles with `--no-default-config -isysroot MacOS::CLT.sdk_path`
+- Local reproduction 2026-09-06 (Homebrew clang 22.1.8, arm64; the Command Line Tools SDK directory has no `MacOSX26.sdk`; `xcrun` resolves to the Xcode SDK): `clang -###` printed `Configuration file: /opt/homebrew/Cellar/llvm/22.1.8/etc/clang/arm64-apple-darwin25.cfg` whose only line is `-isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk` (absent on this machine); `clang probe.c` failed with `'stdio.h' file not found` with `SDKROOT` unset, set to the xcrun path, and set to the CLT `MacOSX.sdk` path alike; `-isysroot "$(xcrun --show-sdk-path)"` compiled (rc 0); `--no-default-config` with `SDKROOT` set compiled (rc 0) and `-###` then showed the `SDKROOT` value as `-isysroot`; `--no-default-config` with `SDKROOT` unset failed again. A 113-test suite driven by this clang had failed en masse with the same header error before the flag was added (field, linkly)
