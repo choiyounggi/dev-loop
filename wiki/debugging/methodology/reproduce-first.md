@@ -10,7 +10,7 @@ sources:
   - https://sre.google/sre-book/effective-troubleshooting/
   - https://github.com/mattpocock/skills/blob/main/skills/engineering/diagnosing-bugs/SKILL.md
 last_verified: 2026-08-24
-related: [debugging-methodology-hypothesis-testing, debugging-concurrency-intermittent-failures, debugging-signals-logs-and-correlation]
+related: [debugging-methodology-hypothesis-testing, debugging-concurrency-intermittent-failures, debugging-signals-logs-and-correlation, debugging-methodology-probe-path-vs-operation-path]
 ---
 
 # Building a Reproduction Before Investigating a Bug

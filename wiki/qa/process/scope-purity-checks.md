@@ -10,7 +10,7 @@ sources:
   - https://bazel.build/reference/test-encyclopedia
   - "Field reproduction 2026-08-14 (dev-loop, reviews/i83-insight-emission-r1.md): a permanent bats test asserting `git status` scope failed on an unrelated uncommitted sibling file; rewritten to commit-diff evidence → 521/521"
 last_verified: 2026-08-14
-related: [testing-quality-checks-that-cannot-pass, testing-quality-harness-reverse-controls, testing-quality-history-dependent-checks-on-shallow-clones]
+related: [testing-quality-checks-that-cannot-pass, testing-quality-harness-reverse-controls, testing-quality-history-dependent-checks-on-shallow-clones, infrastructure-agent-orchestration-worktree-isolated-workers]
 ---
 
 # Proving Scope Purity from `git status` Output

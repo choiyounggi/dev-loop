@@ -15,18 +15,7 @@ sources:
   - https://github.com/DavidAnson/markdownlint/issues/1206
   - https://google.github.io/styleguide/docguide/best_practices.html
 last_verified: 2026-08-09
-related:
-  [
-    qa-process-acceptance-criteria,
-    testing-quality-tests-that-cannot-fail,
-    platforms-environment-unicode-text-matching,
-    qa-deliverables-generated-artifacts-as-deliverable-source,
-    testing-quality-spec-artifact-checks,
-    testing-quality-checks-that-cannot-pass,
-    qa-deliverables-command-transcripts-in-a-document,
-    qa-deliverables-exclusivity-and-absence-claims,
-    qa-document-verification-generated-reference-drift-gates,
-  ]
+related: [qa-process-acceptance-criteria, testing-quality-tests-that-cannot-fail, platforms-environment-unicode-text-matching, qa-deliverables-generated-artifacts-as-deliverable-source, testing-quality-spec-artifact-checks, testing-quality-checks-that-cannot-pass, qa-deliverables-command-transcripts-in-a-document, qa-deliverables-exclusivity-and-absence-claims, qa-document-verification-generated-reference-drift-gates, qa-document-verification-sweeping-pre-gate-citations-for-fabrication]
 ---
 
 # Automated Gates on a Specification Document
