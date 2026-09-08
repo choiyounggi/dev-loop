@@ -8,8 +8,7 @@ sources:
   - https://google.github.io/styleguide/docguide/best_practices.html
   - https://www.writethedocs.org/guide/writing/docs-principles/
 last_verified: 2026-08-06
-related:
-  [qa-deliverables-generated-artifacts-as-deliverable-source, qa-document-verification-spec-document-gates, testing-quality-spec-artifact-checks]
+related: [qa-deliverables-generated-artifacts-as-deliverable-source, qa-document-verification-spec-document-gates, testing-quality-spec-artifact-checks, qa-document-verification-sweeping-pre-gate-citations-for-fabrication, qa-document-verification-editing-a-gated-document]
 ---
 
 # Numbers in a Document About to Be Published Outside the Team

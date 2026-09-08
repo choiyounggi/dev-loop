@@ -9,7 +9,7 @@ sources:
   - https://github.com/virgiliojr94/book-to-skill/blob/9c207f870adebe20ade4f7d2f11bc3d759c2fd88/SECURITY-NOTICE.md
   - https://github.com/different-ai/openwork/blob/fda0babb6c7600ed044757515beb374a3f4dc827/skills-lock.json
 last_verified: 2026-08-29
-related: [security-dependencies-supply-chain, security-agent-exposure-in-session-tool-exposure]
+related: [security-dependencies-supply-chain, security-agent-exposure-in-session-tool-exposure, qa-process-session-identity-leak-in-plugin-prose]
 ---
 
 # Trusting Third-Party Agent Skills, Plugins, and MCP Servers

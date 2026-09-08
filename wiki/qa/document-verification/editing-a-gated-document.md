@@ -9,8 +9,8 @@ sources:
   - https://docs.vale.sh/topics/scopes.md
   - https://docs.vale.sh/checks/existence
   - https://github.com/DavidAnson/markdownlint/blob/main/doc/md013.md
-last_verified: 2026-08-14
-related: [qa-process-acceptance-criteria, qa-process-regression-scope, testing-quality-tests-that-cannot-fail]
+last_verified: 2026-09-08
+related: [qa-process-acceptance-criteria, qa-process-regression-scope, testing-quality-tests-that-cannot-fail, qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-sweeping-pre-gate-citations-for-fabrication]
 ---
 
 # Editing a Document That Automated Text Gates Check
@@ -75,6 +75,7 @@ now fails on wording whose meaning did not change.
 | The failure surfaces in another task's or another agent's check log | Attribute before repairing: identify which file the failing pattern targets, since a cross-file gate makes your edit look like their regression |
 | The gate is genuinely wrong (it forbids a correct sentence with no replacement available) | Change the gate, with a control proving it still catches the defect it owns — do not reword a correct document into a worse one |
 | The gate is green on your machine and red only in CI after a prose edit (macOS-authored bats suites) | Treat the anchor inventory of step 1 as the authoritative local signal, not the test run: under bash ≤4.0 (macOS system bash 3.2) a failing mid-test `[[ ]]` does not fail the test, so the broken anchor passes silently on your platform ([testing-quality-tests-that-cannot-fail]) |
+| A content-only PR fails CI and the failing gate is a corpus-derived exact count pinned in a test (a lint's printed `directives: N` vs. a test file's pinned `N`), authored on a machine that never ran the local suite | Diff the gate's own printed count against the pinned count before reading the changed content — content-only PRs are commonly authored without running the local test suite, so the mismatch first surfaces in CI and looks like a content defect but is a one-line pin bump alongside the content change |
 | You are authoring the gate rather than the document | This page covers the author's side; gate construction and its controls are a separate concern → [testing-quality-tests-that-cannot-fail]. For a phrase anchor specifically, compare whitespace-normalized text (collapse runs of whitespace, then `grep -qF`) so legitimate reflow of the document cannot break the gate |
 
 ## Instead of
@@ -95,6 +96,8 @@ now fails on wording whose meaning did not change.
 - https://man7.org/linux/man-pages/man1/pgrep.1.html — "The running pgrep, pkill, or pidwait process will never report itself as a match" — self-exclusion is designed in because self-matching is the expected failure
 - Measured 2026-08-14 (macOS bash 3.2.57): `[[ "$s" == *"return to step 1"* ]]` does not match when `$s` carries the phrase split across a newline — the wrap genuinely breaks the anchor on every platform; and `set -e; [[ 1 -eq 2 ]]; echo REACHED` prints, so the broken mid-test anchor is invisible under macOS bats while bash ≥4.2 CI fails it
 - Field reproduction ×2 (dev-loop): PR #94 §O3 and PR #102 — reflowing SKILL.md prose split `return to step 1 of the dispatch` across two lines; `tests/orchestrate-review-pass.bats` asserted it as a single-line substring, CI red on ubuntu only, fixed by reflowing the phrase onto one physical line (commit 9cbc065)
+- Reproduction 2026-09-08 (dev-loop repo): `node scripts/wiki-lint-prohibitions.js wiki` prints `directives: 75`; `tests/wiki-lint-prohibitions.bats` pins the identical literal `directives: 75` as an exact-match assertion — the gate's printed count and the pinned test count are two independently maintained copies of one corpus-derived number
+- Field evidence (dev-loop PR #151): `wiki-lint-prohibitions.js` printed `directives: 72` while `tests/wiki-lint-prohibitions.bats` pinned 71; bumping the pin turned both CI jobs green with zero content changes
 
 ## Field context
 

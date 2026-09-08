@@ -18,7 +18,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [client-vs-server-state](state/client-vs-server-state.md) | Deciding where/how to store a piece of UI data (fetched entities vs ephemeral UI vs theme/session vs filters/tabs); untangling a global store that has grown unmanageable |
 | [derived-state](state/derived-state.md) | About to store a value computable from existing state/props (filtered list, count, selected object); two copies of the same fact have drifted; tempted to set state from an effect |
-| [effects-usage](state/effects-usage.md) | Writing or reviewing a useEffect (or framework-equivalent watcher); an effect chain causes render loops, flicker, or double-firing; deciding where non-render logic belongs (event handler vs effect vs module scope) |
+| [effects-usage](state/effects-usage.md) | Writing or reviewing a useEffect (or framework-equivalent watcher); an effect chain causes render loops, flicker, or double-firing; deciding where non-render logic belongs (event handler vs effect vs module scope); a canvas/WebGL/rAF setup-teardown effect is keyed on an object a hook returns (theme, colors, viewport) that gets a fresh identity on every DOM mutation a scroll/animation library makes (e.g. Lenis toggling `<html>` classes on scroll start/stop), re-running setup though nothing the loop needs changed |
 
 ## structure
 
