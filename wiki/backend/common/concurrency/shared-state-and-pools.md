@@ -8,7 +8,7 @@ sources:
   - https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing
   - https://docs.oracle.com/javase/tutorial/essential/concurrency/sync.html
 last_verified: 2026-07-10
-related: [databases-transactions-isolation-level-selection, backend-common-caching-invalidation-and-stampede, backend-common-reliability-timeouts-and-retries, databases-query-optimization-n-plus-one-queries, databases-indexing-index-selection]
+related: [databases-transactions-isolation-level-selection, backend-common-caching-invalidation-and-stampede, backend-common-reliability-timeouts-and-retries, databases-query-optimization-n-plus-one-queries, databases-indexing-index-selection, testing-quality-sequential-dispatch-assumption-under-concurrency]
 ---
 
 # Shared In-Process State and Pool Sizing under Concurrent Requests
