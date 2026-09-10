@@ -13,7 +13,7 @@ sources:
   - https://www.gnu.org/software/bash/manual/html_node/Double-Quotes.html
   - https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
 last_verified: 2026-08-05
-related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution, platforms-shells-escapes-in-shell-string-literals, platforms-shells-env-var-off-switches, platforms-shells-unset-versus-empty-parameters, platforms-shells-option-like-argument-values, platforms-processes-tool-diagnostics-without-a-failing-exit-code, testing-quality-completion-predicates]
+related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution, platforms-shells-escapes-in-shell-string-literals, platforms-shells-env-var-off-switches, platforms-shells-unset-versus-empty-parameters, platforms-shells-option-like-argument-values, platforms-processes-tool-diagnostics-without-a-failing-exit-code, testing-quality-completion-predicates, platforms-tools-jq-dot-rebinding-in-predicates]
 ---
 
 # Shell Scripts That Must Run on More Than One Machine or Shell

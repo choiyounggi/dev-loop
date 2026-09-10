@@ -8,7 +8,7 @@ sources:
   - https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html
   - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html
 last_verified: 2026-07-10
-related: [debugging-methodology-isolate-by-bisection, debugging-methodology-reproduce-first, testing-flaky-diagnosing-flaky-tests]
+related: [debugging-methodology-isolate-by-bisection, debugging-methodology-reproduce-first, testing-flaky-diagnosing-flaky-tests, testing-quality-proving-a-critical-section-is-lock-protected]
 ---
 
 # Making an Intermittent Failure Reproducible
