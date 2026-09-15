@@ -38,6 +38,25 @@ worker_question() {
   jq -n --arg t "$2" --arg q "$3" '{taskId:$t, question:$q, options:[]}' > "$d/$2.json"
 }
 
+# worker_blocked <worktree-name> <task> <ts> [reason]
+worker_blocked() {
+  d="$WROOT/$1/.orchestration/blocked"
+  mkdir -p "$d"
+  reason="${4:-idle_prompt}"
+  jq -n --arg ts "$3" --arg task "$2" --arg reason "$reason" --arg wt "$WROOT/$1" \
+    '{ts:$ts, taskId:$task, session:"lo-1", event:"Notification", reason:$reason, detail:"x", worktree:$wt}' \
+    > "$d/$2.json"
+}
+
+# canonical_blocked <task> <ts> <worktree>
+canonical_blocked() {
+  bdir="$(dirname "$CDIR")/blocked"
+  mkdir -p "$bdir"
+  jq -n --arg ts "$2" --arg task "$1" --arg wt "$3" \
+    '{ts:$ts, taskId:$task, session:"lo-1", event:"Notification", reason:"idle_prompt", detail:"canonical-marker", worktree:$wt}' \
+    > "$bdir/$1.json"
+}
+
 @test "normal: worker record newer than canonical is collected, content matches" {
   graph '{"tasks":[{"id":"t1","deps":[]}]}'
   canonical_status t1 implementing 2026-01-01T00:00:00Z
@@ -187,4 +206,110 @@ worker_question() {
   run sh "$CS" "$G" "$CDIR" "$WROOT"
   [ "$status" -eq 0 ]
   [ "$output" = "collected=0 skipped=0 foreign=0" ]
+}
+
+# ---- blocked records (R1-R3) ----
+
+@test "R1 normal: blocked record absent from canonical is copied, content matches" {
+  graph '{"tasks":[{"id":"t1","deps":[]}]}'
+  worker_blocked wt1 t1 2026-01-01T00:05:00Z
+  run sh "$CS" "$G" "$CDIR" "$WROOT"
+  [ "$status" -eq 0 ]
+  bdir="$(dirname "$CDIR")/blocked"
+  [ -f "$bdir/t1.json" ]
+  [ "$(jq -S . "$bdir/t1.json")" = "$(jq -S . "$WROOT/wt1/.orchestration/blocked/t1.json")" ]
+}
+
+@test "R1 normal: worker blocked record newer than canonical replaces it" {
+  graph '{"tasks":[{"id":"t1","deps":[]}]}'
+  canonical_blocked t1 2026-01-01T00:00:00Z "$WROOT/wt1"
+  worker_blocked wt1 t1 2026-01-01T00:05:00Z permission_prompt
+  run sh "$CS" "$G" "$CDIR" "$WROOT"
+  [ "$status" -eq 0 ]
+  bdir="$(dirname "$CDIR")/blocked"
+  [ "$(jq -r '.reason' "$bdir/t1.json")" = "permission_prompt" ]
+  [ "$(jq -r '.ts' "$bdir/t1.json")" = "2026-01-01T00:05:00Z" ]
+}
+
+@test "R1 boundary: equal ts blocked record is not replaced" {
+  graph '{"tasks":[{"id":"t1","deps":[]}]}'
+  canonical_blocked t1 2026-01-01T00:05:00Z "$WROOT/wt1"
+  worker_blocked wt1 t1 2026-01-01T00:05:00Z permission_prompt
+  run sh "$CS" "$G" "$CDIR" "$WROOT"
+  [ "$status" -eq 0 ]
+  bdir="$(dirname "$CDIR")/blocked"
+  [ "$(jq -r '.detail' "$bdir/t1.json")" = "canonical-marker" ]
+}
+
+@test "R2 normal: canonical blocked record is removed when the worker-side file is gone" {
+  graph '{"tasks":[{"id":"t1","deps":[]}]}'
+  mkdir -p "$WROOT/wt1/.orchestration"
+  canonical_blocked t1 2026-01-01T00:00:00Z "$WROOT/wt1"
+  run sh "$CS" "$G" "$CDIR" "$WROOT"
+  [ "$status" -eq 0 ]
+  bdir="$(dirname "$CDIR")/blocked"
+  [ ! -e "$bdir/t1.json" ]
+}
+
+@test "R2 boundary: canonical blocked record is removed when its worktree dir is missing" {
+  graph '{"tasks":[{"id":"t1","deps":[]}]}'
+  canonical_blocked t1 2026-01-01T00:00:00Z "$WROOT/nonexistent-wt"
+  run sh "$CS" "$G" "$CDIR" "$WROOT"
+  [ "$status" -eq 0 ]
+  bdir="$(dirname "$CDIR")/blocked"
+  [ ! -e "$bdir/t1.json" ]
+}
+
+@test "R2 boundary: canonical blocked record with empty worktree field is removed" {
+  graph '{"tasks":[{"id":"t1","deps":[]}]}'
+  canonical_blocked t1 2026-01-01T00:00:00Z ""
+  run sh "$CS" "$G" "$CDIR" "$WROOT"
+  [ "$status" -eq 0 ]
+  bdir="$(dirname "$CDIR")/blocked"
+  [ ! -e "$bdir/t1.json" ]
+}
+
+@test "R2 boundary: a canonical record whose worktree is a physical path survives a symlinked worktrees root" {
+  graph '{"tasks":[{"id":"t1","deps":[]}]}'
+  mkdir -p "$WROOT/wt1/.orchestration/blocked"
+  jq -n --arg ts "2026-01-01T00:05:00Z" \
+    '{ts:$ts, taskId:"t1", session:"lo-1", event:"Notification", reason:"idle_prompt", detail:"x", worktree:"placeholder"}' \
+    > "$WROOT/wt1/.orchestration/blocked/t1.json"
+  phys="$(cd "$WROOT/wt1" && pwd -P)"
+  canonical_blocked t1 2026-01-01T00:05:00Z "$phys"
+  link="$BATS_TEST_TMPDIR/link"
+  ln -s "$WROOT" "$link"
+  run sh "$CS" "$G" "$CDIR" "$link"
+  [ "$status" -eq 0 ]
+  bdir="$(dirname "$CDIR")/blocked"
+  [ -f "$bdir/t1.json" ]
+}
+
+@test "R3 error: malformed worker blocked record is not copied, exit still 0" {
+  graph '{"tasks":[{"id":"t1","deps":[]}]}'
+  d="$WROOT/wt1/.orchestration/blocked"
+  mkdir -p "$d"
+  printf 'not-json' > "$d/t1.json"
+  run sh "$CS" "$G" "$CDIR" "$WROOT"
+  [ "$status" -eq 0 ]
+  bdir="$(dirname "$CDIR")/blocked"
+  [ ! -e "$bdir/t1.json" ]
+}
+
+@test "R3 boundary: blocked record for a foreign task id is not copied" {
+  graph '{"tasks":[{"id":"t1","deps":[]}]}'
+  worker_blocked other-run zz 2026-01-01T00:05:00Z
+  run sh "$CS" "$G" "$CDIR" "$WROOT"
+  [ "$status" -eq 0 ]
+  bdir="$(dirname "$CDIR")/blocked"
+  [ ! -e "$bdir/zz.json" ]
+}
+
+@test "R3 normal: stdout summary line is unchanged by blocked-record collection" {
+  graph '{"tasks":[{"id":"t1","deps":[]}]}'
+  worker_status wt1 t1 planning 2026-01-01T00:00:00Z
+  worker_blocked wt1 t1 2026-01-01T00:05:00Z
+  run sh "$CS" "$G" "$CDIR" "$WROOT"
+  [ "$status" -eq 0 ]
+  [ "$output" = "collected=1 skipped=0 foreign=0" ]
 }

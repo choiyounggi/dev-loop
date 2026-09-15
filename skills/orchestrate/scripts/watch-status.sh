@@ -17,6 +17,20 @@
 #           and clear questions/ before relaunching)
 #   exit 7: a live non-terminal worker's pane is stalled (tmux-worker-stalled.sh
 #           reported 1 — a wedged/idle worker; inspect or nudge the session)
+#   exit 8: a worker is blocked — a current .orchestration/blocked record
+#           (worker-blocked-signal.sh hook) whose pane stayed unchanged across
+#           two polls; handle it, delete both record copies, then relaunch
+#
+# A blocked record is a HINT, not proof: the hook contract says a dialog
+# answered by `keys` in-turn leaves the record behind, so a record only
+# counts as current while its .ts is strictly newer than the task's status
+# .updatedAt. Currency alone still is not enough (an idle_prompt can fire
+# while a background agent is still working), so the witness is the pane
+# itself: this script hashes `tmux capture-pane` for the task's session once
+# per poll, and only wakes (exit 8) once the same (ts, hash) has been seen on
+# two consecutive polls — about one interval after the pane truly stops
+# moving, and never while it keeps repainting (a spinner, a counter, a
+# background-agent timer).
 #
 # LO_GRAPH + LO_WORKTREES_ROOT (both required together, issue #167): workers
 # write status/questions worker-locally now, never into this checkout. When
@@ -123,6 +137,23 @@ elapsed=0
 escdir="$(dirname "$dir")/escalations"
 # Worker questions (ask-coordinator.sh) use the same sibling layout: <root>/.orchestration/questions.
 qdir="$(dirname "$dir")/questions"
+# Blocked records (worker-blocked-signal.sh hook, collected by collect-status.sh)
+# use the same sibling layout: <root>/.orchestration/blocked.
+bdir="$(dirname "$dir")/blocked"
+# Per-task static-pane witness state for this watch process: newline-separated
+# "TASK<TAB>TS<TAB>HASH<TAB>COUNT" lines. bl_get prints TS/HASH/COUNT for a
+# task (nothing if absent); bl_put replaces that task's line and prints the
+# new state. A literal tab (not a space) delimits fields — task ids and ts
+# values may contain either.
+bl_state=""
+bl_tab=$(printf '\t')
+bl_get() {
+  printf '%s\n' "$bl_state" | awk -F "$bl_tab" -v t="$1" '$1==t{print $2 "\t" $3 "\t" $4; exit}'
+}
+bl_put() {
+  printf '%s\n' "$bl_state" | awk -F "$bl_tab" -v t="$1" -v ts="$2" -v h="$3" -v c="$4" -v tab="$bl_tab" \
+    'NF==0{next} $1!=t{print} END{print t tab ts tab h tab c}'
+}
 # tmux binary for dead-worker (liveness) checks; overridable in tests via WATCH_TMUX.
 # If it is not resolvable, DISABLE liveness (empty) rather than flag every worker
 # dead — a missing tmux must not abort the run (`! missing-cmd` would invert to true).
@@ -281,7 +312,7 @@ while [ "$elapsed" -lt "$budget" ]; do
     if [ "$q_found" -eq 1 ]; then exit 6; fi
   fi
 
-  done_count=0; failed=0; summary=""; stalled=""
+  done_count=0; failed=0; summary=""; stalled=""; blocked=""
   for f in "$dir"/*.json; do
     [ -f "$f" ] || continue
     if [ -n "$only" ]; then
@@ -343,6 +374,50 @@ while [ "$elapsed" -lt "$budget" ]; do
             fi
           fi
         fi
+        # Blocked-worker check: a current .orchestration/blocked/<task>.json
+        # record (see the header) is a HINT confirmed by hashing the pane
+        # across two consecutive polls (D3, D4). Gated on ar_pressed==0,
+        # exactly like the stall check below: send-prompt.sh keys returns as
+        # soon as tmux accepts the key event, not once the CLI has redrawn,
+        # so a capture taken moments later can still show the PRE-Enter
+        # pane. A poll that pressed Enter is skipped here entirely — neither
+        # judged nor recorded into the witness state — so a stale pre-repaint
+        # capture never counts toward the two-poll confirmation; the next
+        # poll judges the (by then actually repainted) pane fresh.
+        if [ "$ar_pressed" -eq 0 ] && [ "$r" -lt "$target_rank" ] && [ -n "$TMUX_BIN" ] && [ -n "$sess" ] \
+           && [ -f "$bdir/$tk.json" ] && "$JQ" -e . "$bdir/$tk.json" >/dev/null 2>&1; then
+          bts=$("$JQ" -r '.ts // empty' "$bdir/$tk.json" 2>/dev/null || true)
+          bupd=$("$JQ" -r '.updatedAt // empty' "$f" 2>/dev/null || true)
+          if [ -n "$bts" ] && [ "$bts" \> "$bupd" ]; then
+            cs_ok=1
+            cs_pane=$("$TMUX_BIN" capture-pane -t "=$sess:" -p 2>/dev/null) || cs_ok=0
+            if [ "$cs_ok" -eq 1 ]; then
+              bh=$(printf '%s' "$cs_pane" | cksum)
+            else
+              bh="capture-failed-$elapsed"
+            fi
+            bl_prev=$(bl_get "$tk")
+            bl_pts=""; bl_phash=""; bl_pcount=0
+            if [ -n "$bl_prev" ]; then
+              bl_pts=$(printf '%s' "$bl_prev" | awk -F "$bl_tab" '{print $1}')
+              bl_phash=$(printf '%s' "$bl_prev" | awk -F "$bl_tab" '{print $2}')
+              bl_pcount=$(printf '%s' "$bl_prev" | awk -F "$bl_tab" '{print $3}')
+            fi
+            if [ "$bl_pts" = "$bts" ] && [ "$bl_phash" = "$bh" ]; then
+              bl_count=$((bl_pcount+1))
+            else
+              bl_count=1
+            fi
+            bl_state=$(bl_put "$tk" "$bts" "$bh" "$bl_count")
+            if [ "$bl_count" -ge 2 ]; then
+              breason=$("$JQ" -r '.reason // "?"' "$bdir/$tk.json" 2>/dev/null || echo "?")
+              bdetail=$("$JQ" -r '.detail // ""' "$bdir/$tk.json" 2>/dev/null || echo "")
+              bdetail=$(printf '%s' "$bdetail" | tr '\n' ' ' | cut -c1-120)
+              blocked="${blocked}[watch] worker blocked — ${tk}:${sess} (${breason}: ${bdetail})
+"
+            fi
+          fi
+        fi
         # Per-session stall check: only rc 1 marks a stall. rc 0 (progressing),
         # rc 2 (unknown), or a broken script are all NOT stalled — the explicit
         # rc capture means no failure here can abort the watch loop.
@@ -363,7 +438,13 @@ while [ "$elapsed" -lt "$budget" ]; do
   echo "[watch ->$target] $done_count/$expected |$summary"
   [ "$failed" -gt 0 ] && { echo "[watch] failed session detected — abort"; exit 3; }
   [ "$done_count" -ge "$expected" ] && { echo "[watch] all reached $target"; exit 0; }
-  # Stall is the weakest signal: failed(3) and all-reached(0) above win over it.
+  # A confirmed blocked worker outranks the stall heuristic — the harness
+  # already told us why, so there's nothing left for the heuristic to guess.
+  if [ -n "$blocked" ]; then
+    printf '%s' "$blocked"
+    exit 8
+  fi
+  # Stall is the weakest signal: failed(3), all-reached(0), and blocked(8) above win over it.
   if [ -n "$stalled" ]; then
     stmsg=""
     for se in $stalled; do

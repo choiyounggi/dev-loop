@@ -24,6 +24,18 @@
 #   when no canonical question record already exists (copy-if-absent) — an
 #   answered/cleared question must never be re-collected.
 #
+#   Also collects <worktrees-root>/*/.orchestration/blocked/<task>.json
+#   (BlockedRecord, written by hooks/worker-blocked-signal.sh; task id in the
+#   graph) into <canonical-status-dir>/../blocked/<task>.json via tmp+mv when
+#   no canonical copy exists or the worker record's .ts is strictly greater
+#   (lexical compare) than the canonical's .ts — the last event always wins,
+#   unlike status's tombstone rule. A second pass then removes any canonical
+#   blocked record whose .worktree field is empty, names a missing directory,
+#   or has no matching WORKTREE/.orchestration/blocked/<task>.json, so a
+#   cleared or relaunched worker's stale record does not linger and keep
+#   waking the coordinator. Neither pass changes the collected/skipped/foreign
+#   counters or the stdout contract.
+#
 #   exit 0: ran (stdout: exactly one line `collected=<n> skipped=<n> foreign=<n>`)
 #   exit 2: usage error (wrong arg count)
 #   exit 4: graph unreadable or malformed (no .tasks array), or the canonical
@@ -48,6 +60,8 @@ graph="$1"; cdir="$2"; wroot="$3"
 mkdir -p "$cdir" || { echo "collect-status: cannot create '$cdir'" >&2; exit 4; }
 qdir="$(dirname "$cdir")/questions"
 mkdir -p "$qdir" || { echo "collect-status: cannot create '$qdir'" >&2; exit 4; }
+bdir="$(dirname "$cdir")/blocked"
+mkdir -p "$bdir" || { echo "collect-status: cannot create '$bdir'" >&2; exit 4; }
 
 ids=$("$JQ" -r '.tasks[]?.id // empty' "$graph")
 # -F: the candidate is a LITERAL string, not a BRE pattern — an id/basename
@@ -127,6 +141,38 @@ for f in "$wroot"/*/.orchestration/questions/*.json; do
   "$JQ" '.' "$f" > "$tmp"
   mv "$tmp" "$qfile"
   tmp=""
+done
+
+for f in "$wroot"/*/.orchestration/blocked/*.json; do
+  [ -f "$f" ] || continue
+  base=${f##*/}; task=${base%.json}
+  is_task "$task" || continue
+
+  "$JQ" -e . "$f" >/dev/null 2>&1 || {
+    echo "collect-status: malformed worker blocked record '$f' — skipped" >&2
+    continue
+  }
+
+  bfile="$bdir/$task.json"
+  if [ -f "$bfile" ] && "$JQ" -e . "$bfile" >/dev/null 2>&1; then
+    wts=$("$JQ" -r '.ts // ""' "$f")
+    cts=$("$JQ" -r '.ts // ""' "$bfile")
+    [ "$wts" \> "$cts" ] || continue
+  fi
+
+  tmp="$bfile.tmp.$$"
+  "$JQ" '.' "$f" > "$tmp"
+  mv "$tmp" "$bfile"
+  tmp=""
+done
+
+for b in "$bdir"/*.json; do
+  [ -f "$b" ] || continue
+  bbase=${b##*/}; btask=${bbase%.json}
+  bwt=$("$JQ" -r '.worktree // ""' "$b" 2>/dev/null || true)
+  if [ -z "$bwt" ] || [ ! -d "$bwt" ] || [ ! -f "$bwt/.orchestration/blocked/$btask.json" ]; then
+    rm -f "$b"
+  fi
 done
 
 echo "collected=$collected skipped=$skipped foreign=$foreign"
