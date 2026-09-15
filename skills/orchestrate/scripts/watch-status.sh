@@ -24,6 +24,25 @@
 # $LO_WORKTREES_ROOT` first to pull those records in; a collector failure
 # warns on stderr and the wait continues. Either unset -> unchanged behavior.
 #
+# Auto-recover (on by default): a worker's pane can hold an unsubmitted
+# [Pasted text placeholder (send-prompt.sh `state` exit 9) after a prompt
+# lands but nothing presses Enter — today that costs the full stall timeout
+# before the coordinator wakes to press it itself. When a non-terminal,
+# below-target task's session reports exit 9 on two consecutive polls of this
+# watch process, watch-status.sh presses Enter itself via `send-prompt.sh keys
+# SESSION Enter` and keeps polling; this never changes the exit-code contract
+# above. LO_AUTO_RECOVER set to 0, off, or false disables it (unset or any
+# other value, including empty, enables it). LO_AUTO_RECOVER_MAX (default 3)
+# bounds Enter presses per session for the lifetime of this watch process; a
+# non-numeric or zero value is refused with exit 4 before polling starts, the
+# same treatment LO_PHASE_TIMEOUTS gets. WATCH_SEND_PROMPT overrides the
+# send-prompt.sh path used (default: the sibling send-prompt.sh next to this
+# script) — tests use it to stub the `state`/`keys` verbs. Single-actor
+# assumption the two-poll debounce relies on: the coordinator only calls
+# send-prompt.sh after a watch-status.sh run has exited, never while a poll is
+# in flight, so this script's own `keys` call is always the only outstanding
+# send for a session.
+#
 # Per-phase deadlines: one flat timeout gave a plan phase and a long implement
 # phase the same budget. LO_PHASE_TIMEOUTS carries a per-phase budget keyed on
 # the TARGET phase of this wait, so one exported value serves every call:
@@ -114,6 +133,52 @@ command -v "$TMUX_BIN" >/dev/null 2>&1 || TMUX_BIN=""
 # script DISABLES the check (empty), mirroring the TMUX_BIN treatment above.
 STALL_SCRIPT="${WATCH_STALL_SCRIPT:-$(dirname "$0")/tmux-worker-stalled.sh}"
 [ -f "$STALL_SCRIPT" ] || STALL_SCRIPT=""
+
+# Auto-recover setup (see the header paragraph above). Validated up front,
+# like LO_PHASE_TIMEOUTS, so a typo'd bound fails fast rather than mid-wait.
+AR_MAX="${LO_AUTO_RECOVER_MAX:-3}"
+case "$AR_MAX" in
+  ''|*[!0-9]*) echo "watch-status: invalid LO_AUTO_RECOVER_MAX '$AR_MAX' (must be a positive integer)" >&2; exit 4 ;;
+esac
+[ "$AR_MAX" -gt 0 ] || { echo "watch-status: invalid LO_AUTO_RECOVER_MAX '$AR_MAX' (must be > 0)" >&2; exit 4; }
+SEND_PROMPT="${WATCH_SEND_PROMPT:-$(dirname "$0")/send-prompt.sh}"
+case "${LO_AUTO_RECOVER:-1}" in
+  0|off|false) AR_ON=0; echo "[watch] auto-recover=off (LO_AUTO_RECOVER=${LO_AUTO_RECOVER})" ;;
+  *)
+    if [ -f "$SEND_PROMPT" ]; then
+      AR_ON=1; echo "[watch] auto-recover=on (max=$AR_MAX)"
+    else
+      AR_ON=0; echo "[watch] auto-recover=off (send-prompt script missing)"
+    fi
+    ;;
+esac
+# Per-session counters, POSIX sh has no arrays: a leading space then
+# "session:count " tokens; the trailing colon in the match pattern keeps
+# lo-1 from matching lo-10. Session names are letters/digits/_/- only
+# (launch-session.sh), so they cannot collide with the ":"/" " delimiters.
+ar_consec=" "
+ar_presses=" "
+ar_get() {
+  case "$1" in
+    *" $2:"*)
+      ar_g_val="${1#*" $2:"}"
+      ar_g_val="${ar_g_val%% *}"
+      echo "$ar_g_val"
+      ;;
+    *) echo 0 ;;
+  esac
+}
+ar_set() {
+  case "$1" in
+    *" $2:"*)
+      ar_s_pre="${1%%" $2:"*}"
+      ar_s_rest="${1#*" $2:"}"
+      ar_s_post="${ar_s_rest#*" "}"
+      printf '%s %s:%s %s' "$ar_s_pre" "$2" "$3" "$ar_s_post"
+      ;;
+    *) printf '%s%s:%s ' "$1" "$2" "$3" ;;
+  esac
+}
 
 # classify_stall <session> — read the pane SCROLLBACK (not just the visible
 # region) for a stalled session and print an annotation for the exit-7
@@ -244,13 +309,50 @@ while [ "$elapsed" -lt "$budget" ]; do
           echo "[watch] task $tk: session '$sess' gone at phase '$ph' — dead worker"
           failed=$((failed+1)); continue
         fi
+        # Auto-recover: a below-target session whose pane holds an unsubmitted
+        # paste on two consecutive polls gets Enter pressed for it here. Runs
+        # before the stall check so a just-repaired pane skips this poll's
+        # stall verdict (ar_pressed below) instead of re-reporting the exact
+        # condition just fixed.
+        ar_pressed=0
+        if [ "$AR_ON" -eq 1 ] && [ "$r" -lt "$target_rank" ] && [ -n "$TMUX_BIN" ] && [ -n "$sess" ]; then
+          ar_n=$(ar_get "$ar_presses" "$sess")
+          if [ "$ar_n" -lt "$AR_MAX" ]; then
+            arc=0; sh "$SEND_PROMPT" state "$sess" >/dev/null 2>&1 || arc=$?
+            if [ "$arc" -eq 9 ]; then
+              ar_c=$(( $(ar_get "$ar_consec" "$sess") + 1 ))
+              if [ "$ar_c" -ge 2 ]; then
+                ar_n=$((ar_n+1))
+                ar_presses=$(ar_set "$ar_presses" "$sess" "$ar_n")
+                ar_consec=$(ar_set "$ar_consec" "$sess" 0)
+                ar_pressed=1
+                krc=0; sh "$SEND_PROMPT" keys "$sess" Enter >/dev/null 2>&1 || krc=$?
+                if [ "$krc" -eq 0 ]; then
+                  echo "[watch] auto-recover — $tk:$sess unsubmitted prompt -> Enter ($ar_n/$AR_MAX)"
+                else
+                  echo "[watch] auto-recover failed — $tk:$sess (keys rc=$krc)"
+                fi
+                if [ "$ar_n" -ge "$AR_MAX" ]; then
+                  echo "[watch] auto-recover cap reached — $tk:$sess"
+                fi
+              else
+                ar_consec=$(ar_set "$ar_consec" "$sess" "$ar_c")
+              fi
+            else
+              ar_consec=$(ar_set "$ar_consec" "$sess" 0)
+            fi
+          fi
+        fi
         # Per-session stall check: only rc 1 marks a stall. rc 0 (progressing),
         # rc 2 (unknown), or a broken script are all NOT stalled — the explicit
         # rc capture means no failure here can abort the watch loop.
         # Extra gate vs. the dead-worker check above: a task at/above the
         # target is never stall-checked (#88) — its silence is exactly what
         # the session prompt ordered ("signal and wait"), not a wedged worker.
-        if [ "$r" -lt "$target_rank" ] && [ -n "$STALL_SCRIPT" ] && [ -n "$TMUX_BIN" ] && [ -n "$sess" ]; then
+        # ar_pressed: an Enter just sent for this task this poll skips the
+        # stall verdict this poll only — the pane hash it would check is from
+        # before the repair.
+        if [ "$ar_pressed" -eq 0 ] && [ "$r" -lt "$target_rank" ] && [ -n "$STALL_SCRIPT" ] && [ -n "$TMUX_BIN" ] && [ -n "$sess" ]; then
           src=0; sh "$STALL_SCRIPT" "$sess" >/dev/null 2>&1 || src=$?
           if [ "$src" -eq 1 ]; then stalled="$stalled $tk:$sess"; fi
         fi

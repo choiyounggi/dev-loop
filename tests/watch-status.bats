@@ -646,3 +646,305 @@ SCRIPT
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"collect failed"* ]]
 }
+
+# ---- auto-recover (unsubmitted paste -> Enter) ----
+# watch-status.sh presses Enter itself via send-prompt.sh keys when a worker's
+# pane holds an unsubmitted [Pasted text placeholder (send-prompt.sh `state`
+# exit 9) on two consecutive polls — on by default, bounded per session, and
+# never aborting the watch (no new exit code). See
+# .orchestration/plans/t2-watch-autoenter.md D1-D8.
+
+_sp_stub() {
+  SP_DIR="$BATS_TEST_TMPDIR/sp"
+  mkdir -p "$SP_DIR"
+  export SP_DIR
+  cat > "$BATS_TEST_TMPDIR/sp_stub.sh" <<'SCRIPT'
+#!/bin/sh
+# args: state <sess> | keys <sess> Enter
+printf '%s\n' "$*" >> "$SP_DIR/calls.log"
+case "$1" in
+  state)
+    seq="$SP_DIR/$2.seq"
+    if [ -s "$seq" ]; then rc=$(head -n 1 "$seq"); tail -n +2 "$seq" > "$seq.t"; mv "$seq.t" "$seq"
+    else rc=$(cat "$SP_DIR/$2.default" 2>/dev/null || echo 0); fi
+    exit "$rc" ;;
+  keys) exit "$(cat "$SP_DIR/keys_rc" 2>/dev/null || echo 0)" ;;
+esac
+exit 0
+SCRIPT
+}
+
+_calls_count() {
+  n=$(grep -c -- "$1" "$SP_DIR/calls.log" 2>/dev/null) || true
+  echo "${n:-0}"
+}
+
+_output_count() {
+  n=$(printf '%s\n' "$output" | grep -cF -- "$1") || true
+  echo "${n:-0}"
+}
+
+@test "auto-recover R1: two consecutive unsubmitted polls press Enter once (normal)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n9\n' > "$SP_DIR/lo-1.seq"
+  printf '0\n' > "$SP_DIR/lo-1.default"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 4 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 1 ]
+  assert_output_has "[watch] auto-recover — t1:lo-1 unsubmitted prompt -> Enter (1/3)"
+}
+
+@test "auto-recover R2: a single unsubmitted observation does not press Enter (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n0\n9\n' > "$SP_DIR/lo-1.seq"
+  printf '0\n' > "$SP_DIR/lo-1.default"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 4 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 0 ]
+}
+
+@test "auto-recover R3: LO_AUTO_RECOVER=0 disables auto-recover, never calls state (normal)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER=0 WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+  assert_output_has "[watch] auto-recover=off (LO_AUTO_RECOVER=0)"
+}
+
+@test "auto-recover R3: LO_AUTO_RECOVER=off disables auto-recover the same way (normal)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER=off WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+  assert_output_has "[watch] auto-recover=off (LO_AUTO_RECOVER=off)"
+}
+
+@test "auto-recover R3: LO_AUTO_RECOVER=false disables auto-recover the same way (normal)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER=false WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+  assert_output_has "[watch] auto-recover=off (LO_AUTO_RECOVER=false)"
+}
+
+@test "auto-recover R3: an empty LO_AUTO_RECOVER value keeps auto-recover on (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '0\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER= WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  assert_output_has "[watch] auto-recover=on (max=3)"
+  [ "$(_calls_count '^state lo-1$')" -ge 1 ]
+}
+
+@test "auto-recover R4: LO_AUTO_RECOVER_MAX caps presses and reports the cap once, after the last press (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER_MAX=2 WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 8 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 2 ]
+  [ "$(_output_count 'auto-recover cap reached — t1:lo-1')" -eq 1 ]
+  press_line=$(printf '%s\n' "$output" | grep -nF -- '(2/2)' | head -n1 | cut -d: -f1)
+  cap_line=$(printf '%s\n' "$output" | grep -nF -- 'auto-recover cap reached' | head -n1 | cut -d: -f1)
+  [ -n "$press_line" ]
+  [ -n "$cap_line" ]
+  [ "$press_line" -lt "$cap_line" ]
+}
+
+@test "auto-recover D4: an empty LO_AUTO_RECOVER_MAX falls back to the default of 3, not an error (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '0\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER_MAX= WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  assert_output_has "[watch] auto-recover=on (max=3)"
+}
+
+@test "auto-recover R5: a non-numeric LO_AUTO_RECOVER_MAX is refused before polling (error)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  run env LO_AUTO_RECOVER_MAX=abc sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 4 ]
+  assert_output_has "LO_AUTO_RECOVER_MAX"
+}
+
+@test "auto-recover R5: LO_AUTO_RECOVER_MAX=0 is refused, a zero cap would never recover (error)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  run env LO_AUTO_RECOVER_MAX=0 sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 4 ]
+  assert_output_has "LO_AUTO_RECOVER_MAX"
+}
+
+@test "auto-recover R6: a keys failure is logged, and failed attempts count toward the cap (error)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  printf '6\n' > "$SP_DIR/keys_rc"
+  # default always reports unsubmitted, so every 2-poll cycle is another press
+  # attempt; if a FAILED attempt did not count toward the cap, ar_n would
+  # never reach MAX and 8 polls (4 cycles) would produce 4 keys calls, not 2.
+  run env LO_AUTO_RECOVER_MAX=2 WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 8 1
+  [ "$status" -eq 2 ]
+  assert_output_has "[watch] auto-recover failed — t1:lo-1 (keys rc=6)"
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 2 ]
+  [ "$(_output_count 'auto-recover cap reached — t1:lo-1')" -eq 1 ]
+}
+
+@test "auto-recover R6: a missing send-prompt script disables auto-recover for the whole process (boundary)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="/nonexistent/sp.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  assert_output_has "[watch] auto-recover=off (send-prompt script missing)"
+}
+
+@test "auto-recover R7: a task at or above the target is never state-checked (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"impl_done","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","session":"lo-2"}' > "$ORCH/status/t2.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  printf '0\n' > "$SP_DIR/lo-2.default"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" --tasks t1,t2 "$ORCH/status" impl_done 2 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+}
+
+@test "auto-recover R7: a task at a terminal phase (done) is never state-checked (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"done","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","session":"lo-2"}' > "$ORCH/status/t2.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  printf '0\n' > "$SP_DIR/lo-2.default"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" --tasks t1,t2 "$ORCH/status" impl_done 2 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+}
+
+@test "auto-recover R7: a record with no session field is never state-checked (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [ ! -f "$SP_DIR/calls.log" ]
+}
+
+@test "auto-recover R7: unresolvable tmux disables auto-recover's state check too (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  run env WATCH_TMUX=/nonexistent/tmux WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+}
+
+@test "auto-recover R8: an Enter pressed this poll suppresses this poll's stall verdict (normal)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  cat > "$BATS_TEST_TMPDIR/stall_stub.sh" <<STUB
+#!/bin/sh
+cnt="$BATS_TEST_TMPDIR/stall_calls"
+n=0
+[ -f "\$cnt" ] && n=\$(cat "\$cnt")
+n=\$((n+1))
+printf '%s' "\$n" > "\$cnt"
+[ "\$n" -eq 1 ] && exit 0
+exit 1
+STUB
+  printf '9\n9\n0\n' > "$SP_DIR/lo-1.seq"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 6 1
+  [ "$status" -eq 7 ]
+  enter_line=$(printf '%s\n' "$output" | grep -nF -- '-> Enter (1/3)' | head -n1 | cut -d: -f1)
+  stalled_line=$(printf '%s\n' "$output" | grep -nF -- '[watch] worker stalled' | head -n1 | cut -d: -f1)
+  [ -n "$enter_line" ]
+  [ -n "$stalled_line" ]
+  [ "$enter_line" -lt "$stalled_line" ]
+  # Discriminating check: the Enter-poll's stall check must be SKIPPED, not
+  # just printed earlier. Without the suppression, poll 2's stall check would
+  # also fire (stall stub call #2 -> exit 1 -> stalled) and the watch would
+  # exit 7 on poll 2 instead of poll 3, after only 2 state calls, not 3.
+  [ "$(_calls_count '^state lo-1$')" -eq 3 ]
+}
+
+@test "auto-recover D7: per-session counters are independent — pressing lo-1 does not affect lo-2 (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","session":"lo-2"}' > "$ORCH/status/t2.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n9\n' > "$SP_DIR/lo-1.seq"
+  printf '9\n0\n' > "$SP_DIR/lo-2.seq"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" --tasks t1,t2 "$ORCH/status" impl_done 2 4 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 1 ]
+  [ "$(_calls_count '^keys lo-2 Enter$')" -eq 0 ]
+}
+
+@test "auto-recover D7: session name substring collision — lo-1's counter is not read from lo-10's entry (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","session":"lo-10"}' > "$ORCH/status/t2.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  # Without the trailing-colon anchor in ar_get/ar_set's match pattern, a
+  # lookup for "lo-1" would match inside the " lo-10:" token (a plain
+  # substring match), cross-contaminating the two sessions' counters.
+  printf '9\n9\n' > "$SP_DIR/lo-1.seq"
+  printf '9\n0\n' > "$SP_DIR/lo-10.seq"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" --tasks t1,t2 "$ORCH/status" impl_done 2 4 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 1 ]
+  [ "$(_calls_count '^keys lo-10 Enter$')" -eq 0 ]
+}
