@@ -1044,7 +1044,11 @@ ${b109}"
   [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
 }
 
-@test "blocked R5 boundary: a record ts equal to updatedAt is not current — no exit 8" {
+@test "blocked F2 boundary: a record ts equal to updatedAt (same-second stamp) is still current — confirms and exits 8" {
+  # F2 (round-2 integration review): a status-update and the blocked-signal
+  # hook can legitimately stamp the same whole second. Currency is now >=,
+  # not strictly >, so an equal ts is not discarded — it's the static-pane
+  # witness (D4), not currency alone, that still has to confirm it.
   _tmux_stub
   PANE_DIR="$BATS_TEST_TMPDIR/panes4"; mkdir -p "$PANE_DIR"
   printf 'same\n' > "$PANE_DIR/pane"
@@ -1053,7 +1057,47 @@ ${b109}"
   printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
   run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
       WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
-      sh "$WS" "$ORCH/status" impl_done 1 3 1
+      sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 8 ]
+  assert_output_has "worker blocked"
+}
+
+@test "blocked F2 boundary: a same-second record whose pane keeps repainting still does not wake" {
+  # Companion to the case above: currency alone (ts == updatedAt) is not a
+  # free pass — a worker that actually moved on in that same second repaints
+  # its pane, so the two-poll static witness still never confirms.
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes4b"; mkdir -p "$PANE_DIR"
+  printf 'A\n' > "$PANE_DIR/pane.1"
+  printf 'B\n' > "$PANE_DIR/pane.2"
+  printf 'A\n' > "$PANE_DIR/pane.3"
+  printf 'B\n' > "$PANE_DIR/pane.4"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:05:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 4 1
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked F2 boundary: a record OLDER than updatedAt is stale — no exit 8 even with a static pane" {
+  # Regression guard for the currency gate's REJECT direction: the round-1
+  # test asserting this ("equal ts does not wake") was inverted by F2 since
+  # equal now DOES wake, which silently dropped coverage of ts < updatedAt —
+  # the exact "dialog answered by keys in-turn leaves the record behind"
+  # scenario the currency gate exists to stop (a genuinely stale record must
+  # never wake, no matter how static the pane looks).
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes4c"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:05:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:00:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 4 1
   [ "$status" -eq 2 ]
   [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
 }

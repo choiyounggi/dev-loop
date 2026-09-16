@@ -313,3 +313,22 @@ canonical_blocked() {
   [ "$status" -eq 0 ]
   [ "$output" = "collected=1 skipped=0 foreign=0" ]
 }
+
+@test "F4 error: a non-object (array) canonical blocked record is skipped, not fatal — still exits 0 and still prunes" {
+  # Corrupted-by-hand or an out-of-band writer, not the hook itself: a
+  # canonical blocked/t1.json that is valid JSON but not an object used to
+  # abort the whole script under set -eu the moment its .ts field was read
+  # (jq errors indexing an array with a string key, and `//` does not rescue
+  # that). t2's stale canonical record (worktree gone) proves the prune pass
+  # still runs afterward — the abort never happens.
+  graph '{"tasks":[{"id":"t1","deps":[]},{"id":"t2","deps":[]}]}'
+  bdir="$(dirname "$CDIR")/blocked"
+  mkdir -p "$bdir"
+  printf '[]' > "$bdir/t1.json"
+  worker_blocked wt1 t1 2026-01-01T00:05:00Z permission_prompt
+  canonical_blocked t2 2026-01-01T00:00:00Z "$WROOT/nonexistent-wt"
+  run sh "$CS" "$G" "$CDIR" "$WROOT"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.reason' "$bdir/t1.json")" = "permission_prompt" ]
+  [ ! -e "$bdir/t2.json" ]
+}

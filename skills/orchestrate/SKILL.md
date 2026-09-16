@@ -438,7 +438,10 @@ escalation env into each worker. Also export `LO_GRAPH=.orchestration/graph.json
 LO_WORKTREES_ROOT=<root>/.worktrees` once per run: with both set, every
 `watch-status.sh` call pulls each worker's worktree-local `.orchestration/status`
 (and `questions/`) records into the canonical dir automatically, once per poll
-(issue #167 — workers never write into this checkout). `ready-set.sh` reads the
+(issue #167 — workers never write into this checkout). It also collects
+`blocked/` records (the `worker-blocked-signal.sh` hook) the same way, except a
+canonical `blocked/<task>.json` is pruned once its worker-side copy is gone —
+see exit 8 below. `ready-set.sh` reads the
 status dir directly and does not poll, so before every `ready-set.sh` round also
 run `scripts/collect-status.sh .orchestration/graph.json .orchestration/status
 .worktrees` yourself (Phase 3 step 1). Trust-screen wording drifts between CLI releases —
@@ -813,10 +816,16 @@ exits — handle, then relaunch watch with the same target:
 - **8 — worker blocked** (prints `[watch] worker blocked — <task>:<session>
   (<reason>: <detail>)`; recurs while the canonical record exists and the
   pane stays static): act on `<reason>` — `rate_limit` / `overloaded` /
-  `server_error` → read the pane; if the CLI shows automatic continue armed
-  (`autoContinueAtUsageLimit`, on by default for interactive
-  claude.ai-subscription sessions when the reset is under 24 hours) just
-  wait, otherwise follow the usage-limit branch of 7 below;
+  `server_error` → read the pane, THEN delete BOTH
+  `.orchestration/blocked/<task>.json` and
+  `<record.worktree>/.orchestration/blocked/<task>.json` right away (the
+  collector copies a worker-side record back otherwise; deleting only after
+  a multi-hour wait means the same static pane re-wakes exit 8 on every
+  poll — about every 30s — for the whole window); THEN, if the CLI shows
+  automatic continue armed (`autoContinueAtUsageLimit`, on by default for
+  interactive claude.ai-subscription sessions when the reset is under 24
+  hours), just wait and relaunch watch once it resumes; otherwise follow the
+  usage-limit branch of 7 below and relaunch watch only after that wait;
   `quota_auto_resume_stale` → the pane asks to press enter to continue:
   `scripts/send-prompt.sh keys <session> Enter`; `quota_auto_resume_disabled`
   → automatic continue will not resume the task (turned off, reset more than
@@ -827,8 +836,9 @@ exits — handle, then relaunch watch with the same target:
   the safe answer); `idle_prompt` → finished-but-silent or a question asked
   in prose: send a prompt to emit the missing signal or to use
   `ask-coordinator.sh`; `authentication_failed` / `billing_error` / anything
-  else → report to the user. Then delete BOTH
-  `.orchestration/blocked/<task>.json` and
+  else → report to the user. For every reason OTHER than `rate_limit` /
+  `overloaded` / `server_error` (handled above, before its wait), then
+  delete BOTH `.orchestration/blocked/<task>.json` and
   `<record.worktree>/.orchestration/blocked/<task>.json` (the collector
   copies a worker-side record back otherwise) and relaunch watch.
 - **7 — stalled live worker** (prints `[watch] worker stalled — <task>:<session>`;
@@ -847,10 +857,10 @@ exits — handle, then relaunch watch with the same target:
   <key>...` (allowlist exactly `Up Down Left Right Enter Escape Tab Space 0-9 y n`;
   ALL keys validated before ANY is sent; **0** sent / **2** invalid session or
   key, nothing sent / **3** gone / **6** send failed on a live session);
-  usage-limit stop ("You've hit your session limit · resets HH:MM") → wait for
-  the reset time, unless the pane shows automatic continue armed
-  (`autoContinueAtUsageLimit`), in which case the CLI resumes by itself, then
-  re-send a resume prompt that orders a state re-check
+  usage-limit stop ("You've hit your session limit · resets HH:MM") → if the
+  pane shows automatic continue armed (`autoContinueAtUsageLimit`), the CLI
+  resumes by itself — nothing further to do; otherwise wait for the reset
+  time, then re-send a resume prompt that orders a state re-check
   (git status / tests) before continuing; finished-but-silent (forgot
   status-update) → send a prompt to emit the missing signal; auth/trust screen →
   keys per the screen. Then relaunch watch.
