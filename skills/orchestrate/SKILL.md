@@ -317,10 +317,59 @@ from the graph and not confirmed is recorded on the blackboard as
 
 ```json
 { "tasks": [
-    { "id": "t1", "deps": [],     "files": ["src/auth/**"], "outputs": ["AuthToken"] },
-    { "id": "t3", "deps": ["t1"], "files": ["src/api/**"],  "consumes": ["AuthToken"] }
+    { "id": "t1", "deps": [],     "files": ["src/auth/**"], "outputs": ["AuthToken"], "risk": "R1", "risk_basis": ["none"] },
+    { "id": "t3", "deps": ["t1"], "files": ["src/api/**"],  "consumes": ["AuthToken"], "risk": "R3", "risk_basis": ["path:auth", "shared-surface"] }
 ] }
 ```
+
+**Risk tier (issue #192).** Every task node carries risk (exactly one of R0, R1,
+R2, R3) and risk_basis (array of signal tokens from the table below, or
+`["none"]`). The scheduler ignores both fields — ready-set.sh reads only id and
+deps and graph-add.sh validates only id, deps, split_of, outputs, so no script
+changes — and every node added later with graph-add.sh carries them too.
+
+| Signal | Source | Token | Floor |
+|---|---|---|---|
+| files match an auth, authorization, secrets, or payment path | Phase 2 affected files | path:auth path:secrets path:payment | R3 |
+| DB schema or migration files | affected files | path:schema | R3 |
+| destructive or irreversible action (delete, drop, force, revoke) | plan deliverables | destructive | R3 |
+| public API contract or deploy pipeline files (.github/workflows, Dockerfile) | affected files | path:public-api path:pipeline | R2 |
+| shared-surface producer (another task consumes its output) | conflict matrix | shared-surface | R2 |
+| new external dependency | plan | new-dependency | R2 |
+| concurrency or multi-object write | lens 4 signal | concurrency | R2 |
+| two or more dependents in graph.json | graph reverse lookup | fan-out:<n> | R2 |
+| wiki-plan Size verdict large | step 2a | size:large | R2 |
+| one or more [no-wiki] decisions | step 2a | no-wiki:<n> | R1 |
+| no signal and Size verdict small | — | none | R0 |
+
+The tier is the max-of-signals: the highest Floor any single signal sets is
+the tier; signals are never summed, because a sum lets several low signals
+dilute one payment-path hit into R1.
+
+Phase 2 sets the initial tier from the file and graph signals; step 2a
+re-reads the two plan-derived signals (size:large, no-wiki:<n>) and may only
+RAISE the tier — record each raise on the blackboard as
+`- [<task>] Ruling: risk <old>-><new> — <signal> — <cost if wrong>` and
+rewrite graph.json; a tier is LOWERED only by the user at Gate 1 answering
+revise.
+
+**Tier to pipeline profile.**
+
+| | R0 trivial | R1 normal | R2 high | R3 critical |
+|---|---|---|---|---|
+| planning | wiki-plan lite | full A/B/C | full A/B/C, plan-reviewer required | R2 plus a second plan-reviewer call with a different Agent model override |
+| worker model (DEV_LOOP_WORKER_MODEL) | claude-sonnet-5 | claude-sonnet-5 | claude-opus-5 | claude-opus-5 |
+| brief effort_level | simple | medium | complex | complex |
+| review lenses | 1 and 3 only | 1-4 | 1-5 | 1-5 plus the adversarial-change-review techniques recorded under lens 5 |
+| coordinator auditor cross-call | none (floor only) | when tests look weak | mandatory | mandatory |
+| rework budget | 1 | 3 | 3 | 3 |
+| human gates | Gate 1 and 2 | Gate 1 and 2 | Gate 1 and 2 | Gate 1 and 2 (a per-task pre-merge gate is deferred, issue #192 section 9 question 1) |
+
+R0 reuses wiki-plan lite mode as its definition — no new concept; every
+number above lives only in this table and the prose cites the table. The
+"coordinator auditor cross-call" row states only Phase 4's cross-call
+obligation on the coordinator side — the worker's own step 6.5 auditor call
+is unchanged at every tier.
 
 Waves are **an illustration in the Gate 1 report, not an execution unit.**
 Execution is decided by `ready-set.sh`: a task runs as soon as its dependencies
@@ -349,7 +398,11 @@ design links entirely — the original behavior.
 ## 🚦 Gate 1 — task-split approval (REQUIRED)
 Report the task list, the dependency graph (showing the expected flow as Waves is
 fine), the proposed **slot count with its rationale and what it protects**, and a
-rough cost note. That report is the briefing; the approval itself is **one
+rough cost note. The briefing also carries the risk table, one row per task with
+exactly the columns | task | risk | basis | profile (plan depth / worker model /
+review lenses) | rework budget |, filled from the Tier to pipeline profile
+table; this adds no AskUserQuestion question — a tier change is requested
+through the existing revise answer. That report is the briefing; the approval itself is **one
 AskUserQuestion call** (§ Asking the user) in the same turn — Q1 the task split
 (approve as proposed / revise / abort). Bundle every remaining open decision
 (task-set options, substrate choice) into that same call as further questions,
@@ -712,9 +765,10 @@ reasoning-effort flags) that `worker-start` cannot express.
    names what it actually branched from.
 2. Per task: write `briefs/<task>.md` (templates/brief.md) — fill `<tools_guidance>`
    from the resolved tool profile so the session uses the right knowledge/tacit
-   tools (the plan step is fixed to `wiki-plan`, not a configurable role), and for
+   tools (the plan step is fixed to `wiki-plan`, not a configurable role), for
    a UI-facing task fill `<design_spec>` with the `design` role's pulled spec
-   (Phase 2) — then
+   (Phase 2), and fill `<effort_level>` with the Tier to pipeline profile
+   table's value for the task's tier — then
 
    The brief and plan are what the worker reads, not what it writes, so every
    reference to them inside a composed prompt uses the `{ORCH_DIR}` token
@@ -734,7 +788,20 @@ reasoning-effort flags) that `worker-start` cannot express.
    THIS coordinator session on purpose: a worker can be pinned to a cheaper tier
    (`DEV_LOOP_WORKER_MODEL`), and a plan is where an unmade decision becomes the
    implementer's guess — so the plan must come from the strongest model in the run,
-   not from whatever tier is executing. Every design decision must be made and
+   not from whatever tier is executing.
+
+   **Apply the tier's profile here.** Read the task's risk from graph.json
+   first: when R0, invoke wiki-plan in lite mode; when R1, full Phase A/B/C;
+   when R2 or R3, full with the plan-reviewer call required (R3: a second
+   call with a different Agent model override, both verdicts recorded). Then
+   re-check the plan-derived signals (size:large, no-wiki:<n>) and raise the
+   tier per the Phase 2 rule before launching. At launch, prefix the model on
+   the call itself, never export it:
+   `DEV_LOOP_WORKER_MODEL=<id from the profile table> LO_STATUS_DIR=<abs status dir> LO_TASK_ID=<task> scripts/launch-session.sh lo-<n> <worktree> bypassPermissions "<plan prompt>"`
+   — launch-session.sh reads the variable per call, so each dispatch carries
+   its own tier.
+
+   Every design decision must be made and
    grounded in a `wiki/` page (record the decision->page map); leave nothing "as
    appropriate". The worker then ADOPTS this plan (session-prompt §1 / O1) instead
    of authoring one, and still signals `plan_ready` — so the phase sequence, the
@@ -932,6 +999,14 @@ Run the fixed four-lens pass on each worktree diff (`git -C <wt> diff
    (`wiki/backend/common/storage/multi-object-write-ordering.md`). You are the
    only reviewer who sees every worktree at once, so cross-task ordering
    hazards are your job alone.
+5. **AC traceability** (R2 and above) — build the three-column table `| DoD item | gate id | test case |` with one row per `<definition_of_done>` item of the brief: gate id from `.dev-loop/gates/<task>.md`, test case as `<file>:<test name>`; any row with an empty gate or test cell is a Findings item whose failure scenario is the behavior that item guards going unverified (`wiki/qa/process/acceptance-criteria.md`).
+
+**Lens set by tier.** When the task is R0, run lenses 1 and 3 only and write
+`not run — R0 profile` in the other rows; when R1, lenses 1-4; when R2 or R3,
+lenses 1-5. When the task is R0 and a review finds a second blocking round,
+escalate to the user with AskUserQuestion instead of dispatching a second
+rework — LO_MAX_REWORK stays the per-run bound; the R0 budget of 1 is
+enforced by the coordinator not re-dispatching.
 
 Alongside the pass, if a session's tests look weak, **cross-call
 `test-quality-auditor` yourself** (self-call + orchestrator cross-call).

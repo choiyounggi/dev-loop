@@ -14,6 +14,16 @@ one unless you say otherwise.
 | 2. Wiki re-route from the diff | `clean — <what was checked>` or `findings: F1, F2` or `not run — <why>` |
 | 3. Execution-environment reality | `clean — <what was checked>` or `findings: F1, F2` or `not run — <why>` |
 | 4. Multi-object write ordering | `clean — <what was checked>` or `findings: F1, F2` or `not run — <why>` |
+| 5. AC traceability | `clean — <what was checked>` or `findings: F1, F2` or `not run — <why>` |
+
+## AC traceability
+
+R2 and above; for R0 and R1 the per-lens row above already carries the
+skipped-tier marker; leave this table empty.
+
+| DoD item | gate id | test case | verdict |
+|---|---|---|---|
+| <item> | <gate id or —> | <file>:<test> or — | ✔ or ✘ unverified |
 
 ## Findings
 
