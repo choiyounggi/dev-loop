@@ -22,7 +22,10 @@
 #          idle_prompt, elicitation_dialog, elicitation_url_dialog,
 #          agent_needs_input, worker_permission_prompt,
 #          quota_auto_resume_stale, quota_auto_resume_disabled
-#   clear  UserPromptSubmit; Notification quota_auto_resume_fired
+#   clear  UserPromptSubmit whose source is not loop_wakeup, schedule_wakeup,
+#          or poll (a missing/unrecognized source still clears — an older CLI
+#          omits the field for ordinary user prompts); Notification
+#          quota_auto_resume_fired
 #   last event wins.
 #
 # Meaning: the last blocking event since the last prompt submission or
@@ -44,6 +47,7 @@ error=$(printf '%s' "$INPUT" | "$JQ" -r '.error // empty' 2>/dev/null)
 error_details=$(printf '%s' "$INPUT" | "$JQ" -r '.error_details // empty' 2>/dev/null)
 notification_type=$(printf '%s' "$INPUT" | "$JQ" -r '.notification_type // empty' 2>/dev/null)
 message=$(printf '%s' "$INPUT" | "$JQ" -r '.message // empty' 2>/dev/null)
+source=$(printf '%s' "$INPUT" | "$JQ" -r '.source // empty' 2>/dev/null)
 
 mode=""
 event=""
@@ -74,7 +78,10 @@ case "$hook_event_name" in
     esac
     ;;
   UserPromptSubmit)
-    mode=clear
+    case "$source" in
+      loop_wakeup|schedule_wakeup|poll) exit 0 ;;
+      *) mode=clear ;;
+    esac
     ;;
   *)
     exit 0

@@ -109,7 +109,7 @@ _blocked_file() { printf '%s' "$WS/.orchestration/blocked/t1.json"; }
 
 # ------------------------------------------------------------------ R4 --
 
-@test "R4 normal: UserPromptSubmit clears an existing BlockedRecord" {
+@test "R4 normal: UserPromptSubmit with no source field clears an existing BlockedRecord" {
   payload=$(jq -n --arg cwd "$WS" --arg err "x" '{hook_event_name:"StopFailure",cwd:$cwd,error:$err}')
   _fire "$payload" >/dev/null
   [ -f "$(_blocked_file)" ]
@@ -117,6 +117,30 @@ _blocked_file() { printf '%s' "$WS/.orchestration/blocked/t1.json"; }
   run _fire "$ups"
   [ "$status" -eq 0 ]
   [ ! -f "$(_blocked_file)" ]
+}
+
+@test "R4 normal: UserPromptSubmit clears for source=user and source=system" {
+  for src in user system; do
+    payload=$(jq -n --arg cwd "$WS" --arg err "x" '{hook_event_name:"StopFailure",cwd:$cwd,error:$err}')
+    _fire "$payload" >/dev/null
+    [ -f "$(_blocked_file)" ]
+    ups=$(jq -n --arg cwd "$WS" --arg p "x" --arg src "$src" '{hook_event_name:"UserPromptSubmit",cwd:$cwd,prompt:$p,source:$src}')
+    run _fire "$ups"
+    [ "$status" -eq 0 ]
+    [ ! -f "$(_blocked_file)" ]
+  done
+}
+
+@test "R4 boundary: UserPromptSubmit does NOT clear for source loop_wakeup, schedule_wakeup, or poll" {
+  for src in loop_wakeup schedule_wakeup poll; do
+    payload=$(jq -n --arg cwd "$WS" --arg err "x" '{hook_event_name:"StopFailure",cwd:$cwd,error:$err}')
+    _fire "$payload" >/dev/null
+    [ -f "$(_blocked_file)" ]
+    ups=$(jq -n --arg cwd "$WS" --arg p "x" --arg src "$src" '{hook_event_name:"UserPromptSubmit",cwd:$cwd,prompt:$p,source:$src}')
+    run _fire "$ups"
+    [ "$status" -eq 0 ]
+    [ -f "$(_blocked_file)" ]
+  done
 }
 
 @test "R4 normal: a quota_auto_resume_fired Notification clears an existing BlockedRecord" {
