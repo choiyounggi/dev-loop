@@ -27,9 +27,10 @@
 #   Also collects <worktrees-root>/*/.orchestration/blocked/<task>.json
 #   (BlockedRecord, written by hooks/worker-blocked-signal.sh; task id in the
 #   graph) into <canonical-status-dir>/../blocked/<task>.json via tmp+mv when
-#   no canonical copy exists or the worker record's .ts is strictly greater
-#   (lexical compare) than the canonical's .ts — the last event always wins,
-#   unlike status's tombstone rule. A second pass then removes any canonical
+#   the canonical copy is absent or its .ts is NOT strictly greater (lexical
+#   compare) than the worker's .ts — the last event always wins, including a
+#   same-second tie, unlike status's tombstone rule. A second pass then
+#   removes any canonical
 #   blocked record whose .worktree field is empty, names a missing directory,
 #   or has no matching WORKTREE/.orchestration/blocked/<task>.json, so a
 #   cleared or relaunched worker's stale record does not linger and keep
@@ -160,7 +161,11 @@ for f in "$wroot"/*/.orchestration/blocked/*.json; do
   if [ -f "$bfile" ] && "$JQ" -e 'type == "object"' "$bfile" >/dev/null 2>&1; then
     wts=$("$JQ" -r '.ts // ""' "$f")
     cts=$("$JQ" -r '.ts // ""' "$bfile")
-    [ "$wts" \> "$cts" ] || continue
+    # Skip only when the canonical is STRICTLY newer — a same-second tie
+    # goes to the worker record, so the last event wins even when it was
+    # stamped in the same whole second as what's already canonical (F1,
+    # round-3 review).
+    [ "$cts" \> "$wts" ] && continue
   fi
 
   tmp="$bfile.tmp.$$"
