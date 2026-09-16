@@ -25,7 +25,8 @@ related:
     testing-quality-checks-that-cannot-pass,
     qa-deliverables-command-transcripts-in-a-document,
     qa-deliverables-exclusivity-and-absence-claims,
-    qa-document-verification-generated-reference-drift-gates,
+    qa-document-verification-generated-reference-drift-gates,,
+    infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal
   ]
 ---
 

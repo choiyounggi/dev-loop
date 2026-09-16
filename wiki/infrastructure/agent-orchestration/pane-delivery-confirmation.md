@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://man7.org/linux/man-pages/man3/termios.3.html
   - https://man7.org/linux/man-pages/man1/tmux.1.html
-last_verified: 2026-08-25
+last_verified: 2026-09-16
 related: [platforms-shells-option-like-argument-values, infrastructure-agent-orchestration-session-completion-gates, platforms-processes-non-interactive-cli-invocation, infrastructure-agent-orchestration-unattended-worker-questions, platforms-processes-driving-a-tui-in-a-tmux-pane]
 ---
 
@@ -54,6 +54,13 @@ or escalate.
    ([platforms-shells-option-like-argument-values]).
 5. **Capture the pane before and after with the same command and flags**, so a
    redraw, resize, or scroll-region change is not read as new content.
+6. **Skip the pane check entirely on any iteration in which this loop sent
+   keys** — take no capture and leave the witness counters untouched until the
+   next poll. `send-keys` returns once tmux has written the keys to the pty; the
+   pane repaints only after the target reads them and produces output, so a
+   capture taken in the same iteration can still carry the pre-action screen.
+   Resume the check on the following poll, from a capture with no send in
+   between.
 
 ## Edge cases
 
@@ -70,6 +77,7 @@ or escalate.
 | A bind is rejected for a pane/worktree mismatch | Pass the worktree alongside the pane on every bind; a pane identifier alone resolves against the coordinator's own checkout |
 | The pane shows the prompt collapsed into a paste placeholder (`❯ [Pasted text #3]`) with no busy marker | Locate the **input box** — the region between the last two horizontal rules of the full `capture-pane -p` output — and look for the marker inside it, not in a fixed `tail -N` window: an unsubmitted paste renders its own remainder below the marker, so the marker's distance from the bottom grows with the payload and a fixed window is defeated by exactly the size it must detect; a whole-capture grep is also wrong, since it false-positives on a `[Pasted text` rendering still visible in the transcript above the input box. Once located: the body arrived as one bracketed-paste block and the submit key was consumed with it — send `Enter` as its own `send-keys` call and re-read. When the box's chrome cannot be located at all, that is *could not look*, not *nothing found*: report the check as unknown rather than a clean negative, or fall back to a deliberately oversized window only as a degraded check that announces itself as one. [platforms-processes-non-interactive-cli-invocation] owns the paste mechanism |
 | A send helper reports a queued outcome and its own follow-up wait then reports pick-up | That pair is a confirmation: the wait observed the target take the input. A helper that reports delivery without a wait has observed only the write |
+| The same loop both repairs the pane (an auto-recover `Enter`, a resend) and reads a state witness from it | Gate the witness on the repair: when the repair fired this iteration, take no capture and advance no counter. The condition the repair just cleared is still the newest thing on screen, so a same-iteration capture confirms exactly the state that no longer holds |
 
 ## Instead of
 
@@ -81,6 +89,7 @@ or escalate.
 | Resend on the first unchanged capture | Distinguish "busy" from "not delivered" before resending | Resending into a busy pane queues a duplicate that runs when the pane drains |
 | Treat every failed bind the same way and retry it | Branch on the stage the failure names: wait-and-rebind for an occupied runtime, replace the agent for a dead one | The two look identical from outside — the pane renders in both cases — and retrying a dead agent spends units without ever succeeding |
 | Size the pasted-marker window by raising N | Anchor the scan on the input box region | N must exceed the payload's own rendered tail, which is unbounded; raising N moves the threshold instead of removing it |
+| Press a recovery key and, in the same poll, read the pane to decide whether the condition is still present | Skip the read for that poll and decide on the next one | The keys are acknowledged before the target redraws, so the capture can return the pre-action screen and the witness counts a pane it just fixed as still broken |
 
 ## Sources
 
@@ -91,3 +100,5 @@ or escalate.
 - Field reproduction 2026-08-05 (tmux 3.7b, macOS): a pane running `sleep 6` received `echo SECOND_PROMPT_MARKER`. Pane content changed (diff = YES) and the marker appeared once as echoed text, while the command's own output line count stayed 0; after the sleep drained, the command ran and the output line appeared
 - Field observation 2026-08-25 (dev-loop 1.11.0 orchestrate, tmux, session `lo-1-dsr1`, task `t1-foundation` rework round r2): a 1713-byte single-line prompt — `send` returned `delivered` (exit 0) and a follow-up `state` returned `ready` while the pane sat at `❯ [Pasted text #10]…` with four further lines of the paste's remainder rendered below it, putting the marker **7th from the bottom** against the 6-line window; seven earlier sends of 1002–1520 bytes in the same run had succeeded; recovery was one `Enter` as its own `send-keys` call; the run only surfaced the stall ~10 minutes later via `watch-status.sh` exit 7 (`choiyounggi/dev-loop#145`)
 - https://code.claude.com/docs/en/terminal-config — "Paste large content": the CLI collapses input over 800 characters or more than two lines to a `[Pasted text #N +M lines]` placeholder **in the input box**, which is what makes the input box the right anchor for the marker
+- Local reproduction 2026-09-16 (tmux 3.x, macOS, a `sh` pane): with the pane's newest status line reading `STATE=BLOCKED`, a `send-keys` of a command that worked for 0.4s before printing left the same-iteration `capture-pane` still showing `STATE=BLOCKED`, and the next poll showed `STATE=RUNNING`. The same sequence with an instantly-printing command had already repainted inside the same iteration — the outcome is set by the target's work time, which is why the gate belongs on "did this iteration send keys", not on a fixed delay
+- Field evidence 2026-09-16 (dev-loop code review, task `t3-blocked-consume`, finding F1): `watch-status.sh` confirmed its exit-8 "still blocked" witness from a capture taken in the same poll as the auto-recover Enter-press, so a worker that had just been unblocked could be escalated. Fixed by gating the witness on the same `ar_pressed` flag the recovery already sets; removing the gate again woke the witness one poll early under mutation
