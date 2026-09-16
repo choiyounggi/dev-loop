@@ -9,7 +9,7 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
   - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html
 last_verified: 2026-08-05
-related: [testing-quality-checks-that-cannot-pass, testing-quality-tests-that-cannot-fail, platforms-shells-portable-shell-scripts, platforms-processes-background-services]
+related: [testing-quality-checks-that-cannot-pass, testing-quality-tests-that-cannot-fail, platforms-shells-portable-shell-scripts, platforms-processes-background-services, testing-quality-precedence-between-competing-exit-conditions]
 ---
 
 # A Predicate That Decides When Background Work Is Finished

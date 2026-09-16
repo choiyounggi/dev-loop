@@ -8,7 +8,7 @@ sources:
   - https://man.openbsd.org/tmux.1
   - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html
   - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap11.html
-last_verified: 2026-08-25
+last_verified: 2026-09-16
 related: [platforms-processes-non-interactive-cli-invocation, platforms-processes-background-services, platforms-shells-portable-shell-scripts, infrastructure-agent-orchestration-pane-delivery-confirmation]
 ---
 
@@ -60,6 +60,7 @@ text from a variable rather than a fixed literal.
 | Delivery must be confirmed but the program has no busy indicator and no artifact | Add one: have the wrapper echo a unique marker after processing, and search for that marker rather than for the prompt text |
 | The pane's process has exited (shell prompt only) | The keys land on the shell and run as commands — check `#{pane_dead}` / the pane's current command before sending |
 | A collapsed paste placeholder (`[Pasted text #N]`) has the paste's own remainder rendered below it | Not findable in a fixed last-N window — the marker's distance from the bottom grows with the payload; anchor on the **input box** (the region between the last two horizontal rules of the full capture) instead. See [infrastructure-agent-orchestration-pane-delivery-confirmation] for the full detection rule |
+| The same loop sends keys and then reads the pane for a state witness ("still blocked", "still waiting") | Skip the capture on the iteration that sent keys and read on the next poll — the pane repaints only after the target consumes the input, so a same-iteration capture can confirm the state the send just changed. See [infrastructure-agent-orchestration-pane-delivery-confirmation] |
 
 ## Instead of
 

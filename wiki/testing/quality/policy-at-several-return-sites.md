@@ -9,7 +9,7 @@ sources:
   - https://pitest.org/quickstart/basic_concepts/
   - https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/
 last_verified: 2026-08-06
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-harness-reverse-controls, backend-common-change-impact-call-site-enumeration]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-harness-reverse-controls, backend-common-change-impact-call-site-enumeration, testing-quality-precedence-between-competing-exit-conditions]
 ---
 
 # Covering a Policy Applied at Several Return Sites of One Handler
