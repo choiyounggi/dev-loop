@@ -28,6 +28,7 @@
 #  7    unconfirmed     —                      —              —
 #  8    lost            —                      —              —
 #  9    —               unsubmitted            unsubmitted    —
+# 10    truncated       —                      —              —
 # 127   tmux not found
 #
 # 7 vs 8 (issue #7): exit 7 means the pane showed no fresh evidence but MAY
@@ -41,14 +42,21 @@
 # prompt. Recover with `keys <session> Enter` — never a re-`send`, which types
 # a second prompt on top of the first and double-pastes.
 #
-# stdout is exactly one token — delivered|queued|unconfirmed|lost|picked-up|
-# timeout|unsubmitted|ready|busy|gone|sent. Branch on the exit code; stderr is
-# advisory context only and must never be parsed.
+# 10 (issue #198): the worker's transcript shows the new user message SHORTER
+# than the prompt sent — the head was lost in the CLI's paste handling.
+# Re-send (shorter, or a pointer to a file) ; never trust the tail that
+# arrived. Verified only when the transcript can be located; otherwise the
+# verdict stays delivered and stderr says receipt unknown.
+#
+# stdout is exactly one token — delivered|queued|unconfirmed|lost|truncated|
+# picked-up|timeout|unsubmitted|ready|busy|gone|sent. Branch on the exit code;
+# stderr is advisory context only and must never be parsed.
 #
 # env:
 #   LO_QUEUED_PATTERN   substring meaning "queued behind a busy turn"
-#   LO_BUSY_PATTERN     substring meaning "mid-turn" (state only, and send's
-#                       delivered-via-busy-marker check)
+#   LO_BUSY_REGEX       ERE meaning "mid-turn" (default: the CLI's elapsed-time
+#                       spinner suffix "(<n>s ·" or the legacy "esc to interrupt")
+#   LO_BUSY_PATTERN     fixed-string ADDITIONAL mid-turn marker (unset by default)
 #   LO_PASTED_PATTERN   substring meaning "collapsed to an unsubmitted paste
 #                       placeholder" (issue #96, default: [Pasted text)
 #   LO_PANE_TAIL_LINES  non-empty pane lines searched for the queued/busy
@@ -56,6 +64,15 @@
 #                       scan, which is anchored on the input box (issue #145)
 #   LO_PASTED_TAIL_LINES  fallback window for the pasted marker when the input
 #                       box cannot be located (default 40)
+#   LO_PASTE_THRESHOLD  payload size in bytes from which send uses a bracketed
+#                       tmux paste instead of send-keys -l (default 800 = the
+#                       CLI's own paste-collapse threshold)
+#   LO_PASTE_SETTLE     seconds between the paste and its submit key (default 2)
+#   LO_RECEIPT_TIMEOUT  seconds send polls the worker transcript for the
+#                       received prompt (default 10; 0 disables the check)
+#   LO_TRANSCRIPT_DIR   directory holding the worker's *.jsonl transcripts
+#                       (default derived from the pane's current path under
+#                       $HOME/.claude/projects/)
 #   LO_CONFIRM_DELAY    seconds to settle before classifying a send (default 1)
 #   LO_STABLE_DELAY     seconds between pre-send pane-stabilization captures
 #                       (default 1; issue #7 keys->send redraw race guard)
@@ -76,9 +93,12 @@ TMUX_BIN=$(command -v tmux) || { echo "send-prompt: tmux not found" >&2; exit 12
 # The queued/busy wording belongs to the Claude Code CLI, not to this repo, so a
 # CLI release can rename it. Observed 2026-08-05. Override rather than guess:
 # a stale pattern must fail loudly here, not silently downgrade a queued prompt
-# into a reported "delivered".
+# into a reported "delivered". Issue #199: the 2.1.27x TUI dropped "esc to
+# interrupt" for an elapsed-time spinner suffix ("(21s · ..."), observed on a
+# captured pane — the default busy_re covers both.
 queued_pat="${LO_QUEUED_PATTERN:-Press up to edit queued messages}"
-busy_pat="${LO_BUSY_PATTERN:-esc to interrupt}"
+busy_pat="${LO_BUSY_PATTERN:-}"
+busy_re="${LO_BUSY_REGEX:-\([0-9]+s ·|esc to interrupt}"
 
 # Issue #96: a send can collapse into an unsubmitted "[Pasted text #N ...]"
 # placeholder left sitting in the input box — tmux still reports the send-keys
@@ -114,6 +134,21 @@ case "$lost_confirm_delay" in ''|*[!0-9]*) lost_confirm_delay=3 ;; esac
 pasted_tail="${LO_PASTED_TAIL_LINES:-40}"
 case "$pasted_tail" in ''|*[!0-9]*) pasted_tail=40 ;; esac
 [ "$pasted_tail" -ge 1 ] || pasted_tail=40
+
+# Payload size (bytes) from which a send goes through a bracketed tmux paste
+# instead of send-keys -l (issue #198). Same sanitize pattern as above.
+paste_threshold="${LO_PASTE_THRESHOLD:-800}"
+case "$paste_threshold" in ''|*[!0-9]*) paste_threshold=800 ;; esac
+[ "$paste_threshold" -ge 1 ] || paste_threshold=800
+
+# Seconds between the paste and its submit key.
+paste_settle="${LO_PASTE_SETTLE:-2}"
+case "$paste_settle" in ''|*[!0-9]*) paste_settle=2 ;; esac
+
+# Seconds send polls the worker transcript for the received prompt after a
+# delivered verdict (issue #198 part 2). 0 disables the check.
+receipt_timeout="${LO_RECEIPT_TIMEOUT:-10}"
+case "$receipt_timeout" in ''|*[!0-9]*) receipt_timeout=10 ;; esac
 
 usage() {
   cat >&2 <<'EOF'
@@ -165,6 +200,15 @@ session_alive() { "$TMUX_BIN" has-session -t "$(target_session "$1")" 2>/dev/nul
 tail_of() { # $1 = full pane text
   printf '%s\n' "$1" | grep -v '^[[:space:]]*$' \
     | tail -n "${LO_PANE_TAIL_LINES:-6}" || true
+}
+
+# Mid-turn? The CLI's working line drifts per release (2026-08: "esc to
+# interrupt"; 2.1.27x: "✻ Unravelling… (21s · ↓ 1.1k tokens · …)"), so the
+# default is an ERE over the elapsed-time suffix, and LO_BUSY_PATTERN adds a
+# fixed string on top. One helper so state and send cannot disagree.
+pane_is_busy() { # $1 = tail window text
+  printf '%s' "$1" | grep -qE -- "$busy_re" 2>/dev/null && return 0
+  [ -n "$busy_pat" ] && printf '%s' "$1" | grep -qF -- "$busy_pat" 2>/dev/null
 }
 
 # The last non-empty lines of the pane. A TUI paints its queued/busy indicator
@@ -239,7 +283,20 @@ prompt_fingerprint() {
 type_and_enter() {
   # $1=session $2=prompt
   failed=0
-  "$TMUX_BIN" send-keys -t "$(target_pane "$1")" -l -- "$2" || failed=1
+  if [ "$(printf '%s' "$2" | wc -c | tr -d ' ')" -ge "$paste_threshold" ]; then
+    # Issue #198: a long payload reaches the CLI as 1022-byte pty chunks and
+    # its paste handling kept only the last one (measured: head lost, tail
+    # kept, cut at ~1024 bytes). A bracketed paste is reassembled as ONE
+    # block by the CLI regardless of chunking; -p is a no-op for a pane
+    # that never requested bracketed paste. The submit key stays a separate
+    # event after a settle (driving-a-tui-in-a-tmux-pane).
+    _buf="lo-send-$$"
+    printf '%s' "$2" | "$TMUX_BIN" load-buffer -b "$_buf" - || failed=1
+    [ "$failed" -eq 1 ] || "$TMUX_BIN" paste-buffer -p -d -b "$_buf" -t "$(target_pane "$1")" || failed=1
+    [ "$failed" -eq 1 ] || sleep "$paste_settle"
+  else
+    "$TMUX_BIN" send-keys -t "$(target_pane "$1")" -l -- "$2" || failed=1
+  fi
   [ "$failed" -eq 1 ] || "$TMUX_BIN" send-keys -t "$(target_pane "$1")" Enter || failed=1
   if [ "$failed" -eq 1 ]; then
     # A send can fail because the worker died mid-call. Re-ask rather than
@@ -280,7 +337,7 @@ cmd_state() {
     echo "send-prompt: capture-pane failed for live session '$1'" >&2; exit 6; }
   pane=$(tail_of "$raw")
   if printf '%s' "$pane" | grep -qF -- "$queued_pat" 2>/dev/null \
-    || printf '%s' "$pane" | grep -qF -- "$busy_pat" 2>/dev/null; then
+    || pane_is_busy "$pane"; then
     note_pane "$1"
     echo "busy"; exit 4
   fi
@@ -290,6 +347,48 @@ cmd_state() {
     echo "unsubmitted"; exit 9
   fi
   echo "ready"; exit 0
+}
+
+# Where the worker's own transcript lives (D6): the artifact the CLI writes
+# on receipt, so the one witness that can tell a whole prompt from its tail.
+transcript_dir() { # $1=session -> dir on stdout, rc 1 when it cannot be derived
+  if [ -n "${LO_TRANSCRIPT_DIR:-}" ]; then printf '%s' "$LO_TRANSCRIPT_DIR"; return 0; fi
+  _p=$("$TMUX_BIN" display -p -t "$(target_pane "$1")" '#{pane_current_path}' 2>/dev/null) || return 1
+  [ -n "$_p" ] || return 1
+  printf '%s/.claude/projects/%s' "${HOME:-}" "$(printf '%s' "$_p" | tr '/.' '-')"
+}
+
+# "<count> <last-length>" of user TEXT messages in the newest transcript
+# (D7: tool_result records are also type=user and must not count).
+transcript_user_text() { # $1=dir
+  _f=$(ls -t "$1"/*.jsonl 2>/dev/null | head -n 1)
+  [ -n "$_f" ] || { echo "0 0"; return 0; }
+  jq -r 'select(.type=="user" and ((.isMeta // false) | not)) | .message.content
+    | if type=="string" then . elif type=="array" then (map(select(.type=="text") | .text) | join("")) else "" end
+    | select(length > 0) | length' "$_f" 2>/dev/null | awk 'END { print NR, ($0 == "" ? 0 : $0) }'
+}
+
+# Called at every delivered site: verify, then print the final token.
+finish_delivered() { # $1=session $2=count-before $3=sent-length
+  if [ "$receipt_timeout" -eq 0 ] || ! command -v jq >/dev/null 2>&1; then
+    echo "send-prompt[$1]: receipt unknown (check disabled or jq missing)" >&2
+    echo "delivered"; exit 0
+  fi
+  _dir=$(transcript_dir "$1") || { echo "send-prompt[$1]: receipt unknown (no transcript dir)" >&2; echo "delivered"; exit 0; }
+  _t=0
+  while [ "$_t" -lt "$receipt_timeout" ]; do
+    set -- "$1" "$2" "$3" $(transcript_user_text "$_dir")   # $4=count $5=last length
+    if [ "$4" -gt "$2" ]; then
+      if [ "$5" -lt "$3" ]; then
+        echo "send-prompt[$1]: received $5 of $3 characters — head of the prompt lost (issue #198); re-send shorter or as a file pointer" >&2
+        echo "truncated"; exit 10
+      fi
+      echo "delivered"; exit 0
+    fi
+    sleep 1; _t=$((_t + 1))
+  done
+  echo "send-prompt[$1]: receipt unknown (no new user message in ${receipt_timeout}s)" >&2
+  echo "delivered"; exit 0
 }
 
 cmd_send() {
@@ -327,6 +426,13 @@ cmd_send() {
   before="$prev"
 
   fingerprint=$(prompt_fingerprint "$prompt")
+
+  # D3/D7 receipt setup: the sent length and the pre-send user-message count,
+  # so finish_delivered can tell a NEW transcript message apart from a
+  # pre-existing one and compare its length against what was actually typed.
+  sent_len=$(jq -rn --arg p "$prompt" '$p | length' 2>/dev/null || printf '%s' "$prompt" | wc -m | tr -d ' ')
+  count0=0
+  _d=$(transcript_dir "$sess" 2>/dev/null) && count0=$(transcript_user_text "$_d" | cut -d' ' -f1)
 
   # The payload goes after '--'. Without it tmux parses a prompt that begins
   # with '-' as its own flag ("unknown flag -n") and the prompt is never
@@ -377,12 +483,12 @@ cmd_send() {
     # confirmation's evidence table: busy/queued indicator > pane diff) — a
     # worker already mid-turn on this input is delivered, even when this
     # capture window shows no textual change.
-    if printf '%s' "$after" | grep -qF -- "$busy_pat" 2>/dev/null; then
-      echo "delivered"; exit 0
+    if pane_is_busy "$after"; then
+      finish_delivered "$sess" "$count0" "$sent_len"
     fi
 
     if [ "$after" != "$before" ]; then
-      echo "delivered"; exit 0
+      finish_delivered "$sess" "$count0" "$sent_len"
     fi
 
     # No queued/pasted/fingerprint/busy marker and no observable diff: a
