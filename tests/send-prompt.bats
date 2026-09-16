@@ -20,6 +20,10 @@ setup() {
   # the repo (.claude/ is git-ignored), not under $BATS_TEST_TMPDIR: the fake
   # needs an exec bit and host EDR flags chmod +x under /tmp,$TMPDIR.
   STUB_ROOT="${BATS_TEST_DIRNAME}/../.claude/tmp/sp-$$-${BATS_TEST_NUMBER:-0}"
+  # Every existing real-pane test skips the receipt poll (issue #198 part 2):
+  # a mapped projects dir for this worktree can exist on a developer machine
+  # and would otherwise cost up to LO_RECEIPT_TIMEOUT seconds per send.
+  export LO_RECEIPT_TIMEOUT=0
 }
 
 teardown() {
@@ -61,6 +65,14 @@ mk_unsubmitted_box() {
     '────────────────────────' \
     '                    /rc' \
     'bypass permissions on'"
+  tmux send-keys -t "$S" Enter
+  sleep 1
+}
+
+# Paint a pane from a captured fixture file (issue #199: the 2.1.27x TUI's
+# working/idle panes). Mirrors mk_unsubmitted_box's clear+cat-then-Enter shape.
+mk_fixture_pane() { # $1 = fixture file path
+  tmux send-keys -t "$S" -l -- "clear; cat '$1'"
   tmux send-keys -t "$S" Enter
   sleep 1
 }
@@ -119,6 +131,36 @@ mk_unsubmitted_box() {
   run --separate-stderr env LO_QUEUED_PATTERN=-dash-marker sh "$SP" state "$S"
   [ "$status" -eq 4 ]
   [ "$output" = "busy" ]
+}
+
+@test "state: a 2.1.273 working pane (elapsed-time spinner, no 'esc to interrupt') reports busy" {
+  # Issue #199: the 2.1.27x TUI dropped "esc to interrupt" for an elapsed-time
+  # spinner suffix ("(21s · ..."). No LO_BUSY_PATTERN override — the DEFAULT
+  # busy_re must catch this on its own.
+  mk_session
+  mk_fixture_pane "${BATS_TEST_DIRNAME}/fixtures/send-prompt/working-pane-2.1.273.txt"
+  run --separate-stderr sh "$SP" state "$S"
+  [ "$status" -eq 4 ]
+  [ "$output" = "busy" ]
+}
+
+@test "state: negative control — the idle twin of the same pane reports ready" {
+  # Proves the busy test above can fail: same fixture, spinner line removed.
+  mk_session
+  mk_fixture_pane "${BATS_TEST_DIRNAME}/fixtures/send-prompt/idle-pane-2.1.273.txt"
+  run --separate-stderr sh "$SP" state "$S"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ready" ]
+}
+
+@test "state: LO_BUSY_REGEX override replaces the default ERE" {
+  # Proves the default ERE, not the fixture text itself, is what matched above:
+  # a regex that cannot match anything in the fixture must report ready.
+  mk_session
+  mk_fixture_pane "${BATS_TEST_DIRNAME}/fixtures/send-prompt/working-pane-2.1.273.txt"
+  run --separate-stderr env LO_BUSY_REGEX='NOSUCH[0-9]+' sh "$SP" state "$S"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ready" ]
 }
 
 @test "state: stdout carries exactly one token (coordinator branches on it)" {
@@ -321,7 +363,9 @@ _use_fake_tmux_send() {
   FAKE_CAPTURE_N="$STUB_ROOT/capture_n";     echo 0 > "$FAKE_CAPTURE_N"
   FAKE_CAPTURES="$STUB_ROOT/captures";       : > "$FAKE_CAPTURES"
   FAKE_ALIVE_FILE="$STUB_ROOT/alive";        : > "$FAKE_ALIVE_FILE"
-  export FAKE_SEND_LOG FAKE_CAPTURE_N FAKE_CAPTURES FAKE_ALIVE_FILE
+  FAKE_PANE_PATH="";
+  FAKE_TRANSCRIPT="$STUB_ROOT/transcript.jsonl"; : > "$FAKE_TRANSCRIPT"
+  export FAKE_SEND_LOG FAKE_CAPTURE_N FAKE_CAPTURES FAKE_ALIVE_FILE FAKE_PANE_PATH FAKE_TRANSCRIPT
   cat > "$STUB_ROOT/bin/tmux" <<'FAKE'
 #!/bin/sh
 verb="$1"; shift
@@ -335,8 +379,27 @@ case "$verb" in
     sed -n "${idx}p" "$FAKE_CAPTURES"
     echo $((n + 1)) > "$FAKE_CAPTURE_N"
     exit 0 ;;
+  display)
+    printf '%s\n' "${FAKE_PANE_PATH:-}"
+    exit 0 ;;
   send-keys)
-    printf '%s\n' "$*" >> "$FAKE_SEND_LOG"
+    printf 'send-keys %s\n' "$*" >> "$FAKE_SEND_LOG"
+    case "$*" in
+      *Enter)
+        if [ -n "${FAKE_RECEIPT_CONTENT:-}" ]; then
+          jq -cn --arg c "$FAKE_RECEIPT_CONTENT" \
+            '{type:"user",message:{role:"user",content:$c}}' >> "$FAKE_TRANSCRIPT"
+          printf '%s\n' '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"x"}]}}' \
+            >> "$FAKE_TRANSCRIPT"
+        fi ;;
+    esac
+    exit 0 ;;
+  load-buffer)
+    cat > /dev/null
+    printf 'load-buffer %s\n' "$*" >> "$FAKE_SEND_LOG"
+    exit 0 ;;
+  paste-buffer)
+    printf 'paste-buffer %s\n' "$*" >> "$FAKE_SEND_LOG"
     exit 0 ;;
 esac
 exit 0
@@ -344,7 +407,7 @@ FAKE
   chmod +x "$STUB_ROOT/bin/tmux"
   PATH="$STUB_ROOT/bin:$PATH"; export PATH
 }
-_enter_count() { grep -cx -- "-t =$S: Enter" "$FAKE_SEND_LOG"; }
+_enter_count() { grep -cx -- "send-keys -t =$S: Enter" "$FAKE_SEND_LOG"; }
 
 @test "send: a [Pasted text] placeholder cleared by one retry is delivered" {
   _use_fake_tmux_send
@@ -379,6 +442,71 @@ _enter_count() { grep -cx -- "-t =$S: Enter" "$FAKE_SEND_LOG"; }
   [ "$status" -eq 4 ]
   [ "$output" = "queued" ]
   [ "$(_enter_count)" -eq 1 ]
+}
+
+# ------------------------------- send: bracketed-paste delivery (issue #198) -
+#
+# D1/D2: a payload of LO_PASTE_THRESHOLD+ bytes goes through load-buffer +
+# paste-buffer -p, never chunked send-keys -l writes (rejected by the spike);
+# smaller payloads keep the unchanged literal path.
+
+@test "send: a payload at the paste threshold goes through load-buffer + paste-buffer -p, then a separate Enter" {
+  _use_fake_tmux_send
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  payload=$(head -c 800 /dev/zero | tr '\0' a)
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_PASTE_SETTLE=0 sh "$SP" send "$S" "$payload"
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  # order: load-buffer, then paste-buffer -p, then a separate Enter — never a
+  # send-keys line carrying the literal payload.
+  case "$(sed -n '1p' "$FAKE_SEND_LOG")" in load-buffer\ -b\ lo-send-*) : ;; *) return 1 ;; esac
+  case "$(sed -n '2p' "$FAKE_SEND_LOG")" in paste-buffer\ -p\ -d\ -b\ lo-send-*) : ;; *) return 1 ;; esac
+  [ "$(sed -n '3p' "$FAKE_SEND_LOG")" = "send-keys -t =$S: Enter" ]
+  [ "$(_enter_count)" -eq 1 ]
+  ! grep -qF -- 'aaaa' "$FAKE_SEND_LOG"
+}
+
+@test "send: negative control — a 799-byte payload still types with send-keys -l" {
+  _use_fake_tmux_send
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  payload=$(head -c 799 /dev/zero | tr '\0' a)
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_PASTE_SETTLE=0 sh "$SP" send "$S" "$payload"
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  [ "$(grep -cF -- "send-keys -t =$S: -l -- $payload" "$FAKE_SEND_LOG")" -eq 1 ]
+  [ "$(grep -c -- 'paste-buffer' "$FAKE_SEND_LOG")" -eq 0 ]
+}
+
+@test "send: LO_PASTE_THRESHOLD=100000 forces the literal path even for 3000 bytes" {
+  _use_fake_tmux_send
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  payload=$(head -c 3000 /dev/zero | tr '\0' a)
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_PASTE_THRESHOLD=100000 sh "$SP" send "$S" "$payload"
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  [ "$(grep -cF -- "send-keys -t =$S: -l -- $payload" "$FAKE_SEND_LOG")" -eq 1 ]
+  [ "$(grep -c -- 'paste-buffer' "$FAKE_SEND_LOG")" -eq 0 ]
+}
+
+@test "send: real pane — a 3000-byte bracketed paste reaches a raw-mode reader byte-exact" {
+  mk_session
+  mkdir -p "$STUB_ROOT"
+  tmux send-keys -t "$S" -l -- "stty -icanon -echo; cat > $STUB_ROOT/out"
+  tmux send-keys -t "$S" Enter
+  sleep 1
+  payload="$(head -c 2999 /dev/zero | tr '\0' b)X"
+  printf '%s' "$payload" > "$STUB_ROOT/expected"
+  # Assert the FILE only, not $status: echo is off, so the pane shows no diff
+  # and the script legitimately walks its lost path (one automatic resend
+  # appends a second copy AFTER the first 3000 bytes, which head -c 3000
+  # ignores). The pane's own stty command line is short, so it is typed in
+  # canonical mode; the payload then arrives in raw mode.
+  run --separate-stderr env LO_PASTE_SETTLE=0 LO_CONFIRM_DELAY=1 LO_RECEIPT_TIMEOUT=0 \
+    LO_LOST_CONFIRM_DELAY=1 sh "$SP" send "$S" "$payload"
+  sleep 1
+  head -c 3000 "$STUB_ROOT/out" > "$STUB_ROOT/actual"
+  run cmp "$STUB_ROOT/expected" "$STUB_ROOT/actual"
+  [ "$status" -eq 0 ]
 }
 
 # ------------------------------ box-anchored pasted-marker detection (#145) -
@@ -524,7 +652,7 @@ _enter_count() { grep -cx -- "-t =$S: Enter" "$FAKE_SEND_LOG"; }
   [ "$status" -eq 8 ]
   [ "$output" = "lost" ]
   # exactly one resend: 2 sends (initial -l + Enter) + 2 sends (the one resend)
-  [ "$(grep -cx -- "-t =$S: -l -- echo T3_LOST_CASE" "$FAKE_SEND_LOG")" -eq 2 ]
+  [ "$(grep -cx -- "send-keys -t =$S: -l -- echo T3_LOST_CASE" "$FAKE_SEND_LOG")" -eq 2 ]
   [ "$(_enter_count)" -eq 2 ]
 }
 
@@ -537,7 +665,7 @@ _enter_count() { grep -cx -- "-t =$S: Enter" "$FAKE_SEND_LOG"; }
     sh "$SP" send "$S" 'echo T3_RESEND_OK'
   [ "$status" -eq 0 ]
   [ "$output" = "delivered" ]
-  [ "$(grep -cx -- "-t =$S: -l -- echo T3_RESEND_OK" "$FAKE_SEND_LOG")" -eq 2 ]
+  [ "$(grep -cx -- "send-keys -t =$S: -l -- echo T3_RESEND_OK" "$FAKE_SEND_LOG")" -eq 2 ]
 }
 
 @test "send: a wobbling pane is settled to two identical captures before any key is typed" {
@@ -553,6 +681,130 @@ _enter_count() { grep -cx -- "-t =$S: Enter" "$FAKE_SEND_LOG"; }
   # capture (STABLE_DONE) = 5 capture-pane calls total, all BEFORE any send.
   [ "$(cat "$FAKE_CAPTURE_N")" -eq 5 ]
   [ "$(_enter_count)" -eq 1 ]
+}
+
+# ------------------------------- send: receipt verification (issue #198 pt 2)
+#
+# D3: after a delivered verdict, confirm against the worker's newest
+# transcript. D4: unverifiable receipt keeps delivered, stderr advisory only.
+# D6/D7: LO_TRANSCRIPT_DIR overrides the derived path; only NEW type=user
+# TEXT records count, never a pre-existing one or a tool_result record.
+
+@test "send: receipt verified — the transcript's new user message matches the prompt length -> delivered" {
+  _use_fake_tmux_send
+  mkdir -p "$STUB_ROOT/tx"; : > "$STUB_ROOT/tx/s.jsonl"
+  FAKE_TRANSCRIPT="$STUB_ROOT/tx/s.jsonl"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  prompt='echo T3_RECEIPT_OK'
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 LO_TRANSCRIPT_DIR="$STUB_ROOT/tx" \
+    FAKE_RECEIPT_CONTENT="$prompt" sh "$SP" send "$S" "$prompt"
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+}
+
+@test "send: receipt shorter than sent -> truncated (10)" {
+  _use_fake_tmux_send
+  mkdir -p "$STUB_ROOT/tx"; : > "$STUB_ROOT/tx/s.jsonl"
+  FAKE_TRANSCRIPT="$STUB_ROOT/tx/s.jsonl"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  prompt=$(head -c 1190 /dev/zero | tr '\0' c)
+  tail163=$(printf '%s' "$prompt" | tail -c 163)
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 LO_TRANSCRIPT_DIR="$STUB_ROOT/tx" \
+    FAKE_RECEIPT_CONTENT="$tail163" sh "$SP" send "$S" "$prompt"
+  [ "$status" -eq 10 ]
+  [ "$output" = "truncated" ]
+  case "$stderr" in *"received 163 of 1190"*) : ;; *) return 1 ;; esac
+}
+
+@test "send: boundary — a transcript that already held one user message counts only NEW ones" {
+  _use_fake_tmux_send
+  mkdir -p "$STUB_ROOT/tx"
+  jq -cn --arg c "$(head -c 500 /dev/zero | tr '\0' p)" \
+    '{type:"user",message:{role:"user",content:$c}}' > "$STUB_ROOT/tx/s.jsonl"
+  FAKE_TRANSCRIPT="$STUB_ROOT/tx/s.jsonl"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  prompt=$(head -c 1190 /dev/zero | tr '\0' d)
+  short=$(printf '%s' "$prompt" | tail -c 50)
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 LO_TRANSCRIPT_DIR="$STUB_ROOT/tx" \
+    FAKE_RECEIPT_CONTENT="$short" sh "$SP" send "$S" "$prompt"
+  [ "$status" -eq 10 ]
+  [ "$output" = "truncated" ]
+}
+
+@test "send: negative control — a pre-existing SHORT message with no NEW one is never mistaken for a truncated receipt" {
+  # D7's actual guard: the comparison must be against count0 (the pre-send
+  # count), not merely ">0". A pre-existing message shorter than the prompt,
+  # with nothing new arriving, must poll out to "receipt unknown", never
+  # misread the old record as this send's receipt and report truncated.
+  _use_fake_tmux_send
+  mkdir -p "$STUB_ROOT/tx"
+  jq -cn --arg c "$(head -c 50 /dev/zero | tr '\0' q)" \
+    '{type:"user",message:{role:"user",content:$c}}' > "$STUB_ROOT/tx/s.jsonl"
+  FAKE_TRANSCRIPT="$STUB_ROOT/tx/s.jsonl"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  prompt=$(head -c 1190 /dev/zero | tr '\0' e)
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=2 LO_TRANSCRIPT_DIR="$STUB_ROOT/tx" \
+    sh "$SP" send "$S" "$prompt"
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  case "$stderr" in *"receipt unknown"*) : ;; *) return 1 ;; esac
+}
+
+@test "send: default transcript dir (derived from pane_current_path) is used when LO_TRANSCRIPT_DIR is unset" {
+  # Every other receipt test overrides LO_TRANSCRIPT_DIR; this one exercises
+  # the real transcript_dir() derivation ($HOME/.claude/projects/<tr '/.' '->
+  # of the pane's cwd>) end to end.
+  _use_fake_tmux_send
+  fake_path="$STUB_ROOT/work/myrepo"
+  mapped=$(printf '%s' "$fake_path" | tr '/.' '-')
+  derived_dir="$STUB_ROOT/home/.claude/projects/$mapped"
+  mkdir -p "$derived_dir"
+  : > "$derived_dir/s.jsonl"
+  FAKE_TRANSCRIPT="$derived_dir/s.jsonl"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  prompt='echo T3_DEFAULT_DIR'
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 HOME="$STUB_ROOT/home" \
+    FAKE_PANE_PATH="$fake_path" FAKE_RECEIPT_CONTENT="$prompt" sh "$SP" send "$S" "$prompt"
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  # A verified receipt writes no stderr line at all; "receipt unknown" only
+  # appears on the fallback path, so its absence proves the derived directory
+  # was the one actually read — a broken '.' mapping would land here too.
+  case "$stderr" in *"receipt unknown"*) return 1 ;; *) : ;; esac
+}
+
+@test "send: pane_current_path unobtainable -> no transcript dir resolvable, delivered with 'receipt unknown' on stderr" {
+  # transcript_dir() itself must fail (rc 1) when the pane's cwd cannot be
+  # read at all — distinct from the derived-but-empty-directory case below,
+  # which instead exhausts the poll loop.
+  _use_fake_tmux_send
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 FAKE_PANE_PATH= \
+    sh "$SP" send "$S" 'echo T3_NOPATH'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  case "$stderr" in *"receipt unknown (no transcript dir)"*) : ;; *) return 1 ;; esac
+}
+
+@test "send: transcript dir derived but empty -> delivered with 'receipt unknown' on stderr (poll-timeout branch)" {
+  _use_fake_tmux_send
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=2 HOME="$STUB_ROOT" \
+    FAKE_PANE_PATH=/nonexistent/x sh "$SP" send "$S" 'echo T3_NODIR'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  case "$stderr" in *"receipt unknown (no new user message"*) : ;; *) return 1 ;; esac
+}
+
+@test "send: LO_RECEIPT_TIMEOUT=0 disables the check" {
+  _use_fake_tmux_send
+  mkdir -p "$STUB_ROOT/tx"; : > "$STUB_ROOT/tx/s.jsonl"
+  FAKE_TRANSCRIPT="$STUB_ROOT/tx/s.jsonl"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=0 LO_TRANSCRIPT_DIR="$STUB_ROOT/tx" \
+    FAKE_RECEIPT_CONTENT=short sh "$SP" send "$S" 'echo T3_NORECEIPT_LONG_PROMPT_TAIL_SHORT'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
 }
 
 # ---------------------------------------------------------------- wait
@@ -848,6 +1100,17 @@ tpl_sections_single_line() {
   # silently from the other file's side.
   for n in 1 2 3 4; do
     grep -qF "## ($n) " "$TPL"
+  done
+}
+
+@test "contract: SKILL.md and the script header both name exit 10 truncated and the new knobs" {
+  # Doc and script cannot drift (issue #198): the exit table entry and every
+  # new knob this task introduced must be named in both places.
+  SK="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
+  [[ "$(cat "$SK")" == *'**10** truncated'* ]]
+  for knob in LO_PASTE_THRESHOLD LO_PASTE_SETTLE LO_RECEIPT_TIMEOUT LO_TRANSCRIPT_DIR LO_BUSY_REGEX; do
+    [[ "$(cat "$SK")" == *"$knob"* ]]
+    [[ "$(head -80 "$SP")" == *"$knob"* ]]
   done
 }
 

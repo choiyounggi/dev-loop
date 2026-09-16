@@ -449,7 +449,16 @@ if a launch hangs, set `LO_READY_EXTRA` / `LO_TRUST_EXTRA` (substrings) or
 `LO_READY_TIMEOUT`. `LO_PASTED_TAIL_LINES` (default 40) is `send-prompt.sh`'s
 fallback pasted-marker window, scanned only when it cannot locate the input box
 in the pane capture — raise it if a CLI release changes the input-box chrome so
-the box stops being locatable. `status-update.sh` resolves the status file's `session` field
+the box stops being locatable. `send-prompt.sh send` pastes any payload of
+`LO_PASTE_THRESHOLD` bytes or more (default 800) as one bracketed tmux paste
+and waits `LO_PASTE_SETTLE` seconds (default 2) before the submit key; after a
+delivered verdict it confirms receipt against the worker's newest transcript
+for up to `LO_RECEIPT_TIMEOUT` seconds (default 10; 0 disables) —
+`LO_TRANSCRIPT_DIR` overrides the derived `~/.claude/projects/<mapped worktree
+path>` location — and `state`/`send` recognise a mid-turn worker by
+`LO_BUSY_REGEX` (default: the CLI's elapsed-time spinner suffix or the legacy
+`esc to interrupt`) plus the optional fixed-string `LO_BUSY_PATTERN`.
+`status-update.sh` resolves the status file's `session` field
 from `tmux display-message -p '#S'` only when the caller is itself inside tmux
 (`$TMUX` set) — a coordinator-side call (this shell, not a worker's tmux pane)
 must pass `STATUS_SESSION=<lo-n-runid>` explicitly, or the record's `session`
@@ -877,8 +886,11 @@ Deliver §2 (implement) to each session with `scripts/send-prompt.sh send lo-<n>
 "<prompt>"` — **0** delivered, **4** queued behind a busy turn, **7** unconfirmed
 (may still have been delivered — do not resend; cross-check with `wait`/`state`),
 **8** lost (confirmed: two quiet observations plus a failed automatic resend —
-safe to re-dispatch), **3** the session is gone, **2** the session name or prompt
-was rejected. Branch on the exit code; stdout is exactly one token and stderr is
+safe to re-dispatch), **10** truncated (the worker's transcript shows a user
+message shorter than the prompt sent — the head was lost in the CLI's paste
+handling: re-send it shorter, or write it to `{ORCH_DIR}/prompts/<task>-<round>.txt`
+and send only a pointer; never trust the tail that arrived), **3** the session
+is gone, **2** the session name or prompt was rejected. Branch on the exit code; stdout is exactly one token and stderr is
 advisory context that must never be parsed. On **4**, `scripts/send-prompt.sh wait
 lo-<n> [timeout]` blocks until the worker picks it up (**0** picked-up, **5**
 deadline expired, **9** the worker is parked on an unsubmitted prompt: press
