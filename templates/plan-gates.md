@@ -57,3 +57,8 @@ either script were needed or made.
   CHECK: sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check reviewer-verdict {PLAN_DIR}
   EXPECT: ok
   EVIDENCE: pending
+
+- [ ] gaps-emitted: every [no-wiki] row in design.md's Decisions table was recorded as a log.md gap line and an insight-queue candidate (emission never fails the gate; warnings go to stderr)
+  CHECK: sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/emit-gaps.sh {PLAN_DIR}
+  EXPECT: ok
+  EVIDENCE: pending
