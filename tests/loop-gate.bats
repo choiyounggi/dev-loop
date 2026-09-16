@@ -69,6 +69,13 @@ _run_gate() { # <cwd> <stop_hook_active>
   [ "$status" -eq 0 ]
 }
 
+@test "phase=pending (launch pre-seed), worker identity match: allows stop (exit 0)" {
+  printf '{"worktree":"%s","phase":"pending","session":"work-t1"}' "$WS" > "$WS/.orchestration/status/t1.json"
+  export TMUX=/tmp/fake-socket LOOP_GATE_TMUX="$FAKE_TMUX" FAKE_TMUX_SESSION="work-t1"
+  run _run_gate "$WS" false
+  [ "$status" -eq 0 ]
+}
+
 # --- Session identity check: block only the managed tmux worker ---
 
 @test "worker identity match + phase=implementing: blocks (exit 2)" {

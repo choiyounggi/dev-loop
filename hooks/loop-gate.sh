@@ -4,10 +4,11 @@
 # Two independent gates, both enforced at session stop:
 #
 # GATE 1 (phase, managed sessions only): blocks a MANAGED worker session from
-# ending while its recorded phase is pending|planning|implementing|rework —
+# ending while its recorded phase is planning|implementing|rework —
 # mid-loop abandonment. Every other phase (done/approved/merged/failed/
 # plan_ready/impl_done, or an unknown/unset value) is terminal or an
-# instructed wait-phase and allows the stop. Blocking additionally requires
+# instructed wait-phase and allows the stop (pending is the launch pre-seed
+# and is terminal, issue #197). Blocking additionally requires
 # THIS session to be the managed worker: when the matched status entry has a
 # non-empty .session, only a tmux session whose name equals it is blocked — a
 # coordinator visiting the same worktree, or any non-tmux session, is never
@@ -95,7 +96,7 @@ if [ "$ACTIVE" != "true" ]; then
       fi
 
       case "$ph" in
-        pending|planning|implementing|rework) incomplete_phase="$ph" ;;
+        planning|implementing|rework) incomplete_phase="$ph" ;;
         *) : ;;   # terminal, instructed-wait, or unrecognized — allow stop
       esac
       break   # one status entry per worktree; stop at the matched one
