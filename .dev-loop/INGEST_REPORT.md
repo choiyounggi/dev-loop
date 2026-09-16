@@ -78,8 +78,10 @@ emitted by the gate, not requested in prose.
   alerts API, and dismissed alerts stay in the Closed list for review. This is the canonical
   shape of a *recorded* escape hatch.
 - https://github.blog/changelog/2025-07-01-delegated-alert-dismissal-for-code-scanning-is-now-generally-available/
-  — each dismissal request carries a mandatory rationale, visible on the timeline, in the
-  audit log, and via REST API and webhooks.
+  — fetched this session: reviewers can "provide a comment when approving/rejecting alert
+  dismissal requests", and dismissal requests are created, listed and reviewed through
+  dedicated REST API endpoints — the review of a hatch use is itself recorded and readable
+  outside the UI.
 - Local field measurement (this repo, 1.22.0): `skills/wiki-plan/scripts/plan-gate.sh:166`
   passes an ungrounded decision with `[ "$basis" = "[no-wiki]" ] && continue` and records
   nothing, while `skills/wiki-plan/SKILL.md:135` asks in prose for the decision to be "noted
