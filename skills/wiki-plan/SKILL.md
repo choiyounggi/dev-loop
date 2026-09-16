@@ -64,7 +64,9 @@ ABANDON: reviewer-verdict lite mode (small, no no-wiki, no pins)
 ```
 A quiet skip is never allowed — every abandonment must appear on the ledger and
 in the eventual task report's `GATES:` line. (This is the same abandonment
-mechanism `templates/gates.md` already uses.)
+mechanism `templates/gates.md` already uses.) gaps-emitted is never abandoned:
+it runs in lite mode too and simply records nothing when the [no-wiki] count
+is the zero the lite verdict assumed.
 
 ## Phase A — Analyze (produces `plans/<feature>/analysis.md`)
 
@@ -132,8 +134,10 @@ every domain the work touches. For each design decision, find the page that
 owns it (match "load when" lines), apply its directives now, and record the
 decision + page. `Wiki basis` is a repo-relative path,
 `wiki/<domain>/<category>/<page>.md`, to a page that actually exists — not a
-page id — or the literal `[no-wiki]` (with the decision noted as an ingest
-candidate); gate-B greps every non-`[no-wiki]` path under the wiki root and
+page id — or the literal `[no-wiki]` (gate-B's gaps-emitted gate records each
+such row as a log.md gap line and an insight-queue candidate for
+knowledge-flush — nothing to write by hand); gate-B greps every
+non-`[no-wiki]` path under the wiki root and
 fails on any miss. Example, for a login feature:
 
 | # | Decision | Choice | Wiki basis | Rejected alternative | Testability |
@@ -162,7 +166,7 @@ requester, not a forced PASS.
 sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh emit B plans/<feature> .dev-loop/gates/plan-B-<feature>.md
 sh ${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh --run .dev-loop/gates/plan-B-<feature>.md
 ```
-Gate ids: `groundings-exist`, `decision-rows-complete`, `reviewer-verdict`.
+Gate ids: `groundings-exist`, `decision-rows-complete`, `reviewer-verdict`, `gaps-emitted`.
 Exit 0 before entering Phase C.
 
 ## Phase C — Decompose (produces `plans/<feature>/plan.md` + `tasks/NN-*.md`)

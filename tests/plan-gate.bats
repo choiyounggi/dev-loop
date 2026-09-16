@@ -259,15 +259,15 @@ EOF
   grep -q 'CHECK: true && echo GATE_OK' "$WORK/plan-A-fixture.md"
 }
 
-@test "emit B: writes 3 gates, all CHECK/EXPECT/EVIDENCE lines present" {
+@test "emit B: writes 4 gates, all CHECK/EXPECT/EVIDENCE lines present" {
   run sh "$PG" emit B "$FIX/passing" "$WORK/plan-B-fixture.md"
   [ "$status" -eq 0 ]
-  ids="groundings-exist decision-rows-complete reviewer-verdict"
+  ids="groundings-exist decision-rows-complete reviewer-verdict gaps-emitted"
   for id in $ids; do
     grep -q -- "- \[ \] ${id}:" "$WORK/plan-B-fixture.md"
   done
-  [ "$(grep -c '^  CHECK: ' "$WORK/plan-B-fixture.md")" -eq 3 ]
-  [ "$(grep -c '^  EXPECT: ' "$WORK/plan-B-fixture.md")" -eq 3 ]
+  [ "$(grep -c '^  CHECK: ' "$WORK/plan-B-fixture.md")" -eq 4 ]
+  [ "$(grep -c '^  EXPECT: ' "$WORK/plan-B-fixture.md")" -eq 4 ]
   ! grep -q '{PLAN_DIR}' "$WORK/plan-B-fixture.md"
 }
 
@@ -297,7 +297,8 @@ EOF
 
 @test "emitted ledger --run reaches MET for every gate-B id when the plan-dir is well formed" {
   sh "$PG" emit B "$FIX/passing" "$WORK/plan-B-run.md"
-  CLAUDE_PLUGIN_ROOT="${BATS_TEST_DIRNAME}/.." run bash "$GC" --run "$WORK/plan-B-run.md"
+  printf '# Change Log\n\n' > "$WORK/log.md"
+  CLAUDE_PLUGIN_ROOT="${BATS_TEST_DIRNAME}/.." DEV_LOOP_LOG_MD="$WORK/log.md" DEV_LOOP_QUEUE_DIR="$WORK/queue" run bash "$GC" --run "$WORK/plan-B-run.md"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"met=3 unmet=0"* ]]
+  [[ "$output" == *"met=4 unmet=0"* ]]
 }
