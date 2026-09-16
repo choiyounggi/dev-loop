@@ -32,15 +32,16 @@ lens_order() {
   phase4_section "$1" | grep -oE '^[0-9]\. \*\*[^*]+\*\*' | sed -E 's/^([0-9])\..*/\1/' | tr -d '\n'
 }
 
-# --- normal: the four lenses are present, numbered 1-4, in order -----------
+# --- normal: the five lenses are present, numbered 1-5, in order -----------
 
-@test "Phase 4 contains the four lenses, numbered 1-4, in order" {
-  [ "$(lens_order "$SKILL")" = "1234" ]
+@test "Phase 4 contains the five lenses, numbered 1-5, in order" {
+  [ "$(lens_order "$SKILL")" = "12345" ]
   section="$(phase4_section "$SKILL")"
   [[ "$section" == *"Plan conformance"* ]]
   [[ "$section" == *"Wiki re-route from the diff"* ]]
   [[ "$section" == *"Execution-environment reality"* ]]
   [[ "$section" == *"Multi-object write ordering"* ]]
+  [[ "$section" == *"AC traceability"* ]]
 }
 
 @test "lens 2 cites AGENTS.md routing protocol step 7 by document and step number only" {
@@ -65,11 +66,12 @@ lens_order() {
   [[ "$section" == *'templates/review-report.md'* ]]
 }
 
-@test "Phase 4 retains the test-quality-auditor obligation alongside the pass, not as a fifth lens" {
+@test "Phase 4 retains the test-quality-auditor obligation as prose alongside the pass, not as a numbered lens" {
   section="$(phase4_section "$SKILL")"
   [[ "$section" == *'test-quality-auditor'* ]]
-  # it must not be numbered 5 — the issue fixes exactly four lenses
-  [[ "$section" != *'5. **'* ]]
+  # it must not be a sixth numbered lens — the issue fixes exactly five lenses
+  [[ "$section" != *'6. **'* ]]
+  [[ "$section" == *'5. **AC traceability'* ]]
 }
 
 @test "Phase 4 retains the surrounding mechanics: diff command, rework budget, escalation, dispatch-loop return" {
@@ -89,8 +91,8 @@ lens_order() {
 
 @test "negative control: a SKILL.md copy with the lens lines removed fails the order check" {
   stripped="${BATS_TEST_TMPDIR}/skill-no-lenses.md"
-  grep -v -E '^[0-9]\. \*\*(Plan conformance|Wiki re-route|Execution-environment|Multi-object)' "$SKILL" > "$stripped"
-  [ "$(lens_order "$stripped")" != "1234" ]
+  grep -v -E '^[0-9]\. \*\*(Plan conformance|Wiki re-route|Execution-environment|Multi-object|AC traceability)' "$SKILL" > "$stripped"
+  [ "$(lens_order "$stripped")" != "12345" ]
 }
 
 # --- negative control: reordering two lenses breaks the order check --------
@@ -106,7 +108,7 @@ lens_order() {
     }
     { print }
   ' "$SKILL" > "$swapped"
-  [ "$(lens_order "$swapped")" != "1234" ]
+  [ "$(lens_order "$swapped")" != "12345" ]
 }
 
 # --- template structure: three-part finding format + non-blocking section --
@@ -129,12 +131,12 @@ lens_order() {
 
 # --- error/boundary: per-lens table distinguishes clean, findings, not-run -
 
-@test "review-report.md's per-lens table has 4 rows, each distinguishing clean/findings/not-run" {
+@test "review-report.md's per-lens table has 5 rows, each distinguishing clean/findings/not-run" {
   content="$(cat "$TEMPLATE")"
   clean_count="$(grep -c 'clean —' "$TEMPLATE")"
   notrun_count="$(grep -c 'not run —' "$TEMPLATE")"
-  [ "$clean_count" -eq 4 ]
-  [ "$notrun_count" -eq 4 ]
+  [ "$clean_count" -eq 5 ]
+  [ "$notrun_count" -eq 5 ]
   [[ "$content" == *"findings: F1, F2"* ]]
 }
 
@@ -154,4 +156,32 @@ lens_order() {
   awk '/^## Non-blocking/{exit} {print}' "$TEMPLATE" > "$stripped"
   content="$(cat "$stripped")"
   [[ "$content" != *"## Non-blocking"* ]]
+}
+
+# --- lens 5 AC traceability (issue #192 stage 3) ----------------------------
+
+@test "review-report.md has the AC traceability section with the DoD, gate id, test case columns" {
+  content="$(cat "$TEMPLATE")"
+  [[ "$content" == *"## AC traceability"* ]]
+  [[ "$content" == *"| DoD item | gate id | test case |"* ]]
+}
+
+@test "negative control: a review-report.md copy without the AC traceability heading fails the section check" {
+  stripped="${BATS_TEST_TMPDIR}/review-report-no-ac-traceability.md"
+  awk '/^## AC traceability/{exit} {print}' "$TEMPLATE" > "$stripped"
+  content="$(cat "$stripped")"
+  [[ "$content" != *"## AC traceability"* ]]
+}
+
+@test "lens 5 names the three columns and routes empty cells to Findings" {
+  section="$(phase4_section "$SKILL")"
+  [[ "$section" == *"| DoD item | gate id | test case |"* ]]
+  [[ "$section" == *"empty gate or test cell is a Findings item"* ]]
+}
+
+@test "negative control: a Phase 4 copy without the AC traceability lens fails the three-column check" {
+  stripped="${BATS_TEST_TMPDIR}/skill-no-ac-traceability-lens.md"
+  grep -v 'AC traceability' "$SKILL" > "$stripped"
+  section="$(phase4_section "$stripped")"
+  [[ "$section" != *"| DoD item | gate id | test case |"* ]]
 }
