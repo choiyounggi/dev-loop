@@ -231,9 +231,26 @@ canonical_blocked() {
   [ "$(jq -r '.ts' "$bdir/t1.json")" = "2026-01-01T00:05:00Z" ]
 }
 
-@test "R1 boundary: equal ts blocked record is not replaced" {
+@test "F1 boundary: an equal-ts worker record REPLACES the canonical (same-second tie goes to the worker)" {
+  # Round-3 review F1: the tie-break used to be strictly-greater, so a
+  # same-second worker record (real — a status-update and the
+  # worker-blocked-signal.sh hook can stamp the same whole second) was
+  # silently dropped, leaving a stale reason in the canonical copy. A tie
+  # now goes to the worker record, matching the header's "last event wins,
+  # including a same-second tie".
   graph '{"tasks":[{"id":"t1","deps":[]}]}'
   canonical_blocked t1 2026-01-01T00:05:00Z "$WROOT/wt1"
+  worker_blocked wt1 t1 2026-01-01T00:05:00Z permission_prompt
+  run sh "$CS" "$G" "$CDIR" "$WROOT"
+  [ "$status" -eq 0 ]
+  bdir="$(dirname "$CDIR")/blocked"
+  [ "$(jq -r '.reason' "$bdir/t1.json")" = "permission_prompt" ]
+  [ "$(jq -r '.detail' "$bdir/t1.json")" = "x" ]
+}
+
+@test "R1 boundary: a strictly-newer canonical is preserved (a stale worker record does not replace it)" {
+  graph '{"tasks":[{"id":"t1","deps":[]}]}'
+  canonical_blocked t1 2026-01-01T00:10:00Z "$WROOT/wt1"
   worker_blocked wt1 t1 2026-01-01T00:05:00Z permission_prompt
   run sh "$CS" "$G" "$CDIR" "$WROOT"
   [ "$status" -eq 0 ]
@@ -270,9 +287,15 @@ canonical_blocked() {
 }
 
 @test "R2 boundary: a canonical record whose worktree is a physical path survives a symlinked worktrees root" {
+  # Worker ts is strictly OLDER than canonical here (unlike the copy-loop
+  # tie-break tests above) so this test's own worker record — whose
+  # worktree field is a deliberately bogus placeholder, irrelevant to the
+  # prune pass — never overwrites the canonical's physical-path worktree
+  # field; this test is only about the PRUNE loop surviving a symlinked
+  # scan root, independent of the copy loop's F1 tie-break semantics.
   graph '{"tasks":[{"id":"t1","deps":[]}]}'
   mkdir -p "$WROOT/wt1/.orchestration/blocked"
-  jq -n --arg ts "2026-01-01T00:05:00Z" \
+  jq -n --arg ts "2026-01-01T00:00:00Z" \
     '{ts:$ts, taskId:"t1", session:"lo-1", event:"Notification", reason:"idle_prompt", detail:"x", worktree:"placeholder"}' \
     > "$WROOT/wt1/.orchestration/blocked/t1.json"
   phys="$(cd "$WROOT/wt1" && pwd -P)"
