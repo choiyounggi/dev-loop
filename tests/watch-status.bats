@@ -646,3 +646,769 @@ SCRIPT
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"collect failed"* ]]
 }
+
+# ---- auto-recover (unsubmitted paste -> Enter) ----
+# watch-status.sh presses Enter itself via send-prompt.sh keys when a worker's
+# pane holds an unsubmitted [Pasted text placeholder (send-prompt.sh `state`
+# exit 9) on two consecutive polls — on by default, bounded per session, and
+# never aborting the watch (no new exit code). See
+# .orchestration/plans/t2-watch-autoenter.md D1-D8.
+
+_sp_stub() {
+  SP_DIR="$BATS_TEST_TMPDIR/sp"
+  mkdir -p "$SP_DIR"
+  export SP_DIR
+  cat > "$BATS_TEST_TMPDIR/sp_stub.sh" <<'SCRIPT'
+#!/bin/sh
+# args: state <sess> | keys <sess> Enter
+printf '%s\n' "$*" >> "$SP_DIR/calls.log"
+case "$1" in
+  state)
+    seq="$SP_DIR/$2.seq"
+    if [ -s "$seq" ]; then rc=$(head -n 1 "$seq"); tail -n +2 "$seq" > "$seq.t"; mv "$seq.t" "$seq"
+    else rc=$(cat "$SP_DIR/$2.default" 2>/dev/null || echo 0); fi
+    exit "$rc" ;;
+  keys) exit "$(cat "$SP_DIR/keys_rc" 2>/dev/null || echo 0)" ;;
+esac
+exit 0
+SCRIPT
+}
+
+_calls_count() {
+  n=$(grep -c -- "$1" "$SP_DIR/calls.log" 2>/dev/null) || true
+  echo "${n:-0}"
+}
+
+_output_count() {
+  n=$(printf '%s\n' "$output" | grep -cF -- "$1") || true
+  echo "${n:-0}"
+}
+
+@test "auto-recover R1: two consecutive unsubmitted polls press Enter once (normal)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n9\n' > "$SP_DIR/lo-1.seq"
+  printf '0\n' > "$SP_DIR/lo-1.default"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 4 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 1 ]
+  assert_output_has "[watch] auto-recover — t1:lo-1 unsubmitted prompt -> Enter (1/3)"
+}
+
+@test "auto-recover R2: a single unsubmitted observation does not press Enter (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n0\n9\n' > "$SP_DIR/lo-1.seq"
+  printf '0\n' > "$SP_DIR/lo-1.default"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 4 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 0 ]
+}
+
+@test "auto-recover R3: LO_AUTO_RECOVER=0 disables auto-recover, never calls state (normal)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER=0 WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+  assert_output_has "[watch] auto-recover=off (LO_AUTO_RECOVER=0)"
+}
+
+@test "auto-recover R3: LO_AUTO_RECOVER=off disables auto-recover the same way (normal)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER=off WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+  assert_output_has "[watch] auto-recover=off (LO_AUTO_RECOVER=off)"
+}
+
+@test "auto-recover R3: LO_AUTO_RECOVER=false disables auto-recover the same way (normal)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER=false WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+  assert_output_has "[watch] auto-recover=off (LO_AUTO_RECOVER=false)"
+}
+
+@test "auto-recover R3: an empty LO_AUTO_RECOVER value keeps auto-recover on (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '0\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER= WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  assert_output_has "[watch] auto-recover=on (max=3)"
+  [ "$(_calls_count '^state lo-1$')" -ge 1 ]
+}
+
+@test "auto-recover R4: LO_AUTO_RECOVER_MAX caps presses and reports the cap once, after the last press (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER_MAX=2 WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 8 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 2 ]
+  [ "$(_output_count 'auto-recover cap reached — t1:lo-1')" -eq 1 ]
+  press_line=$(printf '%s\n' "$output" | grep -nF -- '(2/2)' | head -n1 | cut -d: -f1)
+  cap_line=$(printf '%s\n' "$output" | grep -nF -- 'auto-recover cap reached' | head -n1 | cut -d: -f1)
+  [ -n "$press_line" ]
+  [ -n "$cap_line" ]
+  [ "$press_line" -lt "$cap_line" ]
+}
+
+@test "auto-recover D4: an empty LO_AUTO_RECOVER_MAX falls back to the default of 3, not an error (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '0\n' > "$SP_DIR/lo-1.default"
+  run env LO_AUTO_RECOVER_MAX= WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  assert_output_has "[watch] auto-recover=on (max=3)"
+}
+
+@test "auto-recover R5: a non-numeric LO_AUTO_RECOVER_MAX is refused before polling (error)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  run env LO_AUTO_RECOVER_MAX=abc sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 4 ]
+  assert_output_has "LO_AUTO_RECOVER_MAX"
+}
+
+@test "auto-recover R5: LO_AUTO_RECOVER_MAX=0 is refused, a zero cap would never recover (error)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  run env LO_AUTO_RECOVER_MAX=0 sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 4 ]
+  assert_output_has "LO_AUTO_RECOVER_MAX"
+}
+
+@test "auto-recover R6: a keys failure is logged, and failed attempts count toward the cap (error)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  printf '6\n' > "$SP_DIR/keys_rc"
+  # default always reports unsubmitted, so every 2-poll cycle is another press
+  # attempt; if a FAILED attempt did not count toward the cap, ar_n would
+  # never reach MAX and 8 polls (4 cycles) would produce 4 keys calls, not 2.
+  run env LO_AUTO_RECOVER_MAX=2 WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 8 1
+  [ "$status" -eq 2 ]
+  assert_output_has "[watch] auto-recover failed — t1:lo-1 (keys rc=6)"
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 2 ]
+  [ "$(_output_count 'auto-recover cap reached — t1:lo-1')" -eq 1 ]
+}
+
+@test "auto-recover R6: a missing send-prompt script disables auto-recover for the whole process (boundary)" {
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="/nonexistent/sp.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  assert_output_has "[watch] auto-recover=off (send-prompt script missing)"
+}
+
+@test "auto-recover R7: a task at or above the target is never state-checked (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"impl_done","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","session":"lo-2"}' > "$ORCH/status/t2.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  printf '0\n' > "$SP_DIR/lo-2.default"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" --tasks t1,t2 "$ORCH/status" impl_done 2 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+}
+
+@test "auto-recover R7: a task at a terminal phase (done) is never state-checked (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"done","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","session":"lo-2"}' > "$ORCH/status/t2.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  printf '0\n' > "$SP_DIR/lo-2.default"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" --tasks t1,t2 "$ORCH/status" impl_done 2 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+}
+
+@test "auto-recover R7: a record with no session field is never state-checked (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [ ! -f "$SP_DIR/calls.log" ]
+}
+
+@test "auto-recover R7: unresolvable tmux disables auto-recover's state check too (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n' > "$SP_DIR/lo-1.default"
+  run env WATCH_TMUX=/nonexistent/tmux WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 2 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^state lo-1$')" -eq 0 ]
+}
+
+@test "auto-recover R8: an Enter pressed this poll suppresses this poll's stall verdict (normal)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  cat > "$BATS_TEST_TMPDIR/stall_stub.sh" <<STUB
+#!/bin/sh
+cnt="$BATS_TEST_TMPDIR/stall_calls"
+n=0
+[ -f "\$cnt" ] && n=\$(cat "\$cnt")
+n=\$((n+1))
+printf '%s' "\$n" > "\$cnt"
+[ "\$n" -eq 1 ] && exit 0
+exit 1
+STUB
+  printf '9\n9\n0\n' > "$SP_DIR/lo-1.seq"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" "$ORCH/status" impl_done 1 6 1
+  [ "$status" -eq 7 ]
+  enter_line=$(printf '%s\n' "$output" | grep -nF -- '-> Enter (1/3)' | head -n1 | cut -d: -f1)
+  stalled_line=$(printf '%s\n' "$output" | grep -nF -- '[watch] worker stalled' | head -n1 | cut -d: -f1)
+  [ -n "$enter_line" ]
+  [ -n "$stalled_line" ]
+  [ "$enter_line" -lt "$stalled_line" ]
+  # Discriminating check: the Enter-poll's stall check must be SKIPPED, not
+  # just printed earlier. Without the suppression, poll 2's stall check would
+  # also fire (stall stub call #2 -> exit 1 -> stalled) and the watch would
+  # exit 7 on poll 2 instead of poll 3, after only 2 state calls, not 3.
+  [ "$(_calls_count '^state lo-1$')" -eq 3 ]
+}
+
+@test "auto-recover D7: per-session counters are independent — pressing lo-1 does not affect lo-2 (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","session":"lo-2"}' > "$ORCH/status/t2.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  printf '9\n9\n' > "$SP_DIR/lo-1.seq"
+  printf '9\n0\n' > "$SP_DIR/lo-2.seq"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" --tasks t1,t2 "$ORCH/status" impl_done 2 4 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 1 ]
+  [ "$(_calls_count '^keys lo-2 Enter$')" -eq 0 ]
+}
+
+@test "auto-recover D7: session name substring collision — lo-1's counter is not read from lo-10's entry (boundary)" {
+  _sp_stub
+  printf '{"task":"t1","phase":"implementing","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","session":"lo-10"}' > "$ORCH/status/t2.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall_stub.sh"
+  # Without the trailing-colon anchor in ar_get/ar_set's match pattern, a
+  # lookup for "lo-1" would match inside the " lo-10:" token (a plain
+  # substring match), cross-contaminating the two sessions' counters.
+  printf '9\n9\n' > "$SP_DIR/lo-1.seq"
+  printf '9\n0\n' > "$SP_DIR/lo-10.seq"
+  run env WATCH_TMUX=true WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_stub.sh" \
+      WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub.sh" SP_DIR="$SP_DIR" \
+      sh "$WS" --tasks t1,t2 "$ORCH/status" impl_done 2 4 1
+  [ "$status" -eq 2 ]
+  [ "$(_calls_count '^keys lo-1 Enter$')" -eq 1 ]
+  [ "$(_calls_count '^keys lo-10 Enter$')" -eq 0 ]
+}
+
+# ---- blocked worker (exit 8) ----
+# .orchestration/blocked/<task>.json (BlockedRecord, hooks/worker-blocked-signal.sh,
+# t1-blocked-hook) is a hint; watch-status.sh confirms it is CURRENT (ts newer
+# than the status updatedAt) and witnesses a static pane across two polls
+# before waking with exit 8. See .orchestration/plans/t3-blocked-consume.md D2-D6.
+
+# _tmux_stub: has-session always succeeds; capture-pane reads a shared counter
+# in $PANE_DIR/count (default 0), increments it, and prints $PANE_DIR/pane.$n
+# if that file exists, else $PANE_DIR/pane — so a test can make every capture
+# identical (write only `pane`) or alternate (write pane.1, pane.2, ...).
+_tmux_stub() {
+  cat > "$BATS_TEST_TMPDIR/tmux_stub.sh" <<'SCRIPT'
+#!/bin/sh
+case "$1" in
+  has-session) exit 0 ;;
+  capture-pane)
+    n=$(cat "$PANE_DIR/count" 2>/dev/null || echo 0)
+    n=$((n+1))
+    printf '%s' "$n" > "$PANE_DIR/count"
+    if [ -f "$PANE_DIR/pane.$n" ]; then
+      cat "$PANE_DIR/pane.$n"
+    else
+      cat "$PANE_DIR/pane" 2>/dev/null
+    fi
+    exit 0
+    ;;
+  *) exit 0 ;;
+esac
+SCRIPT
+  chmod +x "$BATS_TEST_TMPDIR/tmux_stub.sh"
+}
+
+# blocked <task> <ts> <reason> <detail> — writes a worktree-canonical
+# BlockedRecord (the seven-field contract) to $ORCH/blocked/<task>.json.
+blocked() {
+  mkdir -p "$ORCH/blocked"
+  jq -n --arg ts "$2" --arg task "$1" --arg reason "$3" --arg detail "$4" \
+    --arg wt "$BATS_TEST_TMPDIR/wt" \
+    '{ts:$ts, taskId:$task, session:"lo-1", event:"Notification", reason:$reason, detail:$detail, worktree:$wt}' \
+    > "$ORCH/blocked/$1.json"
+}
+
+@test "blocked R4 normal: a confirmed blocked worker (static pane, two polls) exits 8 with the reason and detail" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes1"; mkdir -p "$PANE_DIR"
+  printf 'same pane content\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:05:00Z permission_prompt "Claude needs your permission"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 8 ]
+  assert_output_has "[watch] worker blocked — t1:lo-1 (permission_prompt: Claude needs your permission)"
+}
+
+@test "blocked R4 boundary: a 200-char detail with an embedded newline is cut to 120 chars, newlines to spaces" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes2"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  a90=$(printf 'a%.0s' $(seq 1 90))
+  b109=$(printf 'b%.0s' $(seq 1 109))
+  long_detail="${a90}
+${b109}"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "$long_detail"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 8 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 1 ]
+  expected="${a90} $(printf 'b%.0s' $(seq 1 29))"
+  detail=$(printf '%s\n' "$output" | sed -n 's/.*(idle_prompt: \(.*\))/\1/p')
+  [ "$detail" = "$expected" ]
+}
+
+@test "blocked R5 boundary: an alternating (repainting) pane never confirms — no exit 8, times out normally" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes3"; mkdir -p "$PANE_DIR"
+  printf 'A\n' > "$PANE_DIR/pane.1"
+  printf 'B\n' > "$PANE_DIR/pane.2"
+  printf 'A\n' > "$PANE_DIR/pane.3"
+  printf 'B\n' > "$PANE_DIR/pane.4"
+  printf 'A\n' > "$PANE_DIR/pane.5"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 4 1
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked F2 boundary: a record ts equal to updatedAt (same-second stamp) is still current — confirms and exits 8" {
+  # F2 (round-2 integration review): a status-update and the blocked-signal
+  # hook can legitimately stamp the same whole second. Currency is now >=,
+  # not strictly >, so an equal ts is not discarded — it's the static-pane
+  # witness (D4), not currency alone, that still has to confirm it.
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes4"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:05:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 8 ]
+  assert_output_has "worker blocked"
+}
+
+@test "blocked F2 boundary: a same-second record whose pane keeps repainting still does not wake" {
+  # Companion to the case above: currency alone (ts == updatedAt) is not a
+  # free pass — a worker that actually moved on in that same second repaints
+  # its pane, so the two-poll static witness still never confirms.
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes4b"; mkdir -p "$PANE_DIR"
+  printf 'A\n' > "$PANE_DIR/pane.1"
+  printf 'B\n' > "$PANE_DIR/pane.2"
+  printf 'A\n' > "$PANE_DIR/pane.3"
+  printf 'B\n' > "$PANE_DIR/pane.4"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:05:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 4 1
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked F2 boundary: a record OLDER than updatedAt is stale — no exit 8 even with a static pane" {
+  # Regression guard for the currency gate's REJECT direction: the round-1
+  # test asserting this ("equal ts does not wake") was inverted by F2 since
+  # equal now DOES wake, which silently dropped coverage of ts < updatedAt —
+  # the exact "dialog answered by keys in-turn leaves the record behind"
+  # scenario the currency gate exists to stop (a genuinely stale record must
+  # never wake, no matter how static the pane looks).
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes4c"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:05:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:00:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 4 1
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked R5 boundary: a task already at the target phase is never blocked-checked, even mid-run" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes5"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"impl_done","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-2"}' > "$ORCH/status/t2.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 2 3 1
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked R5 boundary: a terminal-phase task with a blocked record is never blocked-checked" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes6"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"done","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 3 1
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked R5 boundary: --tasks scoping excludes an out-of-scope task's blocked record" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes7"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"done","updatedAt":"2026-01-01T00:00:00Z","session":"lo-2"}' > "$ORCH/status/t2.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" --tasks t2 "$ORCH/status" done 1 3 1
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked R5 boundary: a blocked record for a task with no status file is ignored" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes8"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  blocked tGhost 2026-01-01T00:05:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 3 1
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked R5 boundary: a status record without a session field is never blocked-checked" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panes9"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 3 1
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked R6 precedence: a failed task wins over a blocked-wake (exit 3)" {
+  # t2 turns failed exactly on t1's SECOND capture, i.e. the same poll t1's
+  # blocked witness would confirm — both signals are true in the same
+  # iteration, so this actually exercises the precedence order (3 checked
+  # before the blocked-8 check), not just "3 fires before 8 ever could".
+  PANE_DIR="$BATS_TEST_TMPDIR/panesA"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z"}' > "$ORCH/status/t2.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  cat > "$BATS_TEST_TMPDIR/tmux_stubA.sh" <<EOF
+#!/bin/sh
+case "\$1" in
+  has-session) exit 0 ;;
+  capture-pane)
+    n=\$(cat "$PANE_DIR/count" 2>/dev/null || echo 0)
+    n=\$((n+1))
+    printf '%s' "\$n" > "$PANE_DIR/count"
+    if [ "\$n" -eq 2 ]; then
+      printf '{"task":"t2","phase":"failed","updatedAt":"2026-01-01T00:00:00Z"}' > "$ORCH/status/t2.json"
+    fi
+    cat "$PANE_DIR/pane"
+    exit 0
+    ;;
+  *) exit 0 ;;
+esac
+EOF
+  chmod +x "$BATS_TEST_TMPDIR/tmux_stubA.sh"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stubA.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 2 6 1
+  [ "$status" -eq 3 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked R6 precedence: all-reached wins over a blocked-wake (exit 0)" {
+  # t2 reaches the target exactly on t1's SECOND capture, the same poll t1's
+  # blocked witness would confirm — both signals true in the same iteration,
+  # so an incorrect ordering (checking blocked before all-reached) would flip
+  # this to exit 8 instead of 0.
+  PANE_DIR="$BATS_TEST_TMPDIR/panesB"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z"}' > "$ORCH/status/t2.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  cat > "$BATS_TEST_TMPDIR/tmux_stubB.sh" <<EOF
+#!/bin/sh
+case "\$1" in
+  has-session) exit 0 ;;
+  capture-pane)
+    n=\$(cat "$PANE_DIR/count" 2>/dev/null || echo 0)
+    n=\$((n+1))
+    printf '%s' "\$n" > "$PANE_DIR/count"
+    if [ "\$n" -eq 2 ]; then
+      printf '{"task":"t2","phase":"impl_done","updatedAt":"2026-01-01T00:00:00Z"}' > "$ORCH/status/t2.json"
+    fi
+    cat "$PANE_DIR/pane"
+    exit 0
+    ;;
+  *) exit 0 ;;
+esac
+EOF
+  chmod +x "$BATS_TEST_TMPDIR/tmux_stubB.sh"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stubB.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 6 1
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked R6 precedence: a confirmed blocked wake wins over the stall heuristic (exit 8)" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panesC"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  # Not-stalled on the first poll, stalled from the second poll onward — lines
+  # up with when the blocked witness also confirms (poll 2), so both signals
+  # are true in the SAME iteration and the precedence check is meaningful.
+  cat > "$BATS_TEST_TMPDIR/stall_seq.sh" <<EOF
+#!/bin/sh
+n=\$(cat "$PANE_DIR/stall_count" 2>/dev/null || echo 0)
+n=\$((n+1))
+printf '%s' "\$n" > "$PANE_DIR/stall_count"
+[ "\$n" -ge 2 ] && exit 1
+exit 0
+EOF
+  chmod +x "$BATS_TEST_TMPDIR/stall_seq.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall_seq.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 8 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker stalled')" -eq 0 ]
+}
+
+@test "blocked R7 normal: exit 8 recurs on relaunch while the record is still present and the pane is still static" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panesD"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 8 ]
+  rm -f "$PANE_DIR/count"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 8 ]
+}
+
+@test "blocked R7 error: a malformed blocked record is ignored, no exit 8" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panesE"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  mkdir -p "$ORCH/blocked"
+  printf 'not-json' > "$ORCH/blocked/t1.json"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 3 1
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s\n' "$output" | grep -c 'worker blocked')" -eq 0 ]
+}
+
+@test "blocked D4 boundary: a new ts between polls restarts the static-pane count" {
+  PANE_DIR="$BATS_TEST_TMPDIR/panesF"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "first"
+  cat > "$BATS_TEST_TMPDIR/tmux_stub2.sh" <<EOF
+#!/bin/sh
+case "\$1" in
+  has-session) exit 0 ;;
+  capture-pane)
+    n=\$(cat "$PANE_DIR/count" 2>/dev/null || echo 0)
+    n=\$((n+1))
+    printf '%s' "\$n" > "$PANE_DIR/count"
+    if [ "\$n" -eq 1 ]; then
+      printf '{"ts":"2026-01-01T00:09:00Z","taskId":"t1","session":"lo-1","event":"Notification","reason":"idle_prompt","detail":"second","worktree":"$BATS_TEST_TMPDIR/wt"}' > "$ORCH/blocked/t1.json"
+    fi
+    cat "$PANE_DIR/pane"
+    exit 0
+    ;;
+  *) exit 0 ;;
+esac
+EOF
+  chmod +x "$BATS_TEST_TMPDIR/tmux_stub2.sh"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub2.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 1 6 1
+  [ "$status" -eq 8 ]
+  assert_output_has "second"
+  # The restart must cost two FURTHER polls after the ts change (poll 2 resets
+  # to count=1, poll 3 confirms at count=2) — three polls total, not two. A
+  # witness that ignored the ts change (comparing pane hash alone) would
+  # confirm one poll early, at poll 2, since the pane never actually changed.
+  [ "$(printf '%s\n' "$output" | grep -c '\[watch ->impl_done\]')" -eq 3 ]
+}
+
+@test "blocked D5 boundary: independent per-task witnesses — only the static task's record wakes (exit 8 names t1 only)" {
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panesG"; mkdir -p "$PANE_DIR"
+  printf 'X\n' > "$PANE_DIR/pane.1"
+  printf 'A\n' > "$PANE_DIR/pane.2"
+  printf 'X\n' > "$PANE_DIR/pane.3"
+  printf 'B\n' > "$PANE_DIR/pane.4"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  printf '{"task":"t2","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-2"}' > "$ORCH/status/t2.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "t1-detail"
+  blocked t2 2026-01-01T00:05:00Z idle_prompt "t2-detail"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" LO_AUTO_RECOVER=0 \
+      sh "$WS" "$ORCH/status" impl_done 2 6 1
+  [ "$status" -eq 8 ]
+  assert_output_has "t1:lo-1"
+  [ "$(printf '%s\n' "$output" | grep -c 't2:lo-2')" -eq 0 ]
+}
+
+@test "blocked D6 boundary: a poll that presses auto-recover's Enter is excluded from the blocked witness (F1)" {
+  # F1 (review round 1): send-prompt.sh keys returns as soon as tmux accepts
+  # the key event, not once the CLI has redrawn — a capture-pane taken
+  # moments later on the SAME poll can still show the pre-Enter pane. The
+  # stub tmux here keeps printing the SAME pane on every capture (no repaint
+  # modeled at all — the worst case), so if the Enter-press poll were still
+  # evaluated by the blocked check, the witness would wrongly reach count=2
+  # one poll early and wake at poll 2. The fix gates the blocked check on
+  # ar_pressed==0, so that poll contributes neither a capture nor a witness
+  # update: count reaches 2 (and exit 8 fires) only at poll 3 — one real
+  # capture from poll 1, the press-poll's capture skipped, one more real
+  # capture from poll 3 — and capture-pane is called exactly twice, not
+  # three times, proving poll 2's capture never happened.
+  _tmux_stub
+  PANE_DIR="$BATS_TEST_TMPDIR/panesH"; mkdir -p "$PANE_DIR"
+  printf 'same\n' > "$PANE_DIR/pane"
+  printf '{"task":"t1","phase":"implementing","updatedAt":"2026-01-01T00:00:00Z","session":"lo-1"}' > "$ORCH/status/t1.json"
+  blocked t1 2026-01-01T00:05:00Z idle_prompt "x"
+  cat > "$BATS_TEST_TMPDIR/sp_stub3.sh" <<EOF
+#!/bin/sh
+case "\$1" in
+  state)
+    n=\$(cat "$PANE_DIR/state_count" 2>/dev/null || echo 0)
+    n=\$((n+1))
+    printf '%s' "\$n" > "$PANE_DIR/state_count"
+    if [ "\$n" -le 2 ]; then exit 9; else exit 0; fi
+    ;;
+  keys) exit 0 ;;
+esac
+exit 0
+EOF
+  chmod +x "$BATS_TEST_TMPDIR/sp_stub3.sh"
+  printf 'exit 0\n' > "$BATS_TEST_TMPDIR/stall0.sh"
+  run env WATCH_TMUX="$BATS_TEST_TMPDIR/tmux_stub.sh" PANE_DIR="$PANE_DIR" \
+      WATCH_STALL_SCRIPT="$BATS_TEST_TMPDIR/stall0.sh" WATCH_SEND_PROMPT="$BATS_TEST_TMPDIR/sp_stub3.sh" \
+      sh "$WS" "$ORCH/status" impl_done 1 6 1
+  [ "$status" -eq 8 ]
+  # Three polls happened (poll 1: first observation; poll 2: Enter pressed;
+  # poll 3: confirms), but only two of them actually captured the pane.
+  [ "$(printf '%s\n' "$output" | grep -c '\[watch ->impl_done\]')" -eq 3 ]
+  [ "$(cat "$PANE_DIR/count")" -eq 2 ]
+  ar_line=$(printf '%s\n' "$output" | grep -nF 'auto-recover —' | head -n1 | cut -d: -f1)
+  blocked_line=$(printf '%s\n' "$output" | grep -nF 'worker blocked' | head -n1 | cut -d: -f1)
+  [ -n "$ar_line" ]
+  [ -n "$blocked_line" ]
+  [ "$ar_line" -lt "$blocked_line" ]
+  # Nothing "worker blocked" appears before the 3rd poll marker — i.e. not on
+  # poll 1 and, crucially, not on poll 2 (the Enter-press poll).
+  third_marker_line=$(printf '%s\n' "$output" | grep -n '\[watch ->impl_done\]' | sed -n '3p' | cut -d: -f1)
+  [ -n "$third_marker_line" ]
+  before_third=$(printf '%s\n' "$output" | head -n "$((third_marker_line - 1))")
+  [ "$(printf '%s\n' "$before_third" | grep -c 'worker blocked')" -eq 0 ]
+}

@@ -17,12 +17,50 @@
 #           and clear questions/ before relaunching)
 #   exit 7: a live non-terminal worker's pane is stalled (tmux-worker-stalled.sh
 #           reported 1 — a wedged/idle worker; inspect or nudge the session)
+#   exit 8: a worker is blocked — a current .orchestration/blocked record
+#           (worker-blocked-signal.sh hook) whose pane stayed unchanged across
+#           two polls; handle it, delete both record copies, then relaunch
+#
+# A blocked record is a HINT, not proof: the hook contract says a dialog
+# answered by `keys` in-turn leaves the record behind, so a record only
+# counts as current while its .ts is not older than the task's status
+# .updatedAt (>=, not strictly >: a status-update and a hook can legitimately
+# stamp the same whole second — see F2 of the round-2 integration review).
+# Equality is safe here precisely because currency is not the only gate:
+# the static-pane witness below still requires two consecutive identical
+# captures, so a worker that actually moved on in that same second repaints
+# and never wakes. Currency alone still is not enough (an idle_prompt can fire
+# while a background agent is still working), so the witness is the pane
+# itself: this script hashes `tmux capture-pane` for the task's session once
+# per poll, and only wakes (exit 8) once the same (ts, hash) has been seen on
+# two consecutive polls — about one interval after the pane truly stops
+# moving, and never while it keeps repainting (a spinner, a counter, a
+# background-agent timer).
 #
 # LO_GRAPH + LO_WORKTREES_ROOT (both required together, issue #167): workers
 # write status/questions worker-locally now, never into this checkout. When
 # both are set, every poll iteration runs `collect-status.sh $LO_GRAPH <dir>
 # $LO_WORKTREES_ROOT` first to pull those records in; a collector failure
 # warns on stderr and the wait continues. Either unset -> unchanged behavior.
+#
+# Auto-recover (on by default): a worker's pane can hold an unsubmitted
+# [Pasted text placeholder (send-prompt.sh `state` exit 9) after a prompt
+# lands but nothing presses Enter — today that costs the full stall timeout
+# before the coordinator wakes to press it itself. When a non-terminal,
+# below-target task's session reports exit 9 on two consecutive polls of this
+# watch process, watch-status.sh presses Enter itself via `send-prompt.sh keys
+# SESSION Enter` and keeps polling; this never changes the exit-code contract
+# above. LO_AUTO_RECOVER set to 0, off, or false disables it (unset or any
+# other value, including empty, enables it). LO_AUTO_RECOVER_MAX (default 3)
+# bounds Enter presses per session for the lifetime of this watch process; a
+# non-numeric or zero value is refused with exit 4 before polling starts, the
+# same treatment LO_PHASE_TIMEOUTS gets. WATCH_SEND_PROMPT overrides the
+# send-prompt.sh path used (default: the sibling send-prompt.sh next to this
+# script) — tests use it to stub the `state`/`keys` verbs. Single-actor
+# assumption the two-poll debounce relies on: the coordinator only calls
+# send-prompt.sh after a watch-status.sh run has exited, never while a poll is
+# in flight, so this script's own `keys` call is always the only outstanding
+# send for a session.
 #
 # Per-phase deadlines: one flat timeout gave a plan phase and a long implement
 # phase the same budget. LO_PHASE_TIMEOUTS carries a per-phase budget keyed on
@@ -104,6 +142,23 @@ elapsed=0
 escdir="$(dirname "$dir")/escalations"
 # Worker questions (ask-coordinator.sh) use the same sibling layout: <root>/.orchestration/questions.
 qdir="$(dirname "$dir")/questions"
+# Blocked records (worker-blocked-signal.sh hook, collected by collect-status.sh)
+# use the same sibling layout: <root>/.orchestration/blocked.
+bdir="$(dirname "$dir")/blocked"
+# Per-task static-pane witness state for this watch process: newline-separated
+# "TASK<TAB>TS<TAB>HASH<TAB>COUNT" lines. bl_get prints TS/HASH/COUNT for a
+# task (nothing if absent); bl_put replaces that task's line and prints the
+# new state. A literal tab (not a space) delimits fields — task ids and ts
+# values may contain either.
+bl_state=""
+bl_tab=$(printf '\t')
+bl_get() {
+  printf '%s\n' "$bl_state" | awk -F "$bl_tab" -v t="$1" '$1==t{print $2 "\t" $3 "\t" $4; exit}'
+}
+bl_put() {
+  printf '%s\n' "$bl_state" | awk -F "$bl_tab" -v t="$1" -v ts="$2" -v h="$3" -v c="$4" -v tab="$bl_tab" \
+    'NF==0{next} $1!=t{print} END{print t tab ts tab h tab c}'
+}
 # tmux binary for dead-worker (liveness) checks; overridable in tests via WATCH_TMUX.
 # If it is not resolvable, DISABLE liveness (empty) rather than flag every worker
 # dead — a missing tmux must not abort the run (`! missing-cmd` would invert to true).
@@ -114,6 +169,52 @@ command -v "$TMUX_BIN" >/dev/null 2>&1 || TMUX_BIN=""
 # script DISABLES the check (empty), mirroring the TMUX_BIN treatment above.
 STALL_SCRIPT="${WATCH_STALL_SCRIPT:-$(dirname "$0")/tmux-worker-stalled.sh}"
 [ -f "$STALL_SCRIPT" ] || STALL_SCRIPT=""
+
+# Auto-recover setup (see the header paragraph above). Validated up front,
+# like LO_PHASE_TIMEOUTS, so a typo'd bound fails fast rather than mid-wait.
+AR_MAX="${LO_AUTO_RECOVER_MAX:-3}"
+case "$AR_MAX" in
+  ''|*[!0-9]*) echo "watch-status: invalid LO_AUTO_RECOVER_MAX '$AR_MAX' (must be a positive integer)" >&2; exit 4 ;;
+esac
+[ "$AR_MAX" -gt 0 ] || { echo "watch-status: invalid LO_AUTO_RECOVER_MAX '$AR_MAX' (must be > 0)" >&2; exit 4; }
+SEND_PROMPT="${WATCH_SEND_PROMPT:-$(dirname "$0")/send-prompt.sh}"
+case "${LO_AUTO_RECOVER:-1}" in
+  0|off|false) AR_ON=0; echo "[watch] auto-recover=off (LO_AUTO_RECOVER=${LO_AUTO_RECOVER})" ;;
+  *)
+    if [ -f "$SEND_PROMPT" ]; then
+      AR_ON=1; echo "[watch] auto-recover=on (max=$AR_MAX)"
+    else
+      AR_ON=0; echo "[watch] auto-recover=off (send-prompt script missing)"
+    fi
+    ;;
+esac
+# Per-session counters, POSIX sh has no arrays: a leading space then
+# "session:count " tokens; the trailing colon in the match pattern keeps
+# lo-1 from matching lo-10. Session names are letters/digits/_/- only
+# (launch-session.sh), so they cannot collide with the ":"/" " delimiters.
+ar_consec=" "
+ar_presses=" "
+ar_get() {
+  case "$1" in
+    *" $2:"*)
+      ar_g_val="${1#*" $2:"}"
+      ar_g_val="${ar_g_val%% *}"
+      echo "$ar_g_val"
+      ;;
+    *) echo 0 ;;
+  esac
+}
+ar_set() {
+  case "$1" in
+    *" $2:"*)
+      ar_s_pre="${1%%" $2:"*}"
+      ar_s_rest="${1#*" $2:"}"
+      ar_s_post="${ar_s_rest#*" "}"
+      printf '%s %s:%s %s' "$ar_s_pre" "$2" "$3" "$ar_s_post"
+      ;;
+    *) printf '%s%s:%s ' "$1" "$2" "$3" ;;
+  esac
+}
 
 # classify_stall <session> — read the pane SCROLLBACK (not just the visible
 # region) for a stalled session and print an annotation for the exit-7
@@ -216,7 +317,7 @@ while [ "$elapsed" -lt "$budget" ]; do
     if [ "$q_found" -eq 1 ]; then exit 6; fi
   fi
 
-  done_count=0; failed=0; summary=""; stalled=""
+  done_count=0; failed=0; summary=""; stalled=""; blocked=""
   for f in "$dir"/*.json; do
     [ -f "$f" ] || continue
     if [ -n "$only" ]; then
@@ -244,13 +345,96 @@ while [ "$elapsed" -lt "$budget" ]; do
           echo "[watch] task $tk: session '$sess' gone at phase '$ph' — dead worker"
           failed=$((failed+1)); continue
         fi
+        # Auto-recover: a below-target session whose pane holds an unsubmitted
+        # paste on two consecutive polls gets Enter pressed for it here. Runs
+        # before the stall check so a just-repaired pane skips this poll's
+        # stall verdict (ar_pressed below) instead of re-reporting the exact
+        # condition just fixed.
+        ar_pressed=0
+        if [ "$AR_ON" -eq 1 ] && [ "$r" -lt "$target_rank" ] && [ -n "$TMUX_BIN" ] && [ -n "$sess" ]; then
+          ar_n=$(ar_get "$ar_presses" "$sess")
+          if [ "$ar_n" -lt "$AR_MAX" ]; then
+            arc=0; sh "$SEND_PROMPT" state "$sess" >/dev/null 2>&1 || arc=$?
+            if [ "$arc" -eq 9 ]; then
+              ar_c=$(( $(ar_get "$ar_consec" "$sess") + 1 ))
+              if [ "$ar_c" -ge 2 ]; then
+                ar_n=$((ar_n+1))
+                ar_presses=$(ar_set "$ar_presses" "$sess" "$ar_n")
+                ar_consec=$(ar_set "$ar_consec" "$sess" 0)
+                ar_pressed=1
+                krc=0; sh "$SEND_PROMPT" keys "$sess" Enter >/dev/null 2>&1 || krc=$?
+                if [ "$krc" -eq 0 ]; then
+                  echo "[watch] auto-recover — $tk:$sess unsubmitted prompt -> Enter ($ar_n/$AR_MAX)"
+                else
+                  echo "[watch] auto-recover failed — $tk:$sess (keys rc=$krc)"
+                fi
+                if [ "$ar_n" -ge "$AR_MAX" ]; then
+                  echo "[watch] auto-recover cap reached — $tk:$sess"
+                fi
+              else
+                ar_consec=$(ar_set "$ar_consec" "$sess" "$ar_c")
+              fi
+            else
+              ar_consec=$(ar_set "$ar_consec" "$sess" 0)
+            fi
+          fi
+        fi
+        # Blocked-worker check: a current .orchestration/blocked/<task>.json
+        # record (see the header) is a HINT confirmed by hashing the pane
+        # across two consecutive polls (D3, D4). Gated on ar_pressed==0,
+        # exactly like the stall check below: send-prompt.sh keys returns as
+        # soon as tmux accepts the key event, not once the CLI has redrawn,
+        # so a capture taken moments later can still show the PRE-Enter
+        # pane. A poll that pressed Enter is skipped here entirely — neither
+        # judged nor recorded into the witness state — so a stale pre-repaint
+        # capture never counts toward the two-poll confirmation; the next
+        # poll judges the (by then actually repainted) pane fresh.
+        if [ "$ar_pressed" -eq 0 ] && [ "$r" -lt "$target_rank" ] && [ -n "$TMUX_BIN" ] && [ -n "$sess" ] \
+           && [ -f "$bdir/$tk.json" ] && "$JQ" -e . "$bdir/$tk.json" >/dev/null 2>&1; then
+          bts=$("$JQ" -r '.ts // empty' "$bdir/$tk.json" 2>/dev/null || true)
+          bupd=$("$JQ" -r '.updatedAt // empty' "$f" 2>/dev/null || true)
+          # not older than (>=), not strictly newer — POSIX test has no
+          # string >=, so this is "NOT (bupd is newer than bts)".
+          if [ -n "$bts" ] && ! [ "$bupd" \> "$bts" ]; then
+            cs_ok=1
+            cs_pane=$("$TMUX_BIN" capture-pane -t "=$sess:" -p 2>/dev/null) || cs_ok=0
+            if [ "$cs_ok" -eq 1 ]; then
+              bh=$(printf '%s' "$cs_pane" | cksum)
+            else
+              bh="capture-failed-$elapsed"
+            fi
+            bl_prev=$(bl_get "$tk")
+            bl_pts=""; bl_phash=""; bl_pcount=0
+            if [ -n "$bl_prev" ]; then
+              bl_pts=$(printf '%s' "$bl_prev" | awk -F "$bl_tab" '{print $1}')
+              bl_phash=$(printf '%s' "$bl_prev" | awk -F "$bl_tab" '{print $2}')
+              bl_pcount=$(printf '%s' "$bl_prev" | awk -F "$bl_tab" '{print $3}')
+            fi
+            if [ "$bl_pts" = "$bts" ] && [ "$bl_phash" = "$bh" ]; then
+              bl_count=$((bl_pcount+1))
+            else
+              bl_count=1
+            fi
+            bl_state=$(bl_put "$tk" "$bts" "$bh" "$bl_count")
+            if [ "$bl_count" -ge 2 ]; then
+              breason=$("$JQ" -r '.reason // "?"' "$bdir/$tk.json" 2>/dev/null || echo "?")
+              bdetail=$("$JQ" -r '.detail // ""' "$bdir/$tk.json" 2>/dev/null || echo "")
+              bdetail=$(printf '%s' "$bdetail" | tr '\n' ' ' | cut -c1-120)
+              blocked="${blocked}[watch] worker blocked — ${tk}:${sess} (${breason}: ${bdetail})
+"
+            fi
+          fi
+        fi
         # Per-session stall check: only rc 1 marks a stall. rc 0 (progressing),
         # rc 2 (unknown), or a broken script are all NOT stalled — the explicit
         # rc capture means no failure here can abort the watch loop.
         # Extra gate vs. the dead-worker check above: a task at/above the
         # target is never stall-checked (#88) — its silence is exactly what
         # the session prompt ordered ("signal and wait"), not a wedged worker.
-        if [ "$r" -lt "$target_rank" ] && [ -n "$STALL_SCRIPT" ] && [ -n "$TMUX_BIN" ] && [ -n "$sess" ]; then
+        # ar_pressed: an Enter just sent for this task this poll skips the
+        # stall verdict this poll only — the pane hash it would check is from
+        # before the repair.
+        if [ "$ar_pressed" -eq 0 ] && [ "$r" -lt "$target_rank" ] && [ -n "$STALL_SCRIPT" ] && [ -n "$TMUX_BIN" ] && [ -n "$sess" ]; then
           src=0; sh "$STALL_SCRIPT" "$sess" >/dev/null 2>&1 || src=$?
           if [ "$src" -eq 1 ]; then stalled="$stalled $tk:$sess"; fi
         fi
@@ -261,7 +445,13 @@ while [ "$elapsed" -lt "$budget" ]; do
   echo "[watch ->$target] $done_count/$expected |$summary"
   [ "$failed" -gt 0 ] && { echo "[watch] failed session detected — abort"; exit 3; }
   [ "$done_count" -ge "$expected" ] && { echo "[watch] all reached $target"; exit 0; }
-  # Stall is the weakest signal: failed(3) and all-reached(0) above win over it.
+  # A confirmed blocked worker outranks the stall heuristic — the harness
+  # already told us why, so there's nothing left for the heuristic to guess.
+  if [ -n "$blocked" ]; then
+    printf '%s' "$blocked"
+    exit 8
+  fi
+  # Stall is the weakest signal: failed(3), all-reached(0), and blocked(8) above win over it.
   if [ -n "$stalled" ]; then
     stmsg=""
     for se in $stalled; do

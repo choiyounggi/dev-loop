@@ -438,7 +438,10 @@ escalation env into each worker. Also export `LO_GRAPH=.orchestration/graph.json
 LO_WORKTREES_ROOT=<root>/.worktrees` once per run: with both set, every
 `watch-status.sh` call pulls each worker's worktree-local `.orchestration/status`
 (and `questions/`) records into the canonical dir automatically, once per poll
-(issue #167 — workers never write into this checkout). `ready-set.sh` reads the
+(issue #167 — workers never write into this checkout). It also collects
+`blocked/` records (the `worker-blocked-signal.sh` hook) the same way, except a
+canonical `blocked/<task>.json` is pruned once its worker-side copy is gone —
+see exit 8 below. `ready-set.sh` reads the
 status dir directly and does not poll, so before every `ready-set.sh` round also
 run `scripts/collect-status.sh .orchestration/graph.json .orchestration/status
 .worktrees` yourself (Phase 3 step 1). Trust-screen wording drifts between CLI releases —
@@ -466,8 +469,15 @@ waiting forever. On exit 6, retry delivery directly with
 `scripts/send-prompt.sh send lo-<n> "<same message>"` — then relaunch. Exits **3** on a failed
 OR a *dead* worker (a non-terminal task whose tmux session vanished — recorded via
 the status file's `session` field) — both abort fast instead of waiting the
-timeout. It also exits **6** on a pending worker question and **7** on a live
-worker whose pane is stalled — playbooks in Phase 3 step 3. Give each
+timeout. It also exits **6** on a pending worker question, **7** on a live worker
+whose pane is stalled, and **8** on a blocked worker (a
+`.orchestration/blocked/<task>.json` record from the
+`worker-blocked-signal.sh` hook, confirmed by a pane that stayed unchanged
+across two polls) — playbooks in Phase 3 step 3. It presses Enter itself
+when a worker's input box holds an unsubmitted paste on two consecutive
+polls, unless `LO_AUTO_RECOVER` is `0`, `off`, or `false`;
+`LO_AUTO_RECOVER_MAX` (default 3) bounds those presses per session per watch
+process, and a malformed value is refused with **exit 4**. Give each
 phase its own deadline with one exported
 `LO_PHASE_TIMEOUTS="plan_ready=900,impl_done=3600,done=1800"`, keyed on the TARGET
 phase of each wait: precedence is an explicit `[timeout-sec]` argument, then the
@@ -803,21 +813,54 @@ exits — handle, then relaunch watch with the same target:
   scripts/status-update.sh <task> <observed-phase> note="reset after exit-6
   answer"` — otherwise `watch-status.sh` counts the stale `failed` phase and
   aborts with exit 3 again on the very next poll. Then relaunch watch.
+- **8 — worker blocked** (prints `[watch] worker blocked — <task>:<session>
+  (<reason>: <detail>)`; recurs while the canonical record exists and the
+  pane stays static): act on `<reason>` — `rate_limit` / `overloaded` /
+  `server_error` → read the pane, THEN delete BOTH
+  `.orchestration/blocked/<task>.json` and
+  `<record.worktree>/.orchestration/blocked/<task>.json` right away (the
+  collector copies a worker-side record back otherwise; deleting only after
+  a multi-hour wait means the same static pane re-wakes exit 8 on every
+  poll — about every 30s — for the whole window); THEN, if the CLI shows
+  automatic continue armed (`autoContinueAtUsageLimit`, on by default for
+  interactive claude.ai-subscription sessions when the reset is under 24
+  hours), just wait and relaunch watch once it resumes; otherwise follow the
+  usage-limit branch of 7 below and relaunch watch only after that wait;
+  `quota_auto_resume_stale` → the pane asks to press enter to continue:
+  `scripts/send-prompt.sh keys <session> Enter`; `quota_auto_resume_disabled`
+  → automatic continue will not resume the task (turned off, reset more than
+  24 hours out, continuation dropped, or retry cap exhausted): report it to
+  the user; `permission_prompt` / `elicitation_dialog` /
+  `elicitation_url_dialog` / `agent_needs_input` / `worker_permission_prompt`
+  → read the pane and answer with `scripts/send-prompt.sh keys` (decline is
+  the safe answer); `idle_prompt` → finished-but-silent or a question asked
+  in prose: send a prompt to emit the missing signal or to use
+  `ask-coordinator.sh`; `authentication_failed` / `billing_error` / anything
+  else → report to the user. For every reason OTHER than `rate_limit` /
+  `overloaded` / `server_error` (handled above, before its wait), then
+  delete BOTH `.orchestration/blocked/<task>.json` and
+  `<record.worktree>/.orchestration/blocked/<task>.json` (the collector
+  copies a worker-side record back otherwise) and relaunch watch.
 - **7 — stalled live worker** (prints `[watch] worker stalled — <task>:<session>`;
   the weakest signal — failed(3) and all-reached(0) win over it; driven by
   `tmux-worker-stalled.sh`, silence threshold `LO_STALL_SEC` default 600s; a
   missing script or tmux disables the check): read the pane FIRST
   (`tmux capture-pane -t "=<session>:" -p | tail`), classify with
   `scripts/send-prompt.sh state lo-<n>`, then act — **9** (`unsubmitted`, the
-  input box holds a parked paste) → `scripts/send-prompt.sh keys lo-<n> Enter`,
+  input box holds a parked paste) → `scripts/send-prompt.sh keys lo-<n> Enter`
+  (watch now presses this Enter itself on two consecutive observations unless
+  `LO_AUTO_RECOVER` disables it, so reaching 7 with 9 means auto-recover is off
+  or capped),
   then relaunch watch (this is the exact path a field incident took ~10 minutes
   to find via the stall timeout instead); interactive chooser → answer with
   `scripts/send-prompt.sh keys <session>
   <key>...` (allowlist exactly `Up Down Left Right Enter Escape Tab Space 0-9 y n`;
   ALL keys validated before ANY is sent; **0** sent / **2** invalid session or
   key, nothing sent / **3** gone / **6** send failed on a live session);
-  usage-limit stop ("You've hit your session limit · resets HH:MM") → wait for
-  the reset time, then re-send a resume prompt that orders a state re-check
+  usage-limit stop ("You've hit your session limit · resets HH:MM") → if the
+  pane shows automatic continue armed (`autoContinueAtUsageLimit`), the CLI
+  resumes by itself — nothing further to do; otherwise wait for the reset
+  time, then re-send a resume prompt that orders a state re-check
   (git status / tests) before continuing; finished-but-silent (forgot
   status-update) → send a prompt to emit the missing signal; auth/trust screen →
   keys per the screen. Then relaunch watch.
