@@ -148,13 +148,16 @@ for f in "$wroot"/*/.orchestration/blocked/*.json; do
   base=${f##*/}; task=${base%.json}
   is_task "$task" || continue
 
-  "$JQ" -e . "$f" >/dev/null 2>&1 || {
+  # type=="object", not just "-e ." (which a bare array or string also
+  # passes): an indexing error like `.ts` on `[]` is NOT rescued by `//`
+  # under set -eu and would abort the whole script (F4, round-2 review).
+  "$JQ" -e 'type == "object"' "$f" >/dev/null 2>&1 || {
     echo "collect-status: malformed worker blocked record '$f' — skipped" >&2
     continue
   }
 
   bfile="$bdir/$task.json"
-  if [ -f "$bfile" ] && "$JQ" -e . "$bfile" >/dev/null 2>&1; then
+  if [ -f "$bfile" ] && "$JQ" -e 'type == "object"' "$bfile" >/dev/null 2>&1; then
     wts=$("$JQ" -r '.ts // ""' "$f")
     cts=$("$JQ" -r '.ts // ""' "$bfile")
     [ "$wts" \> "$cts" ] || continue

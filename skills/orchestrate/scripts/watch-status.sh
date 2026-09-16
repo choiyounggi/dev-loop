@@ -23,8 +23,13 @@
 #
 # A blocked record is a HINT, not proof: the hook contract says a dialog
 # answered by `keys` in-turn leaves the record behind, so a record only
-# counts as current while its .ts is strictly newer than the task's status
-# .updatedAt. Currency alone still is not enough (an idle_prompt can fire
+# counts as current while its .ts is not older than the task's status
+# .updatedAt (>=, not strictly >: a status-update and a hook can legitimately
+# stamp the same whole second — see F2 of the round-2 integration review).
+# Equality is safe here precisely because currency is not the only gate:
+# the static-pane witness below still requires two consecutive identical
+# captures, so a worker that actually moved on in that same second repaints
+# and never wakes. Currency alone still is not enough (an idle_prompt can fire
 # while a background agent is still working), so the witness is the pane
 # itself: this script hashes `tmux capture-pane` for the task's session once
 # per poll, and only wakes (exit 8) once the same (ts, hash) has been seen on
@@ -388,7 +393,9 @@ while [ "$elapsed" -lt "$budget" ]; do
            && [ -f "$bdir/$tk.json" ] && "$JQ" -e . "$bdir/$tk.json" >/dev/null 2>&1; then
           bts=$("$JQ" -r '.ts // empty' "$bdir/$tk.json" 2>/dev/null || true)
           bupd=$("$JQ" -r '.updatedAt // empty' "$f" 2>/dev/null || true)
-          if [ -n "$bts" ] && [ "$bts" \> "$bupd" ]; then
+          # not older than (>=), not strictly newer — POSIX test has no
+          # string >=, so this is "NOT (bupd is newer than bts)".
+          if [ -n "$bts" ] && ! [ "$bupd" \> "$bts" ]; then
             cs_ok=1
             cs_pane=$("$TMUX_BIN" capture-pane -t "=$sess:" -p 2>/dev/null) || cs_ok=0
             if [ "$cs_ok" -eq 1 ]; then
