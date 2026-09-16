@@ -119,8 +119,8 @@ _blocked_file() { printf '%s' "$WS/.orchestration/blocked/t1.json"; }
   [ ! -f "$(_blocked_file)" ]
 }
 
-@test "R4 normal: UserPromptSubmit clears for source=user and source=system" {
-  for src in user system; do
+@test "R4 normal: UserPromptSubmit clears for source=user, source=sdk, and source=system" {
+  for src in user sdk system; do
     payload=$(jq -n --arg cwd "$WS" --arg err "x" '{hook_event_name:"StopFailure",cwd:$cwd,error:$err}')
     _fire "$payload" >/dev/null
     [ -f "$(_blocked_file)" ]
@@ -131,8 +131,8 @@ _blocked_file() { printf '%s' "$WS/.orchestration/blocked/t1.json"; }
   done
 }
 
-@test "R4 boundary: UserPromptSubmit does NOT clear for source loop_wakeup, schedule_wakeup, or poll" {
-  for src in loop_wakeup schedule_wakeup poll; do
+@test "R4 boundary: UserPromptSubmit does NOT clear for source loop_wakeup, schedule_wakeup, or poll_event" {
+  for src in loop_wakeup schedule_wakeup poll_event; do
     payload=$(jq -n --arg cwd "$WS" --arg err "x" '{hook_event_name:"StopFailure",cwd:$cwd,error:$err}')
     _fire "$payload" >/dev/null
     [ -f "$(_blocked_file)" ]
