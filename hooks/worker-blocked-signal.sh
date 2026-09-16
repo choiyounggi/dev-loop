@@ -23,8 +23,8 @@
 #          agent_needs_input, worker_permission_prompt,
 #          quota_auto_resume_stale, quota_auto_resume_disabled
 #   clear  UserPromptSubmit whose source is not loop_wakeup, schedule_wakeup,
-#          or poll (a missing/unrecognized source still clears — an older CLI
-#          omits the field for ordinary user prompts); Notification
+#          or poll_event (a missing/unrecognized source still clears — an
+#          older CLI omits the field for ordinary user prompts); Notification
 #          quota_auto_resume_fired
 #   last event wins.
 #
@@ -79,7 +79,7 @@ case "$hook_event_name" in
     ;;
   UserPromptSubmit)
     case "$source" in
-      loop_wakeup|schedule_wakeup|poll) exit 0 ;;
+      loop_wakeup|schedule_wakeup|poll_event) exit 0 ;;
       *) mode=clear ;;
     esac
     ;;
