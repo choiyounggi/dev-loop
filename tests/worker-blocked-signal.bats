@@ -299,6 +299,8 @@ _blocked_file() { printf '%s' "$WS/.orchestration/blocked/t1.json"; }
   [ "$status" -eq 0 ]
   run jq -e '.hooks.PreToolUse[0].hooks | length == 2' "$HOOKS_JSON"
   [ "$status" -eq 0 ]
-  run jq -e '.hooks.SessionStart[0].hooks | length == 3' "$HOOKS_JSON"
+  run jq -e '.hooks.SessionStart[0].hooks | length == 4' "$HOOKS_JSON"
+  [ "$status" -eq 0 ]
+  run jq -e '.hooks.SessionStart[0].hooks[3].command == "bash ${CLAUDE_PLUGIN_ROOT}/hooks/graph-nudge.sh"' "$HOOKS_JSON"
   [ "$status" -eq 0 ]
 }

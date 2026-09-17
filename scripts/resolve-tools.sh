@@ -98,7 +98,7 @@ case "${1:-}" in
     ;;
   --summary)
     printf '%s' "$resolved" | "$JQ" -r '
-      to_entries[] |
+      to_entries[] | select(.key != "workspace") |
       .key + ": " +
       (if (.value.kind // "default") == "default"
         then "default (built-in behavior)"
@@ -106,6 +106,7 @@ case "${1:-}" in
              + (if .value.how then " — " + .value.how else "" end)
       end)
       + (if .value.when then "  [when: " + .value.when + "]" else "" end)'
+    printf '%s' "$resolved" | "$JQ" -r 'if (.workspace.roots? // []) | length > 0 then "workspace: " + (.workspace.roots | join(",")) + " (depth " + ((.workspace.depth // 2) | tostring) + ")" else empty end'
     ;;
   --role)
     role="${2:?resolve-tools: --role needs a role name}"
