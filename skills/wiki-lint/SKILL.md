@@ -51,6 +51,8 @@ Run all of these; report findings grouped by severity.
 | 13 | `status` value outside `active` / `superseded` / `retired` (an absent key reads as `active`), or `status: superseded` without a `superseded_by` that resolves to an existing page id — reported by `node scripts/wiki-structure-checks.js` as `bad-status` / `bad-superseded-by` | error |
 | 14 | Page with `status: superseded` or `retired` still listed in its domain `index.md` — `listed-inactive` from `node scripts/wiki-structure-checks.js`; the file stays on disk, only the index row is removed | error |
 | 15 | `superseded_by` target is itself superseded or retired — a chain to walk, allowed but surfaced; `superseded-chain` on stderr plus a `warnings: K` stdout line from `node scripts/wiki-structure-checks.js`, exit code unchanged | warn |
+| 16 | Bundled `wiki/**` page carrying a non-empty `reference_impl:` (the field is `wiki-local/**` only) — `reference-impl-bundled` from `node scripts/wiki-structure-checks.js` | error |
+| 17 | `wiki-local/**` page whose `reference_impl:` path is absolute, escapes the project, or does not exist under the project root (the parent of `wiki-local/`) — `reference-impl-missing` on stderr plus the `warnings: K` stdout line, exit code unchanged; run the checker over the local layer with `node scripts/wiki-structure-checks.js wiki-local --layer local` from the project root | warn |
 
 ## Health score
 
@@ -58,11 +60,11 @@ After running all checks, compute `score = round(100 × passed_weight / total_we
 
 | Severity | Weight | Checks |
 |----------|--------|--------|
-| error | 3 | 1–4, 13, 14 |
-| warn | 2 | 5–9, 15 |
+| error | 3 | 1–4, 13, 14, 16 |
+| warn | 2 | 5–9, 15, 17 |
 | info | 1 | 10–12 |
 
-`total_weight = 33` (6×3 + 6×2 + 3×1). Report `health: NN/100 (errors E, warns W, infos I)` at the top of the report. This score never gates — no exit-code change, no blocking threshold; it exists only so two runs are comparable.
+`total_weight = 38` (7×3 + 7×2 + 3×1). Report `health: NN/100 (errors E, warns W, infos I)` at the top of the report. This score never gates — no exit-code change, no blocking threshold; it exists only so two runs are comparable.
 
 ## Fix protocol
 

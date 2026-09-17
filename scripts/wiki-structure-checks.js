@@ -7,7 +7,9 @@
 // qualifiers, staleness judgment) stays with the wiki-lint skill. Same split as
 // scripts/wiki-lint-prohibitions.js (check 2) and test-floor.sh.
 //
-// usage: node scripts/wiki-structure-checks.js <wiki-root>
+// usage: node scripts/wiki-structure-checks.js <wiki-root> [--layer bundled|local]
+//   --layer local  the root is a project's wiki-local/ layer: page ids are local-<path>,
+//                  reference_impl paths resolve against the parent of <wiki-root>
 //
 // exit 0  clean   — stdout one summary line `pages: N, indexes: M, findings: 0`
 // exit 3  findings — same summary on stdout, one finding per line on stderr:
@@ -47,10 +49,15 @@
 //                      an id no page carries (same resolver as bad-related)
 //   listed-inactive    a superseded or retired page is still the target of a
 //                      domain index row (only active pages route)
+//   reference-impl-bundled  a bundled-layer page (default --layer bundled) carries a
+//                      non-empty `reference_impl:` (the key is wiki-local only)
 // Warnings (stderr, same `<check>:<file>: <detail>` shape; summarized by a second
 // stdout line `warnings: K` printed only when K > 0; never change the exit code):
 //   superseded-chain   `superseded_by` names a page that is itself superseded or
 //                      retired — a chain to walk, allowed but surfaced
+//   reference-impl-missing  (--layer local) a `reference_impl:` item is absolute, has a
+//                      `..` segment, or does not exist under the project root (the
+//                      parent of the wiki-local root)
 'use strict';
 
 const fs = require('fs');
@@ -69,6 +76,16 @@ if (!rootStat || !rootStat.isDirectory()) {
   process.stderr.write(`wiki-structure-checks: '${root}' is not a readable directory\n`);
   process.exit(4);
 }
+
+let layer = 'bundled';
+if (process.argv.length > 3) {
+  if (process.argv[3] !== '--layer' || !['bundled', 'local'].includes(process.argv[4]) || process.argv.length > 5) {
+    process.stderr.write('wiki-structure-checks: --layer must be bundled or local\n');
+    process.exit(4);
+  }
+  layer = process.argv[4];
+}
+const projectRoot = path.dirname(path.resolve(root));
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -103,6 +120,19 @@ for (const p of pages) {
     const r = fm.match(new RegExp(`^${k}:\\s*(.*)$`, 'm'));
     return r ? r[1].trim() : null;
   };
+  const listItems = (k) => {
+    const inline = fm.match(new RegExp(`^${k}:\\s*\\[([^\\]]*)\\]\\s*$`, 'm'));
+    if (inline) return inline[1].split(',').map((s) => s.trim()).filter(Boolean);
+    const lines = fm.split('\n');
+    const start = lines.findIndex((l) => new RegExp(`^${k}:\\s*$`).test(l));
+    if (start < 0) return [];
+    const items = [];
+    for (const l of lines.slice(start + 1)) {
+      const mm = l.match(/^\s+-\s+(.*)$/);
+      if (mm) items.push(mm[1].trim()); else if (/^[A-Za-z_][A-Za-z0-9_-]*:/.test(l)) break;
+    }
+    return items;
+  };
 
   for (const k of REQUIRED_KEYS) {
     if (!new RegExp(`^${k}:`, 'm').test(fm)) report('missing-key', p, `frontmatter lacks '${k}'`);
@@ -112,7 +142,7 @@ for (const p of pages) {
   const parts = rel.split(path.sep);
   const id = get('id');
   if (id !== null) {
-    const expected = parts.join('-');
+    const expected = (layer === 'local' ? 'local-' : '') + parts.join('-');
     if (id !== expected) report('id-path-mismatch', p, `id '${id}' != path-derived '${expected}'`);
     if (!idOwners.has(id)) idOwners.set(id, []);
     idOwners.get(id).push(p);
@@ -144,6 +174,18 @@ for (const p of pages) {
   const effective = status === null ? 'active' : status;
   if (!STATUS.has(effective)) { report('bad-status', p, `status '${effective}' not in active|superseded|retired`); pageStatus.set(path.normalize(p), 'invalid'); } else { pageStatus.set(path.normalize(p), effective); }
   if (effective === 'superseded') supersededBy.set(p, get('superseded_by'));
+
+  const refItems = listItems('reference_impl');
+  if (refItems.length > 0) {
+    if (layer === 'bundled') {
+      report('reference-impl-bundled', p, 'reference_impl is wiki-local only');
+    } else {
+      for (const item of refItems) {
+        const escapes = path.isAbsolute(item) || item.split('/').includes('..');
+        if (escapes || !fs.existsSync(path.join(projectRoot, item))) warn('reference-impl-missing', p, `${item} does not exist under ${projectRoot}`);
+      }
+    }
+  }
 }
 
 for (const [id, owners] of idOwners) {
