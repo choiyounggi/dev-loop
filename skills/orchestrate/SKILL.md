@@ -98,7 +98,9 @@ Gate 2's full-diff read is the LAST one of a run, not a recurring cost: Phase
 fresh context, so this coordinator session itself never reads the full
 integration diff until this final gate. Per-task diffs are read by the
 `task-reviewer` agent at Phase 4 the same way, so this session reads no
-worktree diff at all before Gate 2.
+worktree diff at all before Gate 2. Per-task plans are written and re-planned
+on the `task-planner` agent at Phase 3 step 2a the same way, so this session
+holds no plan body either.
 
 The middle row is the one that matters. Gate 1 and Gate 2 are the *first* and
 *last* things a run does, so on their own they leave the long autonomous middle
@@ -131,24 +133,31 @@ with the compact offer. The End-of-run contract runs the same script over the
 whole run; this is that measurement taken while it can still change something.
 
 **Known amplifier — the re-plan loop.** When a worker reports the plan is
-contradictory or under-decided (Phase 3 step 2a), every round appends
-permanently to coordinator context: the worker's gap report, your verification
-of it against the code, the plan patch, and the re-send. One measured run did
-eleven of them. Each round was worth doing — it caught a real defect every time
-— so the fix is not to skip the loop but to keep the re-send short: the worker
+contradictory or under-decided (Phase 3 step 2a), every round used to append
+permanently to coordinator context: the worker's gap report, the coordinator's
+verification of it against the code, the plan patch, and the re-send. One
+measured run did eleven of them. The verification and the patch now run on the
+same task-planner agent that wrote the plan — forward the gap report verbatim
+with SendMessage; its transcript still holds the plan — so what this session
+keeps per round is the one-line forward and the short re-send: the worker
 re-reads `{ORCH_DIR}/plans/<task>.md` from disk anyway, so send `plan patched at
 §N — re-read it from disk and re-run the adoption check` instead of restating
 the fix in the prompt.
 
 **Re-plan ladder — bound the loop.** Track each task's round count in your head
 from the review/patch history already on disk (no new state file). Rounds 1–2
-on a task are SCOPED PATCHES: the cheap re-send above, patching only the
-reported gap. Round 3 is ONE full re-plan: rewrite `plans/<task>.md` wholesale,
-re-running `wiki-plan` on the planning model rather than patching a single
-section — a third scoped patch is the signal the section-level fixes aren't
-converging. A task that still reports a plan gap after its round-3 full
-re-plan is a deadlock-grade escalation to the user: report it and get a human
-decision, same as a Phase 3 step 1 exit-3 DEADLOCK. There is never a round 4.
+on a task are SCOPED PATCHES: the same task-planner agent patches only the
+reported gap (one SendMessage), then the cheap re-send above. Round 3 is ONE
+full re-plan and goes through the two-stage handshake again: the same agent
+deletes its stale `review-verdict.md`, rewrites `plans/<task>.md` wholesale by
+re-running `wiki-plan` from Phase A on the planning model, and STOPs with a
+fresh STOP REPORT instead of a FINAL REPORT — you run `plan-reviewer` again on
+the redesigned `design.md` before it emits gate-B, exactly as in the first
+handshake, rather than patching a single section — a third scoped patch is
+the signal the section-level fixes aren't converging. A task that still
+reports a plan gap after its round-3 full re-plan is a deadlock-grade
+escalation to the user: report it and get a human decision, same as a Phase 3
+step 1 exit-3 DEADLOCK. There is never a round 4.
 
 Basis:
 `wiki/infrastructure/agent-orchestration/session-context-token-budget.md`
@@ -741,8 +750,9 @@ reasoning-effort flags) that `worker-start` cannot express.
    **Contract-first dispatch (shared surfaces) — ordering exception.** A task
    that PRODUCES a shared surface (Phase 2) reorders its own steps so the stub
    it commits can quote a real signature and land before its own worktree
-   exists: run step 2a's `wiki-plan` invocation for this task FIRST — write
-   `plans/<task>.md`, but do not launch yet — then commit the stub below, THEN
+   exists: run step 2a's `wiki-plan` invocation for this task FIRST (on the
+   `task-planner` agent) — it writes `plans/<task>.md`, but do not launch yet
+   — then commit the stub below, THEN
    step 1 (`setup-worktrees.sh`, whose worktree now branches from a tip that
    already contains the stub), then step 2 (write the brief, referencing the
    already-written plan) and launch. A consumer task needs no reordering of its
@@ -787,23 +797,47 @@ reasoning-effort flags) that `worker-start` cannot express.
    `briefs/<task>.md` / `plans/<task>.md` references above stay relative — the
    coordinator's cwd is the main repo root.
 
-   **2a. Plan it yourself, here, before launching.** Invoke the bundled `wiki-plan`
-   skill for this task and write the result to `plans/<task>.md`. Planning runs in
-   THIS coordinator session on purpose: a worker can be pinned to a cheaper tier
-   (`DEV_LOOP_WORKER_MODEL`), and a plan is where an unmade decision becomes the
-   implementer's guess — so the plan must come from the strongest model in the run,
-   not from whatever tier is executing.
+   **2a. Plan it yourself, before launching — on the `task-planner` agent,
+   never in this session.** Invoke the bundled `task-planner` agent (Agent
+   tool, fresh context) for this task: it runs the bundled `wiki-plan` skill
+   and writes `plans/<task>/` plus the flat `plans/<task>.md`. Planning still
+   belongs to the coordinator side on purpose: a worker can be pinned to a
+   cheaper tier (`DEV_LOOP_WORKER_MODEL`), and a plan is where an unmade
+   decision becomes the implementer's guess — so the plan must come from the
+   strongest model in the run, not from whatever tier is executing. The agent
+   inherits the coordinator model (it carries no `model:` pin), so that
+   guarantee holds without this session holding a single plan body: you read
+   only the agent's fixed report, the gate ledgers' exit codes you re-run
+   yourself, and the Size verdict line — never `analysis.md`, `design.md`,
+   `plan.md`, or the flat plan. Pass it the task id, brief path, plan dir,
+   gates dir, risk tier, wiki root, integ ref, and any pointer files (issue
+   text, user decisions, blackboard).
 
    **Apply the tier's profile here.** Read the task's risk from graph.json
-   first: when R0, invoke wiki-plan in lite mode; when R1, full Phase A/B/C;
-   when R2 or R3, full with the plan-reviewer call required (R3: a second
-   call with a different Agent model override, both verdicts recorded). Then
-   re-check the plan-derived signals (size:large, no-wiki:<n>) and raise the
+   first and pass the tier to the agent: when R0, the agent runs wiki-plan in
+   lite mode; when R1, full Phase A/B/C; when R2 or R3, full with the
+   plan-reviewer call required (R3: a second call with a different Agent
+   model override, both verdicts recorded). In every full-mode tier the
+   plan-reviewer call is yours, not the agent's — see the two-stage handshake
+   below. Then re-check the plan-derived signals (size:large, no-wiki:<n>) and raise the
    tier per the Phase 2 rule before launching. At launch, prefix the model on
    the call itself, never export it:
    `DEV_LOOP_WORKER_MODEL=<id from the profile table> LO_STATUS_DIR=<abs status dir> LO_TASK_ID=<task> scripts/launch-session.sh lo-<n> <worktree> bypassPermissions "<plan prompt>"`
    — launch-session.sh reads the variable per call, so each dispatch carries
    its own tier.
+
+   **Two-stage handshake (full mode).** The agent stops after writing
+   `design.md` and replies with its stop report (plan dir, gate-A rc, decision
+   and no-wiki counts, expected size, contradiction line). You then run the
+   `plan-reviewer` agent yourself (Agent tool) on `analysis.md` + `design.md`,
+   record its full output under `design.md`'s `## Review`, and on
+   `VERDICT: PASS` write just that line into `<plan dir>/review-verdict.md`;
+   on `VERDICT: FAIL` forward the blocking findings to the same agent with
+   SendMessage and wait for a fresh stop report (bounded at 3 reviewer calls,
+   R3 always two). Then resume the same agent with SendMessage: "verdict
+   recorded — emit gate-B, run Phase C, write the flat plan, reply with the
+   final report". R0 lite mode has no stop: the agent runs straight through
+   to the final report.
 
    Every design decision must be made and
    grounded in a `wiki/` page (record the decision->page map); leave nothing "as
@@ -816,11 +850,14 @@ reasoning-effort flags) that `worker-start` cannot express.
    `plan-B-<task>.md` must exist and `gate-check.sh --run` must exit 0 against
    each — a lite-mode `ABANDON` entry with a recorded reason still counts as
    passing that gate. A plan with no evidence — the ledger is missing, or any
-   gate reads `UNMET` or `CLAIMED` — must not be dispatched: send the task
-   back to `wiki-plan`'s corresponding Phase instead of launching a worker on it.
+   gate reads `UNMET` or `CLAIMED` — must not be dispatched: send the agent
+   back to `wiki-plan`'s corresponding Phase with SendMessage instead of
+   launching a worker on it — and re-run `gate-check.sh --run` yourself on
+   both ledgers after every report: the agent's report is a claim, the
+   ledger's exit code is the evidence.
 
    **Read the Size verdict before launching.** `plans/<task>.md` step 5 carries a
-   REQUIRED `## Size verdict`; read it now, before `launch-session.sh` — the task
+   REQUIRED `## Size verdict`; read that one line now (`grep -n -A1 '^## Size verdict' plans/<task>.md`), before `launch-session.sh` — the task
    is still undispatched at this moment, so no status file exists for it yet.
    `small`/`medium` — continue below, unchanged. `large` — do NOT launch this
    task. Instead attempt `scripts/graph-drop.sh .orchestration/graph.json
@@ -836,17 +873,21 @@ reasoning-effort flags) that `worker-start` cannot express.
    — same duty as a mid-run split — then resume this loop with the (possibly
    changed) task set.
 
-   Because planning happens here, **the planning model is whatever model this
-   coordinator session is running**. There is no separate setting to turn: to plan
+   Because the agent inherits this session's model, **the planning model is
+   whatever model this coordinator session is running**. There is no separate setting to turn: to plan
    on a stronger tier than you implement on, start the coordinator on that tier
    (`claude --model <planning model>`). The worker model is set per dispatch from
    the Tier to pipeline profile table, prefixed on the launch call below — never
    exported run-wide for the session.
 
    A worker that reports the plan is contradictory or under-decided is telling you
-   the planning pass was wrong: fix `plans/<task>.md` here and re-send §1. Do not
+   the planning pass was wrong: forward the gap report verbatim with SendMessage
+   to the same task-planner agent that wrote the plan (it patches `plans/<task>.md`
+   from its intact context and replies with a fresh final report), re-run the gate
+   and Size checks above, and re-send §1. Do not
    let the worker re-plan — that silently moves planning back onto the worker tier,
-   which is the thing this step exists to prevent. Then
+   which is the thing this step exists to prevent — and do not patch the plan in
+   this session either (Coordinator token budget, Known amplifier). Then
    `DEV_LOOP_WORKER_MODEL=<id from the profile table> LO_STATUS_DIR=<abs status dir>
    LO_TASK_ID=<task> scripts/launch-session.sh lo-<n> <worktree> bypassPermissions
    "<plan prompt>"`
@@ -1274,7 +1315,7 @@ kept), so re-running it is safe. Note the difference from **partial resume** (Ph
   (issue #166); worker worktrees also carry a mechanical `Bash(git stash:*)` deny.
 - Always verify real state after worktree/session ops (`git worktree list`, `tmux ls`,
   status files) — never trust echo logs (set -e is fail-open in eval subshells).
-- Bundled agents only: `test-quality-auditor`, `integration-reviewer`, `task-reviewer`. Don't
+- Bundled agents only: `test-quality-auditor`, `integration-reviewer`, `task-reviewer`, `task-planner`. Don't
   depend on built-in agent names (general-purpose/Explore/Plan are
   version-dependent).
 - A completed/excluded issue (partial resume) is injected as a **base output**, never

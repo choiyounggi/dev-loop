@@ -15,6 +15,7 @@ setup() {
   AGENT="${REPO_ROOT}/agents/integration-reviewer.md"
   AGENT2="${REPO_ROOT}/agents/test-quality-auditor.md"
   AGENT3="${REPO_ROOT}/agents/task-reviewer.md"
+  AGENT4="${REPO_ROOT}/agents/task-planner.md"
 }
 
 # Collapses embedded newlines to a single space so a substring assertion
@@ -181,8 +182,8 @@ orca_protocol_section() {
 
 # --- 6b: both review agents prohibit git stash, with the refs/stash rationale (issue #166) ---
 
-@test "all three agent files carry the git-stash prohibition and refs/stash rationale" {
-  for f in "$AGENT" "$AGENT2" "$AGENT3"; do
+@test "all four agent files carry the git-stash prohibition and refs/stash rationale" {
+  for f in "$AGENT" "$AGENT2" "$AGENT3" "$AGENT4"; do
     content="$(cat "$f")"
     [[ "$content" == *'NEVER `git stash`'* ]]
     [[ "$content" == *"refs/stash"* ]]
@@ -409,4 +410,83 @@ orca_protocol_section() {
   sed 's/not a prefix or substring match, and not the//' "$AGENT3" > "$stripped"
   content="$(cat "$stripped")"
   [[ "$content" != *"not a prefix or substring match"* ]]
+}
+
+# --- 8: task-planner agent (issue #192 stage 5) ---
+
+@test "agents/task-planner.md exists with name, a tools line that includes Skill and Write and excludes Agent, and NO model pin" {
+  [ -f "$AGENT4" ]
+  head -10 "$AGENT4" | grep -qF 'name: task-planner'
+  tools_line="$(head -10 "$AGENT4" | grep '^tools:')"
+  [[ "$tools_line" == *"Skill"* ]]
+  [[ "$tools_line" == *"Write"* ]]
+  [[ "$tools_line" != *"Agent"* ]]
+  run sh -c "head -10 '$AGENT4' | grep -q '^model:'"
+  [ "$status" -ne 0 ]
+}
+
+@test "negative control: a task-planner copy with Agent added to tools fails the no-Agent check" {
+  fixture="${BATS_TEST_TMPDIR}/task-planner-with-agent.md"
+  sed 's/^tools: Read, Grep, Glob, Bash, Write, Edit, Skill$/tools: Read, Grep, Glob, Bash, Write, Edit, Skill, Agent/' "$AGENT4" > "$fixture"
+  tools_line="$(head -10 "$fixture" | grep '^tools:')"
+  [[ "$tools_line" == *"Agent"* ]]
+}
+
+@test "task-planner body lists every explicit input, the two-stage handshake, and the fixed report fields" {
+  content="$(normalize_ws "$(cat "$AGENT4")")"
+  [[ "$content" == *"task id"* ]]
+  [[ "$content" == *"brief path"* ]]
+  [[ "$content" == *"plan dir"* ]]
+  [[ "$content" == *"gates dir"* ]]
+  [[ "$content" == *"risk tier"* ]]
+  [[ "$content" == *"wiki root"* ]]
+  [[ "$content" == *"integ ref"* ]]
+  [[ "$content" == *"ask for them rather than guessing"* ]]
+  [[ "$content" == *"Two-stage handshake"* ]]
+  [[ "$content" == *"review-verdict.md"* ]]
+  [[ "$content" == *"SendMessage"* ]]
+  [[ "$content" == *"plan path:"* ]]
+  [[ "$content" == *"size:"* ]]
+  [[ "$content" == *"gate-A rc:"* ]]
+  [[ "$content" == *"gate-B rc:"* ]]
+  [[ "$content" == *"no-wiki count:"* ]]
+  [[ "$content" == *"contradiction:"* ]]
+}
+
+@test "negative control: a task-planner copy with review-verdict.md stripped fails the handshake check" {
+  stripped="${BATS_TEST_TMPDIR}/task-planner-no-verdict.md"
+  grep -v 'review-verdict.md' "$AGENT4" > "$stripped"
+  content="$(normalize_ws "$(cat "$stripped")")"
+  [[ "$content" != *"review-verdict.md"* ]]
+}
+
+@test "task-planner write scope: plan dir and gate ledgers only, never status-update.sh, no tracked repo file" {
+  content="$(normalize_ws "$(cat "$AGENT4")")"
+  [[ "$content" == *'never call `status-update.sh`'* ]]
+  [[ "$content" == *"edit no tracked repo file"* ]]
+  [[ "$content" == *".dev-loop/gates/plan-A-<task>.md"* ]]
+  [[ "$content" == *"{ORCH_DIR}/plans/<task>.md"* ]]
+}
+
+@test "boundary: a frontmatter-only task-planner copy fails the inputs check" {
+  fm="${BATS_TEST_TMPDIR}/task-planner-frontmatter-only.md"
+  awk '{print} /^---$/{n++} n==2{exit}' "$AGENT4" > "$fm"
+  content="$(normalize_ws "$(cat "$fm")")"
+  [[ "$content" != *"brief path"* ]]
+}
+
+@test "task-planner round-3 full re-plan re-enters the two-stage handshake: deletes review-verdict.md and STOPs with a fresh STOP REPORT" {
+  content="$(normalize_ws "$(cat "$AGENT4")")"
+  [[ "$content" == *"Round 3"* ]]
+  [[ "$content" == *"re-enters the two-stage handshake"* ]]
+  [[ "$content" == *"delete \`<plan"*"review-verdict.md\`"* ]]
+  [[ "$content" == *"STOP with a fresh STOP REPORT"* ]]
+  [[ "$content" == *"never a FINAL REPORT"* ]]
+}
+
+@test "negative control: a task-planner copy without the round-3 handshake re-entry fails the check" {
+  stripped="${BATS_TEST_TMPDIR}/task-planner-no-round3-handshake.md"
+  grep -v 're-enters the two-stage handshake' "$AGENT4" > "$stripped"
+  content="$(normalize_ws "$(cat "$stripped")")"
+  [[ "$content" != *"re-enters the two-stage handshake"* ]]
 }

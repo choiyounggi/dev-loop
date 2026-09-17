@@ -62,7 +62,7 @@ Run it two ways:
   executor — the wiki-executor discipline (load only named pages, decisions win,
   BLOCKED-on-gap) is folded into this loop.
 - **A whole goal, split across parallel worker sessions** → the `orchestrate`
-  skill: intake → decompose (approval gate) → dispatch loop: plan (wiki-plan) →
+  skill: intake → decompose (approval gate) → dispatch loop: plan (wiki-plan on the task-planner agent) →
   implement + review (each session runs `loop-implement`) → integration test →
   pre-merge gate → merge. There is no wave barrier: a dependency graph plus slot
   accounting starts each task the moment its own dependencies are approved and a
@@ -275,6 +275,7 @@ dev-loop/
 ├── skills/                           # the 9 skills above (user-invocable; appear in the / menu by skill name)
 ├── agents/test-quality-auditor.md    # bundled independent test auditor (loop step 6.5)
 ├── agents/task-reviewer.md           # bundled fresh-context per-task reviewer (orchestrate Phase 4)
+├── agents/task-planner.md            # bundled fresh-context per-task planner (orchestrate Phase 3 step 2a)
 ├── hooks/
 │   ├── hooks.json
 │   ├── preflight.sh                  # SessionStart: git/tmux/jq advisory
