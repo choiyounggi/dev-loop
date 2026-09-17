@@ -35,5 +35,11 @@
     "ref": "rtb-figma",
     "how": "get_spec_links -> inspect_node / get_dev_ready / get_design_tokens",
     "when": "issue has a Figma link AND the change touches UI; skip for backend-only tasks"
-  }
+  },
+  "workspace": {
+    "roots": ["/Users/me/workspace"],
+    "depth": 2,
+    "exclude": ["node_modules", "graphify-out"]
+  },
+  "_note_workspace": "Not a capability role: the parent directories whose git repos /dev-loop:graph-setup onboards and hooks/graph-nudge.sh watches (issue #203). Read with resolve-tools.sh --role workspace."
 }

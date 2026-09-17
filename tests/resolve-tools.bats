@@ -143,3 +143,49 @@ setup() {
   [ "$(printf '%s' "$output" | jq -r '.kind')" = "default" ]
   [[ "$(printf '%s' "$output" | jq -r '.when')" == *'graphify'* ]]
 }
+
+# --- workspace: parent directories the code graph covers (not a role) --------
+# (wiki/infrastructure/config/environment-config.md, wiki/platforms/processes/tool-diagnostics-without-a-failing-exit-code.md)
+
+@test "workspace: configured roots resolve via --role and appear as a single --summary line" {
+  printf '{"workspace":{"roots":["/ws/a","/ws/b"],"depth":3,"exclude":["node_modules"]}}' > "$PROJ_CFG"
+  run bash "$RT" --role workspace
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.roots[1]')" = "/ws/b" ]
+  [ "$(printf '%s' "$output" | jq -r '.depth')" = "3" ]
+  run bash "$RT" --summary
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"workspace: /ws/a,/ws/b (depth 3)"* ]]
+  [[ "$output" != *"workspace: default"* ]]
+  [[ "$output" == *"knowledge: default"* ]]
+}
+
+@test "workspace: boundary — unset prints no workspace line in --summary" {
+  run bash "$RT" --summary
+  [ "$status" -eq 0 ]
+  count=$(printf '%s\n' "$output" | grep -c '^workspace:' || true)
+  [ "$count" -eq 0 ]
+}
+
+@test "workspace: boundary — empty roots array prints no workspace line" {
+  printf '{"workspace":{"roots":[]}}' > "$PROJ_CFG"
+  run bash "$RT" --summary
+  [ "$status" -eq 0 ]
+  count=$(printf '%s\n' "$output" | grep -c '^workspace:' || true)
+  [ "$count" -eq 0 ]
+}
+
+@test "workspace: error — a non-object workspace value never crashes --summary or --role" {
+  printf '{"workspace":"oops"}' > "$PROJ_CFG"
+  run bash "$RT" --summary
+  [ "$status" -eq 0 ]
+  count=$(printf '%s\n' "$output" | grep -c '^workspace:' || true)
+  [ "$count" -eq 0 ]
+  run bash "$RT" --role workspace
+  [ "$status" -eq 0 ]
+}
+
+@test "example config documents a non-empty workspace.roots" {
+  run bash -c "jq -e '.workspace.roots | length > 0' '$BATS_TEST_DIRNAME/../examples/tools.example.json'"
+  [ "$status" -eq 0 ]
+}

@@ -260,6 +260,11 @@ REASONS: ...
 - `VERDICT: PASS` -> proceed to step 7.
 - `VERDICT: FAIL` -> address REASONS by strengthening the tests/code (never by
   weakening tests), increment the attempt count, and loop back to step 3.
+- The Agent call itself fails with an HTTP 429 that names a model limit (e.g.
+  "You've reached your <model> limit") -> this is NOT a verdict (issue #200):
+  re-run the identical call with the Agent tool's `model` parameter set to
+  `opus`; if that also 429s, once more with `sonnet`; after those two retries
+  report BLOCKED instead of guessing a verdict.
 
 Floor passed != quality passed — the auditor still rules on semantic quality
 even when the floor came back clean.

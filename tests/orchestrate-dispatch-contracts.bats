@@ -50,6 +50,19 @@ phase2_section() {
   awk '/^## Phase 2/{p=1;next} /^## /{p=0} p' "$1"
 }
 
+# Extracts the "## 🚦 Gate 1" section: from its heading up to (not including)
+# the next "## " heading.
+gate1_section() {
+  awk '/^## 🚦 Gate 1/{p=1;next} /^## /{p=0} p' "$1"
+}
+
+# Extracts the "## Phase 4" section: from its heading up to (not including)
+# the next "## " heading (local copy of tests/orchestrate-review-pass.bats'
+# extractor of the same name — bats loads each file in its own process).
+phase4_section() {
+  awk '/^## Phase 4/{p=1} p && /^## / && !/^## Phase 4/{exit} p' "$1"
+}
+
 # Extracts the "## Coordinator token budget" section (same extractor as
 # tests/orchestrate-token-budget.bats' section_body()).
 token_budget_section() {
@@ -285,4 +298,159 @@ brief_dependencies_region() {
   grep -v 'UNMET' "$SKILL" > "$fixture"
   section="$(normalize_ws "$(step2a_section "$fixture")")"
   [[ "$section" != *"UNMET"* ]]
+}
+
+# --- 12: risk tier (issue #192 stage 1) -------------------------------------
+
+@test "Phase 2 defines the risk and risk_basis fields and states the scheduler pass-through" {
+  section="$(normalize_ws "$(phase2_section "$SKILL")")"
+  [[ "$section" == *"risk_basis"* ]]
+  [[ "$section" == *"one of R0, R1, R2, R3"* ]]
+  [[ "$section" == *"ready-set.sh reads only"* ]]
+}
+
+@test "negative control: a Phase 2 copy without the risk_basis lines fails the field check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-risk-basis.md"
+  grep -v 'risk_basis' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(phase2_section "$fixture")")"
+  [[ "$section" != *"risk_basis"* ]]
+}
+
+@test "Phase 2 rubric is max-of-signals and never a sum" {
+  section="$(normalize_ws "$(phase2_section "$SKILL")")"
+  [[ "$section" == *"max-of-signals"* ]]
+  [[ "$section" == *"never summed"* ]]
+}
+
+@test "negative control: a Phase 2 copy with max-of-signals renamed to sum-of-signals fails the rubric check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-sum-of-signals.md"
+  sed 's/max-of-signals/sum-of-signals/' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(phase2_section "$fixture")")"
+  [[ "$section" != *"max-of-signals"* ]]
+}
+
+@test "Phase 2 states raise-only at step 2a, lower-only at Gate 1, and the blackboard Ruling line" {
+  section="$(normalize_ws "$(phase2_section "$SKILL")")"
+  [[ "$section" == *"may only RAISE"* ]]
+  [[ "$section" == *"LOWERED only by the user"* ]]
+  [[ "$section" == *"Ruling: risk"* ]]
+}
+
+@test "negative control: a Phase 2 copy without the Ruling line fails the movement-rule check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-ruling.md"
+  grep -v 'Ruling: risk' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(phase2_section "$fixture")")"
+  [[ "$section" != *"Ruling: risk"* ]]
+}
+
+@test "Gate 1 briefing carries the five-column risk table without a new chooser question" {
+  section="$(normalize_ws "$(gate1_section "$SKILL")")"
+  [[ "$section" == *"| task | risk | basis | profile"* ]]
+  [[ "$section" == *"rework budget |"* ]]
+  [[ "$section" == *"adds no AskUserQuestion"* ]]
+}
+
+@test "negative control: a Gate 1 copy without the rework-budget column fails the risk-table check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-rework-budget.md"
+  grep -v 'rework budget |' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(gate1_section "$fixture")")"
+  [[ "$section" != *"rework budget |"* ]]
+}
+
+@test "Phase 2 JSON example parses and every task carries a valid risk token" {
+  json="$(awk '/^```json/{p=1;next} /^```/{p=0} p' <(phase2_section "$SKILL"))"
+  run jq -e '[.tasks[].risk] | all(. as $r | ["R0","R1","R2","R3"] | index($r) != null)' <<< "$json"
+  [ "$status" -eq 0 ]
+}
+
+@test "negative control: a task with risk R9 fails the valid-risk-token check" {
+  json='{ "tasks": [ { "id": "t1", "risk": "R9" } ] }'
+  run jq -e '[.tasks[].risk] | all(. as $r | ["R0","R1","R2","R3"] | index($r) != null)' <<< "$json"
+  [ "$status" -ne 0 ]
+}
+
+# --- 13: tier profile (issue #192 stage 2) ----------------------------------
+
+@test "Phase 2 carries the tier-to-profile table with the four tiers and the two model ids" {
+  section="$(normalize_ws "$(phase2_section "$SKILL")")"
+  [[ "$section" == *"Tier to pipeline profile"* ]]
+  [[ "$section" == *"R0 trivial"* ]]
+  [[ "$section" == *"R3 critical"* ]]
+  [[ "$section" == *"claude-sonnet-5"* ]]
+  [[ "$section" == *"claude-opus-5"* ]]
+  [[ "$section" == *"1 and 3 only"* ]]
+}
+
+@test "negative control: a Phase 2 copy without the profile table fails the tier-profile check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-profile-table.md"
+  grep -v 'Tier to pipeline profile' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(phase2_section "$fixture")")"
+  [[ "$section" != *"Tier to pipeline profile"* ]]
+}
+
+@test "step 2a applies the profile: lite for R0, plan-reviewer for R2+, per-call DEV_LOOP_WORKER_MODEL prefix" {
+  section="$(normalize_ws "$(step2a_section "$SKILL")")"
+  [[ "$section" == *"Apply the tier's profile"* ]]
+  [[ "$section" == *"lite mode"* ]]
+  [[ "$section" == *"plan-reviewer call required"* ]]
+  [[ "$section" == *"DEV_LOOP_WORKER_MODEL=<id from the profile table>"* ]]
+  [[ "$section" == *"never export it"* ]]
+}
+
+@test "negative control: a step-2a copy without the never-export clause fails the per-call-prefix check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-never-export.md"
+  grep -v 'never export it' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(step2a_section "$fixture")")"
+  [[ "$section" != *"never export it"* ]]
+}
+
+@test "Phase 4 selects the lens set by tier and escalates an R0 second round" {
+  section="$(normalize_ws "$(phase4_section "$SKILL")")"
+  [[ "$section" == *"Lens set by tier"* ]]
+  [[ "$section" == *"lenses 1 and 3 only"* ]]
+  [[ "$section" == *"not run — R0 profile"* ]]
+  [[ "$section" == *"instead of dispatching a second rework"* ]]
+}
+
+@test "negative control: a Phase 4 copy without the Lens-set-by-tier paragraph fails the lens-set check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-lens-set-by-tier.md"
+  grep -v 'Lens set by tier' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(phase4_section "$fixture")")"
+  [[ "$section" != *"Lens set by tier"* ]]
+}
+
+@test "the profile table has exactly one rework-budget row with the sequence 1, 3, 3, 3" {
+  n="$(phase2_section "$SKILL" | grep -c '| rework budget | 1 | 3 | 3 | 3 |')"
+  [ "$n" -eq 1 ]
+}
+
+@test "the profile table's coordinator auditor cross-call row does not contradict the worker's mandatory step 6.5 auditor call" {
+  section="$(normalize_ws "$(phase2_section "$SKILL")")"
+  [[ "$section" == *"coordinator auditor cross-call"* ]]
+  [[ "$section" == *"step 6.5 auditor call is unchanged at every tier"* ]]
+}
+
+@test "negative control: a Phase 2 copy without the coordinator-auditor-cross-call row fails the scoping check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-coordinator-auditor-crosscall.md"
+  grep -v 'coordinator auditor cross-call' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(phase2_section "$fixture")")"
+  [[ "$section" != *"coordinator auditor cross-call"* ]]
+}
+
+@test "step 2a's operative launch command carries the DEV_LOOP_WORKER_MODEL prefix from the profile table" {
+  section="$(normalize_ws "$(step2a_section "$SKILL")")"
+  operative="${section#*exists to prevent. Then}"
+  [[ "$operative" == *"DEV_LOOP_WORKER_MODEL=<id from the profile table>"* ]]
+  [[ "$operative" == *"scripts/launch-session.sh"* ]]
+}
+
+@test "negative control: a step-2a copy with only the operative prefix removed fails the operative-prefix check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-operative-prefix.md"
+  awk '
+    /step exists to prevent\. Then$/ { print; getline; sub(/DEV_LOOP_WORKER_MODEL=<id from the profile table> /, ""); print; next }
+    { print }
+  ' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(step2a_section "$fixture")")"
+  operative="${section#*exists to prevent. Then}"
+  [[ "$operative" != *"DEV_LOOP_WORKER_MODEL=<id from the profile table>"* ]]
 }

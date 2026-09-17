@@ -263,6 +263,7 @@ ordinary `gh pr create` in any repo.
 | `wiki-lint` | Health-check the wiki. |
 | `knowledge-flush` | Research + verify + route queued insights → one reviewed wiki PR. |
 | `configure` | Set up the capability-role tool profile (map your wiki, test command, etc.). |
+| `graph-setup` | Onboard a workspace of git repos onto the graphify code graph (consented install, workspace roots, batch build, both hook sets). |
 
 ## Structure
 
@@ -271,13 +272,14 @@ dev-loop/
 ├── .claude-plugin/{plugin,marketplace}.json
 ├── AGENTS.md INDEX.md templates/     # wiki schema + routing entry + page/brief/session-prompt templates
 ├── wiki/                             # 10-domain semantic-layer knowledge base (260 pages: best practices, edge cases, process methodology)
-├── skills/                           # the 8 skills above (user-invocable; appear in the / menu by skill name)
+├── skills/                           # the 9 skills above (user-invocable; appear in the / menu by skill name)
 ├── agents/test-quality-auditor.md    # bundled independent test auditor (loop step 6.5)
 ├── hooks/
 │   ├── hooks.json
 │   ├── preflight.sh                  # SessionStart: git/tmux/jq advisory
 │   ├── insight-instruction.sh        # SessionStart: inject ★ Insight capture instruction (global)
 │   ├── config-nudge.sh               # SessionStart: nudge to /dev-loop:configure if unconfigured (weekly)
+│   ├── graph-nudge.sh                # SessionStart: nudge to /dev-loop:graph-setup if the workspace graph needs onboarding (weekly)
 │   ├── loop-gate.sh                  # Stop: verification-loop integrity gate
 │   ├── harvest-insights.sh + harvest.js  # Stop: harvest insights → queue
 │   ├── auto-flush.sh                 # Stop: auto-run knowledge-flush (guarded) → PR

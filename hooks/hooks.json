@@ -1,5 +1,5 @@
 {
-  "description": "dev-loop hooks — dependency preflight (advisory), verification-loop integrity gate, knowledge capture (SessionStart insight instruction + Stop harvest), automatic queue flush (Stop, guarded), the knowledge-flush pre-PR gate, and the orchestrate chooser gate (no worker launch until Gate 1 was asked with AskUserQuestion).",
+  "description": "dev-loop hooks — dependency preflight (advisory), verification-loop integrity gate, knowledge capture (SessionStart insight instruction + Stop harvest), automatic queue flush (Stop, guarded), the knowledge-flush pre-PR gate, the orchestrate chooser gate (no worker launch until Gate 1 was asked with AskUserQuestion), and the code-graph workspace nudge (SessionStart, advisory only).",
   "hooks": {
     "SessionStart": [
       {
@@ -16,6 +16,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/config-nudge.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/graph-nudge.sh"
           }
         ]
       }

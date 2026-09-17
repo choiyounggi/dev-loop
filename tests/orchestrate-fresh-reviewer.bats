@@ -66,19 +66,20 @@ orca_protocol_section() {
   awk '/^## Orca worker protocol/{p=1} p && /^## Subagent usage protocol/{exit} p' "$1"
 }
 
-# --- 1: agent file exists, frontmatter pins name + model fable -------------
+# --- 1: agent file exists, frontmatter pins name and carries NO model pin --
 
-@test "agents/integration-reviewer.md exists with name + model: fable pinned" {
+@test "agents/integration-reviewer.md exists with name and NO model pin (issue #200)" {
   [ -f "$AGENT" ]
   head -10 "$AGENT" | grep -qF 'name: integration-reviewer'
-  head -10 "$AGENT" | grep -qF 'model: fable'
+  run sh -c "head -10 '$AGENT' | grep -q '^model:'"
+  [ "$status" -ne 0 ]
 }
 
-@test "negative control: a frontmatter copy without the model pin fails the check" {
-  stripped="${BATS_TEST_TMPDIR}/agent-no-model.md"
-  grep -v '^model: fable$' "$AGENT" > "$stripped"
-  run sh -c "head -10 '$stripped' | grep -qF 'model: fable'"
-  [ "$status" -ne 0 ]
+@test "negative control: a frontmatter copy WITH a model pin fails the no-pin check" {
+  pinned="${BATS_TEST_TMPDIR}/agent-pinned.md"
+  awk '/^name:/{print; print "model: fable"; next} {print}' "$AGENT" > "$pinned"
+  run sh -c "head -10 '$pinned' | grep -q '^model:'"
+  [ "$status" -eq 0 ]
 }
 
 # --- 2: agent body is read-only with the fixed VERDICT/FINDINGS contract ---

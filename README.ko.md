@@ -256,6 +256,7 @@ fail-closed로 거부됩니다. 게이트는 knowledge-flush PR로 좁게 스코
 | `wiki-lint` | 위키 건강 점검. |
 | `knowledge-flush` | 큐의 인사이트를 조사 + 검증 + 라우팅 → 리뷰형 위키 PR 하나. |
 | `configure` | capability-role 도구 프로파일 설정 (위키·테스트 명령 등 매핑). |
+| `graph-setup` | git 저장소 워크스페이스를 graphify 코드 그래프에 온보딩 (동의 후 설치, 워크스페이스 루트, 배치 빌드, 두 훅 세트 설치). |
 
 ## 구조
 
@@ -264,13 +265,14 @@ dev-loop/
 ├── .claude-plugin/{plugin,marketplace}.json
 ├── AGENTS.md INDEX.md templates/     # 위키 스키마 + 라우팅 진입점 + 페이지/브리프/세션프롬프트 템플릿
 ├── wiki/                             # 10개 도메인 시맨틱 레이어 지식 베이스 (260페이지: 베스트프랙티스·엣지케이스·프로세스 방법론)
-├── skills/                           # 위의 스킬 8종 (사용자 호출 가능; / 메뉴에 스킬 이름으로 표시)
+├── skills/                           # 위의 스킬 9종 (사용자 호출 가능; / 메뉴에 스킬 이름으로 표시)
 ├── agents/test-quality-auditor.md    # 번들된 독립 테스트 감사자 (루프 스텝 6.5)
 ├── hooks/
 │   ├── hooks.json
 │   ├── preflight.sh                  # SessionStart: git/tmux/jq 어드바이저리
 │   ├── insight-instruction.sh        # SessionStart: ★ Insight 수집 지시 주입 (글로벌)
 │   ├── config-nudge.sh               # SessionStart: 미설정 시 /dev-loop:configure 넛지 (주간)
+│   ├── graph-nudge.sh                # SessionStart: 워크스페이스 그래프가 온보딩 필요 시 /dev-loop:graph-setup 넛지 (주간)
 │   ├── loop-gate.sh                  # Stop: 검증 루프 무결성 게이트
 │   ├── harvest-insights.sh + harvest.js  # Stop: 인사이트 하베스트 → 큐
 │   ├── auto-flush.sh                 # Stop: knowledge-flush 자동 실행 (가드됨) → PR
