@@ -256,6 +256,19 @@ checkout's `wiki/` — a report citing pages that don't exist fails closed. The
 gate is narrowly scoped to knowledge-flush PRs, so it never interferes with
 ordinary `gh pr create` in any repo.
 
+### Wiki search index (optional, fail-open)
+
+The bundled wiki is also indexed locally (`scripts/wiki-index.py` →
+`~/.dev-loop/wiki-index/`, refreshed in the background by
+`hooks/wiki-index.sh`) and served through the two-tool `dev-loop-wiki` MCP
+(`.mcp.json` → `scripts/wiki-mcp-launch.sh` → `scripts/wiki-mcp.py`:
+`wiki_search`, `wiki_page`). Curated routing stays the first path; the index
+is a fail-open second path in three places — `wiki-query` retries a routing
+0-hit once semantically, `wiki-ingest` shows the top-5 hits before
+merge-vs-create, and `wiki-lint` check 19 lists near-duplicate trigger pairs
+(`neardup`). Without `uv` or a built index every skill behaves as before;
+`DEV_LOOP_WIKI_INDEX=0` turns the feature off.
+
 ---
 
 ## Skills
@@ -289,6 +302,7 @@ dev-loop/
 │   ├── insight-instruction.sh        # SessionStart: inject ★ Insight capture instruction (global)
 │   ├── config-nudge.sh               # SessionStart: nudge to /dev-loop:configure if unconfigured (weekly)
 │   ├── graph-nudge.sh                # SessionStart: nudge to /dev-loop:graph-setup if the workspace graph needs onboarding (weekly)
+│   ├── wiki-index.sh                 # SessionStart: refresh the local wiki vector index in the background (DEV_LOOP_WIKI_INDEX=0 disables)
 │   ├── loop-gate.sh                  # Stop: verification-loop integrity gate
 │   ├── harvest-insights.sh + harvest.js  # Stop: harvest insights → queue
 │   ├── auto-flush.sh                 # Stop: auto-run knowledge-flush (guarded) → PR
@@ -297,6 +311,8 @@ dev-loop/
 ├── scripts/resolve-tools.sh          # capability-role profile resolver (no `plan` role)
 ├── scripts/wiki-contradiction.sh     # evidence-gated log.md contradiction entry for a wiki page falsified at implement time (loop-implement rule 4)
 ├── scripts/wiki-usage.sh + wiki-lint-usage.js  # WIKI: line telemetry -> <repo>/.dev-loop/wiki-usage.jsonl; wiki-lint check 18 zero-citation review queue (report-only)
+├── scripts/wiki-index.py + wiki-mcp.py + wiki-mcp-launch.sh  # local vector index over wiki/ + the two-tool dev-loop-wiki MCP (fail-open)
+├── .mcp.json                         # registers dev-loop-wiki (stdio) through the launcher
 ├── tests/                            # bats suites — hooks (harvest, flush gate, loop gate) + orchestration scripts; CI runs them on ubuntu + macos
 ├── references/tool-profile.md
 └── docs/                             # inherited design notes (loop-orchestrator lineage)

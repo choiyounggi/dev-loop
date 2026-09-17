@@ -238,14 +238,14 @@ rec() { # <ts> <page_id>
   [ "$status" -eq 1 ]
 }
 
-@test "(d) wiki-lint carries check 18, the info row, total_weight 39 and the Fix protocol sentence" {
+@test "(d) wiki-lint carries check 18, the info row, total_weight 40 and the Fix protocol sentence" {
   run grep -F '| 18 | Active page with zero citations' "$WLINT"
   [ "$status" -eq 0 ]
-  run grep -F '| info | 1 | 10–12, 18 |' "$WLINT"
+  run grep -F '| info | 1 | 10–12, 18, 19 |' "$WLINT"
   [ "$status" -eq 0 ]
-  run grep -F 'total_weight = 39' "$WLINT"
+  run grep -F 'total_weight = 40' "$WLINT"
   [ "$status" -eq 0 ]
-  run grep -F '(7×3 + 7×2 + 4×1)' "$WLINT"
+  run grep -F '(7×3 + 7×2 + 5×1)' "$WLINT"
   [ "$status" -eq 0 ]
   run grep -F -e '- For 18: report-only' "$WLINT"
   [ "$status" -eq 0 ]

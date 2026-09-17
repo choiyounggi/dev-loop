@@ -757,3 +757,97 @@ print(pathlib.Path('$BATS_TEST_TMPDIR/__pycache__').exists())
   [ "$status" -eq 0 ]
   [ "$output" != "[]" ]
 }
+
+# --- neardup (issue #202 A6) ---
+
+add_dup_page() {
+  # Same "Load when" routing text as one.md so the trigger chunks (applies
+  # paragraph + "Load when: ..." line) land above the 0.9 cosine threshold
+  # while the applies paragraph itself still differs from one.md's.
+  cat >> "$WIKI/alpha/index.md" <<'EOF2'
+| [dup](cat/dup.md) | Handing out fresh credentials to a machine identity on a schedule |
+EOF2
+  cat > "$WIKI/alpha/cat/dup.md" <<'EOF2'
+---
+id: alpha-cat-dup
+domain: alpha
+category: cat
+confidence: verified
+last_verified: 2026-01-01
+---
+
+# dup
+
+## When this applies
+
+Rotating api keys for a service account with a scheduled overlap.
+
+## Do this
+
+1. Issue the replacement key before revoking the old one.
+
+## Edge cases
+
+| Case | Do |
+|------|----|
+| none | nothing |
+EOF2
+}
+
+@test "normal: neardup finds the near-duplicate trigger pair" {
+  make_wiki
+  add_dup_page
+  python3 "$SCRIPT" --build
+  run python3 "$SCRIPT" neardup --json
+  [ "$status" -eq 0 ]
+  len=$(printf '%s' "$output" | jq 'length')
+  a=$(printf '%s' "$output" | jq -r '.[0].a')
+  b=$(printf '%s' "$output" | jq -r '.[0].b')
+  s=$(printf '%s' "$output" | jq -r '.[0].score')
+  [ "$len" -eq 1 ] && [ "$a" = "alpha-cat-dup" ] && [ "$b" = "alpha-cat-one" ] \
+    && python3 -c "import sys; sys.exit(0 if float(sys.argv[1]) >= 0.9 else 1)" "$s"
+}
+
+@test "negative control: a high threshold finds no pair" {
+  make_wiki
+  add_dup_page
+  python3 "$SCRIPT" --build
+  run python3 "$SCRIPT" neardup --threshold 0.99 --json
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+}
+
+@test "error: an out-of-range or non-numeric threshold exits 2" {
+  run python3 "$SCRIPT" neardup --threshold 1.5 --json
+  [ "$status" -eq 2 ] && [[ "$output" == *"0..1"* ]]
+
+  run python3 "$SCRIPT" neardup --threshold abc --json
+  [ "$status" -eq 2 ]
+}
+
+@test "boundary: no index prints an empty array and index: none on stderr" {
+  make_wiki
+  run python3 "$SCRIPT" neardup --json
+  [ "$status" -eq 0 ] && [[ "$output" == *"index: none"* ]] && [[ "$output" == *"[]"* ]]
+}
+
+@test "boundary: threshold 0 and limit bound the pair count" {
+  make_wiki
+  add_dup_page
+  python3 "$SCRIPT" --build
+  run python3 "$SCRIPT" neardup --threshold 0 --limit 1 --json
+  len1=$(printf '%s' "$output" | jq 'length')
+  run python3 "$SCRIPT" neardup --threshold 0 --json
+  len_all=$(printf '%s' "$output" | jq 'length')
+  [ "$len1" -eq 1 ] && [ "$len_all" -eq 6 ]
+}
+
+@test "boundary: a domain filter scopes the pair search" {
+  make_wiki
+  add_dup_page
+  python3 "$SCRIPT" --build
+  run python3 "$SCRIPT" neardup --domain beta --json
+  [ "$output" = "[]" ]
+  run python3 "$SCRIPT" neardup --domain nosuch --json
+  [ "$output" = "[]" ]
+}

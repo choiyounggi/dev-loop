@@ -10,6 +10,10 @@ CLI contract (every path exits 0 unless stated):
     wiki-index.py search --query T [--k 5] [--domain D] [--engine auto|scan|vec0] [--json]
     wiki-index.py page --page-id ID                  (1 = unknown page_id)
     wiki-index.py eval --cases FILE [--k 5]          (4 = no index)
+    wiki-index.py neardup [--threshold T] [--domain D] [--limit N] [--json]
+                                   trigger-chunk pairs at or above T (exit 0;
+                                   [] + stderr "index: none" without an index;
+                                   exit 2 on a threshold outside 0..1)
 
 Storage lives under DEV_LOOP_WIKI_INDEX_DIR (default ~/.dev-loop/wiki-index):
 wiki.db, manifest.json, .build.lock/, build.log, models/. A relative override is
@@ -892,6 +896,64 @@ def _cmd_page(cfg, args):
     return 0
 
 
+def _unit_float(text):
+    """argparse type: a cosine threshold must be a number in 0..1."""
+    try:
+        value = float(text)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError("threshold must be a number in 0..1")
+    if value < 0.0 or value > 1.0:
+        raise argparse.ArgumentTypeError("threshold must be a number in 0..1")
+    return value
+
+
+def neardup(cfg, threshold=0.9, domain=None, limit=50):
+    """Trigger-chunk pairs whose cosine is at or above the threshold.
+
+    Compares the stored vectors only — no embedder, no uv — so the lint reader
+    can run it under any python3. Never raises for a missing or unreadable
+    index: an empty list is the documented degraded answer.
+    """
+    conn = open_ro(cfg)
+    if conn is None:
+        print("index: none", file=sys.stderr)
+        return []
+    try:
+        sql = (
+            "SELECT page_id, path, embedding FROM chunks "
+            "WHERE section = 'trigger' AND ordinal = 0"
+        )
+        params = ()
+        if domain:
+            sql += " AND domain = ?"
+            params = (domain,)
+        try:
+            rows = [(r[0], r[1], unpack(r[2])) for r in conn.execute(sql, params)]
+        except (sqlite3.Error, struct.error):
+            return []
+    finally:
+        conn.close()
+    rows.sort(key=lambda r: r[0])
+    pairs = []
+    for i in range(len(rows)):
+        a_id, a_path, a_vec = rows[i]
+        for j in range(i + 1, len(rows)):
+            b_id, b_path, b_vec = rows[j]
+            score = sum(x * y for x, y in zip(a_vec, b_vec))
+            if score >= threshold:
+                pairs.append(
+                    {"a": a_id, "b": b_id, "path_a": a_path, "path_b": b_path,
+                     "score": round(float(score), 6)}
+                )
+    pairs.sort(key=lambda p: (-p["score"], p["a"], p["b"]))
+    return pairs[: max(0, int(limit))]
+
+
+def _cmd_neardup(cfg, args):
+    print(json.dumps(neardup(cfg, args.threshold, args.domain, args.limit)))
+    return 0
+
+
 def _cmd_eval(cfg, args):
     with open(args.cases, encoding="utf-8") as fh:
         cases = json.load(fh)
@@ -931,6 +993,12 @@ def main(argv):
     p_eval.add_argument("--cases", required=True)
     p_eval.add_argument("--k", type=int, default=5)
 
+    p_nd = sub.add_parser("neardup", help="trigger-chunk pairs at or above a cosine threshold")
+    p_nd.add_argument("--threshold", type=_unit_float, default=0.9)
+    p_nd.add_argument("--domain", default=None)
+    p_nd.add_argument("--limit", type=int, default=50)
+    p_nd.add_argument("--json", action="store_true", help="accepted; JSON is the only output")
+
     args = parser.parse_args(argv)
     cfg = Config.from_env()
 
@@ -938,6 +1006,8 @@ def main(argv):
         return _cmd_search(cfg, args)
     if args.command == "page":
         return _cmd_page(cfg, args)
+    if args.command == "neardup":
+        return _cmd_neardup(cfg, args)
     if args.command == "eval":
         return _cmd_eval(cfg, args)
     if args.status:

@@ -43,6 +43,13 @@ or a distilled lesson ("we hit X; doing Y fixed it because Z").
 
 4. **Merge before creating.** Read every existing page in the target category whose
    "load when" line overlaps the new case.
+   - Semantic dedupe first: call the dev-loop-wiki tool `wiki_search` with the
+     candidate's trigger sentence (k=5), open each hit's page and read its
+     "When this applies"; the first trigger that describes the same situation
+     is the merge target for the bullets below, and the top-5 hits are listed
+     in the step-8 report. When the `wiki_search` tool is absent from the
+     session or returns an empty list, continue exactly as this step read
+     before the tool existed.
    - Same trigger, same directive → add the new source / edge case to that page.
    - Same trigger, conflicting directive → do NOT overwrite. Add the conflict to the
      page under `Edge cases` if it is condition-dependent, or flag it in `log.md` as
@@ -63,4 +70,4 @@ or a distilled lesson ("we hit X; doing Y fixed it because Z").
    Add `related:` links both ways for genuinely adjacent pages.
 
 8. **Report.** List pages created/updated, conflicts flagged, and anything left
-   `unverified` that needs evidence.
+   `unverified` that needs evidence, and the top-5 wiki_search hits considered in step 4.
