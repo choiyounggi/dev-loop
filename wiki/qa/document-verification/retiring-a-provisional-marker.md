@@ -9,7 +9,7 @@ sources:
   - https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions
   - https://www.rfc-editor.org/rfc/rfc7322.html
 last_verified: 2026-08-14
-related: [qa-document-verification-editing-a-gated-document, qa-document-verification-spec-document-gates, qa-process-acceptance-criteria]
+related: [qa-document-verification-editing-a-gated-document, qa-document-verification-spec-document-gates, qa-process-acceptance-criteria, qa-document-verification-superseding-a-knowledge-record]
 ---
 
 # Converting a Provisional Marker to a Settled Statement in a Reviewed Design Document
