@@ -61,7 +61,10 @@ Rules the skills apply (basis:
 - **Freshness first.** `sh ${CLAUDE_PLUGIN_ROOT}/scripts/graph-freshness.sh <root>`
   exits 0 `fresh`, 2 `stale <N>`, 3 `absent`, 4 `cannot-evaluate <reason>`;
   the graph is used only on 0. On 2 the human chooses whether to run
-  `graphify update <root>`; the plugin never runs a build itself.
+  `graphify update <root>`; the plugin's agents never run a build themselves;
+  a git post-merge hook the user installed once via `/dev-loop:graph-setup`
+  runs `graphify update` on merge (git is the actor, consent was given at
+  onboarding).
 - **Lead, not evidence.** A graph hit enters a plan only paired with a search:
   `graphify explain <Symbol> -> <N> connections; grep -rn <Symbol> src -> <n>
   hits`. Unconfirmed assumptions are reported as `graph-derived:`.
@@ -72,6 +75,30 @@ Rules the skills apply (basis:
   reflects the integration base.
 
 Unset, `explore` resolves to `default` and nothing above runs.
+
+### `workspace` — the repos the code graph covers (optional, not a role)
+
+```json
+{
+  "workspace": {
+    "roots": ["/abs/path"],
+    "depth": 2,
+    "exclude": ["node_modules", "graphify-out"]
+  }
+}
+```
+
+- `roots` — absolute paths to the parent directories `/dev-loop:graph-setup`
+  and `hooks/graph-nudge.sh` scan for git repos.
+- `depth` — the `find -maxdepth` under each root (default `2`).
+- `exclude` — shell glob patterns matched against any path component; a repo
+  whose relative path contains a match is skipped.
+
+Read by `/dev-loop:graph-setup` (onboarding) and `hooks/graph-nudge.sh` (the
+SessionStart advisory), both via `resolve-tools.sh --role workspace`. It is
+not a capability role: `--summary` never lists it among the role lines, and
+prints one `workspace: <roots> (depth <n>)` line only when it is configured.
+Silence the SessionStart nudge with `DEV_LOOP_GRAPH_NUDGE=0`.
 
 ### `research` — external best-practice/pitfall search (optional, fixed interpretation order)
 
