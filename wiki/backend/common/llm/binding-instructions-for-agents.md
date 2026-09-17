@@ -8,7 +8,7 @@ sources:
   - https://github.com/obra/superpowers
   - https://github.com/ayghri/i-have-adhd/blob/main/skills/i-have-adhd/SKILL.md
 last_verified: 2026-08-24
-related: [backend-common-api-design-agent-tool-granularity, backend-common-llm-progressive-disclosure-artifacts]
+related: [backend-common-api-design-agent-tool-granularity, backend-common-llm-progressive-disclosure-artifacts, backend-common-llm-project-local-layer-over-shared-guidance]
 ---
 
 # Instruction Text That Must Bind an LLM Agent's Behavior

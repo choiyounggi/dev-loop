@@ -9,7 +9,7 @@ sources:
   - https://github.com/rust-lang/rust-clippy/blob/master/lintcheck/README.md
   - https://github.com/rust-lang/crater
 last_verified: 2026-08-07
-related: [backend-common-change-impact-call-site-enumeration, backend-common-api-design-unenforced-declarations, testing-quality-guard-shape-vs-consequence, qa-process-regression-scope]
+related: [backend-common-change-impact-call-site-enumeration, backend-common-api-design-unenforced-declarations, testing-quality-guard-shape-vs-consequence, qa-process-regression-scope, infrastructure-ci-cd-write-time-limit-guards]
 ---
 
 # Bounding a New Rejection Rule Against the Existing Corpus
