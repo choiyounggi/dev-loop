@@ -1,0 +1,77 @@
+[
+  {
+    "query": "Reads from an HTTP endpoint keep stalling while a batch importer writes to the same embedded file store",
+    "expected_page_id": "databases-sqlite-concurrent-access-for-a-read-api",
+    "path": "wiki/databases/sqlite/concurrent-access-for-a-read-api.md"
+  },
+  {
+    "query": "Making sure a single worker performs a job at once, using an owner token and an expiry",
+    "expected_page_id": "backend-common-concurrency-distributed-locks",
+    "path": "wiki/backend/common/concurrency/distributed-locks.md"
+  },
+  {
+    "query": "Keeping a watcher alive after the shell that launched it exits, and picking between cron and a launch agent",
+    "expected_page_id": "platforms-processes-background-services",
+    "path": "wiki/platforms/processes/background-services.md"
+  },
+  {
+    "query": "Auditing a suite that never goes red to see whether its assertions could catch a real defect",
+    "expected_page_id": "testing-quality-tests-that-cannot-fail",
+    "path": "wiki/testing/quality/tests-that-cannot-fail.md"
+  },
+  {
+    "query": "Vetting a new package before pulling it in, and defending a build against compromised or typosquatted libraries",
+    "expected_page_id": "security-dependencies-supply-chain",
+    "path": "wiki/security/dependencies/supply-chain.md"
+  },
+  {
+    "query": "A value I am about to keep in component state can be recomputed from what is already there",
+    "expected_page_id": "frontend-state-derived-state",
+    "path": "wiki/frontend/state/derived-state.md"
+  },
+  {
+    "query": "Several worker processes share progress through files inside a single checkout and I need the folder layout",
+    "expected_page_id": "infrastructure-agent-orchestration-shared-run-state",
+    "path": "wiki/infrastructure/agent-orchestration/shared-run-state.md"
+  },
+  {
+    "query": "Deciding if this build is safe to ship and what checklist that call should follow",
+    "expected_page_id": "qa-process-release-gates",
+    "path": "wiki/qa/process/release-gates.md"
+  },
+  {
+    "query": "A defect was reported and I want to make it happen on demand before changing any code",
+    "expected_page_id": "debugging-methodology-reproduce-first",
+    "path": "wiki/debugging/methodology/reproduce-first.md"
+  },
+  {
+    "query": "The app has to keep working on patchy connectivity, queueing what the user does locally and merging it later",
+    "expected_page_id": "mobile-offline-offline-first-sync",
+    "path": "wiki/mobile/offline/offline-first-sync.md"
+  },
+  {
+    "query": "Walking a big table in batches without OFFSET so pages do not shift or repeat rows",
+    "expected_page_id": "databases-query-optimization-keyset-pagination",
+    "path": "wiki/databases/query-optimization/keyset-pagination.md"
+  },
+  {
+    "query": "Which column comes first in a composite index when a query filters on equality and then sorts",
+    "expected_page_id": "databases-indexing-composite-index-column-order",
+    "path": "wiki/databases/indexing/composite-index-column-order.md"
+  },
+  {
+    "query": "Two requests read the same row, both modify it, and the second silently overwrites the first",
+    "expected_page_id": "databases-transactions-optimistic-vs-pessimistic-locking",
+    "path": "wiki/databases/transactions/optimistic-vs-pessimistic-locking.md"
+  },
+  {
+    "query": "A payments endpoint may be called twice by a retrying client and must not double-charge",
+    "expected_page_id": "backend-common-api-design-idempotency",
+    "path": "wiki/backend/common/api-design/idempotency.md"
+  },
+  {
+    "query": "Caching an expensive query result and preventing a thundering herd when the entry expires",
+    "expected_page_id": "backend-common-caching-invalidation-and-stampede",
+    "path": "wiki/backend/common/caching/invalidation-and-stampede.md"
+  }
+]
