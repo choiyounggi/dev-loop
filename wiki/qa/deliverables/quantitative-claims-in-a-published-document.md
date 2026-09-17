@@ -9,7 +9,7 @@ sources:
   - https://www.writethedocs.org/guide/writing/docs-principles/
 last_verified: 2026-08-06
 related:
-  [qa-deliverables-generated-artifacts-as-deliverable-source, qa-document-verification-spec-document-gates, testing-quality-spec-artifact-checks]
+  [qa-deliverables-generated-artifacts-as-deliverable-source, qa-document-verification-spec-document-gates, testing-quality-spec-artifact-checks, qa-deliverables-documented-behavior-of-a-third-party-tool]
 ---
 
 # Numbers in a Document About to Be Published Outside the Team
