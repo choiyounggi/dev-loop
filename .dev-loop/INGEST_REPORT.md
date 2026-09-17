@@ -1,150 +1,138 @@
 # Knowledge flush — 4 insight(s)
 
-Claimed queue ids: `c6c76b1cb2d35bf9`, `028fcf4648303397`, `1c4620e3aadaf0b7`, `56f4dbc8fb5997f8`.
-All four were handled (2 new pages, 3 amended pages); none dropped.
+Claimed queue ids: `475884eefc1cdb16`, `4d7177433b8112d0`, `2552c5c6c0431371`, `f8015ebd7aa0489d`.
+Outcome: 1 new page, 0 merges, 3 drops (project-specific plan-gap rows). Nothing is left `unverified`.
 
 ## Verified best-practice
 
-**1. `c6c76b1cb2d35bf9` — precedence tests must stage the competing condition at the deciding iteration** (→ `confidence: verified`)
+**1. `475884eefc1cdb16` — a root resolver with a cwd fallback is unobserved while the fixture root is the test's cwd** (→ `confidence: verified`)
 
-Claim: a test asserting that exit condition A wins over B must make B become true in
-the same poll/iteration in which A reaches its threshold; a B staged earlier makes the
-assertion hold under either ordering of the checks.
+Claim: when a test harness `cd`s into its temp directory and builds the fixture project
+there, the resolver's fallback (the working directory) returns the expected root, so
+deleting the search leaves every test green. Separate the fixture root from the cwd
+(`$WORK/proj` vs `$WORK/elsewhere`) and give each documented stage — start directory,
+ancestor, fallback — its own case. "One mutant went red" does not establish that the
+search is guarded.
 
-- https://arxiv.org/abs/1909.04770 (Vera-Pérez, Danglot, Monperrus, Baudry, 2019) — fetched
-  this session. An undetected mutant has three causes, the first being that "the test
-  inputs are not sufficient to infect the state of the program". That is exactly this
-  failure: if B fires before A can activate, the reordering mutant is never reached in a
-  state where it can infect the outcome.
-- https://pitest.org/quickstart/basic_concepts/ — a surviving mutant means no test
-  distinguishes the mutated program; a kill is attributed to the covering test, which is
-  why the precedence test itself (not merely the file) must redden.
-- https://testing.googleblog.com/2021/04/mutation-testing.html — detection is measured by
-  inserting the fault and requiring failure, not by branch coverage.
-- Field measurement (dev-loop `watch-status.sh`, three "R6 precedence" bats cases): moving
-  the exit-8 block above the failed/done check left all three green. Re-staging the
-  competing status transition to the same tmux-stub capture count that confirms the
-  two-poll witness made the same swap red.
+How it was verified:
 
-**2. `028fcf4648303397` — never confirm a pane witness from a capture taken in the same iteration as a key-send** (→ merged as `verified` material into an existing `verified` page)
+- **Reproducible check, run in this flush** (POSIX `sh`, macOS arm64; marker-walk resolver
+  with a `$PWD` fallback; 3 mutants x 2 fixture layouts; known-good control = the
+  unmutated resolver, green in both layouts):
 
-Claim: when a poll loop both sends keys (auto-recover `Enter`, resend) and reads a state
-witness from the pane, it must skip the capture entirely on the iteration that sent keys.
+  | Variant | Coincident layout (cwd is the root) | Separated layout (`proj` / `elsewhere`) |
+  |---------|-------------------------------------|------------------------------------------|
+  | original | GREEN | GREEN |
+  | walk deleted | **GREEN** (blind) | RED — ancestor, start-directory |
+  | walk starts at the parent | **GREEN** (blind) | RED — start-directory only |
+  | overshoot (returns the found dir's parent) | RED | RED |
 
-- Reproduced locally this session (tmux, macOS, `sh` pane): with the newest status line
-  reading `STATE=BLOCKED`, sending a command that worked 0.4s before printing left the
-  same-iteration `capture-pane` still showing `STATE=BLOCKED`; the next poll showed
-  `STATE=RUNNING`. The same sequence with an instantly-printing command had already
-  repainted within the same iteration — so the check's outcome is set by the target's work
-  time, which is why the gate belongs on "did this iteration send keys", not on a delay.
-- Mechanism already sourced on the target page: https://man7.org/linux/man-pages/man1/tmux.1.html
-  (`send-keys` writes keys into the pane; `capture-pane` copies visible contents — neither
-  reports consumption) and https://man7.org/linux/man-pages/man3/termios.3.html.
-- Field evidence: dev-loop code review of task `t3-blocked-consume`, finding F1 — the exit-8
-  "still blocked" witness was confirmed from a same-poll capture, so a just-repaired worker
-  could be escalated; gating on the recovery flag fixed it, and removing the gate under
-  mutation woke the witness one poll early.
+  This reproduces both halves of the claim: the deletion survives under the coincident
+  layout *while another mutant reddens*, and under the separated layout the
+  start-at-parent mutant is caught by exactly one stage case. A second check confirmed the
+  page's nested-fixture edge row: with a marker on a directory above the scratch tree, the
+  no-marker case returned that host directory instead of the `elsewhere` fallback.
+- https://bats-core.readthedocs.io/en/stable/faq.html (fetched 2026-09-17) — "The working
+  directory is simply the directory where you started when executing bats. If you want to
+  enforce a specific directory, you can use cd in the setup_file/setup functions." The
+  runner does not separate cwd from the fixture; the `cd` in `setup` is what creates the
+  coincident layout.
+- https://en.wikipedia.org/wiki/Mutation_testing (fetched 2026-09-17) — the kill
+  conditions: reach the mutated statement, infect the state, and "The incorrect program
+  state … must propagate to the program's output and be checked by the test." The
+  coincident cwd is a propagation failure: the fallback maps the infected state back to
+  the expected output.
+- https://arxiv.org/abs/2410.21904 (fetched 2026-09-17) — Mirian-Hosseinabadi, "Formal
+  Analysis of Reachability, Infection and Propagation Conditions in Mutation Testing";
+  cited for the RIP terminology only. The abstract page does not define the three
+  conditions individually, and the page quotes only the sentence that was actually there.
+- Field evidence: the originating session's resolver (`project_root_for` in dev-loop
+  `skills/wiki-plan/scripts/plan-gate.sh`, worktree commit `5afddde`) and its
+  `elsewhere`-separated bats cases were read and confirmed to exist. **Its mutants were not
+  re-run in this flush**; the page labels that bullet a field report and says so.
 
-**3. `1c4620e3aadaf0b7` — graphify's installed hooks miss the `git pull` path** (→ `verified`)
+Not used: pytest's rootdir documentation was fetched as a candidate second resolver
+example, but its fallback is "the already determined common ancestor", not plainly the
+cwd, so it is not cited.
 
-Claim: `graphify hook install` covers `post-commit` and `post-checkout` only, while the
-"PR merged upstream → `git pull`" path fires `post-merge`, so the graph goes stale while
-`hook status` reports installed.
+**2. `4d7177433b8112d0` — `--layer bundled|local` flag shape for wiki-structure-checks** → dropped.
+**3. `2552c5c6c0431371` — the literal log.md entry text for t5-ref-impl** → dropped.
+**4. `f8015ebd7aa0489d` — wiki-lint row 9 stays, README gains one tree line** → dropped.
 
-- https://git-scm.com/docs/githooks — fetched this session: `post-commit` "is invoked by
-  git-commit"; `post-merge` "is invoked by git-merge, which happens when a `git` `pull` is
-  done on a local repository"; `post-checkout` "is also run after git-clone, unless the
-  `--no-checkout` (`-n`) option is used".
-- Local reproduction (git 2.50.1, macOS): in a clone carrying all three hooks, a
-  fast-forward `git pull` fired `post-merge 0` alone; a divergent `git pull` that created a
-  merge commit also fired `post-merge 0` and **no** `post-commit`; a fresh `git clone` of
-  that repository carried no non-sample hooks.
-- Source read: `graphifyy 0.4.23` `hooks.py:186-187` installs `"post-commit"` and
-  `"post-checkout"` only; `grep -c post-merge hooks.py` → 0.
-- **Correction applied to the candidate's stated reasoning:** the submitted note said git
-  "does not run hooks on clone". Per the docs and the reproduction, `git clone` *does* run
-  `post-checkout` — the reason a clone gets no graph is that hooks are not copied by clone,
-  so none exist to run. The page carries the corrected reason.
-
-**4. `56f4dbc8fb5997f8` — a grounding gate's escape hatch must emit a gap record at the point it grants the pass** (→ `confidence: field-tested`)
-
-Claim: an escape hatch (`[no-wiki]`, a suppression comment) is the most valuable signal a
-knowledge base gets, and a gate that only decides pass/fail destroys it; the record must be
-emitted by the gate, not requested in prose.
-
-- https://docs.github.com/en/code-security/code-scanning/managing-code-scanning-alerts/resolving-code-scanning-alerts
-  — fetched this session: dismissing an alert requires choosing a reason, "the dismissal
-  comment is added to the alert timeline", it is readable as `dismissed_comment` on the
-  alerts API, and dismissed alerts stay in the Closed list for review. This is the canonical
-  shape of a *recorded* escape hatch.
-- https://github.blog/changelog/2025-07-01-delegated-alert-dismissal-for-code-scanning-is-now-generally-available/
-  — fetched this session: reviewers can "provide a comment when approving/rejecting alert
-  dismissal requests", and dismissal requests are created, listed and reviewed through
-  dedicated REST API endpoints — the review of a hatch use is itself recorded and readable
-  outside the UI.
-- Local field measurement (this repo, 1.22.0): `skills/wiki-plan/scripts/plan-gate.sh:166`
-  passes an ungrounded decision with `[ "$basis" = "[no-wiki]" ] && continue` and records
-  nothing, while `skills/wiki-plan/SKILL.md:135` asks in prose for the decision to be "noted
-  as an ingest candidate". Against 276 non-index wiki pages, `log.md` carries exactly one
-  `gap` entry (2026-07-11).
-- No external source states the general rule as a directive, so this stays **field-tested**
-  rather than verified; the GitHub precedent supports the mechanism, not the general claim.
+All three are `plan-gap` rows whose trigger is "Planning <task>: deciding <one repo's
+artifact>" and whose directive is that repo's design record (argv positions, a log line's
+wording, a README tree entry). None has a situation a task in another repo could route on,
+and the cited research URLs support the surrounding plan, not the directive. Row 2's
+rejected alternative (inferring a mode from a path substring) is the only generalizable
+fragment; it arrives with no evidence beyond the design doc, so it was not promoted.
+These are recorded in the repo's own `plans/*/design.md`, which is where they belong.
 
 ## Existing-layer check
 
-Routed via `INDEX.md` → domain `index.md` → every page whose "load when" overlapped.
+Routed via `INDEX.md` → `wiki/testing/index.md` → category `quality` (verifying that tests
+can fail). A whole-wiki keyword sweep (`cwd|working director|project.root|ancestor|walk up|
+upward|path.resol|fallback`) matched 42 files; the testing-domain and path-resolution hits
+were opened.
 
-Pages read: testing-quality-tests-that-cannot-fail, testing-quality-policy-at-several-return-sites, testing-quality-completion-predicates, testing-quality-surviving-mutant-equivalence-triage, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-code-graph-as-orientation-layer, platforms-processes-driving-a-tui-in-a-tmux-pane, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-autonomous-decision-rulings
+Pages read: testing-quality-tests-that-cannot-fail, testing-quality-default-values-under-test, testing-quality-surviving-mutant-equivalence-triage, testing-quality-harness-reverse-controls, testing-data-test-data-and-isolation
 
-(Directory-level scans of `wiki/testing/quality/`, `wiki/platforms/processes/`,
-`wiki/infrastructure/agent-orchestration/` plus keyword sweeps for `no-wiki`, `post-merge`,
-`capture-pane`/`send-keys`, and `precedence` over the whole wiki preceded these reads.)
+- `tests-that-cannot-fail` — owns the general "break it and require red" procedure and the
+  "another writer sets the same observable" row. Adjacent mechanism, different trigger: it
+  has no row for a fallback path that coincides with the expected value, and at its size a
+  new section would not fit the 120-line budget. → linked, not merged.
+- `default-values-under-test` — closest sibling: a mechanism-test fixture that repeats the
+  shipped default makes the dropped-lookup mutant unkillable. Same shape (defect in the
+  input, not the assertion), different subject (a numeric default vs. a filesystem search
+  and its cwd). → new page cross-references it; reciprocal `related:` added.
+- `test-data-and-isolation` — covers temp directories and env isolation; nothing on cwd vs
+  fixture root in the merged copy (the open-PR copy is discussed below).
+- `surviving-mutant-equivalence-triage`, `harness-reverse-controls` — linked for the
+  "deletion survives although cwd is separate" edge; no overlap.
 
-| Insight | Overlap found | Outcome |
-|---------|---------------|---------|
-| 1 precedence | `tests-that-cannot-fail` carries a co-occurring-writer edge case (two writers of one flag) and `policy-at-several-return-sites` carries per-site mutation — both are about *coverage of one site*, neither about *which of two live conditions wins* | **New page**, cross-linked to both; no conflicting directive |
-| 2 pane witness | `pane-delivery-confirmation` already rules that a pane *diff* is not delivery evidence (echo direction). The new rule is the opposite direction — a stale capture *falsely confirming* a witness | **Merged** into that page (Do-this #6, 1 edge row, 1 Instead-of row, 2 sources); 1 pointer row added to `driving-a-tui-in-a-tmux-pane` |
-| 3 graphify hooks | `code-graph-as-orientation-layer` already gates on freshness and its Sources line already names `hook install` post-commit/post-checkout — the hook-coverage consequence was missing | **Merged** into that page (2 edge rows, 2 sources, 1 clause on directive 1) |
-| 4 escape hatch | `session-completion-gates` and `spec-document-gates` cover gate *authoring*; none covers what a gate does with its own exemptions. Keyword sweep for `no-wiki`/`escape hatch`/`knowledge gap` returned no owning page | **New page** in the existing `agent-orchestration` category |
-
-Conflicts flagged: none — no existing directive is contradicted.
-Related links added both ways: `tests-that-cannot-fail`, `policy-at-several-return-sites`,
-`completion-predicates` ↔ the new precedence page; `session-completion-gates`,
-`autonomous-decision-rulings`, `spec-document-gates` ↔ the new escape-hatch page.
-
-Lint after the edits: `wiki-structure-checks.js` → **278 pages, 13 indexes, 0 findings**;
-`wiki-lint-prohibitions.js` → no findings on any touched page (the 2 repo-wide violations it
-reports are pre-existing, in `plans/` and `tests/fixtures/`). New pages are 67 and 69 body
-lines; amended pages are 92, 92 and 65 — all under the 120-line cap.
+Created: `wiki/testing/quality/path-resolver-fixtures-with-coincident-cwd.md` (72 body lines).
+Updated: `wiki/testing/index.md` (+1 row), `default-values-under-test.md` (+1 related id), `log.md` (+1 entry).
+Conflicts flagged: none. One deliberate asymmetry: `tests-that-cannot-fail` is linked from
+the new page only — three open PRs (#179, #188, #191) each rewrite its single-line
+`related:` list (a fourth, #186, edits the file elsewhere), and another edit of that line
+would conflict with each of them.
+Checks: `wiki-structure-checks.js wiki` — baseline 278 pages / 0 findings → 279 pages / 0
+findings; `wiki-lint-prohibitions.js wiki` — 0 violations before and after.
 
 ## Open-PR check
 
-Listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` —
-12 open heads: #191, #190, #189, #188, #187, #186, #185, #183, #182, #181, #180, #179.
-Each head was fetched and its **added** wiki lines (`git diff <merge-base> pr-N -- wiki/`)
-grepped for `post-merge|graphify|graph.json|no-wiki|capture-pane|send-keys|precedence|knowledge gap`.
+Listed 16 open `knowledge/*` heads and fetched all 16: #179, #180, #181, #182, #183, #185,
+#186, #187, #188, #189, #190, #191, #205, #207, #208, #209. For each head, the added lines
+of every changed `wiki/` file were searched for the same overlap keywords.
 
-| Candidate | Overlapping open head | Verdict |
-|-----------|----------------------|---------|
-| 1 precedence | none — #189's `proving-a-critical-section-is-lock-protected` and `sequential-dispatch-assumption-under-concurrency` are concurrency-window tests, not exit-condition ordering; its only `precedence` hits are Gradle property precedence (#179) | **new** |
-| 2 pane witness | none — #183's single `send-keys` hit is a pointer row in a stdin-vs-send-keys edge case | **new** |
-| 3 graphify hooks | #185 edits the *same page* but adds an unrelated row (`update` exits 1 on a >5,000-node HTML viz); #186 only mentions this page in an INGEST_REPORT dedup note | **new** (no content overlap; noted below as a textual merge risk) |
-| 4 escape hatch | none — #189's `gate-evidence-exit-code-class` is about a gate's own exit-code classes, not about recording exemptions | **new** |
+- **#179** (`knowledge/choiyounggi-20260903-172728`) adds a row to `test-data-and-isolation`:
+  tests that never `cd` into their temp directory read a real sandbox config through the
+  code's upward walk, so "make every such test `cd "$BATS_TEST_TMPDIR"`". This is the
+  **inverse** failure, and its remedy is the precondition for the one here — after that
+  `cd`, a fixture built at `.` is the coincident layout. No shared directive. The new page
+  points at `test-data-and-isolation` for that case. Verdict for candidate 1: **new**.
+- Other keyword hits, each read: #188 `real-cli-spot-check-for-new-execution-paths` (a
+  never-created spawn cwd → ENOENT), #179 `path-valued-config` (an empty `--out` resolving to
+  the CWD), #183 `unix-domain-socket-path-length` (socket paths derived from the project
+  root), #180 `portable-shell-scripts` (zsh word-splitting giving sessions one shared cwd),
+  #208 `project-local-layer-over-shared-guidance` (where a local guidance layer lives —
+  same originating feature, a design rule, nothing about testing the resolver). The
+  `path-resolution.md` hits in #179/#181/#189 were the file path matching the pattern, not
+  content. No overlap with testing a resolver.
+- No open head touches `default-values-under-test.md` or creates a page on resolver tests.
+- Candidates 2–4: #207 and #208 carry plan-gap batches from the same repo. Their added
+  `wiki/` lines, and #209's, were searched for `--layer`, `reference_impl`,
+  `wiki-contradiction`, `README`, `argv`, `positional`, `infer`: 0 hits in #207 and #208; 2
+  in #209, both an unrelated `grep -qF … README.md` quoting example. They are dropped as
+  project-specific, not as pending duplicates. Verdict: **drop**.
 
-Merge-risk note for the reviewer: **#185 and this PR both append to
-`wiki/infrastructure/agent-orchestration/code-graph-as-orientation-layer.md`** (different
-edge-case rows and different source bullets). Whichever lands second may need a one-hunk
-textual merge; the content does not conflict semantically.
+Expected merge friction: `wiki/testing/index.md` and `log.md` are edited by most open
+heads, so this PR will need the usual one-row rebase there.
 
 ## Routing decision
 
-| Insight | Target | New category? |
-|---------|--------|---------------|
-| 1 | `testing/quality/precedence-between-competing-exit-conditions.md` (**new page**) | No — `testing/quality` already owns "can this test actually fail" |
-| 2 | `infrastructure/agent-orchestration/pane-delivery-confirmation.md` (**merge**), + 1 pointer row in `platforms/processes/driving-a-tui-in-a-tmux-pane.md` | No |
-| 3 | `infrastructure/agent-orchestration/code-graph-as-orientation-layer.md` (**merge**) | No |
-| 4 | `infrastructure/agent-orchestration/escape-hatch-uses-as-a-knowledge-gap-signal.md` (**new page**) | No — `agent-orchestration` already carries the gate-authoring pages (`session-completion-gates`, `autonomous-decision-rulings`); a `knowledge-base` category would hold one page and split gate knowledge across two places |
-
-Plumbing: `wiki/testing/index.md` +1 row; `wiki/infrastructure/index.md` +1 row and two
-extended "load when" lines (pane-delivery-confirmation, code-graph-as-orientation-layer);
-`log.md` +1 `ingest` entry.
+| Candidate | Target | Decision |
+|-----------|--------|----------|
+| `475884eefc1cdb16` | `testing/quality/path-resolver-fixtures-with-coincident-cwd` (new page, existing category) | The harvested hint `domain: testing` holds. `quality` rather than `data`: the subject is whether a test can detect a defect (mutation-proven), which is what `quality` owns; `data` owns fixture creation and isolation, and receives the cross-link for the inverse case. No new category. |
+| `4d7177433b8112d0` | — | Dropped: one repo's CLI argument spec. |
+| `2552c5c6c0431371` | — | Dropped: one repo's log line. |
+| `f8015ebd7aa0489d` | — | Dropped: one repo's README/skill-row decision. |
