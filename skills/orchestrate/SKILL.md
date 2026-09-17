@@ -96,7 +96,9 @@ back, so they are keyed by predicate:
 Gate 2's full-diff read is the LAST one of a run, not a recurring cost: Phase
 5's integration review now runs on the `integration-reviewer` agent's own
 fresh context, so this coordinator session itself never reads the full
-integration diff until this final gate.
+integration diff until this final gate. Per-task diffs are read by the
+`task-reviewer` agent at Phase 4 the same way, so this session reads no
+worktree diff at all before Gate 2.
 
 The middle row is the one that matters. Gate 1 and Gate 2 are the *first* and
 *last* things a run does, so on their own they leave the long autonomous middle
@@ -461,8 +463,10 @@ answered.
    <status-dir> impl_done <N>` — without `--tasks` the tasks approved in
    earlier rounds satisfy `expected=<N>` immediately and the wait spins. Orca:
    `scripts/orca-wait.sh` with the implement Task ids, already event-driven.
-5. On wake, handle that task: review each worktree diff (`git -C <wt> diff
-   <integ>...HEAD`). If tests weak, audit with `test-quality-auditor`. **On
+5. On wake, handle that task: run the Phase 4 review — `test-floor.sh`, then
+   the `task-reviewer` agent — and read the verdict line of
+   `reviews/<task>-rN.md` (`head -1`). If tests weak, audit with
+   `test-quality-auditor`. **On
    approval, merge before you loop (issue #90):** fast-forward first —
    `git fetch . <branch>:<integ>` (no checkout needed, works while the main
    worktree sits on another branch) — and only fall back to
@@ -971,22 +975,38 @@ that task's existing session — a bare `--terminal` is rejected with
 `terminal_worktree_mismatch` (see O3) — and wait with `scripts/orca-wait.sh`.
 Rework rounds are further Tasks on the same `--terminal`+`--worktree` pair.)*
 
-Before the four-lens pass, run the floor: `scripts/test-floor.sh <wt> '<integ>'`.
+Before invoking the reviewer, run the floor: `scripts/test-floor.sh <wt> '<integ>'`.
 At review time the worker has not committed (§2 forbids it; §4 commits
 later), so the single-ref form measures the working tree — including
 untracked new test files — instead of an empty `<integ>...HEAD` range; an
 empty measurement now exits 2 (`unknown`, stderr `empty-range`), never
-`pass`. **Exit 3** — skip the four-lens pass and the auditor
-entirely; the itemized stderr reasons (`no-tests` / `case-count:<file>:<n>` /
-`no-assertion:<file>:<case>`) become the findings of `reviews/<task>-rN.md` —
+`pass`. **Exit 3** — do not invoke `task-reviewer` and skip the auditor
+entirely; the coordinator writes `reviews/<task>-rN.md` itself with line 1
+`VERDICT: rework` and the itemized stderr reasons (`no-tests` /
+`case-count:<file>:<n>` / `no-assertion:<file>:<case>`) become the findings
+of `reviews/<task>-rN.md` —
 this consumes a rework round exactly like any other finding (run the rework
 sequence below). **Exit 0 or 2** — continue to the four-lens pass unchanged,
 and when the auditor is invoked, pass `floor=pass` or `floor=unknown`
 alongside it.
 
-Run the fixed four-lens pass on each worktree diff (`git -C <wt> diff
-<integ>...HEAD`) — write the result to `reviews/<task>-rN.md` from
-`templates/review-report.md`:
+Run the review on the `task-reviewer` agent (Agent tool, fresh context — not
+this coordinator session). Pass it: the task id and round N, the worktree
+path, the integration ref, the `{ORCH_DIR}` paths of the brief and the plan,
+the task's risk tier, the floor result (`floor=pass` or `floor=unknown`), the
+absolute review output path `{ORCH_DIR}/reviews/<task>-rN.md`, and the
+template path `templates/review-report.md`. The agent runs `git -C <wt> diff
+<integ>` plus `git -C <wt> ls-files --others --exclude-standard` for
+untracked files itself (the worker has not committed yet) and writes
+`reviews/<task>-rN.md` from `templates/review-report.md` with line 1 EXACTLY
+`VERDICT: approve` or EXACTLY `VERDICT: rework` — a prefix or substring
+match is not valid, and the unfilled template placeholder
+`VERDICT: approve | rework` matches neither; the coordinator reads that line
+with `head -1` and treats any other first line, including the placeholder,
+as not-a-verdict (re-run `task-reviewer`, never approve). The coordinator
+MUST NOT read the worktree diff into its own context (issue #192 stage 4).
+Lens 4's cross-task ordering check still belongs to the integration-reviewer
+at Phase 5; per task, the agent applies these fixed lenses:
 
 1. **Plan conformance** — diff vs. the plan's decision→page map and the
    brief's `<scope_boundaries>` / `<out_of_scope>`; a decision silently made
@@ -1003,7 +1023,8 @@ Run the fixed four-lens pass on each worktree diff (`git -C <wt> diff
    hazards are your job alone.
 5. **AC traceability** (R2 and above) — build the three-column table `| DoD item | gate id | test case |` with one row per `<definition_of_done>` item of the brief: gate id from `.dev-loop/gates/<task>.md`, test case as `<file>:<test name>`; any row with an empty gate or test cell is a Findings item whose failure scenario is the behavior that item guards going unverified (`wiki/qa/process/acceptance-criteria.md`).
 
-**Lens set by tier.** When the task is R0, run lenses 1 and 3 only and write
+**Lens set by tier.** The tier is passed to the agent and selects its lens
+set: when the task is R0, it runs lenses 1 and 3 only and writes
 `not run — R0 profile` in the other rows; when R1, lenses 1-4; when R2 or R3,
 lenses 1-5. When the task is R0 and a review finds a second blocking round,
 escalate to the user with AskUserQuestion instead of dispatching a second
@@ -1253,7 +1274,7 @@ kept), so re-running it is safe. Note the difference from **partial resume** (Ph
   (issue #166); worker worktrees also carry a mechanical `Bash(git stash:*)` deny.
 - Always verify real state after worktree/session ops (`git worktree list`, `tmux ls`,
   status files) — never trust echo logs (set -e is fail-open in eval subshells).
-- Bundled agents only: `test-quality-auditor`, `integration-reviewer`. Don't
+- Bundled agents only: `test-quality-auditor`, `integration-reviewer`, `task-reviewer`. Don't
   depend on built-in agent names (general-purpose/Explore/Plan are
   version-dependent).
 - A completed/excluded issue (partial resume) is injected as a **base output**, never

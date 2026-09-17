@@ -274,6 +274,7 @@ dev-loop/
 ├── wiki/                             # 10-domain semantic-layer knowledge base (260 pages: best practices, edge cases, process methodology)
 ├── skills/                           # the 9 skills above (user-invocable; appear in the / menu by skill name)
 ├── agents/test-quality-auditor.md    # bundled independent test auditor (loop step 6.5)
+├── agents/task-reviewer.md           # bundled fresh-context per-task reviewer (orchestrate Phase 4)
 ├── hooks/
 │   ├── hooks.json
 │   ├── preflight.sh                  # SessionStart: git/tmux/jq advisory
