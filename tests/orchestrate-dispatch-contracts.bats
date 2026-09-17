@@ -436,3 +436,21 @@ brief_dependencies_region() {
   section="$(normalize_ws "$(phase2_section "$fixture")")"
   [[ "$section" != *"coordinator auditor cross-call"* ]]
 }
+
+@test "step 2a's operative launch command carries the DEV_LOOP_WORKER_MODEL prefix from the profile table" {
+  section="$(normalize_ws "$(step2a_section "$SKILL")")"
+  operative="${section#*exists to prevent. Then}"
+  [[ "$operative" == *"DEV_LOOP_WORKER_MODEL=<id from the profile table>"* ]]
+  [[ "$operative" == *"scripts/launch-session.sh"* ]]
+}
+
+@test "negative control: a step-2a copy with only the operative prefix removed fails the operative-prefix check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-operative-prefix.md"
+  awk '
+    /step exists to prevent\. Then$/ { print; getline; sub(/DEV_LOOP_WORKER_MODEL=<id from the profile table> /, ""); print; next }
+    { print }
+  ' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(step2a_section "$fixture")")"
+  operative="${section#*exists to prevent. Then}"
+  [[ "$operative" != *"DEV_LOOP_WORKER_MODEL=<id from the profile table>"* ]]
+}
