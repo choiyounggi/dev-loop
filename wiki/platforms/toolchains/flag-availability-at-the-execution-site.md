@@ -9,7 +9,7 @@ sources:
   - https://semver.org/
   - https://protobuf.dev/programming-guides/proto3/
 last_verified: 2026-08-14
-related: [platforms-toolchains-version-management, platforms-tools-bsd-vs-gnu-cli, backend-common-integrations-externally-owned-defaults]
+related: [platforms-toolchains-version-management, platforms-tools-bsd-vs-gnu-cli, backend-common-integrations-externally-owned-defaults, qa-deliverables-documented-behavior-of-a-third-party-tool]
 ---
 
 # A CLI Flag, Subcommand, or API Method That Exists Locally but Not Where It Runs

@@ -1,150 +1,53 @@
-# Knowledge flush — 4 insight(s)
+# Knowledge flush — 3 insight(s)
 
-Claimed queue ids: `c6c76b1cb2d35bf9`, `028fcf4648303397`, `1c4620e3aadaf0b7`, `56f4dbc8fb5997f8`.
-All four were handled (2 new pages, 3 amended pages); none dropped.
+Queue rows claimed by this run: `e025ad454c4fa162` (stale rationale after a config removal), `2d18b514c5263d8a` (tier-table obligation row vs. a pinned sibling contract), `dee63eaab5ef0e5d` (doc sentence about a third-party installer's side effect). All three ingested as new pages; 0 dropped, 0 folded onto an open PR.
 
 ## Verified best-practice
 
-**1. `c6c76b1cb2d35bf9` — precedence tests must stage the competing condition at the deciding iteration** (→ `confidence: verified`)
+**1. Rationale prose left behind when a pinned config value is removed** — `confidence: verified`
+- Claim: after removing/changing a pinned config value (agent frontmatter `model:`, a version pin, a flag default), grep the whole file and its quoting siblings for the old value's narration (literal, decision verb, reason words) and, per hit, delete mechanism-only rationale, rewrite a still-live trade-off as one sentence about the new behavior, rename tests titled for the old rule, keep history lines; state the sweep in the PR; route the diff through a reader that did not write it.
+- Sources checked (all live-fetched 2026-09-17): https://peps.python.org/pep-0008/#comments — "Comments that contradict the code are worse than no comments. Always make a priority of keeping the comments up-to-date when the code changes!"; https://google.github.io/eng-practices/review/reviewer/looking-for.html — Documentation section: developer "also updates associated documentation" and, on removal, "whether the documentation should also be deleted"; https://google.github.io/styleguide/docguide/best_practices.html — "Dead docs are bad. They misinform"; "Change your documentation in the same CL as the code change"; https://code.claude.com/docs/en/sub-agents — `model` frontmatter values (`sonnet`/`opus`/`haiku`/`fable`, full id, `inherit`) and the four-step precedence order when omitted.
+- Field evidence: dev-loop t3-agent-pin (issue #200): `.orchestration/reviews/t3-agent-pin-r0.md` records the pin removal from `agents/test-quality-auditor.md` + `agents/integration-reviewer.md` and the deleted "pinned rather than inherit" blockquotes; 35/35 bats green and self-review passed the contradiction, the independent test-quality-auditor call returned FAIL first.
 
-Claim: a test asserting that exit condition A wins over B must make B become true in
-the same poll/iteration in which A reaches its threshold; a B staged earlier makes the
-assertion hold under either ordering of the checks.
+**2. A table row that states an obligation another contract already fixes** — `confidence: verified`
+- Claim: before committing a tier/profile/policy row whose label names an obligation ("test audit") that a checksum-pinned sibling contract makes mandatory, grep sibling contracts for the obligation noun; name the actor in the row label and every cell; add the one clause that the other contract is unchanged; review the row against the sibling contract rather than the plan.
+- Sources checked: INCOSE Guide to Writing Requirements v4 summary sheet, rule R2 — "Use the active voice in the need or requirement statement with the responsible entity clearly identified as the subject of the sentence" (the PDF at incose.org returned 403 to WebFetch and an HTML error page to curl on 2026-09-17; the wording was confirmed via two independent restatements, both live-fetched: https://www.jamasoftware.com/legacy/requirements-management-guide/writing-requirements/incose-requirements-writing-guide/ — "'The system shall use a 20 V electrical input' names an owner, while 'A 20 V electrical input shall be used' names nobody." and https://www.altium.com/documentation/altium-365/requirements-systems-portal/valiassistant/quality-assessment — R2 verbatim); https://alistairmavin.com/ears/ — "While <optional pre-condition>, when <optional trigger>, the <system name> shall <system response>", one system name required; http://principles-wiki.net/principles:don_t_repeat_yourself — "at some point in time the different representations diverge which is a fault".
+- Field evidence: `.orchestration/reviews/t5-risk-tier-r1.md` F1 and the fixing diff in `.worktrees/t5-risk-tier/skills/orchestrate/SKILL.md` ("coordinator auditor cross-call" row + "the worker's own step 6.5 auditor call is unchanged at every tier"); lens 1 plan conformance passed because the plan carried the row.
 
-- https://arxiv.org/abs/1909.04770 (Vera-Pérez, Danglot, Monperrus, Baudry, 2019) — fetched
-  this session. An undetected mutant has three causes, the first being that "the test
-  inputs are not sufficient to infect the state of the program". That is exactly this
-  failure: if B fires before A can activate, the reordering mutant is never reached in a
-  state where it can infect the outcome.
-- https://pitest.org/quickstart/basic_concepts/ — a surviving mutant means no test
-  distinguishes the mutated program; a kill is attributed to the covering test, which is
-  why the precedence test itself (not merely the file) must redden.
-- https://testing.googleblog.com/2021/04/mutation-testing.html — detection is measured by
-  inserting the fault and requiring failure, not by branch coverage.
-- Field measurement (dev-loop `watch-status.sh`, three "R6 precedence" bats cases): moving
-  the exit-8 block above the failed/done check left all three green. Re-staging the
-  competing status transition to the same tmux-stub capture count that confirms the
-  two-poll witness made the same swap red.
-
-**2. `028fcf4648303397` — never confirm a pane witness from a capture taken in the same iteration as a key-send** (→ merged as `verified` material into an existing `verified` page)
-
-Claim: when a poll loop both sends keys (auto-recover `Enter`, resend) and reads a state
-witness from the pane, it must skip the capture entirely on the iteration that sent keys.
-
-- Reproduced locally this session (tmux, macOS, `sh` pane): with the newest status line
-  reading `STATE=BLOCKED`, sending a command that worked 0.4s before printing left the
-  same-iteration `capture-pane` still showing `STATE=BLOCKED`; the next poll showed
-  `STATE=RUNNING`. The same sequence with an instantly-printing command had already
-  repainted within the same iteration — so the check's outcome is set by the target's work
-  time, which is why the gate belongs on "did this iteration send keys", not on a delay.
-- Mechanism already sourced on the target page: https://man7.org/linux/man-pages/man1/tmux.1.html
-  (`send-keys` writes keys into the pane; `capture-pane` copies visible contents — neither
-  reports consumption) and https://man7.org/linux/man-pages/man3/termios.3.html.
-- Field evidence: dev-loop code review of task `t3-blocked-consume`, finding F1 — the exit-8
-  "still blocked" witness was confirmed from a same-poll capture, so a just-repaired worker
-  could be escalated; gating on the recovery flag fixed it, and removing the gate under
-  mutation woke the witness one poll early.
-
-**3. `1c4620e3aadaf0b7` — graphify's installed hooks miss the `git pull` path** (→ `verified`)
-
-Claim: `graphify hook install` covers `post-commit` and `post-checkout` only, while the
-"PR merged upstream → `git pull`" path fires `post-merge`, so the graph goes stale while
-`hook status` reports installed.
-
-- https://git-scm.com/docs/githooks — fetched this session: `post-commit` "is invoked by
-  git-commit"; `post-merge` "is invoked by git-merge, which happens when a `git` `pull` is
-  done on a local repository"; `post-checkout` "is also run after git-clone, unless the
-  `--no-checkout` (`-n`) option is used".
-- Local reproduction (git 2.50.1, macOS): in a clone carrying all three hooks, a
-  fast-forward `git pull` fired `post-merge 0` alone; a divergent `git pull` that created a
-  merge commit also fired `post-merge 0` and **no** `post-commit`; a fresh `git clone` of
-  that repository carried no non-sample hooks.
-- Source read: `graphifyy 0.4.23` `hooks.py:186-187` installs `"post-commit"` and
-  `"post-checkout"` only; `grep -c post-merge hooks.py` → 0.
-- **Correction applied to the candidate's stated reasoning:** the submitted note said git
-  "does not run hooks on clone". Per the docs and the reproduction, `git clone` *does* run
-  `post-checkout` — the reason a clone gets no graph is that hooks are not copied by clone,
-  so none exist to run. The page carries the corrected reason.
-
-**4. `56f4dbc8fb5997f8` — a grounding gate's escape hatch must emit a gap record at the point it grants the pass** (→ `confidence: field-tested`)
-
-Claim: an escape hatch (`[no-wiki]`, a suppression comment) is the most valuable signal a
-knowledge base gets, and a gate that only decides pass/fail destroys it; the record must be
-emitted by the gate, not requested in prose.
-
-- https://docs.github.com/en/code-security/code-scanning/managing-code-scanning-alerts/resolving-code-scanning-alerts
-  — fetched this session: dismissing an alert requires choosing a reason, "the dismissal
-  comment is added to the alert timeline", it is readable as `dismissed_comment` on the
-  alerts API, and dismissed alerts stay in the Closed list for review. This is the canonical
-  shape of a *recorded* escape hatch.
-- https://github.blog/changelog/2025-07-01-delegated-alert-dismissal-for-code-scanning-is-now-generally-available/
-  — fetched this session: reviewers can "provide a comment when approving/rejecting alert
-  dismissal requests", and dismissal requests are created, listed and reviewed through
-  dedicated REST API endpoints — the review of a hatch use is itself recorded and readable
-  outside the UI.
-- Local field measurement (this repo, 1.22.0): `skills/wiki-plan/scripts/plan-gate.sh:166`
-  passes an ungrounded decision with `[ "$basis" = "[no-wiki]" ] && continue` and records
-  nothing, while `skills/wiki-plan/SKILL.md:135` asks in prose for the decision to be "noted
-  as an ingest candidate". Against 276 non-index wiki pages, `log.md` carries exactly one
-  `gap` entry (2026-07-11).
-- No external source states the general rule as a directive, so this stays **field-tested**
-  rather than verified; the GitHub precedent supports the mechanism, not the general claim.
+**3. A sentence in your docs stating what a third-party tool does** — `confidence: verified`
+- Claim: locate the tool's source as installed where the reader runs it (pipx/pip/npm/brew lookup table), grep it for the named object, attribute each effect to the component that produces it, record version + check, and treat issue/plan-sourced claims as unverified input; link instead of restating where the tool documents the effect.
+- Sources checked (live-fetched): https://diataxis.fr/reference/ — "accuracy, precision, completeness and clarity"; "The only purpose of a reference guide is to describe, as succinctly as possible, and in an orderly way"; "neutral description"; https://google.github.io/styleguide/docguide/best_practices.html — "Link to it instead."; Google reviewer guide as above.
+- Reproduction 2026-09-17: graphifyy 0.4.23 (pipx venv, `site-packages/graphify/hooks.py`, 220 lines): `grep -nE 'exclude|gitignore|graphify-out' hooks.py` → only lines 91–92 (`if [ ! -d "graphify-out" ]` existence guard); hooks installed are `post-commit` and `post-checkout`; no `.git/info/exclude` or `.gitignore` handling. dev-loop's own `scripts/graph-hooks.sh` (line 20 comment + line 128 `git rev-parse --git-path info/exclude`) is the component that writes the exclude entry.
+- Field evidence: `.orchestration/reviews/t7-graph-setup-r1.md` F1 and the fixed sentence at `.worktrees/t7-graph-setup/skills/graph-setup/SKILL.md:80`.
 
 ## Existing-layer check
 
-Routed via `INDEX.md` → domain `index.md` → every page whose "load when" overlapped.
+Routed via `INDEX.md` → qa (release-quality process, document deliverables and their verification); read `wiki/qa/index.md` in full, plus `wiki/testing/index.md` (candidate 1 was tagged `testing`) and `wiki/backend/index.md` (agent-facing artifacts) and the `agent-orchestration` section of `wiki/infrastructure/index.md` to rule those domains out.
 
-Pages read: testing-quality-tests-that-cannot-fail, testing-quality-policy-at-several-return-sites, testing-quality-completion-predicates, testing-quality-surviving-mutant-equivalence-triage, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-code-graph-as-orientation-layer, platforms-processes-driving-a-tui-in-a-tmux-pane, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-autonomous-decision-rulings
+Pages read: qa-document-verification-retiring-a-provisional-marker, qa-document-verification-editing-a-gated-document, qa-document-verification-spec-document-gates, qa-deliverables-exclusivity-and-absence-claims, qa-deliverables-quantitative-claims-in-a-published-document, qa-process-defect-class-resweep-after-review, backend-common-llm-binding-instructions-for-agents, backend-common-integrations-externally-owned-defaults, platforms-toolchains-flag-availability-at-the-execution-site
 
-(Directory-level scans of `wiki/testing/quality/`, `wiki/platforms/processes/`,
-`wiki/infrastructure/agent-orchestration/` plus keyword sweeps for `no-wiki`, `post-merge`,
-`capture-pane`/`send-keys`, and `precedence` over the whole wiki preceded these reads.)
+Overlaps and decisions:
+- Candidate 1 vs `retiring-a-provisional-marker` (a checklist row stays `[x]` on evidence you just deleted): same mechanism (one file, two independently edited axes) but a different trigger (provisional markers in an ADR/RFC vs. a config value with narrating prose). Created new; cross-linked both ways and reused its history-line rule in the decision table. vs `editing-a-gated-document`: it owns machine anchors; new page points to it for the gate-in-same-commit edge and for scoping the sweep count. vs `defect-class-resweep-after-review`: reused for the copied-siblings edge. No conflict with any existing directive.
+- Candidate 2 vs `exclusivity-and-absence-claims` (write the generating rule, not the enumeration): adjacent — cited for the "cite the contract instead of restating its condition" row. vs `spec-document-gates` cross-reference axis: that page gates a document against itself; the new page is the authoring rule for the row. vs `binding-instructions-for-agents` edge "two instruction sources conflict → state the precedence inside the artifact": the new page is the specific case where the two sources bind different actors under one obligation noun; linked both ways rather than merged (different trigger, and the lesson is not agent-specific). No conflict.
+- Candidate 3 vs `exclusivity-and-absence-claims` edge "claim about an external system you do not control → state the version and the check": that row covers absence claims; the new page covers positive side-effect claims and how to locate the installed source. vs `externally-owned-defaults` (re-query the owner's catalog at review): same principle for a named resource; linked. vs `flag-availability-at-the-execution-site` (resolve a flag against the version present): same lens, different artifact (a doc sentence vs. a CLI flag); linked both ways. vs `quantitative-claims-in-a-published-document`: adjacent (claims in docs); linked. No conflict.
 
-| Insight | Overlap found | Outcome |
-|---------|---------------|---------|
-| 1 precedence | `tests-that-cannot-fail` carries a co-occurring-writer edge case (two writers of one flag) and `policy-at-several-return-sites` carries per-site mutation — both are about *coverage of one site*, neither about *which of two live conditions wins* | **New page**, cross-linked to both; no conflicting directive |
-| 2 pane witness | `pane-delivery-confirmation` already rules that a pane *diff* is not delivery evidence (echo direction). The new rule is the opposite direction — a stale capture *falsely confirming* a witness | **Merged** into that page (Do-this #6, 1 edge row, 1 Instead-of row, 2 sources); 1 pointer row added to `driving-a-tui-in-a-tmux-pane` |
-| 3 graphify hooks | `code-graph-as-orientation-layer` already gates on freshness and its Sources line already names `hook install` post-commit/post-checkout — the hook-coverage consequence was missing | **Merged** into that page (2 edge rows, 2 sources, 1 clause on directive 1) |
-| 4 escape hatch | `session-completion-gates` and `spec-document-gates` cover gate *authoring*; none covers what a gate does with its own exemptions. Keyword sweep for `no-wiki`/`escape hatch`/`knowledge gap` returned no owning page | **New page** in the existing `agent-orchestration` category |
+Merged vs created: 3 new pages, 0 merges. Amended pages carry only reverse `related:` links (9 pages, 11 link additions). `wiki/qa/index.md` +3 rows; `INDEX.md` qa route line extended; `log.md` entry appended.
 
-Conflicts flagged: none — no existing directive is contradicted.
-Related links added both ways: `tests-that-cannot-fail`, `policy-at-several-return-sites`,
-`completion-predicates` ↔ the new precedence page; `session-completion-gates`,
-`autonomous-decision-rulings`, `spec-document-gates` ↔ the new escape-hatch page.
-
-Lint after the edits: `wiki-structure-checks.js` → **278 pages, 13 indexes, 0 findings**;
-`wiki-lint-prohibitions.js` → no findings on any touched page (the 2 repo-wide violations it
-reports are pre-existing, in `plans/` and `tests/fixtures/`). New pages are 67 and 69 body
-lines; amended pages are 92, 92 and 65 — all under the 120-line cap.
+Lint on the checkout: `node scripts/wiki-lint-prohibitions.js` → directives 75 / compliant 75 / violations 0; `node scripts/wiki-structure-checks.js .` → no findings under `wiki/` (only the pre-existing `tests/fixtures/**` orphan noise); `node scripts/wiki-lint-model-era.js .` → the 6 pre-existing revalidate candidates, none of the new pages; new page body lines 72 / 70 / 73 (≤120); no vague qualifiers in directive sentences.
 
 ## Open-PR check
 
-Listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` —
-12 open heads: #191, #190, #189, #188, #187, #186, #185, #183, #182, #181, #180, #179.
-Each head was fetched and its **added** wiki lines (`git diff <merge-base> pr-N -- wiki/`)
-grepped for `post-merge|graphify|graph.json|no-wiki|capture-pane|send-keys|precedence|knowledge gap`.
+Open `knowledge/*` heads listed via `gh pr list --search "head:knowledge/"`: #191 (20260914-213301), #190 (20260914-180008), #189 (20260910-162026), #188 (20260908-154412), #187 (20260906-213635), #186 (20260906-013856), #185 (20260906-003745), #183 (20260904-133717), #182 (20260903-214027), #181 (20260903-203836), #180 (20260903-184706), #179 (20260903-172728). Each head was fetched and `git diff --name-status origin/main origin/<head> -- wiki/` inspected; pages with plausibly overlapping triggers were read from the head.
 
-| Candidate | Overlapping open head | Verdict |
-|-----------|----------------------|---------|
-| 1 precedence | none — #189's `proving-a-critical-section-is-lock-protected` and `sequential-dispatch-assumption-under-concurrency` are concurrency-window tests, not exit-condition ordering; its only `precedence` hits are Gradle property precedence (#179) | **new** |
-| 2 pane witness | none — #183's single `send-keys` hit is a pointer row in a stdin-vs-send-keys edge case | **new** |
-| 3 graphify hooks | #185 edits the *same page* but adds an unrelated row (`update` exits 1 on a >5,000-node HTML viz); #186 only mentions this page in an INGEST_REPORT dedup note | **new** (no content overlap; noted below as a textual merge risk) |
-| 4 escape hatch | none — #189's `gate-evidence-exit-code-class` is about a gate's own exit-code classes, not about recording exemptions | **new** |
+- Candidate 1 (stale rationale after a config removal) — #191 amends `usage-limit-paused-workers` with the subagent `model` frontmatter under a 429 (different trigger: a rate limit, not an edit); #188 `session-identity-leak-in-plugin-prose` (a personal name in redistributed prose, not a contradiction with config); #186 `model-coupled-guidance-aging-detector` (a lint for model-era aging). No head carries this trigger → **new**.
+- Candidate 2 (obligation row vs. pinned sibling contract) — #189 `worker-reported-plan-contradiction` (resolving a doc/doc fact dispute at implement time by running the suite; adjacent, not the authoring rule); #181 `checkable-claims-in-an-adopted-plan` (recompute a plan's numbers / dependency table vs. Steps prose); #180 `forward-references-in-a-numbered-protocol` (graft ordering). None names the actor-in-the-row rule or the unchanged-clause → **new**.
+- Candidate 3 (doc sentence about a third-party tool's side effect) — #188 `sweeping-pre-gate-citations-for-fabrication` (wiki citation sweeps) and `real-cli-spot-check-for-new-execution-paths` (test paths, not docs); #182 `vendor-benchmark-claims-for-an-llm-tool` (vendor benchmark numbers); #181 `checkable-claims-in-an-adopted-plan` (plan numbers/symbols). None covers locating the installed tool's source for a documented side effect → **new**.
 
-Merge-risk note for the reviewer: **#185 and this PR both append to
-`wiki/infrastructure/agent-orchestration/code-graph-as-orientation-layer.md`** (different
-edge-case rows and different source bullets). Whichever lands second may need a one-hunk
-textual merge; the content does not conflict semantically.
+No fold, no pending-duplicate drop; no sibling PR was modified.
 
 ## Routing decision
 
-| Insight | Target | New category? |
-|---------|--------|---------------|
-| 1 | `testing/quality/precedence-between-competing-exit-conditions.md` (**new page**) | No — `testing/quality` already owns "can this test actually fail" |
-| 2 | `infrastructure/agent-orchestration/pane-delivery-confirmation.md` (**merge**), + 1 pointer row in `platforms/processes/driving-a-tui-in-a-tmux-pane.md` | No |
-| 3 | `infrastructure/agent-orchestration/code-graph-as-orientation-layer.md` (**merge**) | No |
-| 4 | `infrastructure/agent-orchestration/escape-hatch-uses-as-a-knowledge-gap-signal.md` (**new page**) | No — `agent-orchestration` already carries the gate-authoring pages (`session-completion-gates`, `autonomous-decision-rulings`); a `knowledge-base` category would hold one page and split gate knowledge across two places |
-
-Plumbing: `wiki/testing/index.md` +1 row; `wiki/infrastructure/index.md` +1 row and two
-extended "load when" lines (pane-delivery-confirmation, code-graph-as-orientation-layer);
-`log.md` +1 `ingest` entry.
+- Candidate 1 → `qa/document-verification/rationale-prose-after-a-config-value-change.md` (`qa-document-verification-rationale-prose-after-a-config-value-change`). Not `testing` (the queue's domain hint): the lesson is about the edited artifact's prose, not about test code; the auditor that caught it is recorded as field context. Not `backend/common/llm`: the rule applies to any config+prose file (Dockerfile comments, CI yaml), not only agent artifacts. Existing category fits (document self-consistency pages already live here).
+- Candidate 2 → `qa/deliverables/obligation-row-without-a-named-actor.md` (`qa-deliverables-obligation-row-without-a-named-actor`). The artifact is a spec/policy table being authored; `deliverables` already holds the claim-form pages (exclusivity/absence, quantitative claims). Not `infrastructure/agent-orchestration`: the field case is an orchestration skill, but the rule (actor as subject, unchanged-clause) is generic requirements-writing.
+- Candidate 3 → `qa/deliverables/documented-behavior-of-a-third-party-tool.md` (`qa-deliverables-documented-behavior-of-a-third-party-tool`). Same category as the other claim-form pages; not `platforms/toolchains` because the artifact under review is the document, with the toolchain page linked for the version-at-execution-site lens.
+- No new category; `INDEX.md` qa route line extended with the three triggers.
