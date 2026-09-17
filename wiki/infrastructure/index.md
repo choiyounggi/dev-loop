@@ -32,6 +32,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [pipeline-structure](ci-cd/pipeline-structure.md) | Creating or restructuring a CI pipeline; CI is slow, unreliable, or reports failures too late; deciding where a new check/stage belongs |
 | [secrets-handling](ci-cd/secrets-handling.md) | A build or deploy step needs credentials (registry, cloud, private packages, signing); reviewing how secrets flow through CI; a secret leaked (log/chat/commit) and deciding the response |
 | [changed-files-only-gates](ci-cd/changed-files-only-gates.md) | A CI step builds a changed-files list in the shell and passes it to `prettier`/`eslint`/a checker as operands; deciding whether a green gate means "no violations" or "nothing examined"; the list is empty because a base ref did not resolve; the script runs under zsh where an unquoted variable does not word-split; placing a probe file to prove the gate can fail |
+| [write-time-limit-guards](ci-cd/write-time-limit-guards.md) | Building or reviewing a guard that rejects a write whose result exceeds a budget/quota/size limit (agent or editor hook, pre-commit/pre-receive check, admission controller, upload validator); the guard blocks every write to a resource that is already over the limit, including the one that would shrink it; choosing the deny predicate and the test fixtures for such a guard |
 
 ## config
 
