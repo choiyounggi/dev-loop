@@ -139,6 +139,7 @@ last_verified: YYYY-MM-DD
 verified_model: <model-id>            # optional
 status: active | superseded | retired # optional, absent = active
 superseded_by: <page id>              # required when status: superseded
+reference_impl: [<repo-relative path>, ...] # wiki-local/** only
 related: [<page id>, ...]
 ---
 ```
@@ -150,6 +151,13 @@ page. `unverified`: candidate knowledge; lint reports it until upgraded or remov
 A `wiki-local/**` page defaults to `confidence: field-tested`; `verified` keeps
 the sources requirement, and a repository ADR or design-document path is a valid
 source there.
+
+A `wiki-local/**` page points at the code it describes with `reference_impl:`, a list of
+repo-relative paths (inline `[src/a.js, docs/b.md]` or a block list); each path resolves
+against the project root, the parent of `wiki-local/`, and lint reports a path that no
+longer exists as check 17 (`reference-impl-missing`, warn). The bundled `wiki/**` stays
+project-independent, so lint reports the key there as check 16 (`reference-impl-bundled`,
+error). Point at code by path; the 120-line body rule stands because nothing is inlined.
 
 `status` (optional) is the page's current validity and is orthogonal to `confidence`,
 which is evidence strength: `active` (the reading when the key is absent) routes

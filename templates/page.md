@@ -10,6 +10,7 @@ last_verified: YYYY-MM-DD
 # optional: verified_model: <model-id the guidance was verified against>
 # optional: status: active | superseded | retired   (absent = active)
 # superseded_by: <page id>   (required when status: superseded)
+# optional, wiki-local/** only: reference_impl: [<repo-relative path>, ...]
 related: []
 ---
 
