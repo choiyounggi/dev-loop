@@ -295,6 +295,7 @@ dev-loop/
 │   ├── pre-flush-pr-gate.sh          # PreToolUse: enforce the flush pre-PR pipeline
 │   └── orchestrate-ask-gate.sh       # PreToolUse: no worker launch until Gate 1 was asked with AskUserQuestion
 ├── scripts/resolve-tools.sh          # capability-role profile resolver (no `plan` role)
+├── scripts/wiki-contradiction.sh     # evidence-gated log.md contradiction entry for a wiki page falsified at implement time (loop-implement rule 4)
 ├── tests/                            # bats suites — hooks (harvest, flush gate, loop gate) + orchestration scripts; CI runs them on ubuntu + macos
 ├── references/tool-profile.md
 └── docs/                             # inherited design notes (loop-orchestrator lineage)
