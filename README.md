@@ -296,6 +296,7 @@ dev-loop/
 │   └── orchestrate-ask-gate.sh       # PreToolUse: no worker launch until Gate 1 was asked with AskUserQuestion
 ├── scripts/resolve-tools.sh          # capability-role profile resolver (no `plan` role)
 ├── scripts/wiki-contradiction.sh     # evidence-gated log.md contradiction entry for a wiki page falsified at implement time (loop-implement rule 4)
+├── scripts/wiki-usage.sh + wiki-lint-usage.js  # WIKI: line telemetry -> <repo>/.dev-loop/wiki-usage.jsonl; wiki-lint check 18 zero-citation review queue (report-only)
 ├── tests/                            # bats suites — hooks (harvest, flush gate, loop gate) + orchestration scripts; CI runs them on ubuntu + macos
 ├── references/tool-profile.md
 └── docs/                             # inherited design notes (loop-orchestrator lineage)

@@ -145,6 +145,11 @@ starting the next, so a downstream task always builds on a verified upstream one
                         visibly ABANDONED) AND the auditor returns VERDICT:
                         PASS. Emit the task report (format below, with the
                         WIKI: references you applied).                          [DoD / evaluator]
+                        After the report is emitted, run
+                        `sh ${CLAUDE_PLUGIN_ROOT}/scripts/wiki-usage.sh --task <NN-slug> --repo <project root> --line "<WIKI: line>"`
+                        once per WIKI: line (usage telemetry, wiki-lint check 18);
+                        its exit code never changes the PASS or FAIL verdict — a
+                        refusal is noted in NOTES: only.
    - PASS  -> next task in Task order (back to step 0), until all tasks done.
    - FAIL  -> 7b.
 7b. Reflect + retry  — say why it failed. If it is a PLAN defect (a decision/name/

@@ -29,17 +29,17 @@ section_body() {
 
 # --- normal: score formula constants are spelled out -----------------------
 
-@test "Health score section states total_weight=38, weights 3/2/1, and the health: NN/100 format" {
+@test "Health score section states total_weight=39, weights 3/2/1, and the health: NN/100 format" {
   section="$(section_body "$SKILL" '^## Health score')"
-  [[ "$section" == *"total_weight = 38"* ]] && [[ "$section" == *"| error | 3 |"* ]] && [[ "$section" == *"| warn | 2 |"* ]] && [[ "$section" == *"| info | 1 |"* ]] && [[ "$section" == *"health: NN/100 (errors E, warns W, infos I)"* ]]
+  [[ "$section" == *"total_weight = 39"* ]] && [[ "$section" == *"| error | 3 |"* ]] && [[ "$section" == *"| warn | 2 |"* ]] && [[ "$section" == *"| info | 1 |"* ]] && [[ "$section" == *"health: NN/100 (errors E, warns W, infos I)"* ]]
 }
 
 # --- negative control: the pin discriminates on the total_weight constant ---
 
-@test "negative control: a SKILL.md copy with total_weight reverted to 33 fails the constant check" {
-  sed 's/total_weight = 38/total_weight = 33/' "$SKILL" > "$BATS_TEST_TMPDIR/skill.md"
+@test "negative control: a SKILL.md copy with total_weight reverted to 38 fails the constant check" {
+  sed 's/total_weight = 39/total_weight = 38/' "$SKILL" > "$BATS_TEST_TMPDIR/skill.md"
   section="$(section_body "$BATS_TEST_TMPDIR/skill.md" '^## Health score')"
-  [[ "$section" != *"total_weight = 38"* ]] && [[ "$section" == *"total_weight = 33"* ]]
+  [[ "$section" != *"total_weight = 39"* ]] && [[ "$section" == *"total_weight = 38"* ]]
 }
 
 # --- error/negative: the compliance clause must be present verbatim --------
