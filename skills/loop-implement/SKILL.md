@@ -106,8 +106,10 @@ starting the next, so a downstream task always builds on a verified upstream one
                         (See "Gates ledger" below.)                             [DoD/XP]
 1. Analyze + load refs— read THIS task's "Wiki pages (read these first, only
                         these)" — the pages `wiki-plan` navigated to — and load
-                        exactly those from `${CLAUDE_PLUGIN_ROOT}/wiki/`, plus the
-                        task's Inputs (confirm each exists; a missing Input is a
+                        exactly those — a `wiki/...` path from
+                        `${CLAUDE_PLUGIN_ROOT}/wiki/`, a `wiki-local/...` path
+                        from the project root — plus the task's Inputs (confirm
+                        each exists; a missing Input is a
                         plan defect -> 7b, not a stand-in). List the test
                         scenarios. Consult `knowledge`/`tacit`/`explore` if
                         configured; when `explore` is graphify, run

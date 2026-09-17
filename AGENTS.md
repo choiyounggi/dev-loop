@@ -18,6 +18,7 @@ Three layers (Karpathy LLM-wiki pattern):
 | Schema | `AGENTS.md` (this file), `templates/` | Change only with repo owner approval |
 | Wiki | `wiki/**` , `INDEX.md`, `log.md` | You create and update via the workflows below |
 | Workflows | `skills/` | Change only with repo owner approval |
+| Project layer | `wiki-local/**` in the consuming project (optional) | Project owners edit it; same schema and routing convention as `wiki/**` |
 
 ## Directory layout
 
@@ -26,6 +27,8 @@ INDEX.md                     # root map: domain → when to route there
 log.md                       # append-only chronological change log
 wiki/<domain>/index.md       # domain map: category/page → when to load it
 wiki/<domain>/<category>/<page>.md
+wiki-local/index.md          # project-local layer (optional, lives in the consuming project): one map for every local page
+wiki-local/<domain>/<category>/<page>.md
 templates/page.md            # canonical page template
 skills/ingest|query|lint/    # the three operations
 ```
@@ -48,6 +51,10 @@ step 7.
 2. Read that domain's `wiki/<domain>/index.md`. Select pages by their **"load when"
    lines — these are the routing gate**. Load only pages whose line matches your
    situation.
+   - **Project-local layer**: when `wiki-local/index.md` exists at the project
+     root, read it after the domain index. It is one file whose rows follow the
+     same "load when" convention, and it is read only when it exists, so a
+     project without one pays nothing.
 3. After loading, the page's "When this applies" should confirm the match. If it
    contradicts your situation, drop the page and append a `drift` entry to `log.md`
    (index line and page trigger disagree — a lint defect), unless the page content
@@ -64,6 +71,10 @@ step 7.
      row** (rows are ordered general → specific); when a general row and a
      precondition-bearing row both fit, take the one that preserves the stated
      invariant.
+   - When a local page (`wiki-local/**`) and a bundled page both match the
+     trigger, apply the local page's directives and keep the bundled page for
+     the cases the local page does not cover; a local edge-case row overrides a
+     bundled general rule.
 7. **Review entry — route from the diff, then compare the page sets.** When your
    input is a change rather than a task, derive the match from what the diff does,
    not from what its plan said it would do:
@@ -136,6 +147,10 @@ related: [<page id>, ...]
 measurement. `field-tested`: worked in real production use; context described in the
 page. `unverified`: candidate knowledge; lint reports it until upgraded or removed.
 
+A `wiki-local/**` page defaults to `confidence: field-tested`; `verified` keeps
+the sources requirement, and a repository ADR or design-document path is a valid
+source there.
+
 `status` (optional) is the page's current validity and is orthogonal to `confidence`,
 which is evidence strength: `active` (the reading when the key is absent) routes
 normally; `superseded` names its replacement in `superseded_by: <page id>` and is
@@ -194,6 +209,11 @@ Two further skills use the wiki to run development work (rather than maintain th
 - Page files: the situation, not the technology (`composite-index-column-order.md`,
   not `postgres-tips.md`).
 - Page ids: `<domain>-<category>-<slug>` matching the file path.
+- Local-layer page ids: `local-<domain>-<category>-<slug>` (the file lives at
+  `wiki-local/<domain>/<category>/<slug>.md`). A local page names a bundled page
+  by its plain repo path `wiki/<domain>/<category>/<page>.md` in prose — lint
+  resolves `related:` ids and `[id]` links inside one root, and a bare path in
+  prose is not an inline link, so check 3 leaves it alone.
 
 ## Maintenance invariants
 

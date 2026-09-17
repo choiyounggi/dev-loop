@@ -30,7 +30,13 @@ or a distilled lesson ("we hit X; doing Y fixed it because Z").
    rewrite it as the replacement action: "when <situation that tempts X>, do Y".
    Keep the prohibition only as an `Instead of` row paired with Y.
 
-3. **Route.** Match the case to a domain via `INDEX.md`, then to a category via the
+3. **Route.** **Layer first.** The knowledge is project-specific when its
+   directive names this repository's own files, modules, services, conventions
+   or infrastructure, or would be wrong in another codebase; route
+   project-specific knowledge to `wiki-local/<domain>/<category>/<slug>.md` in
+   that project (same `templates/page.md`, id `local-<domain>-<category>-<slug>`,
+   one row in `wiki-local/index.md`) and general knowledge to the bundled wiki.
+   Then match the case to a domain via `INDEX.md`, then to a category via the
    domain `index.md`. If no category fits, create one (update the domain index) —
    but first re-check that an existing category doesn't already cover it under a
    different name.

@@ -130,15 +130,19 @@ table now has six columns:
 ```
 
 **Wiki routing sweep** — read the wiki's `INDEX.md`, then the `index.md` of
-every domain the work touches. For each design decision, find the page that
-owns it (match "load when" lines), apply its directives now, and record the
-decision + page. `Wiki basis` is a repo-relative path,
-`wiki/<domain>/<category>/<page>.md`, to a page that actually exists — not a
+every domain the work touches. When `wiki-local/index.md` exists at the project
+root, read it after the bundled domain indexes and cite local pages the same
+way. For each design decision, find the page that owns it (match "load when"
+lines), apply its directives now, and record the decision + page. `Wiki basis`
+is a repo-relative path to a page that actually exists in either layer —
+`wiki/<domain>/<category>/<page>.md` in the bundled wiki or
+`wiki-local/<domain>/<category>/<page>.md` in the project's local layer — not a
 page id — or the literal `[no-wiki]` (gate-B's gaps-emitted gate records each
 such row as a log.md gap line and an insight-queue candidate for
-knowledge-flush — nothing to write by hand); gate-B greps every
-non-`[no-wiki]` path under the wiki root and
-fails on any miss. Example, for a login feature:
+knowledge-flush — nothing to write by hand); gate-B resolves every
+non-`[no-wiki]` path (bundled paths under the wiki root, `wiki-local/` paths
+under the project root derived from the plan dir) and fails on any miss.
+Example, for a login feature:
 
 | # | Decision | Choice | Wiki basis | Rejected alternative | Testability |
 |---|----------|--------|------------|----------------------|-------------|
