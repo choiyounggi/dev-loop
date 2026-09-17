@@ -835,15 +835,17 @@ reasoning-effort flags) that `worker-start` cannot express.
    Because planning happens here, **the planning model is whatever model this
    coordinator session is running**. There is no separate setting to turn: to plan
    on a stronger tier than you implement on, start the coordinator on that tier
-   (`claude --model <planning model>`) and leave `DEV_LOOP_WORKER_MODEL` pointed at
-   the cheaper implementer tier.
+   (`claude --model <planning model>`). The worker model is set per dispatch from
+   the Tier to pipeline profile table, prefixed on the launch call below — never
+   exported run-wide for the session.
 
    A worker that reports the plan is contradictory or under-decided is telling you
    the planning pass was wrong: fix `plans/<task>.md` here and re-send §1. Do not
    let the worker re-plan — that silently moves planning back onto the worker tier,
    which is the thing this step exists to prevent. Then
-   `LO_STATUS_DIR=<abs status dir> LO_TASK_ID=<task> scripts/launch-session.sh
-   lo-<n> <worktree> bypassPermissions "<plan prompt>"`
+   `DEV_LOOP_WORKER_MODEL=<id from the profile table> LO_STATUS_DIR=<abs status dir>
+   LO_TASK_ID=<task> scripts/launch-session.sh lo-<n> <worktree> bypassPermissions
+   "<plan prompt>"`
    (plan prompt = templates/session-prompt.md §1 — the tmux set — with the
    subagent + tmux worker protocol blocks). With BOTH vars set, a successful
    launch (the confirmed-submission path AND the session-reuse path) pre-seeds
