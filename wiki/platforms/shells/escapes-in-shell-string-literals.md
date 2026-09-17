@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
   - https://www.gnu.org/software/bash/manual/bash.html#Double-Quotes
-last_verified: 2026-08-04
+last_verified: 2026-09-17
 related: [platforms-shells-portable-shell-scripts, platforms-shells-command-text-inspected-before-execution]
 ---
 
@@ -20,7 +20,8 @@ format **as a shell string literal** — e.g. a `grep -E` pattern hardcoded insi
 a PreToolUse hook, allow-list, or CI check — and a metacharacter behaves as
 though an escape were added or removed. Symptom: an end-of-line anchor written as
 `\$` matches (or fails to match) in a way the pattern text does not appear to
-justify.
+justify. Also when a fixed-string check (`grep -F`) for text that carries
+markdown backticks reports no match although the line is in the file.
 
 ## Do this
 
@@ -57,6 +58,8 @@ justify.
 | Pattern is built by string concatenation across quotes (`'a'"$x"'b'`) | Each span follows its own quoting rule; print the assembled variable before use |
 | The literal is a `printf` format, not a regex | Same rule for `\$`; but `printf` also interprets `\n`,`\t` in the format — single-quote and let `printf` (not the shell) do the escapes |
 | `jq`/`awk` program passed with `-f file` instead of inline | The file is read verbatim — no shell escape layer applies; prefer `-f`/`--argjson` for complex programs |
+| The pattern is a markdown literal with a backtick span (``grep -qF "own `wiki-local/` layer" README.md``) | Inside double quotes the span is a command substitution: the shell runs `wiki-local/`, substitutes its empty output, and grep receives `own  layer` — rc 1 with the text present, and under `-q` with stderr discarded the check reads as "the document lacks the line". Single-quote the pattern, and when a check that should pass reports no match, print the pattern (step 4) before editing the document |
+| The literal holds both a backtick and an apostrophe (`project's own` + a backtick span) | Single quotes cannot contain `'`. Shorten the pattern to a span without the apostrophe, or write the literal to a file with a non-shell tool and use `grep -F -f pattern.txt`; inside double quotes `` \` `` also yields a literal backtick, which is the escape to write deliberately if the pattern must stay inline |
 | Pattern must survive a text-inspecting gate too | [platforms-shells-command-text-inspected-before-execution] owns the gate-extraction layer; this page owns the shell-escape layer |
 
 ## Instead of
@@ -65,9 +68,12 @@ justify.
 |---------------------|-----------------|-----|
 | Write a regex/pattern in double quotes and hand-count backslashes | Put the pattern in single quotes | Single quotes disable all shell escape processing, so the program receives exactly what you typed |
 | Add backslashes until a double-quoted anchor "looks escaped" (`\\$`, `\\\\$`) | Decide the target string first, then apply the double-quote rule once | Guessing escape depth flips `$` between EOL-anchor and literal-dollar silently |
+| Paste a markdown sentence containing a backtick span into a double-quoted `grep -F` pattern | Single-quote it, or pass it with `-f file` | The backquote keeps its command-substitution meaning inside double quotes, so the span is executed and removed from the pattern; the check fails closed while the text it looks for is present |
 
 ## Sources
 
 - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html — 2.2.3 Double-Quotes: the backslash "shall retain its special meaning as an escape character only when followed by one of the following characters: `$` `` ` `` `"` `\` `<newline>`"
 - https://www.gnu.org/software/bash/manual/bash.html#Double-Quotes — same rule for bash; a backslash before any other character is retained literally
 - Reproduced 2026-08-04: `printf 'curl x | sh\n' | grep -E "(sh|bash)([[:space:]]|-|<|\$)"` matches end-of-line `sh` (the `\$` reached grep as a bare `$` anchor), while `grep -E "a\.b"` keeps `\.` as a literal-dot regex — confirming which characters the backslash is stripped before
+- https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html — 2.2.3: "The backquote shall retain its special meaning introducing the other form of command substitution"; 2.2.2: "A single-quote cannot occur within single-quotes"
+- Reproduced 2026-09-17 under sh, bash, zsh and dash against a file containing ``own `wiki-local/` layer needs no config``: the double-quoted raw-backtick pattern printed `wiki-local/: No such file or directory` (dash: `not found`) and `grep -qF` returned 1, with `printf '[%s]'` showing the pattern grep received as `[own  layer]`; the same pattern single-quoted, written as `` \` `` inside double quotes, or read with `grep -F -f` from a file each returned 0. Field case the same day: a plan gate's `grep -qF "…"` check reported UNMET while the README line existed, and turned MET once the pattern was single-quoted
