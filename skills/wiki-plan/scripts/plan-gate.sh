@@ -8,6 +8,7 @@
 # Gate ids (A): baseline-tests-ran affected-files-evidenced open-questions-resolved
 #               constraints-surveyed research-evidenced
 # Gate ids (B): groundings-exist decision-rows-complete reviewer-verdict
+#   groundings-exist resolves wiki-local/... under the project root (see project_root_for)
 #
 # Exit codes: 0 ok | 2 usage | 3 check failed (content defect, stderr itemizes)
 #             4 target file/section missing (distinct from content missing)
@@ -151,24 +152,44 @@ _decision_rows() { # <design.md> — prints only data rows of ## Decisions table
   '
 }
 
+# project_root_for <plan-dir> — the nearest ancestor of the resolved plan dir
+# (the plan dir itself first) that holds a wiki-local/ directory; when none
+# does, the caller's PWD. Local-layer Wiki basis paths (wiki-local/...) are
+# resolved against this root; bundled paths (wiki/...) never are.
+project_root_for() {
+  dir=$(CDPATH= cd -- "$1" && pwd)
+  while :; do
+    if [ -d "$dir/wiki-local" ]; then printf '%s\n' "$dir"; return 0; fi
+    [ "$dir" = "/" ] && break
+    dir=$(dirname -- "$dir")
+  done
+  printf '%s\n' "$PWD"
+}
+
 check_groundings_exist() { # <plan-dir> <wiki-root>
   file="$1/design.md"
   wiki_root="$2"
+  project_root=$(project_root_for "$1")
   [ -f "$file" ] || fail4 "design.md not found in $1"
   has_heading "$file" "## Decisions" || fail4 "## Decisions section missing in $file"
   rows=$(_decision_rows "$file")
   [ -n "$rows" ] || ok   # no decisions yet: decision-rows-complete gate owns that defect
   misses=""
+  local_misses=""
   while IFS= read -r row; do
     [ -n "$row" ] || continue
     basis=$(printf '%s\n' "$row" | awk -F'|' '{v=$5; gsub(/^[ \t]+|[ \t]+$/,"",v); print v}')
     [ -n "$basis" ] || continue
     [ "$basis" = "[no-wiki]" ] && continue
-    [ -f "$wiki_root/$basis" ] || misses="$misses $basis"
+    case "$basis" in
+      wiki-local/*) [ -f "$project_root/$basis" ] || local_misses="$local_misses $basis" ;;
+      *) [ -f "$wiki_root/$basis" ] || misses="$misses $basis" ;;
+    esac
   done <<EOF
 $rows
 EOF
   [ -z "$misses" ] || fail3 "Wiki basis page(s) not found under $wiki_root:$misses"
+  [ -z "$local_misses" ] || fail3 "Wiki basis page(s) not found under $project_root (project-local layer):$local_misses"
   ok
 }
 

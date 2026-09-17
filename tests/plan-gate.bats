@@ -17,6 +17,17 @@ setup() {
   cd "$WORK"
 }
 
+# local_design <plan-dir> <basis> — a one-row design.md citing <basis>
+local_design() {
+  mkdir -p "$1"
+  cat > "$1/design.md" <<EOF2
+## Decisions
+| # | Decision | Choice | Wiki basis | Rejected alternative | Testability |
+|---|----------|--------|------------|----------------------|-------------|
+| 1 | Local rule | choice X | $2 | choice Y | plan-gate.bats |
+EOF2
+}
+
 # ---------- usage errors (exit 2) ----------
 
 @test "no args: usage error exit 2" {
@@ -301,4 +312,117 @@ EOF
   CLAUDE_PLUGIN_ROOT="${BATS_TEST_DIRNAME}/.." DEV_LOOP_LOG_MD="$WORK/log.md" DEV_LOOP_QUEUE_DIR="$WORK/queue" run bash "$GC" --run "$WORK/plan-B-run.md"
   [ "$status" -eq 0 ]
   [[ "$output" == *"met=4 unmet=0"* ]]
+}
+
+# ---------- groundings-exist: project-local layer (issue #194 A) ----------
+
+@test "groundings-exist: a present wiki-local page cited from plans/<feature> -> ok" {
+  mkdir -p wiki-local/alpha/cat
+  printf '# p\n' > wiki-local/alpha/cat/page.md
+  local_design plans/feat wiki-local/alpha/cat/page.md
+  run sh "$PG" check groundings-exist plans/feat "$WIKI"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok" ]
+}
+
+@test "groundings-exist: the ancestor walk finds wiki-local/ from .orchestration/plans/<task>" {
+  mkdir -p proj/wiki-local/alpha/cat
+  printf '# p\n' > proj/wiki-local/alpha/cat/page.md
+  local_design proj/.orchestration/plans/t9 wiki-local/alpha/cat/page.md
+  mkdir -p elsewhere
+  cd elsewhere
+  [ ! -d wiki-local ]
+  run sh "$PG" check groundings-exist ../proj/.orchestration/plans/t9 "$WIKI"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok" ]
+}
+
+@test "groundings-exist: a plan dir that itself holds wiki-local/ is its own project root (boundary)" {
+  # the walk starts AT the resolved plan dir, not at its parent: here the only
+  # wiki-local/ in the tree sits inside the plan dir itself.
+  mkdir -p planroot/wiki-local/alpha/cat
+  printf '# p\n' > planroot/wiki-local/alpha/cat/page.md
+  local_design planroot wiki-local/alpha/cat/page.md
+  mkdir -p elsewhere
+  cd elsewhere
+  [ ! -d wiki-local ]
+  [ ! -d ../wiki-local ]
+  run sh "$PG" check groundings-exist ../planroot "$WIKI"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok" ]
+}
+
+@test "negative control: with no wiki-local/ above the plan dir the walk falls back to the cwd -> fail exit 3" {
+  mkdir -p proj/.orchestration/plans/t9 elsewhere
+  local_design proj/.orchestration/plans/t9 wiki-local/alpha/cat/page.md
+  cd elsewhere
+  [ ! -d wiki-local ]
+  run sh "$PG" check groundings-exist ../proj/.orchestration/plans/t9 "$WIKI"
+  [ "$status" -eq 3 ]
+  [ "${lines[0]}" = "fail" ]
+  [[ "$output" == *"not found under $WORK/elsewhere (project-local layer): wiki-local/alpha/cat/page.md"* ]]
+}
+
+@test "groundings-exist: a basis that only looks local (wiki-localX/...) resolves against the bundled root" {
+  # the prefix that routes a basis to the project-local root is exactly
+  # "wiki-local/": a sibling directory whose name merely starts with it stays a
+  # bundled citation, even when that same path exists under the project root.
+  mkdir -p wiki-local/alpha/cat wiki-localX/alpha/cat
+  printf '# p\n' > wiki-local/alpha/cat/page.md
+  printf '# p\n' > wiki-localX/alpha/cat/page.md
+  local_design plans/feat wiki-localX/alpha/cat/page.md
+  run sh "$PG" check groundings-exist plans/feat "$WIKI"
+  [ "$status" -eq 3 ]
+  [ "${lines[0]}" = "fail" ]
+  [[ "$output" == *"not found under $WIKI: wiki-localX/alpha/cat/page.md"* ]]
+  [[ "$output" != *"project-local layer"* ]]
+}
+
+@test "groundings-exist: an absent wiki-local page -> fail exit 3 naming the project-local layer" {
+  mkdir -p wiki-local/alpha/cat
+  local_design plans/feat wiki-local/alpha/cat/absent.md
+  run sh "$PG" check groundings-exist plans/feat "$WIKI"
+  [ "$status" -eq 3 ]
+  [ "${lines[0]}" = "fail" ]
+  [[ "$output" == *"not found under $WORK (project-local layer): wiki-local/alpha/cat/absent.md"* ]]
+  [[ "$output" != *"not found under $WIKI"* ]]
+}
+
+@test "groundings-exist: no wiki-local/ dir -> bundled behavior and stderr unchanged (boundary)" {
+  [ ! -d wiki-local ]
+  local_design plans/feat wiki/platforms/shells/portable-shell-scripts.md
+  run sh "$PG" check groundings-exist plans/feat "$WIKI"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok" ]
+  run sh "$PG" check groundings-exist "$FIX/failing/groundings-exist" "$WIKI"
+  [ "$status" -eq 3 ]
+  [ "${lines[0]}" = "fail" ]
+  [[ "$output" == *"Wiki basis page(s) not found under $WIKI: wiki/does/not/exist.md"* ]]
+  [[ "$output" != *"project-local layer"* ]]
+}
+
+@test "groundings-exist: with a miss in EACH root the bundled miss is the one reported (priority)" {
+  mkdir -p wiki-local/alpha/cat plans/feat
+  cat > plans/feat/design.md <<EOF2
+## Decisions
+| # | Decision | Choice | Wiki basis | Rejected alternative | Testability |
+|---|----------|--------|------------|----------------------|-------------|
+| 1 | Bundled rule | choice X | wiki/does/not/exist.md | choice Y | plan-gate.bats |
+| 2 | Local rule | choice X | wiki-local/alpha/cat/absent.md | choice Y | plan-gate.bats |
+EOF2
+  run sh "$PG" check groundings-exist plans/feat "$WIKI"
+  [ "$status" -eq 3 ]
+  [ "${lines[0]}" = "fail" ]
+  [[ "$output" == *"not found under $WIKI: wiki/does/not/exist.md"* ]]
+  [[ "$output" != *"project-local layer"* ]]
+}
+
+@test "negative control: the same local citation in a project without wiki-local/ -> fail exit 3" {
+  [ ! -d wiki-local ]
+  local_design plans/feat wiki-local/alpha/cat/page.md
+  run sh "$PG" check groundings-exist plans/feat "$WIKI"
+  [ "$status" -eq 3 ]
+  [ "${lines[0]}" = "fail" ]
+  [[ "$output" == *"not found under $WORK (project-local layer): wiki-local/alpha/cat/page.md"* ]]
+  [[ "$output" != *"not found under $WIKI"* ]]
 }

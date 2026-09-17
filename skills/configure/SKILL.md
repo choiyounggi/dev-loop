@@ -12,6 +12,8 @@ model's own behavior). Configuring the roles makes the loop use *your* real tool
 your domain wiki for facts, your actual test command for verification, etc. The
 bundled best-practice `wiki/` (used by `wiki-plan`) needs no config — the
 `knowledge` role is for a separate *external/domain* wiki.
+The project's own `wiki-local/` layer (read by `wiki-plan` and `loop-implement`
+when it exists) also needs no config; it is not the `knowledge` role.
 
 > Note: the plan step is fixed to `wiki-plan` and is NOT configurable. There is no
 > `plan` role.

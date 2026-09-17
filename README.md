@@ -113,6 +113,12 @@ This is not a configurable role and cannot be turned off.
 The wiki lives at the plugin root (`wiki/`, `INDEX.md`, `AGENTS.md`,
 `templates/`); the wiki skills resolve their paths against `${CLAUDE_PLUGIN_ROOT}`.
 
+A project can add its own layer at `<repo>/wiki-local/` (same `templates/page.md`
+schema, one `wiki-local/index.md` map, ids `local-<domain>-<category>-<slug>`).
+`wiki-plan` cites local pages as first-class `Wiki basis` groundings, the routing
+protocol reads the local index only when it exists, and a local page wins over a
+bundled page on the same trigger.
+
 ### Configuring your tools (optional)
 
 Like loop-orchestrator, dev-loop runs fully generic with **no** config, but you
@@ -129,7 +135,8 @@ can map its **capability roles** to your real tools so the loop uses them:
 | `research` | external best-practice/pitfall search (wiki-plan Phase A/B). Fixed fallback when unset: brave-search MCP if present → built-in WebSearch → open `ABANDON` |
 
 (`plan` is **not** a role — the plan step is fixed to `wiki-plan`. And the bundled
-best-practice `wiki/` needs no config; `knowledge` is a *separate* external wiki.)
+best-practice `wiki/` needs no config; `knowledge` is a *separate* external wiki —
+the project's own `wiki-local/` layer needs no config either.)
 
 Set it up with **`/dev-loop:configure`**, which writes `~/.claude/dev-loop/tools.json`
 (global) or `<repo>/.dev-loop/tools.json` (per-repo, team-shared). Precedence is

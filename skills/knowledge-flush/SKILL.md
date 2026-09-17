@@ -131,6 +131,13 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
    c. **Routing decision.** State the target `domain/category` and page. If no
       category fits, decide whether to add one (and justify why the existing
       categories genuinely don't cover it) or place it under the closest fit.
+      Apply the layer test from `wiki-ingest` step 3 first: a project-specific
+      candidate (its directive names one repository's own files, modules,
+      services, conventions or infrastructure, or would be wrong in another
+      codebase) is excluded from this PR and listed under
+      `## Local-layer candidates` with its
+      `wiki-local/<domain>/<category>/<slug>.md` target and the note "run
+      wiki-ingest inside that project".
 
    d. **Ingest.** Run the **`wiki-ingest`** skill with the decisions from a–c:
       merge-before-create, positive-guidance form, sourced frontmatter, ≤120
@@ -162,6 +169,11 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
    ## Routing decision
    Target domain/category/page for each insight; any new category + why existing
    ones didn't fit.
+
+   ## Local-layer candidates
+   Project-specific candidates excluded from this PR, each with its
+   wiki-local/<domain>/<category>/<slug>.md target and the project it belongs
+   to; write `none` when every candidate was general.
    ```
 
 4. **Commit + PR (no auto-merge).**
