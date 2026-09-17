@@ -54,6 +54,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [invalidation-and-stampede](common/caching/invalidation-and-stampede.md) | Adding a cache in front of an expensive read — choosing invalidation (delete-on-write vs TTL), building cache keys (tenant/locale/version dimensions), protecting hot keys from stampede; debugging stale reads, cross-tenant leaks, expiry-time load spikes, or eviction evicting sessions |
+| [input-manifest-freshness-with-skipped-inputs](common/caching/input-manifest-freshness-with-skipped-inputs.md) | A derived index/cache (search index, code graph, embedding store) judges freshness by comparing a stored input-hash manifest or version marker with the current inputs, and the builder can skip an unprocessable input; an index reports stale straight after a successful build, or a background hook rebuilds it every session with no error logged; deciding what the manifest records for a skipped or failed input |
 
 ### jobs
 
