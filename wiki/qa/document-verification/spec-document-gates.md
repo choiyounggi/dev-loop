@@ -17,6 +17,7 @@ sources:
 last_verified: 2026-08-09
 related:
   [
+    qa-document-verification-superseding-a-knowledge-record,
     qa-process-acceptance-criteria,
     testing-quality-tests-that-cannot-fail,
     platforms-environment-unicode-text-matching,
