@@ -15,6 +15,7 @@ setup() {
   SKILL="${REPO_ROOT}/skills/loop-implement/SKILL.md"
   AGENT1="${REPO_ROOT}/agents/integration-reviewer.md"
   AGENT2="${REPO_ROOT}/agents/test-quality-auditor.md"
+  AGENT3="${REPO_ROOT}/agents/task-reviewer.md"
 }
 
 # Extracts the "## Floor pre-gate + calling the auditor (step 6.5)" section:
@@ -24,7 +25,7 @@ step65_section() {
 }
 
 @test "review agents carry no model pin" {
-  for f in "$AGENT1" "$AGENT2"; do
+  for f in "$AGENT1" "$AGENT2" "$AGENT3"; do
     run sh -c "head -10 '$f' | grep -q '^model:'"
     [ "$status" -ne 0 ]
   done
@@ -37,8 +38,8 @@ step65_section() {
   [[ "$section" == *"opus"*"sonnet"* ]]
 }
 
-@test "both agent bodies carry the Coordinator note about the 429 override" {
-  for f in "$AGENT1" "$AGENT2"; do
+@test "all three agent bodies carry the Coordinator note about the 429 override" {
+  for f in "$AGENT1" "$AGENT2" "$AGENT3"; do
     content="$(cat "$f" | tr '[:upper:]' '[:lower:]')"
     [[ "$content" == *"429"* ]]
     [[ "$content" == *"not a verdict"* ]]
@@ -63,4 +64,19 @@ step65_section() {
   [[ "$content" == *"integration-reviewer"* ]]
   [[ "$content" != *"not a verdict"* ]]
   [[ "$content" != *"opus"* ]]
+}
+
+@test "negative control: a task-reviewer copy with the 429 note removed fails the note check" {
+  stripped="${BATS_TEST_TMPDIR}/task-reviewer-no-429.md"
+  grep -v '429' "$AGENT3" > "$stripped"
+  content="$(cat "$stripped" | tr '[:upper:]' '[:lower:]')"
+  [ -s "$stripped" ]
+  [[ "$content" != *"429"* ]]
+}
+
+@test "boundary: a task-reviewer copy pinned to a model fails the no-pin check" {
+  pinned="${BATS_TEST_TMPDIR}/task-reviewer-pinned.md"
+  awk '/^name:/{print; print "model: fable"; next} {print}' "$AGENT3" > "$pinned"
+  run sh -c "head -10 '$pinned' | grep -q '^model:'"
+  [ "$status" -eq 0 ]
 }
