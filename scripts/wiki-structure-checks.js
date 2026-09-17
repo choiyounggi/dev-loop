@@ -33,7 +33,7 @@
 //   duplicate-index-row one index lists the same target twice
 //   cross-domain-listing a domain index lists a page outside its own domain
 //                      (routing scopes are disjoint — PR #93)
-//   orphan-page        page listed in no index at all
+//   orphan-page        active page listed in no index at all
 //   bad-related        `related:` names an id no page carries
 //   duplicate-frontmatter-key  a top-level frontmatter key appears more than
 //                      once in the block (YAML last-key-wins silently drops
@@ -41,6 +41,16 @@
 //   stray-frontmatter-value  a key's value block has 2+ top-level `[...]`
 //                      bracket literals, or a non-empty inline value followed
 //                      by an indented `- ` bullet that belongs to no key
+//   bad-status         `status` present but not one of active|superseded|retired
+//                      (an absent key reads as active — AGENTS.md Frontmatter)
+//   bad-superseded-by  `status: superseded` with no `superseded_by`, or one naming
+//                      an id no page carries (same resolver as bad-related)
+//   listed-inactive    a superseded or retired page is still the target of a
+//                      domain index row (only active pages route)
+// Warnings (stderr, same `<check>:<file>: <detail>` shape; summarized by a second
+// stdout line `warnings: K` printed only when K > 0; never change the exit code):
+//   superseded-chain   `superseded_by` names a page that is itself superseded or
+//                      retired — a chain to walk, allowed but surfaced
 'use strict';
 
 const fs = require('fs');
@@ -49,6 +59,7 @@ const path = require('path');
 const REQUIRED_KEYS = ['id', 'domain', 'category', 'applies_to', 'confidence',
   'sources', 'last_verified', 'related'];
 const CONFIDENCE = new Set(['verified', 'field-tested', 'unverified']);
+const STATUS = new Set(['active', 'superseded', 'retired']);
 
 const root = process.argv[2];
 if (!root) { process.stderr.write('usage: wiki-structure-checks.js <wiki-root>\n'); process.exit(4); }
@@ -73,10 +84,14 @@ const pages = all.filter((p) => path.basename(p) !== 'index.md');
 const indexes = all.filter((p) => path.basename(p) === 'index.md');
 const findings = [];
 const report = (check, file, detail) => findings.push(`${check}:${file}: ${detail}`);
+const warnings = [];
+const warn = (check, file, detail) => warnings.push(`${check}:${file}: ${detail}`);
 
 // --- per-page frontmatter checks -------------------------------------------
 const idOwners = new Map();   // id -> [files]
 const pageMeta = new Map();   // file -> { fm } (frontmatter text)
+const pageStatus = new Map();   // normalized file -> active|superseded|retired|invalid (absent = active)
+const supersededBy = new Map(); // file -> superseded_by value or null
 
 for (const p of pages) {
   const text = fs.readFileSync(p, 'utf8');
@@ -125,6 +140,10 @@ for (const p of pages) {
       new RegExp('^sources:\\s*\\n(\\s+-\\s+\\S)', 'm').test(fm);
     if (!inline && !block) report('verified-no-sources', p, 'confidence: verified with empty sources');
   }
+  const status = get('status');
+  const effective = status === null ? 'active' : status;
+  if (!STATUS.has(effective)) { report('bad-status', p, `status '${effective}' not in active|superseded|retired`); pageStatus.set(path.normalize(p), 'invalid'); } else { pageStatus.set(path.normalize(p), effective); }
+  if (effective === 'superseded') supersededBy.set(p, get('superseded_by'));
 }
 
 for (const [id, owners] of idOwners) {
@@ -189,7 +208,10 @@ for (const ix of indexes) {
 }
 
 for (const p of pages) {
-  if (!listed.has(path.normalize(p))) report('orphan-page', p, 'listed in no index');
+  const np = path.normalize(p);
+  const s = pageStatus.get(np) || 'active';
+  if (s === 'active' && !listed.has(np)) report('orphan-page', p, 'active page listed in no index');
+  if ((s === 'superseded' || s === 'retired') && listed.has(np)) report('listed-inactive', p, `status ${s} but still listed in a domain index`);
 }
 
 // --- related-id resolution --------------------------------------------------
@@ -202,8 +224,17 @@ for (const [p, fm] of pageMeta) {
   }
 }
 
+for (const [p, target] of supersededBy) {
+  if (target === null || target === '') { report('bad-superseded-by', p, 'status: superseded with no superseded_by'); continue; }
+  if (!knownIds.has(target)) { report('bad-superseded-by', p, `superseded_by id '${target}' resolves to no page`); continue; }
+  const targetStatus = pageStatus.get(path.normalize(idOwners.get(target)[0])) || 'active';
+  if (targetStatus !== 'active') warn('superseded-chain', p, `superseded_by '${target}' is itself ${targetStatus}`);
+}
+
 // --- report -----------------------------------------------------------------
 process.stdout.write(`pages: ${pages.length}, indexes: ${indexes.length}, findings: ${findings.length}\n`);
+if (warnings.length > 0) process.stdout.write(`warnings: ${warnings.length}\n`);
+for (const w of warnings) process.stderr.write(w + '\n');
 if (findings.length > 0) {
   for (const f of findings) process.stderr.write(f + '\n');
   process.exit(3);

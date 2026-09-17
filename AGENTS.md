@@ -126,6 +126,8 @@ sources:
   - <url or citation>
 last_verified: YYYY-MM-DD
 verified_model: <model-id>            # optional
+status: active | superseded | retired # optional, absent = active
+superseded_by: <page id>              # required when status: superseded
 related: [<page id>, ...]
 ---
 ```
@@ -133,6 +135,15 @@ related: [<page id>, ...]
 `confidence` meanings — `verified`: backed by cited official docs or reproducible
 measurement. `field-tested`: worked in real production use; context described in the
 page. `unverified`: candidate knowledge; lint reports it until upgraded or removed.
+
+`status` (optional) is the page's current validity and is orthogonal to `confidence`,
+which is evidence strength: `active` (the reading when the key is absent) routes
+normally; `superseded` names its replacement in `superseded_by: <page id>` and is
+delisted from the domain index; `retired` is delisted with no replacement and states
+the reason in its body. `confidence: verified` with `status: superseded` is a normal
+combination — the guidance was right and has since been replaced. Superseded and
+retired files stay on disk so historical `Wiki basis` paths and `related:` ids keep
+resolving; lint reports the lifecycle checks (13-15 in `skills/wiki-lint/SKILL.md`).
 
 `verified_model` (optional) names the model generation the page's guidance was
 verified against (e.g. `claude-fable-5`); model-coupled pages missing it, or
@@ -188,14 +199,16 @@ Two further skills use the wiki to run development work (rather than maintain th
 
 After any wiki change, all of these must hold (lint checks them):
 
-1. Every page is listed in its domain `index.md` with an accurate "load when" line.
-   The line must enumerate the page's **distinct use cases** (including
+1. Every active page (`status` absent or `active`) is listed in its domain
+   `index.md` with an accurate "load when" line; a superseded or retired page is
+   delisted. The line must enumerate the page's **distinct use cases** (including
    constraint/uniqueness/design-time uses), not only its headline framing, and must
    not contradict the page's "When this applies". Decision tables inside pages are
    ordered general → specific.
 2. Every domain appears in `INDEX.md`.
 3. `log.md` has an appended entry: `## [YYYY-MM-DD] <ingest|revise|lint> | <summary>`.
-4. Every `related:` id and inline link resolves to an existing page.
+4. Every `related:` id, every `superseded_by:` id, and every inline link resolves to
+   an existing page.
 5. No page exceeds 120 body lines.
 
 ## Running tests on macOS

@@ -90,3 +90,65 @@ setup() {
   [ "$status" -eq 4 ]
   [[ "$output" == *"not a readable directory"* ]]
 }
+
+# --- lifecycle (issue #195) ---
+
+@test "lifecycle ok fixture: superseded/retired pages delisted, exits 0" {
+  run node "$CHECKER" "$FIXTURES/lifecycle/ok"
+  [ "$status" -eq 0 ]
+  [ "$output" = "pages: 5, indexes: 1, findings: 0" ]
+}
+
+@test "lifecycle bad fixture: bad-status, bad-superseded-by, listed-inactive fire and orphan-page does not" {
+  run node "$CHECKER" "$FIXTURES/lifecycle/bad"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"bad-status:"* ]]
+  [[ "$output" == *"status 'archived'"* ]]
+  [ "$(printf '%s\n' "$output" | grep -c '^bad-superseded-by:')" -eq 2 ]
+  [[ "$output" == *"listed-inactive:"* ]]
+  [[ "$output" != *"orphan-page:"* ]]
+  [[ "$output" == *"pages: 4, indexes: 1, findings: 4"* ]]
+}
+
+@test "lifecycle chain fixture: superseded-chain warns on stderr without changing exit code" {
+  run bash -c "node '$CHECKER' '$FIXTURES/lifecycle/chain' 2>/dev/null"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'pages: 3, indexes: 1, findings: 0\nwarnings: 1' ]
+  run bash -c "node '$CHECKER' '$FIXTURES/lifecycle/chain' 2>&1 >/dev/null"
+  [[ "$output" == *"superseded-chain:"* ]]
+  [[ "$output" == *"alpha-cat-b"* ]]
+}
+
+@test "no status key: absent reads as active, orphan-page still fires, bad-status does not" {
+  mkdir -p "$BATS_TEST_TMPDIR/nostatus/alpha/cat"
+  cat > "$BATS_TEST_TMPDIR/nostatus/alpha/index.md" <<'EOF'
+# alpha — Domain Index
+EOF
+  cat > "$BATS_TEST_TMPDIR/nostatus/alpha/cat/solo.md" <<'EOF'
+---
+id: alpha-cat-solo
+domain: alpha
+category: cat
+applies_to: [general]
+confidence: field-tested
+sources:
+  - https://example.com/solo
+last_verified: 2026-01-01
+related: []
+---
+
+# Solo
+EOF
+  run node "$CHECKER" "$BATS_TEST_TMPDIR/nostatus"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"orphan-page:"* ]]
+  [[ "$output" != *"bad-status:"* ]]
+}
+
+@test "lifecycle ok fixture: negative control, no lifecycle class fires" {
+  run bash -c "node '$CHECKER' '$FIXTURES/lifecycle/ok' 2>&1"
+  [[ "$output" != *"bad-status:"* ]]
+  [[ "$output" != *"bad-superseded-by:"* ]]
+  [[ "$output" != *"listed-inactive:"* ]]
+  [[ "$output" != *"superseded-chain:"* ]]
+}

@@ -41,6 +41,7 @@ or a distilled lesson ("we hit X; doing Y fixed it because Z").
    - Same trigger, conflicting directive → do NOT overwrite. Add the conflict to the
      page under `Edge cases` if it is condition-dependent, or flag it in `log.md` as
      `contradiction` for the owner to resolve.
+   - Same trigger, existing page wrong as a whole (its directive is refuted by the new source, not merely condition-dependent) → create the new page, then on the old page set `status: superseded` and `superseded_by: <new page id>`, move its domain `index.md` row to the new page, keep the old file on disk, and append `## [YYYY-MM-DD] revise | <old id> superseded by <new id> — <why>` to `log.md`. A page whose premise is gone with no replacement gets `status: retired`, the reason in its body, and the same delisting.
    - New trigger → create a new page from `templates/page.md`.
 
 5. **Source it.** Fill `sources:` with real, checkable citations. Do not invent or
