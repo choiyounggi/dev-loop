@@ -263,10 +263,13 @@ The bundled wiki is also indexed locally (`scripts/wiki-index.py` →
 `hooks/wiki-index.sh`) and served through the two-tool `dev-loop-wiki` MCP
 (`.mcp.json` → `scripts/wiki-mcp-launch.sh` → `scripts/wiki-mcp.py`:
 `wiki_search`, `wiki_page`). Curated routing stays the first path; the index
-is a fail-open second path in three places — `wiki-query` retries a routing
-0-hit once semantically, `wiki-ingest` shows the top-5 hits before
-merge-vs-create, and `wiki-lint` check 19 lists near-duplicate trigger pairs
-(`neardup`). Without `uv` or a built index every skill behaves as before;
+is a fail-open second path in four places — `wiki-plan`'s Phase B routing
+sweep runs one semantic candidate check per task and per `[no-wiki]`
+decision, adopting a hit only after its own trigger text matches;
+`wiki-query` retries a routing 0-hit once semantically; `wiki-ingest` shows
+the top-5 hits before merge-vs-create; and `wiki-lint` check 19 lists
+near-duplicate trigger pairs (`neardup`). Without `uv` or a built index
+every skill behaves as before;
 `DEV_LOOP_WIKI_INDEX=0` turns the feature off.
 
 ---

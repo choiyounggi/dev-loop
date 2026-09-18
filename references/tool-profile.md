@@ -108,10 +108,13 @@ into `~/.dev-loop/wiki-index/`) and a stdio MCP server `dev-loop-wiki`
 (`.mcp.json`, launched through `scripts/wiki-mcp-launch.sh`) that exposes
 exactly two tools: `wiki_search(query, k=5, domain?)` returns page ids and
 snippets, `wiki_page(page_id)` returns one page body — find the page, then
-read it. Three skills use it as a second path after the curated routing:
-`wiki-query` step 3 (a routing 0-hit is retried once semantically),
-`wiki-ingest` step 4 (top-5 hits before merge-vs-create) and `wiki-lint`
-check 19 (near-duplicate trigger pairs via `neardup`). It is fail-open:
+read it. Four skills use it as a second path after the curated routing:
+`wiki-plan` Phase B (one semantic candidate check per task and per
+`[no-wiki]` decision, adopted only when the hit's own trigger text matches —
+never on score alone), `wiki-query` step 3 (a routing 0-hit is retried once
+semantically), `wiki-ingest` step 4 (top-5 hits before merge-vs-create) and
+`wiki-lint` check 19 (near-duplicate trigger pairs via `neardup`). It is
+fail-open:
 without `uv`, the packages, or a built index the tools return nothing and
 each skill behaves exactly as before; `DEV_LOOP_WIKI_INDEX=0` turns the
 whole feature off.
