@@ -8,7 +8,7 @@ sources:
   - https://git-scm.com/docs/git-worktree
   - https://man.openbsd.org/tmux
 last_verified: 2026-08-17
-related: [infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-worktree-isolated-workers, backend-common-concurrency-distributed-locks, backend-common-jobs-scheduled-job-overlap, testing-data-test-data-and-isolation, infrastructure-agent-orchestration-pane-delivery-confirmation]
+related: [infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-worktree-isolated-workers, backend-common-concurrency-distributed-locks, backend-common-jobs-scheduled-job-overlap, testing-data-test-data-and-isolation, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session]
 ---
 
 # Orchestration State Kept in a Shared Directory Inside the Repository

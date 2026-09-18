@@ -8,7 +8,7 @@ sources:
   - https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
   - https://man7.org/linux/man-pages/man1/flock.1.html
 last_verified: 2026-07-10
-related: [backend-common-jobs-idempotent-handlers, backend-common-concurrency-distributed-locks]
+related: [backend-common-jobs-idempotent-handlers, backend-common-concurrency-distributed-locks, infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session]
 ---
 
 # Preventing Scheduled-Job Overlap
