@@ -100,6 +100,23 @@ not a capability role: `--summary` never lists it among the role lines, and
 prints one `workspace: <roots> (depth <n>)` line only when it is configured.
 Silence the SessionStart nudge with `DEV_LOOP_GRAPH_NUDGE=0`.
 
+### wiki RAG — the bundled index and MCP (optional, not a role)
+
+The plugin ships a local vector index over its own `wiki/`
+(`scripts/wiki-index.py`, built in the background by `hooks/wiki-index.sh`
+into `~/.dev-loop/wiki-index/`) and a stdio MCP server `dev-loop-wiki`
+(`.mcp.json`, launched through `scripts/wiki-mcp-launch.sh`) that exposes
+exactly two tools: `wiki_search(query, k=5, domain?)` returns page ids and
+snippets, `wiki_page(page_id)` returns one page body — find the page, then
+read it. Three skills use it as a second path after the curated routing:
+`wiki-query` step 3 (a routing 0-hit is retried once semantically),
+`wiki-ingest` step 4 (top-5 hits before merge-vs-create) and `wiki-lint`
+check 19 (near-duplicate trigger pairs via `neardup`). It is fail-open:
+without `uv`, the packages, or a built index the tools return nothing and
+each skill behaves exactly as before; `DEV_LOOP_WIKI_INDEX=0` turns the
+whole feature off.
+It is not the `knowledge` role: that role is your external domain wiki, while the bundled RAG needs no config and is on by default.
+
 ### `research` — external best-practice/pitfall search (optional, fixed interpretation order)
 
 `research` backs `wiki-plan`'s Phase A4 (external research: best practices and

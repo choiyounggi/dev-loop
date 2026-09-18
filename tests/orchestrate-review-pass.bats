@@ -74,7 +74,7 @@ lens_order() {
   [[ "$section" == *'5. **AC traceability'* ]]
 }
 
-@test "Phase 4 retains the surrounding mechanics: diff command, rework budget, escalation, dispatch-loop return" {
+@test "Phase 4 retains the surrounding mechanics: the agent's diff range, rework budget, escalation, dispatch-loop return" {
   section="$(phase4_section "$SKILL")"
   [[ "$section" == *'git -C <wt> diff'* ]]
   [[ "$section" == *'<integ>...HEAD'* ]]
@@ -184,4 +184,76 @@ lens_order() {
   grep -v 'AC traceability' "$SKILL" > "$stripped"
   section="$(phase4_section "$stripped")"
   [[ "$section" != *"| DoD item | gate id | test case |"* ]]
+}
+
+# --- task-reviewer invocation (issue #192 stage 4) --------------------------
+
+@test "Phase 4 delegates the per-task review to task-reviewer and reads only the verdict line" {
+  section="$(phase4_section "$SKILL" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$section" == *"task-reviewer"* ]]
+  [[ "$section" == *"head -1"* ]]
+  [[ "$section" == *"MUST NOT read the worktree diff"* ]]
+  [[ "$section" == *"VERDICT: approve"* ]]
+  [[ "$section" == *"floor=pass"* ]]
+}
+
+@test "Phase 4 exit 3 writes the rework review coordinator-side without invoking task-reviewer" {
+  section="$(phase4_section "$SKILL" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$section" == *"do not invoke \`task-reviewer\`"* ]]
+  [[ "$section" == *"VERDICT: rework"* ]]
+}
+
+@test "negative control: a Phase 4 copy without task-reviewer fails the delegation check" {
+  stripped="${BATS_TEST_TMPDIR}/skill-no-task-reviewer.md"
+  sed 's/task-reviewer/coordinator/g' "$SKILL" > "$stripped"
+  section="$(phase4_section "$stripped" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$section" != *"task-reviewer"* ]]
+}
+
+@test "review-report.md line 1 is the VERDICT placeholder" {
+  first="$(head -1 "$TEMPLATE")"
+  [[ "$first" == VERDICT:* ]]
+  [[ "$first" == *"approve"* ]]
+  [[ "$first" == *"rework"* ]]
+}
+
+@test "negative control: a template copy with line 1 removed fails the first-line check" {
+  stripped="${BATS_TEST_TMPDIR}/review-report-no-line1.md"
+  tail -n +2 "$TEMPLATE" > "$stripped"
+  [[ "$(head -1 "$stripped")" != VERDICT:* ]]
+}
+
+@test "boundary: an empty template copy fails the first-line check" {
+  empty="${BATS_TEST_TMPDIR}/review-report-empty.md"
+  : > "$empty"
+  [[ "$(head -1 "$empty")" != VERDICT:* ]]
+}
+
+# --- r1 rework: two-dot working-tree diff + exact verdict match (F1/F2) -----
+
+@test "Phase 4 has task-reviewer read untracked files via ls-files, not just the diff" {
+  section="$(phase4_section "$SKILL" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$section" == *"ls-files --others --exclude-standard"* ]]
+  [[ "$section" == *"has not committed yet"* ]]
+}
+
+@test "negative control: a Phase 4 copy without the ls-files untracked-file step fails the check" {
+  stripped="${BATS_TEST_TMPDIR}/skill-no-ls-files.md"
+  sed 's/ls-files --others --exclude-standard//' "$SKILL" > "$stripped"
+  section="$(phase4_section "$stripped" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$section" != *"ls-files --others --exclude-standard"* ]]
+}
+
+@test "Phase 4 requires an EXACT verdict match, never a prefix, and rejects the template placeholder" {
+  section="$(phase4_section "$SKILL" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$section" == *"EXACTLY"* ]]
+  [[ "$section" == *"prefix or substring match is not valid"* ]]
+  [[ "$section" == *"not-a-verdict"* ]]
+}
+
+@test "negative control: a Phase 4 copy without the exact-match requirement fails the strict-verdict check" {
+  stripped="${BATS_TEST_TMPDIR}/skill-no-exact-verdict.md"
+  sed 's/a prefix or substring//' "$SKILL" > "$stripped"
+  section="$(phase4_section "$stripped" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$section" != *"prefix or substring match is not valid"* ]]
 }

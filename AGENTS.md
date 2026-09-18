@@ -18,6 +18,7 @@ Three layers (Karpathy LLM-wiki pattern):
 | Schema | `AGENTS.md` (this file), `templates/` | Change only with repo owner approval |
 | Wiki | `wiki/**` , `INDEX.md`, `log.md` | You create and update via the workflows below |
 | Workflows | `skills/` | Change only with repo owner approval |
+| Project layer | `wiki-local/**` in the consuming project (optional) | Project owners edit it; same schema and routing convention as `wiki/**` |
 
 ## Directory layout
 
@@ -26,6 +27,8 @@ INDEX.md                     # root map: domain → when to route there
 log.md                       # append-only chronological change log
 wiki/<domain>/index.md       # domain map: category/page → when to load it
 wiki/<domain>/<category>/<page>.md
+wiki-local/index.md          # project-local layer (optional, lives in the consuming project): one map for every local page
+wiki-local/<domain>/<category>/<page>.md
 templates/page.md            # canonical page template
 skills/ingest|query|lint/    # the three operations
 ```
@@ -48,6 +51,10 @@ step 7.
 2. Read that domain's `wiki/<domain>/index.md`. Select pages by their **"load when"
    lines — these are the routing gate**. Load only pages whose line matches your
    situation.
+   - **Project-local layer**: when `wiki-local/index.md` exists at the project
+     root, read it after the domain index. It is one file whose rows follow the
+     same "load when" convention, and it is read only when it exists, so a
+     project without one pays nothing.
 3. After loading, the page's "When this applies" should confirm the match. If it
    contradicts your situation, drop the page and append a `drift` entry to `log.md`
    (index line and page trigger disagree — a lint defect), unless the page content
@@ -64,6 +71,10 @@ step 7.
      row** (rows are ordered general → specific); when a general row and a
      precondition-bearing row both fit, take the one that preserves the stated
      invariant.
+   - When a local page (`wiki-local/**`) and a bundled page both match the
+     trigger, apply the local page's directives and keep the bundled page for
+     the cases the local page does not cover; a local edge-case row overrides a
+     bundled general rule.
 7. **Review entry — route from the diff, then compare the page sets.** When your
    input is a change rather than a task, derive the match from what the diff does,
    not from what its plan said it would do:
@@ -126,6 +137,9 @@ sources:
   - <url or citation>
 last_verified: YYYY-MM-DD
 verified_model: <model-id>            # optional
+status: active | superseded | retired # optional, absent = active
+superseded_by: <page id>              # required when status: superseded
+reference_impl: [<repo-relative path>, ...] # wiki-local/** only
 related: [<page id>, ...]
 ---
 ```
@@ -133,6 +147,26 @@ related: [<page id>, ...]
 `confidence` meanings — `verified`: backed by cited official docs or reproducible
 measurement. `field-tested`: worked in real production use; context described in the
 page. `unverified`: candidate knowledge; lint reports it until upgraded or removed.
+
+A `wiki-local/**` page defaults to `confidence: field-tested`; `verified` keeps
+the sources requirement, and a repository ADR or design-document path is a valid
+source there.
+
+A `wiki-local/**` page points at the code it describes with `reference_impl:`, a list of
+repo-relative paths (inline `[src/a.js, docs/b.md]` or a block list); each path resolves
+against the project root, the parent of `wiki-local/`, and lint reports a path that no
+longer exists as check 17 (`reference-impl-missing`, warn). The bundled `wiki/**` stays
+project-independent, so lint reports the key there as check 16 (`reference-impl-bundled`,
+error). Point at code by path; the 120-line body rule stands because nothing is inlined.
+
+`status` (optional) is the page's current validity and is orthogonal to `confidence`,
+which is evidence strength: `active` (the reading when the key is absent) routes
+normally; `superseded` names its replacement in `superseded_by: <page id>` and is
+delisted from the domain index; `retired` is delisted with no replacement and states
+the reason in its body. `confidence: verified` with `status: superseded` is a normal
+combination — the guidance was right and has since been replaced. Superseded and
+retired files stay on disk so historical `Wiki basis` paths and `related:` ids keep
+resolving; lint reports the lifecycle checks (13-15 in `skills/wiki-lint/SKILL.md`).
 
 `verified_model` (optional) names the model generation the page's guidance was
 verified against (e.g. `claude-fable-5`); model-coupled pages missing it, or
@@ -183,19 +217,26 @@ Two further skills use the wiki to run development work (rather than maintain th
 - Page files: the situation, not the technology (`composite-index-column-order.md`,
   not `postgres-tips.md`).
 - Page ids: `<domain>-<category>-<slug>` matching the file path.
+- Local-layer page ids: `local-<domain>-<category>-<slug>` (the file lives at
+  `wiki-local/<domain>/<category>/<slug>.md`). A local page names a bundled page
+  by its plain repo path `wiki/<domain>/<category>/<page>.md` in prose — lint
+  resolves `related:` ids and `[id]` links inside one root, and a bare path in
+  prose is not an inline link, so check 3 leaves it alone.
 
 ## Maintenance invariants
 
 After any wiki change, all of these must hold (lint checks them):
 
-1. Every page is listed in its domain `index.md` with an accurate "load when" line.
-   The line must enumerate the page's **distinct use cases** (including
+1. Every active page (`status` absent or `active`) is listed in its domain
+   `index.md` with an accurate "load when" line; a superseded or retired page is
+   delisted. The line must enumerate the page's **distinct use cases** (including
    constraint/uniqueness/design-time uses), not only its headline framing, and must
    not contradict the page's "When this applies". Decision tables inside pages are
    ordered general → specific.
 2. Every domain appears in `INDEX.md`.
 3. `log.md` has an appended entry: `## [YYYY-MM-DD] <ingest|revise|lint> | <summary>`.
-4. Every `related:` id and inline link resolves to an existing page.
+4. Every `related:` id, every `superseded_by:` id, and every inline link resolves to
+   an existing page.
 5. No page exceeds 120 body lines.
 
 ## Running tests on macOS

@@ -439,7 +439,7 @@ brief_dependencies_region() {
 
 @test "step 2a's operative launch command carries the DEV_LOOP_WORKER_MODEL prefix from the profile table" {
   section="$(normalize_ws "$(step2a_section "$SKILL")")"
-  operative="${section#*exists to prevent. Then}"
+  operative="${section#*this session either (Coordinator token budget, Known amplifier). Then}"
   [[ "$operative" == *"DEV_LOOP_WORKER_MODEL=<id from the profile table>"* ]]
   [[ "$operative" == *"scripts/launch-session.sh"* ]]
 }
@@ -447,10 +447,109 @@ brief_dependencies_region() {
 @test "negative control: a step-2a copy with only the operative prefix removed fails the operative-prefix check" {
   fixture="${BATS_TEST_TMPDIR}/skill-no-operative-prefix.md"
   awk '
-    /step exists to prevent\. Then$/ { print; getline; sub(/DEV_LOOP_WORKER_MODEL=<id from the profile table> /, ""); print; next }
+    /this session either \(Coordinator token budget, Known amplifier\)\. Then$/ { print; getline; sub(/DEV_LOOP_WORKER_MODEL=<id from the profile table> /, ""); print; next }
     { print }
   ' "$SKILL" > "$fixture"
   section="$(normalize_ws "$(step2a_section "$fixture")")"
-  operative="${section#*exists to prevent. Then}"
+  operative="${section#*this session either (Coordinator token budget, Known amplifier). Then}"
   [[ "$operative" != *"DEV_LOOP_WORKER_MODEL=<id from the profile table>"* ]]
+}
+
+# --- 13: step 2a plans on the task-planner agent (issue #192 stage 5) ---
+
+@test "step 2a plans on the task-planner agent and the coordinator reads only its fixed report" {
+  section="$(normalize_ws "$(step2a_section "$SKILL")")"
+  [[ "$section" == *"task-planner"* ]]
+  [[ "$section" == *"Agent tool"* ]]
+  [[ "$section" == *"fixed report"* ]]
+  [[ "$section" == *'never `analysis.md`'* ]]
+}
+
+@test "negative control: a step-2a copy with task-planner stripped fails the agent check" {
+  fixture="${BATS_TEST_TMPDIR}/step2a-no-task-planner.md"
+  grep -v 'task-planner' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(step2a_section "$fixture")")"
+  [[ "$section" != *"task-planner"* ]]
+}
+
+@test "step 2a states the two-stage handshake: stop after design.md, coordinator-run plan-reviewer, review-verdict.md, SendMessage resume" {
+  section="$(normalize_ws "$(step2a_section "$SKILL")")"
+  [[ "$section" == *"Two-stage handshake"* ]]
+  [[ "$section" == *"design.md"* ]]
+  [[ "$section" == *"review-verdict.md"* ]]
+  [[ "$section" == *"SendMessage"* ]]
+  [[ "$section" == *"plan-reviewer"* ]]
+}
+
+@test "negative control: a step-2a copy without review-verdict.md fails the handshake check" {
+  fixture="${BATS_TEST_TMPDIR}/step2a-no-review-verdict.md"
+  grep -v 'review-verdict.md' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(step2a_section "$fixture")")"
+  [[ "$section" != *"review-verdict.md"* ]]
+}
+
+@test "step 2a keeps the planning model on the coordinator: the agent inherits the coordinator model" {
+  section="$(normalize_ws "$(step2a_section "$SKILL")")"
+  [[ "$section" == *"inherits the coordinator model"* ]]
+  [[ "$section" == *"planning model is whatever model this coordinator session is running"* ]]
+}
+
+@test "negative control: a step-2a copy without the inherits sentence fails the planning-model check" {
+  fixture="${BATS_TEST_TMPDIR}/step2a-no-inherits.md"
+  grep -v 'inherits the coordinator model' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(step2a_section "$fixture")")"
+  [[ "$section" != *"inherits the coordinator model"* ]]
+}
+
+@test "boundary: the step-2a extractor still yields a non-empty section that stops before the watch-status line" {
+  section="$(step2a_section "$SKILL")"
+  [ "$(printf '%s\n' "$section" | wc -l)" -gt 20 ]
+  [[ "$section" != *'3. `scripts/watch-status.sh'* ]]
+  [[ "$section" == *"**2a. Plan it yourself"* ]]
+}
+
+@test "re-plan rounds route the gap report to the same task-planner agent via SendMessage" {
+  section="$(normalize_ws "$(token_budget_section "$SKILL")")"
+  [[ "$section" == *"same task-planner agent"* ]]
+  [[ "$section" == *"SendMessage"* ]]
+  [[ "$section" == *"re-plan loop"* ]]
+}
+
+@test "negative control: a token-budget copy without SendMessage fails the re-plan-route check" {
+  fixture="${BATS_TEST_TMPDIR}/token-budget-no-sendmessage.md"
+  grep -v 'SendMessage' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(token_budget_section "$fixture")")"
+  [[ "$section" != *"SendMessage"* ]]
+}
+
+@test "step 0 runs the wiki-plan invocation on the task-planner agent" {
+  section="$(normalize_ws "$(step0_section "$SKILL")")"
+  [[ "$section" == *"run step 2a's \`wiki-plan\` invocation for this task FIRST"* ]]
+  [[ "$section" == *'(on the `task-planner` agent)'* ]]
+}
+
+@test "negative control: a step-0 copy without the task-planner clause fails the producer check" {
+  fixture="${BATS_TEST_TMPDIR}/step0-no-task-planner.md"
+  # The clause is hard-wrapped across two physical lines in SKILL.md, so a
+  # per-line sed/grep can never match it — slurp the whole file and let \s+
+  # absorb the line break (tests-that-cannot-fail: a per-line strip here
+  # would silently no-op and the negative control would falsely pass).
+  perl -0777 -pe 's/\(on the\s+`task-planner`\s+agent\)//' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(step0_section "$fixture")")"
+  [[ "$section" != *'(on the `task-planner` agent)'* ]]
+}
+
+@test "Re-plan ladder round 3 re-enters the two-stage handshake instead of passing gate-B on a stale verdict" {
+  section="$(normalize_ws "$(token_budget_section "$SKILL")")"
+  [[ "$section" == *"Round 3"* ]]
+  [[ "$section" == *"goes through the two-stage handshake again"* ]]
+  [[ "$section" == *"deletes its stale \`review-verdict.md\`"* ]]
+  [[ "$section" == *"fresh STOP REPORT instead of a FINAL REPORT"* ]]
+}
+
+@test "negative control: a token-budget copy without the round-3 handshake re-entry fails the check" {
+  fixture="${BATS_TEST_TMPDIR}/token-budget-no-round3-handshake.md"
+  grep -v 'goes through the two-stage handshake again' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(token_budget_section "$fixture")")"
+  [[ "$section" != *"goes through the two-stage handshake again"* ]]
 }

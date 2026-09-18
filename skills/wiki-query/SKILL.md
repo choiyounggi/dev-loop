@@ -22,9 +22,15 @@ Input: a question or an active task that needs guidance.
    directives and edge-case tables. Cite each page id you used. Where a page cites
    external sources, surface them.
 
-3. **Say what the wiki doesn't know.** If no page matches, say so explicitly and
-   answer from general knowledge clearly labeled as *not wiki-backed*. Do not blend
-   wiki-backed and unbacked claims without labels.
+3. **Say what the wiki doesn't know — after one semantic retry.** When routing
+   reaches zero pages, call the dev-loop-wiki tool `wiki_search(query, k=5)`;
+   open each hit's page in score order and read its "When this applies"; the
+   first page whose trigger matches the question is loaded and the answer is
+   wiki-backed, citing that page id. When no hit's trigger matches, say so
+   explicitly and answer from general knowledge clearly labeled as *not
+   wiki-backed*. Do not blend wiki-backed and unbacked claims without labels.
+   When the `wiki_search` tool is absent from the session or returns an empty
+   list, continue exactly as this step read before the tool existed.
 
 4. **Compound.** If the answer required synthesizing 2+ pages or filled a gap, and
    the question is one that will recur, run `skills/wiki-ingest/SKILL.md` on the synthesis

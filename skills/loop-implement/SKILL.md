@@ -106,8 +106,10 @@ starting the next, so a downstream task always builds on a verified upstream one
                         (See "Gates ledger" below.)                             [DoD/XP]
 1. Analyze + load refs— read THIS task's "Wiki pages (read these first, only
                         these)" — the pages `wiki-plan` navigated to — and load
-                        exactly those from `${CLAUDE_PLUGIN_ROOT}/wiki/`, plus the
-                        task's Inputs (confirm each exists; a missing Input is a
+                        exactly those — a `wiki/...` path from
+                        `${CLAUDE_PLUGIN_ROOT}/wiki/`, a `wiki-local/...` path
+                        from the project root — plus the task's Inputs (confirm
+                        each exists; a missing Input is a
                         plan defect -> 7b, not a stand-in). List the test
                         scenarios. Consult `knowledge`/`tacit`/`explore` if
                         configured; when `explore` is graphify, run
@@ -143,11 +145,20 @@ starting the next, so a downstream task always builds on a verified upstream one
                         visibly ABANDONED) AND the auditor returns VERDICT:
                         PASS. Emit the task report (format below, with the
                         WIKI: references you applied).                          [DoD / evaluator]
+                        After the report is emitted, run
+                        `sh ${CLAUDE_PLUGIN_ROOT}/scripts/wiki-usage.sh --task <NN-slug> --repo <project root> --line "<WIKI: line>"`
+                        once per WIKI: line (usage telemetry, wiki-lint check 18);
+                        its exit code never changes the PASS or FAIL verdict — a
+                        refusal is noted in NOTES: only.
    - PASS  -> next task in Task order (back to step 0), until all tasks done.
    - FAIL  -> 7b.
 7b. Reflect + retry  — say why it failed. If it is a PLAN defect (a decision/name/
                         input the task+pages+inputs never gave), repair the plan/
                         task via step 2, don't guess; else retry from step 3.
+                        A 2nd failure on the same page and row you applied as
+                        written (rule 4's falsification case) first records the
+                        contradiction via scripts/wiki-contradiction.sh, then
+                        retries as usual — the budget below is unchanged.
                         A PLAN defect routes by cause: requirement/acceptance-
                         example gap -> wiki-plan Phase A repair; decision/
                         grounding gap -> Phase B repair; task-cut/input-output
@@ -176,6 +187,15 @@ correct. While implementing a task:
 4. **Apply wiki directives as written.** A listed page's decision table → do your
    case's row. A listed edge case → the edge-case row overrides the general rule.
    No matching row → that's rule 3 (plan defect), not a guess.
+   A matching row you applied as written whose Verify still fails is a
+   different case. When the task report's `WIKI:` line already names that page
+   id and row, and the same task's Verify has failed at least twice on that
+   same page and row, treat it as a page falsification candidate: record it
+   with `sh ${CLAUDE_PLUGIN_ROOT}/scripts/wiki-contradiction.sh --page <id>
+   --row <row> --task <task> --count <n> --verify "<cmd>" --output "<excerpt>"`
+   (see 7b) and keep retrying the task as usual. Both pieces of evidence must
+   already be in the report before the call; a report that only says the wiki
+   seems wrong stays rule 3.
 5. **Cite what you applied.** The task report's `WIKI:` line names each page id
    and the row/directive you followed — this is the explicit reference back to the
    plan's decision→page map, so every change is traceable.
@@ -192,7 +212,8 @@ GATES:  <met=N unmet=N abandoned=N from gate-check; EVERY abandonment listed
          as "id — reason" — a silently dropped gate is never allowed>
 WIKI:   <page id applied → the row/directive followed, one line each>
 NOTES:  <deviations (should be none); for BLOCKED: the exact missing decision/
-         input, as a one-line question wiki-plan can answer>
+         input, as a one-line question wiki-plan can answer; when rule 4's
+         falsification case fired, the log.md contradiction line it wrote>
 ```
 
 A BLOCKED task is a plan defect: repair the task file / decisions via `wiki-plan`

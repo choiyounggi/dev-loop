@@ -1,6 +1,6 @@
-# Review — {TASK} round {N}
+VERDICT: approve | rework
 
-**Verdict:** approve | rework
+# Review — {TASK} round {N}
 
 ## Per-lens results
 

@@ -104,3 +104,19 @@ WIKI_SLUG='wiki/infrastructure/agent-orchestration/session-context-token-budget.
   count="$(printf '%s' "$flat" | grep -cF "After each merge-on-approval" || true)"
   [ "$count" -eq 0 ]
 }
+
+# --- doc-gate 5: re-plan rounds route to the task-planner agent (issue #192 stage 5) ---
+
+@test "doc-gate: Coordinator token budget routes re-plan rounds to the task-planner agent" {
+  flat="$(flat_skill)"
+  printf '%s' "$flat" | grep -qF "task-planner"
+  printf '%s' "$flat" | grep -qF "SendMessage"
+}
+
+@test "doc-gate can fail: a fixture without the task-planner route does not match" {
+  fixture="${BATS_TEST_TMPDIR}/no-task-planner-route.md"
+  grep -v 'task-planner' "$SKILL" > "$fixture"
+  flat="$(normalize_ws "$(cat "$fixture")")"
+  count="$(printf '%s' "$flat" | grep -cF "task-planner" || true)"
+  [ "$count" -eq 0 ]
+}

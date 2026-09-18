@@ -14,6 +14,8 @@ setup() {
   TPL="${REPO_ROOT}/skills/orchestrate/templates/session-prompt.md"
   AGENT="${REPO_ROOT}/agents/integration-reviewer.md"
   AGENT2="${REPO_ROOT}/agents/test-quality-auditor.md"
+  AGENT3="${REPO_ROOT}/agents/task-reviewer.md"
+  AGENT4="${REPO_ROOT}/agents/task-planner.md"
 }
 
 # Collapses embedded newlines to a single space so a substring assertion
@@ -180,8 +182,8 @@ orca_protocol_section() {
 
 # --- 6b: both review agents prohibit git stash, with the refs/stash rationale (issue #166) ---
 
-@test "both agent files carry the git-stash prohibition and refs/stash rationale" {
-  for f in "$AGENT" "$AGENT2"; do
+@test "all four agent files carry the git-stash prohibition and refs/stash rationale" {
+  for f in "$AGENT" "$AGENT2" "$AGENT3" "$AGENT4"; do
     content="$(cat "$f")"
     [[ "$content" == *'NEVER `git stash`'* ]]
     [[ "$content" == *"refs/stash"* ]]
@@ -198,8 +200,8 @@ orca_protocol_section() {
 # --- 6c: both review agents' read-only claim is honest about temporary tree
 # mutation during test/check runs (D2) ---
 
-@test "both agent files' read-only claim is qualified: repo-state only, checks may temporarily mutate the tree" {
-  for f in "$AGENT" "$AGENT2"; do
+@test "all three agent files' read-only claim is qualified: repo-state only, checks may temporarily mutate the tree" {
+  for f in "$AGENT" "$AGENT2" "$AGENT3"; do
     content="$(cat "$f")"
     [[ "$content" == *"read-only with respect to repo state"* ]]
     [[ "$content" == *"temporarily mutate the working tree"* ]]
@@ -308,4 +310,183 @@ orca_protocol_section() {
   sed '/^## (2) Implement/,/^## (3)/ s/ if it exists//' "$TPL" > "$stripped"
   section="$(section2_body "$stripped")"
   [[ "$section" != *"if it exists"* ]]
+}
+
+# --- 7: task-reviewer agent (issue #192 stage 4) ---------------------------
+
+@test "agents/task-reviewer.md exists with name and NO model pin" {
+  [ -f "$AGENT3" ]
+  head -10 "$AGENT3" | grep -qF 'name: task-reviewer'
+  run sh -c "head -10 '$AGENT3' | grep -q '^model:'"
+  [ "$status" -ne 0 ]
+}
+
+@test "task-reviewer body lists every explicit input and the first-line VERDICT contract" {
+  content="$(normalize_ws "$(cat "$AGENT3")")"
+  [[ "$content" == *"worktree path"* ]]
+  [[ "$content" == *"integ ref"* ]]
+  [[ "$content" == *"brief path"* ]]
+  [[ "$content" == *"plan path"* ]]
+  [[ "$content" == *"risk tier"* ]]
+  [[ "$content" == *"floor result"* ]]
+  [[ "$content" == *"review output path"* ]]
+  [[ "$content" == *"VERDICT: approve"* ]]
+  [[ "$content" == *"VERDICT: rework"* ]]
+  [[ "$content" == *"ask for them rather than guessing"* ]]
+}
+
+@test "task-reviewer keys the lens set by tier with the three predicate rows" {
+  content="$(cat "$AGENT3")"
+  [[ "$content" == *"| R0 |"* ]]
+  [[ "$content" == *"| R1 |"* ]]
+  [[ "$content" == *"| R2 or R3 |"* ]]
+  [[ "$content" == *"not run — R0 profile"* ]]
+  [[ "$content" == *"not run — R1 profile"* ]]
+}
+
+@test "negative control: a task-reviewer copy with the VERDICT lines stripped fails the contract check" {
+  stripped="${BATS_TEST_TMPDIR}/task-reviewer-no-verdict.md"
+  grep -v 'VERDICT:' "$AGENT3" > "$stripped"
+  content="$(cat "$stripped")"
+  [[ "$content" != *"VERDICT: approve"* ]]
+}
+
+@test "negative control: a task-reviewer copy without the R2 or R3 row fails the tier check" {
+  stripped="${BATS_TEST_TMPDIR}/task-reviewer-no-r2r3.md"
+  grep -v 'R2 or R3' "$AGENT3" > "$stripped"
+  content="$(cat "$stripped")"
+  [[ "$content" != *"| R2 or R3 |"* ]]
+}
+
+@test "boundary: a frontmatter-only task-reviewer copy fails the inputs check" {
+  frontmatter_only="${BATS_TEST_TMPDIR}/task-reviewer-frontmatter-only.md"
+  awk '{print} /^---$/{n++} n==2{exit}' "$AGENT3" > "$frontmatter_only"
+  [ -s "$frontmatter_only" ]
+  content="$(cat "$frontmatter_only")"
+  [[ "$content" == *"task-reviewer"* ]]
+  [[ "$content" != *"review output path"* ]]
+}
+
+@test "Guardrails names all three bundled agents including task-reviewer" {
+  section="$(guardrails_section "$SKILL")"
+  [[ "$section" == *"test-quality-auditor"* ]]
+  [[ "$section" == *"integration-reviewer"* ]]
+  [[ "$section" == *"task-reviewer"* ]]
+  [[ "$section" == *"Bundled agents only"* ]]
+}
+
+@test "negative control: a Guardrails copy without task-reviewer fails the three-agents check" {
+  stripped="${BATS_TEST_TMPDIR}/skill-no-task-reviewer-guardrails.md"
+  sed 's/, `task-reviewer`//' "$SKILL" > "$stripped"
+  section="$(guardrails_section "$stripped")"
+  [[ "$section" != *"task-reviewer"* ]]
+  [[ "$section" == *"integration-reviewer"* ]]
+}
+
+# --- r1 rework: two-dot working-tree diff + exact verdict match (F1/F2) -----
+
+@test "task-reviewer diffs the two-dot working tree and lists untracked files separately" {
+  content="$(normalize_ws "$(cat "$AGENT3")")"
+  [[ "$content" == *"ls-files --others --exclude-standard"* ]]
+  [[ "$content" == *"has not committed yet"* ]]
+}
+
+@test "negative control: a task-reviewer copy without the ls-files step fails the untracked-files check" {
+  stripped="${BATS_TEST_TMPDIR}/task-reviewer-no-lsfiles.md"
+  sed 's/ls-files --others --exclude-standard//' "$AGENT3" > "$stripped"
+  content="$(cat "$stripped")"
+  [[ "$content" != *"ls-files --others --exclude-standard"* ]]
+}
+
+@test "task-reviewer self-check requires an exact VERDICT match, rejecting the template placeholder" {
+  content="$(normalize_ws "$(cat "$AGENT3")")"
+  [[ "$content" == *"EXACTLY"* ]]
+  [[ "$content" == *"unfilled template placeholder"* ]]
+  [[ "$content" == *"not a prefix or substring match"* ]]
+}
+
+@test "negative control: a task-reviewer copy without the exact-match self-check fails the strict-verdict check" {
+  stripped="${BATS_TEST_TMPDIR}/task-reviewer-no-exact.md"
+  sed 's/not a prefix or substring match, and not the//' "$AGENT3" > "$stripped"
+  content="$(cat "$stripped")"
+  [[ "$content" != *"not a prefix or substring match"* ]]
+}
+
+# --- 8: task-planner agent (issue #192 stage 5) ---
+
+@test "agents/task-planner.md exists with name, a tools line that includes Skill and Write and excludes Agent, and NO model pin" {
+  [ -f "$AGENT4" ]
+  head -10 "$AGENT4" | grep -qF 'name: task-planner'
+  tools_line="$(head -10 "$AGENT4" | grep '^tools:')"
+  [[ "$tools_line" == *"Skill"* ]]
+  [[ "$tools_line" == *"Write"* ]]
+  [[ "$tools_line" != *"Agent"* ]]
+  run sh -c "head -10 '$AGENT4' | grep -q '^model:'"
+  [ "$status" -ne 0 ]
+}
+
+@test "negative control: a task-planner copy with Agent added to tools fails the no-Agent check" {
+  fixture="${BATS_TEST_TMPDIR}/task-planner-with-agent.md"
+  sed 's/^tools: Read, Grep, Glob, Bash, Write, Edit, Skill$/tools: Read, Grep, Glob, Bash, Write, Edit, Skill, Agent/' "$AGENT4" > "$fixture"
+  tools_line="$(head -10 "$fixture" | grep '^tools:')"
+  [[ "$tools_line" == *"Agent"* ]]
+}
+
+@test "task-planner body lists every explicit input, the two-stage handshake, and the fixed report fields" {
+  content="$(normalize_ws "$(cat "$AGENT4")")"
+  [[ "$content" == *"task id"* ]]
+  [[ "$content" == *"brief path"* ]]
+  [[ "$content" == *"plan dir"* ]]
+  [[ "$content" == *"gates dir"* ]]
+  [[ "$content" == *"risk tier"* ]]
+  [[ "$content" == *"wiki root"* ]]
+  [[ "$content" == *"integ ref"* ]]
+  [[ "$content" == *"ask for them rather than guessing"* ]]
+  [[ "$content" == *"Two-stage handshake"* ]]
+  [[ "$content" == *"review-verdict.md"* ]]
+  [[ "$content" == *"SendMessage"* ]]
+  [[ "$content" == *"plan path:"* ]]
+  [[ "$content" == *"size:"* ]]
+  [[ "$content" == *"gate-A rc:"* ]]
+  [[ "$content" == *"gate-B rc:"* ]]
+  [[ "$content" == *"no-wiki count:"* ]]
+  [[ "$content" == *"contradiction:"* ]]
+}
+
+@test "negative control: a task-planner copy with review-verdict.md stripped fails the handshake check" {
+  stripped="${BATS_TEST_TMPDIR}/task-planner-no-verdict.md"
+  grep -v 'review-verdict.md' "$AGENT4" > "$stripped"
+  content="$(normalize_ws "$(cat "$stripped")")"
+  [[ "$content" != *"review-verdict.md"* ]]
+}
+
+@test "task-planner write scope: plan dir and gate ledgers only, never status-update.sh, no tracked repo file" {
+  content="$(normalize_ws "$(cat "$AGENT4")")"
+  [[ "$content" == *'never call `status-update.sh`'* ]]
+  [[ "$content" == *"edit no tracked repo file"* ]]
+  [[ "$content" == *".dev-loop/gates/plan-A-<task>.md"* ]]
+  [[ "$content" == *"{ORCH_DIR}/plans/<task>.md"* ]]
+}
+
+@test "boundary: a frontmatter-only task-planner copy fails the inputs check" {
+  fm="${BATS_TEST_TMPDIR}/task-planner-frontmatter-only.md"
+  awk '{print} /^---$/{n++} n==2{exit}' "$AGENT4" > "$fm"
+  content="$(normalize_ws "$(cat "$fm")")"
+  [[ "$content" != *"brief path"* ]]
+}
+
+@test "task-planner round-3 full re-plan re-enters the two-stage handshake: deletes review-verdict.md and STOPs with a fresh STOP REPORT" {
+  content="$(normalize_ws "$(cat "$AGENT4")")"
+  [[ "$content" == *"Round 3"* ]]
+  [[ "$content" == *"re-enters the two-stage handshake"* ]]
+  [[ "$content" == *"delete \`<plan"*"review-verdict.md\`"* ]]
+  [[ "$content" == *"STOP with a fresh STOP REPORT"* ]]
+  [[ "$content" == *"never a FINAL REPORT"* ]]
+}
+
+@test "negative control: a task-planner copy without the round-3 handshake re-entry fails the check" {
+  stripped="${BATS_TEST_TMPDIR}/task-planner-no-round3-handshake.md"
+  grep -v 're-enters the two-stage handshake' "$AGENT4" > "$stripped"
+  content="$(normalize_ws "$(cat "$stripped")")"
+  [[ "$content" != *"re-enters the two-stage handshake"* ]]
 }

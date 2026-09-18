@@ -62,7 +62,7 @@ Run it two ways:
   executor — the wiki-executor discipline (load only named pages, decisions win,
   BLOCKED-on-gap) is folded into this loop.
 - **A whole goal, split across parallel worker sessions** → the `orchestrate`
-  skill: intake → decompose (approval gate) → dispatch loop: plan (wiki-plan) →
+  skill: intake → decompose (approval gate) → dispatch loop: plan (wiki-plan on the task-planner agent) →
   implement + review (each session runs `loop-implement`) → integration test →
   pre-merge gate → merge. There is no wave barrier: a dependency graph plus slot
   accounting starts each task the moment its own dependencies are approved and a
@@ -113,6 +113,12 @@ This is not a configurable role and cannot be turned off.
 The wiki lives at the plugin root (`wiki/`, `INDEX.md`, `AGENTS.md`,
 `templates/`); the wiki skills resolve their paths against `${CLAUDE_PLUGIN_ROOT}`.
 
+A project can add its own layer at `<repo>/wiki-local/` (same `templates/page.md`
+schema, one `wiki-local/index.md` map, ids `local-<domain>-<category>-<slug>`).
+`wiki-plan` cites local pages as first-class `Wiki basis` groundings, the routing
+protocol reads the local index only when it exists, and a local page wins over a
+bundled page on the same trigger.
+
 ### Configuring your tools (optional)
 
 Like loop-orchestrator, dev-loop runs fully generic with **no** config, but you
@@ -129,7 +135,8 @@ can map its **capability roles** to your real tools so the loop uses them:
 | `research` | external best-practice/pitfall search (wiki-plan Phase A/B). Fixed fallback when unset: brave-search MCP if present → built-in WebSearch → open `ABANDON` |
 
 (`plan` is **not** a role — the plan step is fixed to `wiki-plan`. And the bundled
-best-practice `wiki/` needs no config; `knowledge` is a *separate* external wiki.)
+best-practice `wiki/` needs no config; `knowledge` is a *separate* external wiki —
+the project's own `wiki-local/` layer needs no config either.)
 
 Set it up with **`/dev-loop:configure`**, which writes `~/.claude/dev-loop/tools.json`
 (global) or `<repo>/.dev-loop/tools.json` (per-repo, team-shared). Precedence is
@@ -249,6 +256,19 @@ checkout's `wiki/` — a report citing pages that don't exist fails closed. The
 gate is narrowly scoped to knowledge-flush PRs, so it never interferes with
 ordinary `gh pr create` in any repo.
 
+### Wiki search index (optional, fail-open)
+
+The bundled wiki is also indexed locally (`scripts/wiki-index.py` →
+`~/.dev-loop/wiki-index/`, refreshed in the background by
+`hooks/wiki-index.sh`) and served through the two-tool `dev-loop-wiki` MCP
+(`.mcp.json` → `scripts/wiki-mcp-launch.sh` → `scripts/wiki-mcp.py`:
+`wiki_search`, `wiki_page`). Curated routing stays the first path; the index
+is a fail-open second path in three places — `wiki-query` retries a routing
+0-hit once semantically, `wiki-ingest` shows the top-5 hits before
+merge-vs-create, and `wiki-lint` check 19 lists near-duplicate trigger pairs
+(`neardup`). Without `uv` or a built index every skill behaves as before;
+`DEV_LOOP_WIKI_INDEX=0` turns the feature off.
+
 ---
 
 ## Skills
@@ -274,18 +294,25 @@ dev-loop/
 ├── wiki/                             # 10-domain semantic-layer knowledge base (260 pages: best practices, edge cases, process methodology)
 ├── skills/                           # the 9 skills above (user-invocable; appear in the / menu by skill name)
 ├── agents/test-quality-auditor.md    # bundled independent test auditor (loop step 6.5)
+├── agents/task-reviewer.md           # bundled fresh-context per-task reviewer (orchestrate Phase 4)
+├── agents/task-planner.md            # bundled fresh-context per-task planner (orchestrate Phase 3 step 2a)
 ├── hooks/
 │   ├── hooks.json
 │   ├── preflight.sh                  # SessionStart: git/tmux/jq advisory
 │   ├── insight-instruction.sh        # SessionStart: inject ★ Insight capture instruction (global)
 │   ├── config-nudge.sh               # SessionStart: nudge to /dev-loop:configure if unconfigured (weekly)
 │   ├── graph-nudge.sh                # SessionStart: nudge to /dev-loop:graph-setup if the workspace graph needs onboarding (weekly)
+│   ├── wiki-index.sh                 # SessionStart: refresh the local wiki vector index in the background (DEV_LOOP_WIKI_INDEX=0 disables)
 │   ├── loop-gate.sh                  # Stop: verification-loop integrity gate
 │   ├── harvest-insights.sh + harvest.js  # Stop: harvest insights → queue
 │   ├── auto-flush.sh                 # Stop: auto-run knowledge-flush (guarded) → PR
 │   ├── pre-flush-pr-gate.sh          # PreToolUse: enforce the flush pre-PR pipeline
 │   └── orchestrate-ask-gate.sh       # PreToolUse: no worker launch until Gate 1 was asked with AskUserQuestion
 ├── scripts/resolve-tools.sh          # capability-role profile resolver (no `plan` role)
+├── scripts/wiki-contradiction.sh     # evidence-gated log.md contradiction entry for a wiki page falsified at implement time (loop-implement rule 4)
+├── scripts/wiki-usage.sh + wiki-lint-usage.js  # WIKI: line telemetry -> <repo>/.dev-loop/wiki-usage.jsonl; wiki-lint check 18 zero-citation review queue (report-only)
+├── scripts/wiki-index.py + wiki-mcp.py + wiki-mcp-launch.sh  # local vector index over wiki/ + the two-tool dev-loop-wiki MCP (fail-open)
+├── .mcp.json                         # registers dev-loop-wiki (stdio) through the launcher
 ├── tests/                            # bats suites — hooks (harvest, flush gate, loop gate) + orchestration scripts; CI runs them on ubuntu + macos
 ├── references/tool-profile.md
 └── docs/                             # inherited design notes (loop-orchestrator lineage)

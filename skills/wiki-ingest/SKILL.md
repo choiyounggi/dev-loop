@@ -30,17 +30,31 @@ or a distilled lesson ("we hit X; doing Y fixed it because Z").
    rewrite it as the replacement action: "when <situation that tempts X>, do Y".
    Keep the prohibition only as an `Instead of` row paired with Y.
 
-3. **Route.** Match the case to a domain via `INDEX.md`, then to a category via the
+3. **Route.** **Layer first.** The knowledge is project-specific when its
+   directive names this repository's own files, modules, services, conventions
+   or infrastructure, or would be wrong in another codebase; route
+   project-specific knowledge to `wiki-local/<domain>/<category>/<slug>.md` in
+   that project (same `templates/page.md`, id `local-<domain>-<category>-<slug>`,
+   one row in `wiki-local/index.md`) and general knowledge to the bundled wiki.
+   Then match the case to a domain via `INDEX.md`, then to a category via the
    domain `index.md`. If no category fits, create one (update the domain index) —
    but first re-check that an existing category doesn't already cover it under a
    different name.
 
 4. **Merge before creating.** Read every existing page in the target category whose
    "load when" line overlaps the new case.
+   - Semantic dedupe first: call the dev-loop-wiki tool `wiki_search` with the
+     candidate's trigger sentence (k=5), open each hit's page and read its
+     "When this applies"; the first trigger that describes the same situation
+     is the merge target for the bullets below, and the top-5 hits are listed
+     in the step-8 report. When the `wiki_search` tool is absent from the
+     session or returns an empty list, continue exactly as this step read
+     before the tool existed.
    - Same trigger, same directive → add the new source / edge case to that page.
    - Same trigger, conflicting directive → do NOT overwrite. Add the conflict to the
      page under `Edge cases` if it is condition-dependent, or flag it in `log.md` as
      `contradiction` for the owner to resolve.
+   - Same trigger, existing page wrong as a whole (its directive is refuted by the new source, not merely condition-dependent) → create the new page, then on the old page set `status: superseded` and `superseded_by: <new page id>`, move its domain `index.md` row to the new page, keep the old file on disk, and append `## [YYYY-MM-DD] revise | <old id> superseded by <new id> — <why>` to `log.md`. A page whose premise is gone with no replacement gets `status: retired`, the reason in its body, and the same delisting.
    - New trigger → create a new page from `templates/page.md`.
 
 5. **Source it.** Fill `sources:` with real, checkable citations. Do not invent or
@@ -56,4 +70,4 @@ or a distilled lesson ("we hit X; doing Y fixed it because Z").
    Add `related:` links both ways for genuinely adjacent pages.
 
 8. **Report.** List pages created/updated, conflicts flagged, and anything left
-   `unverified` that needs evidence.
+   `unverified` that needs evidence, and the top-5 wiki_search hits considered in step 4.

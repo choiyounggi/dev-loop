@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "dev-loop-wiki": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/wiki-mcp-launch.sh", "serve"],
+      "env": {
+        "DEV_LOOP_WIKI_INDEX": "${DEV_LOOP_WIKI_INDEX:-1}",
+        "DEV_LOOP_WIKI_INDEX_DIR": "${DEV_LOOP_WIKI_INDEX_DIR:-}",
+        "DEV_LOOP_WIKI_EMBED_MODEL": "${DEV_LOOP_WIKI_EMBED_MODEL:-}"
+      }
+    }
+  }
+}

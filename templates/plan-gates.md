@@ -43,7 +43,7 @@ either script were needed or made.
   EVIDENCE: pending
 
 <!-- PHASE: B -->
-- [ ] groundings-exist: every `Wiki basis` cell in design.md's `## Decisions` (other than `[no-wiki]`) names a page that exists under the wiki root
+- [ ] groundings-exist: every `Wiki basis` cell in design.md's `## Decisions` (other than `[no-wiki]`) names a page that exists under the bundled wiki root (wiki/...) or the project's local layer (wiki-local/..., project root derived from the plan dir)
   CHECK: sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check groundings-exist {PLAN_DIR}
   EXPECT: ok
   EVIDENCE: pending
