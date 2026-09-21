@@ -63,7 +63,7 @@ carries no external checks.
 ## Sources
 
 - https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository — the "Allow GitHub Actions to create and approve pull requests" setting
-- https://docs.github.com/en/rest/actions/permissions?apiVersion=2022-11-28 — `GET`/`PUT /repos/{owner}/{repo}/actions/permissions/workflow`, field `can_approve_pull_request_reviews`: "if GitHub Actions can submit approving pull request reviews"
+- https://docs.github.com/en/rest/actions/permissions?apiVersion=2022-11-28 — `GET`/`PUT /repos/{owner}/{repo}/actions/permissions/workflow`, field `can_approve_pull_request_reviews`: "Whether GitHub Actions can approve pull requests. Enabling this can be a security risk."; the endpoint description sets "whether GitHub Actions can submit approving pull request reviews" (raw page re-checked 2026-09-21)
 - https://docs.github.com/en/actions/concepts/security/github_token — "events triggered by the `GITHUB_TOKEN` will not create a new workflow run, with the following exceptions: `workflow_dispatch` and `repository_dispatch`"; "use a GitHub App installation access token or a personal access token instead of `GITHUB_TOKEN`"
 - https://docs.github.com/en/rest/repos/rules?apiVersion=2022-11-28 — ruleset `bypass_actors[].actor_type` includes `Integration`; the personal-repo 422 for an Integration actor is field-observed (below), not stated in the reference
 - https://cli.github.com/manual/gh_pr_merge — `--auto`: "Automatically merge only after necessary requirements are met"; `--delete-branch`: "Delete the local and remote branch after merge"

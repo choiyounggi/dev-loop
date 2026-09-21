@@ -58,7 +58,7 @@ Linux CI runner.
 | Colima, Rancher Desktop, or OrbStack instead of Docker Desktop | Same override mechanism: the vendor guides set `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock` (Rancher Desktop also sets `TESTCONTAINERS_HOST_OVERRIDE` to the VM's address) |
 | A specific container class still mounts the wrong socket after the override | The class binds the socket path before host detection resolves it (testcontainers-java#7678, LocalStack; fixed upstream) — upgrade the library before changing more host settings |
 | Ryuk is disabled and a run was interrupted | `docker ps -a --filter label=org.testcontainers` lists what the reaper would have removed; delete those containers and their networks/volumes before the next run |
-| The error text names `/host_mnt/Users/...` | Docker Desktop's file-sharing mount of the host socket path — the socket cannot be shared into the VM as a file (testcontainers-java#8170, closed as environment); it is the same fault as the `~/.docker/run/docker.sock` message |
+| The error text names `/host_mnt/Users/...` | Docker Desktop's file-sharing mount of the host socket path — the socket cannot be shared into the VM as a file (testcontainers-java#8170, closed as not planned); it is the same fault as the `~/.docker/run/docker.sock` message |
 
 ## Instead of
 
@@ -75,7 +75,7 @@ Linux CI runner.
 - https://golang.testcontainers.org/features/configuration/ — disabling Ryuk "will prevent testcontainers from automatically cleaning up resources, which is particularly important in tests which timeout as they don't run test clean up"
 - https://golang.testcontainers.org/system_requirements/rancher/ and https://docs.rancherdesktop.io/how-to-guides/using-testcontainers/ — `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock` for a macOS VM-based Docker runtime
 - https://docs.docker.com/desktop/settings-and-maintenance/settings/ — "Allow the default Docker socket to be used … Creates /var/run/docker.sock which some third party clients may use to communicate with Docker Desktop"
-- https://github.com/testcontainers/testcontainers-java/issues/8170 — `error while creating mount source path '/host_mnt/Users/_user/.docker/run/docker.sock' … operation not supported` on Docker Desktop for Mac; closed as environment
+- https://github.com/testcontainers/testcontainers-java/issues/8170 — `error while creating mount source path '/host_mnt/Users/_user/.docker/run/docker.sock' … operation not supported` on Docker Desktop for Mac; closed as not planned
 - https://github.com/testcontainers/testcontainers-java/issues/7678 — a container fails to start when "Allow the default Docker socket to be used" is unchecked; the class bound the socket before host detection
 - https://github.com/testcontainers/testcontainers-go/issues/399 — the socket override was added for non-standard socket paths on macOS VM runtimes
 - Field reproduction 2026-08-30 (linkly, testcontainers-python, macOS Docker Desktop): the suite exited rc=5 with `errors=2, 0 tests` on the `~/.docker/run/docker.sock` mount error twice; with `TESTCONTAINERS_RYUK_DISABLED=true` it ran 27/27 green twice; GitHub Actions `ubuntu-latest` ran the same suite green with no variable set (run 33309041474)

@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://docs.firecrawl.dev/api-reference/endpoint/scrape
 last_verified: 2026-09-06
-related: [backend-common-integrations-robots-txt-and-source-selection, backend-common-reliability-timeouts-and-retries]
+related: [backend-common-integrations-robots-txt-and-source-selection, backend-common-reliability-timeouts-and-retries, qa-environments-headless-browser-bot-blocking]
 ---
 
 # Collecting Phone Numbers and Addresses From Company Sites With a Main-Content Scraper

@@ -78,6 +78,6 @@ for dark surfaces; reviewing a dark-theme token set that calls its steps
 
 - https://www.w3.org/TR/WCAG21/ — contrast ratio defined as `(L1 + 0.05) / (L2 + 0.05)` on sRGB relative luminance
 - https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast.html — SC 1.4.11: user-interface components and the visual information required to identify them "have a contrast ratio of at least 3:1 against adjacent color(s)"
-- https://www.w3.org/TR/css-color-4/ — OKLCH lightness "clearly reflect[s] the visual lightnesses" of colors (in contrast to HSL); sRGB is gamma-encoded and colors are encoded to it at paint time
+- https://www.w3.org/TR/css-color-4/ — on HSL's disadvantages: blue and yellow both have HSL Lightness 50%, while "The OkLCh Lightnesses of 0.452 and 0.968 clearly reflect the visual lightnesses of the two colors" (raw spec text re-checked 2026-09-21); sRGB is gamma-encoded and colors are encoded to it at paint time
 - Local reproduction 2026-09-06 (Python, CSS Color 4 OKLab→linear-sRGB matrices): `oklch(13% 0.015 215)` → rgb(2, 9, 11), 19% → (12, 22, 24), 22% → (19, 28, 31), 27% → (30, 40, 43), 72% → (155, 167, 170), within ±2 of the engine-measured bytes; WCAG ratios from the measured bytes: 13% vs 19% = 1.091, 22% vs 27% = 1.15, 13% vs 27% = 1.339
 - Field measurement 2026-09-02 (linkly-crew, Tauri macOS WKWebView): canvas `fillStyle` + `getImageData` readback of the four rungs matched the project's OKLCH→sRGB converter byte for byte; the state ladder was redesigned onto outline and chroma cues

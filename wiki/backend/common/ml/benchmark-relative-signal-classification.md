@@ -74,5 +74,5 @@ inputs a signal grader needs before it labels anything "strong".
 ## Sources
 
 - https://corporatefinanceinstitute.com/resources/equities/abnormal-return/ — "Excess Return = Actual Return − Expected Return", with the market index as the expected return in the worked example (12% − 14% = −2%)
-- https://www.wallstreetprep.com/knowledge/information-ratio/ — active performance is "the excess return over a benchmark", the standard denominator for judging entity-specific performance
+- https://www.wallstreetprep.com/knowledge/information-ratio/ — the information ratio is built on "the excess return over a benchmark", the standard denominator for judging entity-specific performance
 - Field measurement 2026-08-26 (stock-signal-bot, KRX): close 1,531,000 (08-18) → 1,599,000 (08-26) = +4.44% while the KOSPI 5-day return was +5.21%; the same day's +0.88% sat under the index's +0.97%; the buy-flow signal graded as strength was a lag once benchmarked, and the grader was changed to require positive excess return

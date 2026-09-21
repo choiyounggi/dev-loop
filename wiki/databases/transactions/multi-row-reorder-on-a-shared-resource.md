@@ -67,7 +67,7 @@ resource the concurrent writer is the normal path, not an exception.**
 |------|------|
 | Rows are inserted and deleted in the same action as the reorder | Same transaction, same parent lock; delete first, then upsert positions, so a deleted row cannot hold a slot the constraint check sees |
 | The ORM issues one `UPDATE` per row under autocommit | Wrap the action explicitly ([backend-common-orm-transaction-boundaries]); per-row autocommit is the interleaving case in step 1 |
-| Many parents are reordered in one request | Lock the parent rows in one ordered `SELECT ... FOR UPDATE` (ascending id) so lock order stays global and deadlocks are avoided |
+| Many parents are reordered in one request | Lock all the parent rows up front with the global lock ordering [databases-transactions-isolation-level-selection] prescribes (one ordered `SELECT ... FOR UPDATE`), then reorder each parent's children |
 | Positions are fractional or sparse keys (LexoRank-style) so a move touches one row | Step 2's constraint question disappears for the moving row, but two movers inserting between the same neighbours still produce equal keys; keep the parent lock, or make the key unique and retry on conflict |
 | Readers must see a consistent order mid-rewrite | Readers at Read Committed see either the pre-commit or the post-commit order, never the interleaving, because the rewrite is one transaction |
 
