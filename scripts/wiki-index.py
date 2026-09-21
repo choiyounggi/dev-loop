@@ -869,11 +869,73 @@ def page(cfg, page_id):
 
 def evaluate(cfg, cases, k):
     hits = 0
+    total = 0
     for case in cases:
+        expected = case.get("expected_page_id")
+        if not expected:
+            continue
+        total += 1
         rows = search(cfg, case["query"], k)
-        if any(row["page_id"] == case["expected_page_id"] for row in rows):
+        if any(row["page_id"] == expected for row in rows):
             hits += 1
-    return hits, len(cases)
+    return hits, total
+
+
+def evaluate_report(cfg, cases, k):
+    records = []
+    for case in cases:
+        expected = case.get("expected_page_id")
+        rows = search(cfg, case["query"], k)
+        rank = None
+        expected_score = None
+        for i, row in enumerate(rows, start=1):
+            if row["page_id"] == expected:
+                rank = i
+                expected_score = row["score"]
+                break
+        top_score = rows[0]["score"] if rows else None
+        records.append({
+            "query": case["query"],
+            "expected_page_id": expected,
+            "rank": rank,
+            "top_score": top_score,
+            "expected_score": expected_score,
+            "source": case.get("source"),
+        })
+
+    positives = [r for r in records if r["expected_page_id"]]
+    negatives = [r for r in records if not r["expected_page_id"]]
+
+    sweep = []
+    floors = [round(0.60 + 0.02 * i, 2) for i in range(16)]
+    for floor in floors:
+        recall_hits = sum(
+            1 for r in positives
+            if r["expected_score"] is not None and r["expected_score"] >= floor
+        )
+        recall = (recall_hits / len(positives)) if positives else 0.0
+        fp = sum(
+            1 for r in negatives
+            if r["top_score"] is not None and r["top_score"] >= floor
+        )
+        fpr = (fp / len(negatives)) if negatives else 0.0
+        top1_hits = sum(
+            1 for r in positives
+            if r["rank"] == 1 and r["expected_score"] is not None and r["expected_score"] >= floor
+        )
+        sweep.append({
+            "floor": "%.2f" % floor,
+            "recall": "%.2f" % recall,
+            "fpr": "%.2f" % fpr,
+            "top1_hits": top1_hits,
+        })
+
+    verdict = None
+    for row in sweep:
+        if float(row["fpr"]) <= 0.10 and float(row["recall"]) >= 0.80:
+            verdict = row
+            break
+    return records, sweep, verdict
 
 
 # --------------------------------------------------------------------------
@@ -955,13 +1017,42 @@ def _cmd_neardup(cfg, args):
 
 
 def _cmd_eval(cfg, args):
-    with open(args.cases, encoding="utf-8") as fh:
-        cases = json.load(fh)
+    try:
+        with open(args.cases, encoding="utf-8") as fh:
+            cases = json.load(fh)
+    except OSError:
+        print("cases file not found: %s" % args.cases, file=sys.stderr)
+        return 3
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        print("malformed cases file: %s: %s" % (args.cases, exc), file=sys.stderr)
+        return 3
+    if not isinstance(cases, list):
+        print("malformed cases file: %s: top-level JSON must be a list" % args.cases, file=sys.stderr)
+        return 3
+
+    for i, case in enumerate(cases):
+        if not isinstance(case, dict) or "query" not in case or "expected_page_id" not in case:
+            print("malformed case at index %d: missing 'query' or 'expected_page_id'" % i, file=sys.stderr)
+            return 3
+
     probe = open_ro(cfg)
     if probe is None:
         print("no index", file=sys.stderr)
         return 4
     probe.close()
+
+    if args.report:
+        records, sweep, verdict = evaluate_report(cfg, cases, args.k)
+        for rec in records:
+            print(json.dumps(rec))
+        for row in sweep:
+            print(json.dumps(row))
+        if verdict is None:
+            print("floor: none separable")
+        else:
+            print("floor: %s recall %s fpr %s" % (verdict["floor"], verdict["recall"], verdict["fpr"]))
+        return 0
+
     hits, total = evaluate(cfg, cases, args.k)
     recall = (hits / total) if total else 0.0
     print("recall@%d %.2f hits %d total %d" % (args.k, recall, hits, total))
@@ -992,6 +1083,7 @@ def main(argv):
     p_eval = sub.add_parser("eval", help="Recall@k over a cases file")
     p_eval.add_argument("--cases", required=True)
     p_eval.add_argument("--k", type=int, default=5)
+    p_eval.add_argument("--report", action="store_true", help="per-case records + threshold sweep")
 
     p_nd = sub.add_parser("neardup", help="trigger-chunk pairs at or above a cosine threshold")
     p_nd.add_argument("--threshold", type=_unit_float, default=0.9)
