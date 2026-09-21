@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://docs.python.org/3/library/concurrent.futures.html
   - https://martinfowler.com/articles/nonDeterminism.html
-  - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html
+  - https://mir.cs.illinois.edu/lamyaa/publications/fse14.pdf
 last_verified: 2026-09-10
 related: [testing-quality-tests-that-cannot-fail, testing-flaky-diagnosing-flaky-tests, backend-common-concurrency-shared-state-and-pools, backend-python-concurrency-gil-and-concurrency-model, testing-quality-proving-a-critical-section-is-lock-protected]
 ---
@@ -65,6 +65,6 @@ or "only N items ran" style assertion.
 
 - https://docs.python.org/3/library/concurrent.futures.html — `Executor.submit()` "schedules the callable... and returns a Future" (non-blocking); `ThreadPoolExecutor` default `max_workers` is `min(32, (os.process_cpu_count() or 1) + 4)` (3.13+); `shutdown(cancel_futures=True)` cancels only futures "the executor has not started running" — running/completed futures are unaffected
 - https://martinfowler.com/articles/nonDeterminism.html — tests that encode a hidden ordering/timing assumption pass under the old execution model and fail once that assumption is removed; poll/assert the actual guaranteed condition instead of an incidental one
-- https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html — threading/concurrency changes are a measured source of tests whose pass/fail depends on an execution-order assumption the test never states
+- https://mir.cs.illinois.edu/lamyaa/publications/fse14.pdf — Luo et al., "An Empirical Analysis of Flaky Tests" (FSE 2014): "The top three categories of flaky tests are Async Wait, Concurrency, and Test Order Dependency"; "32 out of 161 (20%) commits are from the Concurrency category" — execution-order assumptions under concurrency are a measured flakiness source
 - Field reproduction, 2026-09-10 (CPython 3.14.6, `concurrent.futures.ThreadPoolExecutor`): 3 tasks, `max_workers=4`, task for `i==1` sets a `threading.Event` before running; each task checks the event at its own top and returns early if set. Result: all 3 tasks ran (`ran: [0, 1, 2]`) — the flag never took effect, because all 3 were submitted and passed their gate check before task 1's side effect became visible. The identical harness with `max_workers=1` produced `ran: [0, 1]`, `skipped-2` — strict sequential dispatch is what made the original assertion true, not the stop logic
 - Field observation, 2026-09-10 (a Python per-company contact pipeline, `tests/test_resume.py::TestGracefulShutdown::test_shutdown_stops_after_current_company`, 3 companies, default `MAX_COMPANY_WORKERS=4`): passed under the prior sequential-loop dispatch; went deterministically red (`call_count` 3 vs expected 1) the moment per-company dispatch moved to `ThreadPoolExecutor` — reproduced on repeated runs via `sh scripts/run_tests.sh` (265/266 passing, only this test failing), not a flake

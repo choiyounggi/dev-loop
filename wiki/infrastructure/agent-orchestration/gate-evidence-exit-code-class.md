@@ -10,7 +10,7 @@ sources:
   - https://code.claude.com/docs/en/plugins-reference
   - https://www.gnu.org/software/coreutils/manual/html_node/timeout-invocation.html
 last_verified: 2026-09-21
-related: [testing-quality-checks-that-cannot-pass, infrastructure-agent-orchestration-session-completion-gates, platforms-environment-path-resolution, infrastructure-config-path-valued-config, debugging-signals-reading-error-messages, testing-quality-gate-parsing-vs-command-execution]
+related: [testing-quality-checks-that-cannot-pass, infrastructure-agent-orchestration-session-completion-gates, platforms-environment-path-resolution, infrastructure-config-path-valued-config, debugging-signals-reading-error-messages, testing-quality-gate-parsing-vs-command-execution, platforms-tools-plugin-mcp-server-registration]
 ---
 
 # A Gate-Check EVIDENCE Line Whose Exit Code Names the Checker's Failure, Not the Check's Verdict
