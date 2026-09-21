@@ -26,7 +26,8 @@ related:
     qa-deliverables-command-transcripts-in-a-document,
     qa-deliverables-exclusivity-and-absence-claims,
     qa-document-verification-generated-reference-drift-gates,
-    infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal
+    infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal,
+    infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan
   ]
 ---
 

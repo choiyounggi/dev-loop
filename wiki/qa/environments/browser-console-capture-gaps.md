@@ -14,6 +14,7 @@ related:
     platforms-tools-unpacked-extension-source-reload,
     platforms-processes-tool-diagnostics-without-a-failing-exit-code,
     testing-quality-tests-that-cannot-fail,
+    qa-environments-element-crop-screenshots,
   ]
 ---
 
