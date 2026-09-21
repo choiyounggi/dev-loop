@@ -1,150 +1,105 @@
-# Knowledge flush — 4 insight(s)
-
-Claimed queue ids: `c6c76b1cb2d35bf9`, `028fcf4648303397`, `1c4620e3aadaf0b7`, `56f4dbc8fb5997f8`.
-All four were handled (2 new pages, 3 amended pages); none dropped.
+# Knowledge flush — 3 insight(s): 1 new page, 2 project-specific plan-gap drops
 
 ## Verified best-practice
 
-**1. `c6c76b1cb2d35bf9` — precedence tests must stage the competing condition at the deciding iteration** (→ `confidence: verified`)
+### 1. `2b99ac7bc23f307f` — custom-property alias tokens read from script under jsdom → **verified**
 
-Claim: a test asserting that exit condition A wins over B must make B become true in
-the same poll/iteration in which A reaches its threshold; a B staged earlier makes the
-assertion hold under either ordering of the checks.
+Claim: `getComputedStyle(el).getPropertyValue('--a')` for `--a: var(--b)` returns the
+substituted value in a browser but the literal `var(--b)` under jsdom; the string is
+non-empty so an empty-value fallback never fires, and a canvas consumer silently
+ignores it.
 
-- https://arxiv.org/abs/1909.04770 (Vera-Pérez, Danglot, Monperrus, Baudry, 2019) — fetched
-  this session. An undetected mutant has three causes, the first being that "the test
-  inputs are not sufficient to infect the state of the program". That is exactly this
-  failure: if B fires before A can activate, the reordering mutant is never reached in a
-  state where it can infect the outcome.
-- https://pitest.org/quickstart/basic_concepts/ — a surviving mutant means no test
-  distinguishes the mutated program; a kill is attributed to the covering test, which is
-  why the precedence test itself (not merely the file) must redden.
-- https://testing.googleblog.com/2021/04/mutation-testing.html — detection is measured by
-  inserting the fault and requiring failure, not by branch coverage.
-- Field measurement (dev-loop `watch-status.sh`, three "R6 precedence" bats cases): moving
-  the exit-8 block above the failed/done check left all three green. Re-staging the
-  competing status transition to the same tmux-stub capture count that confirms the
-  two-poll witness made the same swap red.
+- **Reproduced** (2026-09-21, jsdom 30.1.0, scratch project, since removed). Printed output of
+  `getPropertyValue` on `:root` with
+  `--b:#ff0000; --a:var(--b); --c:var(--a); --u:var(--missing); --x:var(--y); --y:var(--x)`:
+  `--b "#ff0000"`, `--a "var(--b)"`, `--c "var(--a)"`, `--u "var(--missing)"`,
+  `--x "var(--y)"`, undeclared `--none ""`. This matches the candidate's own evidence
+  (`--color-go: var(--color-accent)` read back as `var(--color-accent)` in a Vitest jsdom env).
+- https://www.w3.org/TR/css-variables-1/ — §2 computed value of `--*`: "specified value with
+  variables substituted, or the guaranteed-invalid value"; §2.2 that value "serializes as the
+  empty string"; §2.3 every property in a cycle is invalid at computed-value time. This is the
+  browser column of the page's table (derived from the spec, not separately measured in a browser).
+- https://html.spec.whatwg.org/multipage/canvas.html — `fillStyle`: "Invalid values are
+  ignored" (extracted from the fetched spec text), which is why the failure is silent.
+- https://github.com/jsdom/jsdom/issues/1895 — "Implement CSS custom properties", state OPEN
+  (read via `gh issue view`): jsdom's support is partial.
 
-**2. `028fcf4648303397` — never confirm a pane witness from a capture taken in the same iteration as a key-send** (→ merged as `verified` material into an existing `verified` page)
+One sentence in my first draft (that each simulated DOM implements a different subset) had no
+source; it was replaced with a statement limited to what was measured (jsdom only).
 
-Claim: when a poll loop both sends keys (auto-recover `Enter`, resend) and reads a state
-witness from the pane, it must skip the capture entirely on the iteration that sent keys.
+### 2. `27f30a2498bd57d3` — resolve `expected_page_id` via a frontmatter-id map → **not ingested (project-specific)**
 
-- Reproduced locally this session (tmux, macOS, `sh` pane): with the newest status line
-  reading `STATE=BLOCKED`, sending a command that worked 0.4s before printing left the
-  same-iteration `capture-pane` still showing `STATE=BLOCKED`; the next poll showed
-  `STATE=RUNNING`. The same sequence with an instantly-printing command had already
-  repainted within the same iteration — so the check's outcome is set by the target's work
-  time, which is why the gate belongs on "did this iteration send keys", not on a delay.
-- Mechanism already sourced on the target page: https://man7.org/linux/man-pages/man1/tmux.1.html
-  (`send-keys` writes keys into the pane; `capture-pane` copies visible contents — neither
-  reports consumption) and https://man7.org/linux/man-pages/man3/termios.3.html.
-- Field evidence: dev-loop code review of task `t3-blocked-consume`, finding F1 — the exit-8
-  "still blocked" witness was confirmed from a same-poll capture, so a just-repaired worker
-  could be escalated; gating on the recovery flag fixed it, and removing the gate under
-  mutation woke the witness one poll early.
+The directive names dev-loop's own id scheme (`<domain>-<category>-<slug>`, `wiki/**/*.md`,
+`index.md`) and one eval-case field. No external verification was attempted because it is not
+bundled-wiki material; see Local-layer candidates.
 
-**3. `1c4620e3aadaf0b7` — graphify's installed hooks miss the `git pull` path** (→ `verified`)
+### 3. `d6771df1f2a91b34` — default `eval` recall counts only positive cases → **not ingested (project-specific)**
 
-Claim: `graphify hook install` covers `post-commit` and `post-checkout` only, while the
-"PR merged upstream → `git pull`" path fires `post-merge`, so the graph goes stale while
-`hook status` reports installed.
-
-- https://git-scm.com/docs/githooks — fetched this session: `post-commit` "is invoked by
-  git-commit"; `post-merge` "is invoked by git-merge, which happens when a `git` `pull` is
-  done on a local repository"; `post-checkout` "is also run after git-clone, unless the
-  `--no-checkout` (`-n`) option is used".
-- Local reproduction (git 2.50.1, macOS): in a clone carrying all three hooks, a
-  fast-forward `git pull` fired `post-merge 0` alone; a divergent `git pull` that created a
-  merge commit also fired `post-merge 0` and **no** `post-commit`; a fresh `git clone` of
-  that repository carried no non-sample hooks.
-- Source read: `graphifyy 0.4.23` `hooks.py:186-187` installs `"post-commit"` and
-  `"post-checkout"` only; `grep -c post-merge hooks.py` → 0.
-- **Correction applied to the candidate's stated reasoning:** the submitted note said git
-  "does not run hooks on clone". Per the docs and the reproduction, `git clone` *does* run
-  `post-checkout` — the reason a clone gets no graph is that hooks are not copied by clone,
-  so none exist to run. The page carries the corrected reason.
-
-**4. `56f4dbc8fb5997f8` — a grounding gate's escape hatch must emit a gap record at the point it grants the pass** (→ `confidence: field-tested`)
-
-Claim: an escape hatch (`[no-wiki]`, a suppression comment) is the most valuable signal a
-knowledge base gets, and a gate that only decides pass/fail destroys it; the record must be
-emitted by the gate, not requested in prose.
-
-- https://docs.github.com/en/code-security/code-scanning/managing-code-scanning-alerts/resolving-code-scanning-alerts
-  — fetched this session: dismissing an alert requires choosing a reason, "the dismissal
-  comment is added to the alert timeline", it is readable as `dismissed_comment` on the
-  alerts API, and dismissed alerts stay in the Closed list for review. This is the canonical
-  shape of a *recorded* escape hatch.
-- https://github.blog/changelog/2025-07-01-delegated-alert-dismissal-for-code-scanning-is-now-generally-available/
-  — fetched this session: reviewers can "provide a comment when approving/rejecting alert
-  dismissal requests", and dismissal requests are created, listed and reviewed through
-  dedicated REST API endpoints — the review of a hatch use is itself recorded and readable
-  outside the UI.
-- Local field measurement (this repo, 1.22.0): `skills/wiki-plan/scripts/plan-gate.sh:166`
-  passes an ungrounded decision with `[ "$basis" = "[no-wiki]" ] && continue` and records
-  nothing, while `skills/wiki-plan/SKILL.md:135` asks in prose for the decision to be "noted
-  as an ingest candidate". Against 276 non-index wiki pages, `log.md` carries exactly one
-  `gap` entry (2026-07-11).
-- No external source states the general rule as a directive, so this stays **field-tested**
-  rather than verified; the GitHub precedent supports the mechanism, not the general claim.
+The directive specifies one function's signature (`evaluate(cfg, cases, k)`), one output format
+string and this repo's case counts (15 / 35+15). The general kernel (recall = hits over cases
+that have a relevant item) is the textbook definition and adds no routable situation; see
+Local-layer candidates.
 
 ## Existing-layer check
 
-Routed via `INDEX.md` → domain `index.md` → every page whose "load when" overlapped.
+Routed candidate 1 via `INDEX.md` → `wiki/frontend/index.md` (owning artifact: the UI helper),
+and checked `wiki/testing/index.md` as the second domain. Whole-wiki grep: `jsdom` / `happy-dom`
+→ 0 files; `getPropertyValue|custom propert|var(--` → 1 file (anti-slop-visual-design, directive 4:
+declare tokens once and reference `var(--token)` — authoring tokens, not reading them from
+script; no overlap, no conflict). `wiki_search` top-5 for the trigger sentence:
+frontend-security-xss-safe-rendering (×2), frontend-design-anti-slop-visual-design,
+testing-e2e-e2e-stability, backend-common-change-impact-compiler-as-call-site-inventory — none
+describes the same situation. Result: **new page**
+`wiki/frontend/design/custom-property-values-read-from-script.md`, no merge target.
 
-Pages read: testing-quality-tests-that-cannot-fail, testing-quality-policy-at-several-return-sites, testing-quality-completion-predicates, testing-quality-surviving-mutant-equivalence-triage, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-code-graph-as-orientation-layer, platforms-processes-driving-a-tui-in-a-tmux-pane, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-autonomous-decision-rulings
+Related links added both ways: frontend-design-anti-slop-visual-design (token declaration),
+frontend-design-html-in-canvas (canvas consumers), testing-mocking-what-to-mock (the Instead-of
+row about mocking `getComputedStyle`). `wiki/frontend/index.md` gained the design row; `log.md`
+gained the ingest entry.
 
-(Directory-level scans of `wiki/testing/quality/`, `wiki/platforms/processes/`,
-`wiki/infrastructure/agent-orchestration/` plus keyword sweeps for `no-wiki`, `post-merge`,
-`capture-pane`/`send-keys`, and `precedence` over the whole wiki preceded these reads.)
+For candidates 2–3, `wiki_search` on the recall trigger returned
+testing-quality-stale-artifact-baselines, databases-indexing-trigram-index-short-patterns,
+qa-process-completion-claims, testing-quality-generated-sql-property-assertions,
+databases-indexing-index-write-cost — no page on retrieval-eval scoring; the plan's own
+grounding page testing-quality-harness-reverse-controls covers harness discrimination, not
+denominators.
 
-| Insight | Overlap found | Outcome |
-|---------|---------------|---------|
-| 1 precedence | `tests-that-cannot-fail` carries a co-occurring-writer edge case (two writers of one flag) and `policy-at-several-return-sites` carries per-site mutation — both are about *coverage of one site*, neither about *which of two live conditions wins* | **New page**, cross-linked to both; no conflicting directive |
-| 2 pane witness | `pane-delivery-confirmation` already rules that a pane *diff* is not delivery evidence (echo direction). The new rule is the opposite direction — a stale capture *falsely confirming* a witness | **Merged** into that page (Do-this #6, 1 edge row, 1 Instead-of row, 2 sources); 1 pointer row added to `driving-a-tui-in-a-tmux-pane` |
-| 3 graphify hooks | `code-graph-as-orientation-layer` already gates on freshness and its Sources line already names `hook install` post-commit/post-checkout — the hook-coverage consequence was missing | **Merged** into that page (2 edge rows, 2 sources, 1 clause on directive 1) |
-| 4 escape hatch | `session-completion-gates` and `spec-document-gates` cover gate *authoring*; none covers what a gate does with its own exemptions. Keyword sweep for `no-wiki`/`escape hatch`/`knowledge gap` returned no owning page | **New page** in the existing `agent-orchestration` category |
+Pages read: frontend-design-anti-slop-visual-design, frontend-design-html-in-canvas, testing-mocking-what-to-mock, testing-quality-harness-reverse-controls
 
-Conflicts flagged: none — no existing directive is contradicted.
-Related links added both ways: `tests-that-cannot-fail`, `policy-at-several-return-sites`,
-`completion-predicates` ↔ the new precedence page; `session-completion-gates`,
-`autonomous-decision-rulings`, `spec-document-gates` ↔ the new escape-hatch page.
-
-Lint after the edits: `wiki-structure-checks.js` → **278 pages, 13 indexes, 0 findings**;
-`wiki-lint-prohibitions.js` → no findings on any touched page (the 2 repo-wide violations it
-reports are pre-existing, in `plans/` and `tests/fixtures/`). New pages are 67 and 69 body
-lines; amended pages are 92, 92 and 65 — all under the 120-line cap.
+Checks run in the checkout: `node scripts/wiki-lint-prohibitions.js` → `directives: 75,
+compliant: 75, violations: 0` (count unchanged, matches the bats pin); new page body = 77 lines;
+banned-qualifier grep on the new page → 0 hits; `bats tests/wiki-lint-prohibitions.bats
+tests/wiki-structure-checks.bats tests/wiki-lint-score.bats` → 35 ok, 0 not ok.
 
 ## Open-PR check
 
-Listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` —
-12 open heads: #191, #190, #189, #188, #187, #186, #185, #183, #182, #181, #180, #179.
-Each head was fetched and its **added** wiki lines (`git diff <merge-base> pr-N -- wiki/`)
-grepped for `post-merge|graphify|graph.json|no-wiki|capture-pane|send-keys|precedence|knowledge gap`.
+Listed 18 open `knowledge/*` heads (#179, #180, #181, #182, #183, #185, #186, #187, #188, #189,
+#190, #191, #205, #207, #208, #209, #210, #212). Fetched each and searched
+`git diff origin/main origin/<head> -- wiki/`:
 
-| Candidate | Overlapping open head | Verdict |
-|-----------|----------------------|---------|
-| 1 precedence | none — #189's `proving-a-critical-section-is-lock-protected` and `sequential-dispatch-assumption-under-concurrency` are concurrency-window tests, not exit-condition ordering; its only `precedence` hits are Gradle property precedence (#179) | **new** |
-| 2 pane witness | none — #183's single `send-keys` hit is a pointer row in a stdin-vs-send-keys edge case | **new** |
-| 3 graphify hooks | #185 edits the *same page* but adds an unrelated row (`update` exits 1 on a >5,000-node HTML viz); #186 only mentions this page in an INGEST_REPORT dedup note | **new** (no content overlap; noted below as a textual merge risk) |
-| 4 escape hatch | none — #189's `gate-evidence-exit-code-class` is about a gate's own exit-code classes, not about recording exemptions | **new** |
-
-Merge-risk note for the reviewer: **#185 and this PR both append to
-`wiki/infrastructure/agent-orchestration/code-graph-as-orientation-layer.md`** (different
-edge-case rows and different source bullets). Whichever lands second may need a one-hunk
-textual merge; the content does not conflict semantically.
+- `jsdom|getPropertyValue|happy-dom` → 0 matches in all 18 heads. Candidate 1: **new**.
+- `recall@|negative cases|denominator|frontmatter id|hyphenated id` → two unrelated
+  "denominator" hits (#185 benchmark-relative grade, #182 vendor benchmark claims), neither about
+  retrieval-eval scoring or id resolution. Candidates 2–3: no overlap; **drop** as
+  project-specific (not as pending duplicates).
 
 ## Routing decision
 
-| Insight | Target | New category? |
-|---------|--------|---------------|
-| 1 | `testing/quality/precedence-between-competing-exit-conditions.md` (**new page**) | No — `testing/quality` already owns "can this test actually fail" |
-| 2 | `infrastructure/agent-orchestration/pane-delivery-confirmation.md` (**merge**), + 1 pointer row in `platforms/processes/driving-a-tui-in-a-tmux-pane.md` | No |
-| 3 | `infrastructure/agent-orchestration/code-graph-as-orientation-layer.md` (**merge**) | No |
-| 4 | `infrastructure/agent-orchestration/escape-hatch-uses-as-a-knowledge-gap-signal.md` (**new page**) | No — `agent-orchestration` already carries the gate-authoring pages (`session-completion-gates`, `autonomous-decision-rulings`); a `knowledge-base` category would hold one page and split gate knowledge across two places |
+| Candidate | Decision |
+|-----------|----------|
+| `2b99ac7bc23f307f` | **new page** → `frontend/design/custom-property-values-read-from-script` (id `frontend-design-custom-property-values-read-from-script`). Existing category `design` fits: it already owns token declaration and canvas effect layers; the artifact changed is the UI helper, so frontend owns it over testing. No new category. |
+| `27f30a2498bd57d3` | excluded — project-specific (layer test) |
+| `d6771df1f2a91b34` | excluded — project-specific (layer test) |
 
-Plumbing: `wiki/testing/index.md` +1 row; `wiki/infrastructure/index.md` +1 row and two
-extended "load when" lines (pane-delivery-confirmation, code-graph-as-orientation-layer);
-`log.md` +1 `ingest` entry.
+## Local-layer candidates
+
+Both belong to the `dev-loop` project (run wiki-ingest inside that project; it has no
+`wiki-local/` yet, and the decisions are already recorded in
+`plans/t2-eval-calibration/design.md` D3/D4 and implemented in commit da64d40):
+
+- `27f30a2498bd57d3` → `wiki-local/testing/quality/eval-case-page-id-resolution.md` — resolve
+  `expected_page_id` through a map built from every page's frontmatter `id:` line; categories
+  such as `query-optimization` contain hyphens, so the id string cannot be split into a path.
+- `d6771df1f2a91b34` → `wiki-local/testing/quality/eval-recall-over-positive-cases.md` — the
+  default `eval` recall counts a case only when `expected_page_id` is truthy; negatives stay out
+  of `hits`/`total` and the output line format is unchanged.
