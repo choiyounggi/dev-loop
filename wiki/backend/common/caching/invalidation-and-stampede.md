@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://aws.amazon.com/builders-library/caching-challenges-and-strategies/
 last_verified: 2026-07-10
-related: [backend-common-reliability-timeouts-and-retries]
+related: [backend-common-reliability-timeouts-and-retries, backend-common-caching-input-manifest-freshness-with-skipped-inputs]
 ---
 
 # Adding a Cache: Invalidation Design and Stampede Protection
