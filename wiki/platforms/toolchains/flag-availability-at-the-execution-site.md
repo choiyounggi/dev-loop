@@ -10,7 +10,7 @@ sources:
   - https://protobuf.dev/programming-guides/proto3/
   - https://code.claude.com/docs/en/cli-reference
 last_verified: 2026-09-08
-related: [platforms-toolchains-version-management, platforms-tools-bsd-vs-gnu-cli, backend-common-integrations-externally-owned-defaults, platforms-processes-non-interactive-cli-invocation]
+related: [platforms-toolchains-version-management, platforms-tools-bsd-vs-gnu-cli, backend-common-integrations-externally-owned-defaults, platforms-processes-non-interactive-cli-invocation, qa-deliverables-documented-behavior-of-a-third-party-tool]
 ---
 
 # A CLI Flag, Subcommand, or API Method That Exists Locally but Not Where It Runs

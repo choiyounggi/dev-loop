@@ -1,88 +1,53 @@
 # Knowledge flush — 3 insight(s)
 
-3 claimed candidates → 2 distinct insights: 1 new page, 1 merge into an existing page (2 duplicate candidates folded into it), 0 drops.
-
-| Queue id | Insight | Outcome |
-|----------|---------|---------|
-| `8c0693fbeb1dca30` | Greedy regex merges adjacent tokens in extractor fixtures | New page `testing-data-adjacent-tokens-in-extractor-fixtures` |
-| `fe22774ea41d523f` | Subagent 429 on a model-scoped (Fable) limit → per-invocation `model` override | Merged into `infrastructure-agent-orchestration-usage-limit-paused-workers` |
-| `2f27db59be18d9c2` | Same insight as `fe22774ea41d523f`, from a second session | Duplicate within this batch; used as the second field observation on that merge |
+Queue rows claimed by this run: `e025ad454c4fa162` (stale rationale after a config removal), `2d18b514c5263d8a` (tier-table obligation row vs. a pinned sibling contract), `dee63eaab5ef0e5d` (doc sentence about a third-party installer's side effect). All three ingested as new pages; 0 dropped, 0 folded onto an open PR.
 
 ## Verified best-practice
 
-**1. Adjacent tokens in fixture text for a greedy pattern extractor** (`8c0693fbeb1dca30`) — `confidence: verified`
+**1. Rationale prose left behind when a pinned config value is removed** — `confidence: verified`
+- Claim: after removing/changing a pinned config value (agent frontmatter `model:`, a version pin, a flag default), grep the whole file and its quoting siblings for the old value's narration (literal, decision verb, reason words) and, per hit, delete mechanism-only rationale, rewrite a still-live trade-off as one sentence about the new behavior, rename tests titled for the old rule, keep history lines; state the sweep in the PR; route the diff through a reader that did not write it.
+- Sources checked (all live-fetched 2026-09-17): https://peps.python.org/pep-0008/#comments — "Comments that contradict the code are worse than no comments. Always make a priority of keeping the comments up-to-date when the code changes!"; https://google.github.io/eng-practices/review/reviewer/looking-for.html — Documentation section: developer "also updates associated documentation" and, on removal, "whether the documentation should also be deleted"; https://google.github.io/styleguide/docguide/best_practices.html — "Dead docs are bad. They misinform"; "Change your documentation in the same CL as the code change"; https://code.claude.com/docs/en/sub-agents — `model` frontmatter values (`sonnet`/`opus`/`haiku`/`fable`, full id, `inherit`) and the four-step precedence order when omitted.
+- Field evidence: dev-loop t3-agent-pin (issue #200): `.orchestration/reviews/t3-agent-pin-r0.md` records the pin removal from `agents/test-quality-auditor.md` + `agents/integration-reviewer.md` and the deleted "pinned rather than inherit" blockquotes; 35/35 bats green and self-review passed the contradiction, the independent test-quality-auditor call returned FAIL first.
 
-- Claim: a regex whose repeated character class admits separators (`\d[\d\s.\-()]{6,18}\d`) greedily merges two occurrences separated only by class-member characters into one span capped at the repeat's maximum, whose digits match neither original. So the test should assert the extractor's own spans first, and per-occurrence fixtures should use a separator outside the class.
-- Sources checked:
-  - https://docs.python.org/3/library/re.html — "The '*', '+', and '?' quantifiers are all greedy; they match as much text as possible"; `re.finditer` returns non-overlapping matches, scanned left-to-right.
-  - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Regular_expressions/Quantifier — "Quantifiers are greedy by default … until the maximum is reached"; lazy `?` matches as few times as possible.
-- How verified: reproduced with CPython `re` this session.
-  - `"- 1900068889\n- 1900068889"` → one match `'1900068889\n- 1900068'` (20 chars = 1 + 18 + 1).
-  - Pipe-separated → two clean matches.
-  - Real-shaped footer `"090 123 4567 028 3822 1234"` → one merged match.
-  - Also reproduced and added as edge cases:
-    - Unbounded `+` merges both numbers (20 digits).
-    - Lazy `{6,18}?` truncates `090 123 4567` to `090 123 4`, and pipe-separated `1900068889` to `19000688`.
-- The session's field evidence (independent test-quality auditor caught it; pipe-delimiting fixed it) matches the reproduction.
+**2. A table row that states an obligation another contract already fixes** — `confidence: verified`
+- Claim: before committing a tier/profile/policy row whose label names an obligation ("test audit") that a checksum-pinned sibling contract makes mandatory, grep sibling contracts for the obligation noun; name the actor in the row label and every cell; add the one clause that the other contract is unchanged; review the row against the sibling contract rather than the plan.
+- Sources checked: INCOSE Guide to Writing Requirements v4 summary sheet, rule R2 — "Use the active voice in the need or requirement statement with the responsible entity clearly identified as the subject of the sentence" (the PDF at incose.org returned 403 to WebFetch and an HTML error page to curl on 2026-09-17; the wording was confirmed via two independent restatements, both live-fetched: https://www.jamasoftware.com/legacy/requirements-management-guide/writing-requirements/incose-requirements-writing-guide/ — "'The system shall use a 20 V electrical input' names an owner, while 'A 20 V electrical input shall be used' names nobody." and https://www.altium.com/documentation/altium-365/requirements-systems-portal/valiassistant/quality-assessment — R2 verbatim); https://alistairmavin.com/ears/ — "While <optional pre-condition>, when <optional trigger>, the <system name> shall <system response>", one system name required; http://principles-wiki.net/principles:don_t_repeat_yourself — "at some point in time the different representations diverge which is a fault".
+- Field evidence: `.orchestration/reviews/t5-risk-tier-r1.md` F1 and the fixing diff in `.worktrees/t5-risk-tier/skills/orchestrate/SKILL.md` ("coordinator auditor cross-call" row + "the worker's own step 6.5 auditor call is unchanged at every tier"); lens 1 plan conformance passed because the plan carried the row.
 
-**2. Subagent failing on a model-scoped limit → per-invocation model override** (`fe22774ea41d523f` + `2f27db59be18d9c2`) — mechanism `verified`; the Fable-specific 429 text is `field-tested`
-
-- Claim: when a subagent call fails at once with `rate_limit`/HTTP 429 naming one model (`claude-fable-5-1`), re-issue the identical call with `model: "sonnet"`. The subagent definition's model is independent of the session's model, and the limit is scoped to that model.
-- Sources checked:
-  - https://code.claude.com/docs/en/sub-agents#choose-a-model (raw `.md` fetched). Resolution order: "1. The per-invocation `model` parameter 2. The subagent definition's `model` frontmatter 3. `CLAUDE_CODE_SUBAGENT_MODEL` 4. The main conversation's model". Before v2.1.251 the env var ranked first.
-  - https://code.claude.com/docs/en/errors (raw `.md` fetched): "The session and weekly limits are shared across all models … The Opus and Sonnet limits each apply only to requests to that model family, so switching to a model outside the family with `/model` keeps you working". Also the `Fable limit reached · continuing on Fable 5.1 uses usage credits … nothing was sent` message for unattended sessions.
-  - https://code.claude.com/docs/en/model-config#fable-and-usage-credits — Fable usage can bill to usage credits behind a consent prompt.
-  - Local check: dev-loop 1.21.0 `agents/test-quality-auditor.md` and `agents/integration-reviewer.md` both declare `model: fable`. That explains why only the subagent failed while the session kept working.
-- Honest gap: the docs do not print the exact `You've reached your Fable limit … model sent to the API` 429 text. That wording is cited only as a field observation (2 independent sessions on 2026-09-14, both of which succeeded after the override).
-- The page stays `verified` because its directive rests on the documented resolution order and model-family scoping.
+**3. A sentence in your docs stating what a third-party tool does** — `confidence: verified`
+- Claim: locate the tool's source as installed where the reader runs it (pipx/pip/npm/brew lookup table), grep it for the named object, attribute each effect to the component that produces it, record version + check, and treat issue/plan-sourced claims as unverified input; link instead of restating where the tool documents the effect.
+- Sources checked (live-fetched): https://diataxis.fr/reference/ — "accuracy, precision, completeness and clarity"; "The only purpose of a reference guide is to describe, as succinctly as possible, and in an orderly way"; "neutral description"; https://google.github.io/styleguide/docguide/best_practices.html — "Link to it instead."; Google reviewer guide as above.
+- Reproduction 2026-09-17: graphifyy 0.4.23 (pipx venv, `site-packages/graphify/hooks.py`, 220 lines): `grep -nE 'exclude|gitignore|graphify-out' hooks.py` → only lines 91–92 (`if [ ! -d "graphify-out" ]` existence guard); hooks installed are `post-commit` and `post-checkout`; no `.git/info/exclude` or `.gitignore` handling. dev-loop's own `scripts/graph-hooks.sh` (line 20 comment + line 128 `git rev-parse --git-path info/exclude`) is the component that writes the exclude entry.
+- Field evidence: `.orchestration/reviews/t7-graph-setup-r1.md` F1 and the fixed sentence at `.worktrees/t7-graph-setup/skills/graph-setup/SKILL.md:80`.
 
 ## Existing-layer check
 
-Pages read: infrastructure-agent-orchestration-usage-limit-paused-workers, testing-quality-tests-that-cannot-fail, testing-data-test-data-and-isolation
+Routed via `INDEX.md` → qa (release-quality process, document deliverables and their verification); read `wiki/qa/index.md` in full, plus `wiki/testing/index.md` (candidate 1 was tagged `testing`) and `wiki/backend/index.md` (agent-facing artifacts) and the `agent-orchestration` section of `wiki/infrastructure/index.md` to rule those domains out.
 
-Also read: `INDEX.md`, `wiki/testing/index.md` (every quality/data/strategy load-when line), and the `agent-orchestration` rows of `wiki/infrastructure/index.md`. I also grepped `wiki/` for `greedy|regex|finditer|adjacent`, `rate.?limit|429`, and `model override|subagent.*model|fable`.
+Pages read: qa-document-verification-retiring-a-provisional-marker, qa-document-verification-editing-a-gated-document, qa-document-verification-spec-document-gates, qa-deliverables-exclusivity-and-absence-claims, qa-deliverables-quantitative-claims-in-a-published-document, qa-process-defect-class-resweep-after-review, backend-common-llm-binding-instructions-for-agents, backend-common-integrations-externally-owned-defaults, platforms-toolchains-flag-availability-at-the-execution-site
 
-- Insight 1: no existing page covers greedy-quantifier merging in test fixtures.
-  - Grep hits were about regex *gates*, not extraction fixtures: `source-text-wiring-assertions`, `completion-predicates`, `checks-that-cannot-pass`.
-  - → **created new**.
-  - Related links added both ways with `testing-data-test-data-and-isolation` (fixture construction) and `testing-quality-tests-that-cannot-fail` (a test green for the wrong reason).
-- Insight 2: `usage-limit-paused-workers` owns model-scoped limits and the `/model` switch → **merged**. Changes:
-  - New step 7 (subagent per-invocation override).
-  - 4 new edge-case rows: override rerun fails again; Fable consent in unattended sessions; `CLAUDE_CODE_SUBAGENT_MODEL` on CLI < v2.1.251; auditor model substitution + `availableModels`.
-  - 1 new Instead-of row, and 2 new sources plus a field observation.
-  - Index load-when extended.
-- **Drift corrected (not a contradiction):** the page said only the *Opus* limit is model-scoped. The current errors doc also lists `You've hit your Sonnet limit`, scoped to the Sonnet family. I updated the marker row, the "only one worker stopped" edge row, and the Instead-of "Why" cell, and bumped `last_verified` to 2026-09-14.
-- No conflicting directive found.
+Overlaps and decisions:
+- Candidate 1 vs `retiring-a-provisional-marker` (a checklist row stays `[x]` on evidence you just deleted): same mechanism (one file, two independently edited axes) but a different trigger (provisional markers in an ADR/RFC vs. a config value with narrating prose). Created new; cross-linked both ways and reused its history-line rule in the decision table. vs `editing-a-gated-document`: it owns machine anchors; new page points to it for the gate-in-same-commit edge and for scoping the sweep count. vs `defect-class-resweep-after-review`: reused for the copied-siblings edge. No conflict with any existing directive.
+- Candidate 2 vs `exclusivity-and-absence-claims` (write the generating rule, not the enumeration): adjacent — cited for the "cite the contract instead of restating its condition" row. vs `spec-document-gates` cross-reference axis: that page gates a document against itself; the new page is the authoring rule for the row. vs `binding-instructions-for-agents` edge "two instruction sources conflict → state the precedence inside the artifact": the new page is the specific case where the two sources bind different actors under one obligation noun; linked both ways rather than merged (different trigger, and the lesson is not agent-specific). No conflict.
+- Candidate 3 vs `exclusivity-and-absence-claims` edge "claim about an external system you do not control → state the version and the check": that row covers absence claims; the new page covers positive side-effect claims and how to locate the installed source. vs `externally-owned-defaults` (re-query the owner's catalog at review): same principle for a named resource; linked. vs `flag-availability-at-the-execution-site` (resolve a flag against the version present): same lens, different artifact (a doc sentence vs. a CLI flag); linked both ways. vs `quantitative-claims-in-a-published-document`: adjacent (claims in docs); linked. No conflict.
 
-Lint results on this branch:
+Merged vs created: 3 new pages, 0 merges. Amended pages carry only reverse `related:` links (9 pages, 11 link additions). `wiki/qa/index.md` +3 rows; `INDEX.md` qa route line extended; `log.md` entry appended.
 
-- `node scripts/wiki-structure-checks.js wiki` → `pages: 277, indexes: 13, findings: 0`.
-- `wiki-lint-prohibitions.js` → 2 violations. Both predate this PR and sit outside `wiki/` (`plans/harvest-dedupe-processed/...`, `tests/fixtures/prohibitions/bad.md`). Neither changed page is flagged.
-- `wiki-lint-model-era.js`:
-  - `usage-limit-paused-workers` is reported as `model-coupled, no verified_model`. It was already flagged that way on `main`, since the page mentions Claude/Opus and no wiki page carries `verified_model`.
-  - I tried `verified_model: claude-opus-5` (the model this flush ran on). The lint rejected it as "not in current set" because the script's `DEFAULT_CURRENT` is still `['opus-4', 'fable-5']`.
-  - I left the field off to match every other page, rather than picking a value just to pass. Refreshing `DEFAULT_CURRENT` is a separate owner decision.
+Lint on the checkout: `node scripts/wiki-lint-prohibitions.js` → directives 75 / compliant 75 / violations 0; `node scripts/wiki-structure-checks.js .` → no findings under `wiki/` (only the pre-existing `tests/fixtures/**` orphan noise); `node scripts/wiki-lint-model-era.js .` → the 6 pre-existing revalidate candidates, none of the new pages; new page body lines 72 / 70 / 73 (≤120); no vague qualifiers in directive sentences.
 
 ## Open-PR check
 
-Listed open `knowledge/*` heads with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`: #190, #189, #188, #187, #186, #185, #183, #182, #181, #180, #179. For each, I diffed its own changes with `git diff origin/main...origin/<head> -- wiki/` and grepped the added lines for `greedy|finditer|adjacent|regex merge|model-scoped|Fable limit|subagent model|per-invocation`. No added lines matched.
+Open `knowledge/*` heads listed via `gh pr list --search "head:knowledge/"`: #191 (20260914-213301), #190 (20260914-180008), #189 (20260910-162026), #188 (20260908-154412), #187 (20260906-213635), #186 (20260906-013856), #185 (20260906-003745), #183 (20260904-133717), #182 (20260903-214027), #181 (20260903-203836), #180 (20260903-184706), #179 (20260903-172728). Each head was fetched and `git diff --name-status origin/main origin/<head> -- wiki/` inspected; pages with plausibly overlapping triggers were read from the head.
 
-- Insight 1 (`8c0693fbeb1dca30`) — verdict **new**.
-  - No open head adds a regex/extractor-fixture page.
-  - The closest is #187's `backend/common/integrations/contact-details-from-scraped-pages.md`, which covers *where* to read phone numbers (`tel:` links, header/footer vs main content), not how a regex tokenizes adjacent numbers. That's a different trigger, so no overlap.
-- Insights 2/3 (`fe22774ea41d523f`, `2f27db59be18d9c2`) — verdict **new** (merge into the main-branch page).
-  - #180 touches `usage-limit-paused-workers.md`, but only its `related:` line (it adds `login-expiry-during-unattended-turns`). No content overlap.
-  - This PR leaves that `related:` line unchanged, so the two PRs should not conflict on that line.
-  - `2f27db59be18d9c2` duplicates `fe22774ea41d523f` within this batch, so it is folded into the same merge rather than dropped.
-- Merge-order note: #188, #181, and #179 also edit `testing/data/test-data-and-isolation.md`, and #188/#183 edit `tests-that-cannot-fail.md`. This PR only appends one id to each page's `related:` list, so any conflict is a one-line `related:` union.
+- Candidate 1 (stale rationale after a config removal) — #191 amends `usage-limit-paused-workers` with the subagent `model` frontmatter under a 429 (different trigger: a rate limit, not an edit); #188 `session-identity-leak-in-plugin-prose` (a personal name in redistributed prose, not a contradiction with config); #186 `model-coupled-guidance-aging-detector` (a lint for model-era aging). No head carries this trigger → **new**.
+- Candidate 2 (obligation row vs. pinned sibling contract) — #189 `worker-reported-plan-contradiction` (resolving a doc/doc fact dispute at implement time by running the suite; adjacent, not the authoring rule); #181 `checkable-claims-in-an-adopted-plan` (recompute a plan's numbers / dependency table vs. Steps prose); #180 `forward-references-in-a-numbered-protocol` (graft ordering). None names the actor-in-the-row rule or the unchanged-clause → **new**.
+- Candidate 3 (doc sentence about a third-party tool's side effect) — #188 `sweeping-pre-gate-citations-for-fabrication` (wiki citation sweeps) and `real-cli-spot-check-for-new-execution-paths` (test paths, not docs); #182 `vendor-benchmark-claims-for-an-llm-tool` (vendor benchmark numbers); #181 `checkable-claims-in-an-adopted-plan` (plan numbers/symbols). None covers locating the installed tool's source for a documented side effect → **new**.
+
+No fold, no pending-duplicate drop; no sibling PR was modified.
 
 ## Routing decision
 
-- Insight 1 → `testing` / `data` / new page `wiki/testing/data/adjacent-tokens-in-extractor-fixtures.md`.
-  - The lesson is about *constructing fixture input* so each synthetic occurrence stays a distinct token. That is the `data` category ("tests need fixture data and you are choosing how to create it").
-  - `quality` was the runner-up (a test that passes for the wrong reason). It is linked through `related:` instead, because the directive acts on the fixture, not the assertion strategy.
-  - No new category needed.
-- Insights 2/3 → `infrastructure` / `agent-orchestration` / existing page `wiki/infrastructure/agent-orchestration/usage-limit-paused-workers.md`.
-  - That page already owns "which usage limit was hit decides the move", and a subagent is an orchestrated worker billed to the same seat.
-  - `platforms/processes` was rejected: the fix is a model-routing decision inside the orchestrator, not an OS/CLI invocation difference.
-  - No new category needed.
+- Candidate 1 → `qa/document-verification/rationale-prose-after-a-config-value-change.md` (`qa-document-verification-rationale-prose-after-a-config-value-change`). Not `testing` (the queue's domain hint): the lesson is about the edited artifact's prose, not about test code; the auditor that caught it is recorded as field context. Not `backend/common/llm`: the rule applies to any config+prose file (Dockerfile comments, CI yaml), not only agent artifacts. Existing category fits (document self-consistency pages already live here).
+- Candidate 2 → `qa/deliverables/obligation-row-without-a-named-actor.md` (`qa-deliverables-obligation-row-without-a-named-actor`). The artifact is a spec/policy table being authored; `deliverables` already holds the claim-form pages (exclusivity/absence, quantitative claims). Not `infrastructure/agent-orchestration`: the field case is an orchestration skill, but the rule (actor as subject, unchanged-clause) is generic requirements-writing.
+- Candidate 3 → `qa/deliverables/documented-behavior-of-a-third-party-tool.md` (`qa-deliverables-documented-behavior-of-a-third-party-tool`). Same category as the other claim-form pages; not `platforms/toolchains` because the artifact under review is the document, with the toolchain page linked for the version-at-execution-site lens.
+- No new category; `INDEX.md` qa route line extended with the three triggers.
