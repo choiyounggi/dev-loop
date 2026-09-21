@@ -7,8 +7,9 @@ confidence: verified
 sources:
   - https://git-scm.com/docs/git-worktree
   - https://code.claude.com/docs/en/hooks
-last_verified: 2026-09-03
-related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-shared-run-state, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-deny-rules-under-bypassed-permissions, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, infrastructure-agent-orchestration-verify-command-in-a-worker-brief]
+  - https://git-scm.com/docs/gitignore
+last_verified: 2026-09-08
+related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-shared-run-state, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-deny-rules-under-bypassed-permissions, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, infrastructure-agent-orchestration-verify-command-in-a-worker-brief, qa-process-scope-purity-checks, testing-quality-cross-task-stub-assertions, testing-strategy-real-cli-spot-check-for-new-execution-paths]
 ---
 
 # Writing the Brief for a Worker Confined to Its Own Worktree
@@ -54,6 +55,14 @@ wait loop keeps escalating with no error from the task itself.
    `--show-toplevel` (the current worktree's own root) computes its state path
    under the main checkout even while running inside a worktree — the relative
    rule in the brief is what stops the worker from acting on that path.
+8. **Ignore a worker's tool byproduct directories (`.dev-loop/`, `.orchestration/`)
+   via `$GIT_COMMON_DIR/info/exclude`, not the tracked `.gitignore`.** From inside
+   any linked worktree, `git rev-parse --git-path info/exclude` resolves to the
+   *main* checkout's `.git/info/exclude` — one file every worker already shares —
+   so writing the pattern there once covers every worker. `.gitignore` is a tracked
+   file: a worker that edits it rides that change through to the final merge as a
+   permanent, unrequested edit to the user's repo, and N parallel workers each
+   patching the same `.gitignore` line produce spurious merge conflicts on top.
 
 ## Edge cases
 
@@ -83,6 +92,7 @@ wait loop keeps escalating with no error from the task itself.
 | Disable the escape guardrail so the workers proceed | Rewrite the paths in the brief | The guardrail is what makes parallel workers safe to run against one repo |
 | Designate a shared scratch directory inside the repo for worker output | Place it outside the repo and pass its path as one named variable | A shared in-repo directory is both a guardrail trip and a write race between workers |
 | Reuse the coordinator's repo-relative path to a gitignored state directory in a worker's prompt template | Expand it to the absolute path at substitution time and note the directory is absent from the worktree | Ignored files exist only where they were created; the relative form silently resolves to a nonexistent path in every worker, and reads of absolute main-root paths pass the guardrail |
+| Add a tool byproduct directory (`.dev-loop/`, `.orchestration/`) to the tracked `.gitignore` to silence `git status` in a worker | Append the pattern to `$GIT_COMMON_DIR/info/exclude` (`git rev-parse --git-path info/exclude`) once | `.gitignore` commits and merges into the user's repo, and every parallel worker patching the same line collides; `info/exclude` is shared across all linked worktrees and never committed |
 | Trust a Bash-hook guardrail as the only isolation for workers with native file tools | Pair it with a relative-paths-only instruction in the brief and a pre-merge `git status` of the main checkout | The hook inspects only the tool its matcher names; an Edit-tool write to an absolute main-checkout path passes silently — the worker need not be routing around anything for the escape to happen |
 | Answer a worktree-escape escalation and move on | Check the main checkout's `git status` in the same step and transfer any worker-owned changes by patch | The Bash hook sees one channel; file-tool edits into the main checkout raise no escalation and are found only by looking |
 | Approve a pre-write `worktree_escape` for a state directory because "the tool needs it" | Deny, and reply with the worktree-relative equivalent of the same path | The tool resolved its root against the shared `.git` common dir; the same directory inside the worktree serves it, and approving lets N workers write one shared state tree in main |
@@ -98,6 +108,8 @@ wait loop keeps escalating with no error from the task itself.
 - Field reproduction 2026-08-21 (dev-loop orchestrate, task hide-color-nudge): on a `worktree_escape` escalation, the main checkout held three files belonging to worker lo-2 whose own worktree was clean; `git diff > patch` in main, `git apply --check` (rc 0) and `git apply` in lo-2's worktree, then `git checkout --` in main left the main tree clean (`MAIN_CLEAN` confirmed) with the work preserved on the worker branch
 - Field reproduction 2026-09-02 (dev-loop orchestrate run i168, task t2): the worker's done signal arrived with a clean worktree, the main checkout was dirty, and the worker's blackboard note complained of unexplained resets; `git diff` in main and `git apply --3way` in the worktree applied cleanly, bats 21/21 passed in the worktree, and the integration reviewer confirmed full recovery
 - Field evidence 2026-08-25 (linkly t112): a worker's cwd was its worktree, yet `diagnostics.py` and `lower.py` in the main checkout carried mtimes 14:23–14:27 when checked at 14:29, naming the worker active in that window; after stopping it and cleaning main by patch transfer, all 11 diagnostic test failures attributed to the just-merged task disappeared
+- https://git-scm.com/docs/gitignore — patterns that "should be version-controlled and distributed to other repositories via clone" go in `.gitignore`; patterns "specific to a particular repository but which do not need to be shared with other related repositories" go in `$GIT_COMMON_DIR/info/exclude`
+- Local reproduction 2026-09-08 (git, macOS): after `git worktree add ../wt1 -b wt1`, `git rev-parse --git-path info/exclude` from inside `wt1` resolved to the main checkout's `.git/info/exclude`; a `.dev-loop/` pattern appended there silenced `git status` for a `.dev-loop/marker` in the worktree and for a `.dev-loop/marker2` in the main checkout — one shared file, not per-worktree
 - Field observation 2026-08-17 (linkly run, worker under a `worktree_escape` Bash-hook guard): the worker modified two `examples/*.lnpl` files in the **main checkout** via its native Edit tool with absolute paths — no block, no log; discovered only when the coordinator's `git pull` failed on local changes (contents happened to match the merged branch, so no damage). The same paths written via Bash redirection would have escalated
 - Field reproduction 2026-08-05 (groundwork guardrails 1.0.0 `hooks/bash-guard.sh`, `worktree_escape` rule, macOS): from a linked worktree, `cp ./a <main_root>/b` and `echo z > <main_root>/f` were both stopped; `cat <main_root>/f`, `ls <main_root>/.orchestration`, and `grep -n x <main_root>/f` all passed. The rule matches an absolute main-root mention together with a write verb (`rm|mv|cp|tee|mkdir|touch|install|dd`) or a redirect to an absolute path
 - Field evidence 2026-08-06 (dev-loop orchestrate, Wave 2 worker consuming an upstream worktree's FINDINGS file): a read-only `awk`/`grep` verification and a `git status` check each raised `worktree_escape` as `ask` and stopped the coordinator's watch with exit 5; both were confirmed read-only and approved. This rule version fired on reads, unlike the 1.0.0 reproduction above where bare `cat`/`ls`/`grep` passed — the read/write asymmetry in the Do-this table is version-dependent, so probe before fanning out
