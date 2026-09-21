@@ -11,7 +11,7 @@ sources:
   - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import
   - https://nodejs.org/api/test.html
 last_verified: 2026-09-04
-related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-tests-that-cannot-fail, testing-mocking-captured-call-arguments, testing-mocking-extracted-method-this-binding, testing-mocking-autouse-fixture-shadows-function-under-test, testing-strategy-real-cli-spot-check-for-new-execution-paths]
+related: [testing-strategy-test-level-choice, testing-quality-behavior-not-implementation, testing-quality-tests-that-cannot-fail, testing-mocking-captured-call-arguments, testing-mocking-extracted-method-this-binding, testing-mocking-autouse-fixture-shadows-function-under-test, testing-strategy-real-cli-spot-check-for-new-execution-paths, frontend-design-custom-property-values-read-from-script]
 ---
 
 # Deciding Whether to Mock, Fake, or Use the Real Dependency
