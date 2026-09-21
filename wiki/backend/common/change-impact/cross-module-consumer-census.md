@@ -8,7 +8,7 @@ sources:
   - https://knip.dev/guides/handling-issues
   - https://knip.dev/reference/configuration
 last_verified: 2026-08-11
-related: [backend-common-change-impact-call-site-enumeration, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-worktree-isolated-workers]
+related: [backend-common-change-impact-call-site-enumeration, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge]
 ---
 
 # Counting the Production Consumers of a Symbol Your Task Just Added

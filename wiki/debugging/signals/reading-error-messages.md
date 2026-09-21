@@ -8,7 +8,7 @@ sources:
   - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Errors
   - https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html
 last_verified: 2026-07-10
-related: [debugging-signals-stack-traces, debugging-methodology-hypothesis-testing, backend-common-errors-diagnostics-from-a-shared-code-path]
+related: [debugging-signals-stack-traces, debugging-methodology-hypothesis-testing, backend-common-errors-diagnostics-from-a-shared-code-path, backend-java-kotlin-compiler-daemon-heap-pressure]
 ---
 
 # Reading an Error Message Before Acting on It

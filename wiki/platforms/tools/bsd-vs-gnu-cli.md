@@ -10,7 +10,7 @@ sources:
   - https://man.freebsd.org/cgi/man.cgi?sed(1)
   - https://man.freebsd.org/cgi/man.cgi?seq(1)
 last_verified: 2026-07-10
-related: [platforms-shells-portable-shell-scripts]
+related: [platforms-shells-portable-shell-scripts, platforms-environment-unicode-text-matching]
 ---
 
 # Same Command Name, Different Userland: BSD (macOS) vs GNU (Linux) Flags

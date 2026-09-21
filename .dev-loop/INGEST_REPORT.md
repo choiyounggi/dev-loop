@@ -1,150 +1,75 @@
-# Knowledge flush — 4 insight(s)
+# Knowledge flush — 12 insight(s)
 
-Claimed queue ids: `c6c76b1cb2d35bf9`, `028fcf4648303397`, `1c4620e3aadaf0b7`, `56f4dbc8fb5997f8`.
-All four were handled (2 new pages, 3 amended pages); none dropped.
+Batch: 12 of 109 pending candidates were claimed (`queue-claim.js claim --max 12`) so the PR stays reviewable; the remaining 97 stay pending for later flushes. Every claimed row was handled (none released): 5 new pages, 7 merges into existing pages, 0 dropped. Each claim was researched by a dedicated verifier agent against live-fetched primary sources and, where possible, reproduced locally; two candidate details were found wrong and corrected in the pages (noted below).
 
 ## Verified best-practice
 
-**1. `c6c76b1cb2d35bf9` — precedence tests must stage the competing condition at the deciding iteration** (→ `confidence: verified`)
-
-Claim: a test asserting that exit condition A wins over B must make B become true in
-the same poll/iteration in which A reaches its threshold; a B staged earlier makes the
-assertion hold under either ordering of the checks.
-
-- https://arxiv.org/abs/1909.04770 (Vera-Pérez, Danglot, Monperrus, Baudry, 2019) — fetched
-  this session. An undetected mutant has three causes, the first being that "the test
-  inputs are not sufficient to infect the state of the program". That is exactly this
-  failure: if B fires before A can activate, the reordering mutant is never reached in a
-  state where it can infect the outcome.
-- https://pitest.org/quickstart/basic_concepts/ — a surviving mutant means no test
-  distinguishes the mutated program; a kill is attributed to the covering test, which is
-  why the precedence test itself (not merely the file) must redden.
-- https://testing.googleblog.com/2021/04/mutation-testing.html — detection is measured by
-  inserting the fault and requiring failure, not by branch coverage.
-- Field measurement (dev-loop `watch-status.sh`, three "R6 precedence" bats cases): moving
-  the exit-8 block above the failed/done check left all three green. Re-staging the
-  competing status transition to the same tmux-stub capture count that confirms the
-  two-poll witness made the same swap red.
-
-**2. `028fcf4648303397` — never confirm a pane witness from a capture taken in the same iteration as a key-send** (→ merged as `verified` material into an existing `verified` page)
-
-Claim: when a poll loop both sends keys (auto-recover `Enter`, resend) and reads a state
-witness from the pane, it must skip the capture entirely on the iteration that sent keys.
-
-- Reproduced locally this session (tmux, macOS, `sh` pane): with the newest status line
-  reading `STATE=BLOCKED`, sending a command that worked 0.4s before printing left the
-  same-iteration `capture-pane` still showing `STATE=BLOCKED`; the next poll showed
-  `STATE=RUNNING`. The same sequence with an instantly-printing command had already
-  repainted within the same iteration — so the check's outcome is set by the target's work
-  time, which is why the gate belongs on "did this iteration send keys", not on a delay.
-- Mechanism already sourced on the target page: https://man7.org/linux/man-pages/man1/tmux.1.html
-  (`send-keys` writes keys into the pane; `capture-pane` copies visible contents — neither
-  reports consumption) and https://man7.org/linux/man-pages/man3/termios.3.html.
-- Field evidence: dev-loop code review of task `t3-blocked-consume`, finding F1 — the exit-8
-  "still blocked" witness was confirmed from a same-poll capture, so a just-repaired worker
-  could be escalated; gating on the recovery flag fixed it, and removing the gate under
-  mutation woke the witness one poll early.
-
-**3. `1c4620e3aadaf0b7` — graphify's installed hooks miss the `git pull` path** (→ `verified`)
-
-Claim: `graphify hook install` covers `post-commit` and `post-checkout` only, while the
-"PR merged upstream → `git pull`" path fires `post-merge`, so the graph goes stale while
-`hook status` reports installed.
-
-- https://git-scm.com/docs/githooks — fetched this session: `post-commit` "is invoked by
-  git-commit"; `post-merge` "is invoked by git-merge, which happens when a `git` `pull` is
-  done on a local repository"; `post-checkout` "is also run after git-clone, unless the
-  `--no-checkout` (`-n`) option is used".
-- Local reproduction (git 2.50.1, macOS): in a clone carrying all three hooks, a
-  fast-forward `git pull` fired `post-merge 0` alone; a divergent `git pull` that created a
-  merge commit also fired `post-merge 0` and **no** `post-commit`; a fresh `git clone` of
-  that repository carried no non-sample hooks.
-- Source read: `graphifyy 0.4.23` `hooks.py:186-187` installs `"post-commit"` and
-  `"post-checkout"` only; `grep -c post-merge hooks.py` → 0.
-- **Correction applied to the candidate's stated reasoning:** the submitted note said git
-  "does not run hooks on clone". Per the docs and the reproduction, `git clone` *does* run
-  `post-checkout` — the reason a clone gets no graph is that hooks are not copied by clone,
-  so none exist to run. The page carries the corrected reason.
-
-**4. `56f4dbc8fb5997f8` — a grounding gate's escape hatch must emit a gap record at the point it grants the pass** (→ `confidence: field-tested`)
-
-Claim: an escape hatch (`[no-wiki]`, a suppression comment) is the most valuable signal a
-knowledge base gets, and a gate that only decides pass/fail destroys it; the record must be
-emitted by the gate, not requested in prose.
-
-- https://docs.github.com/en/code-security/code-scanning/managing-code-scanning-alerts/resolving-code-scanning-alerts
-  — fetched this session: dismissing an alert requires choosing a reason, "the dismissal
-  comment is added to the alert timeline", it is readable as `dismissed_comment` on the
-  alerts API, and dismissed alerts stay in the Closed list for review. This is the canonical
-  shape of a *recorded* escape hatch.
-- https://github.blog/changelog/2025-07-01-delegated-alert-dismissal-for-code-scanning-is-now-generally-available/
-  — fetched this session: reviewers can "provide a comment when approving/rejecting alert
-  dismissal requests", and dismissal requests are created, listed and reviewed through
-  dedicated REST API endpoints — the review of a hatch use is itself recorded and readable
-  outside the UI.
-- Local field measurement (this repo, 1.22.0): `skills/wiki-plan/scripts/plan-gate.sh:166`
-  passes an ungrounded decision with `[ "$basis" = "[no-wiki]" ] && continue` and records
-  nothing, while `skills/wiki-plan/SKILL.md:135` asks in prose for the decision to be "noted
-  as an ingest candidate". Against 276 non-index wiki pages, `log.md` carries exactly one
-  `gap` entry (2026-07-11).
-- No external source states the general rule as a directive, so this stays **field-tested**
-  rather than verified; the GitHub precedent supports the mechanism, not the general claim.
+| # | Candidate (hash) | Claim | Sources checked (fetched/read) | How verified | Confidence |
+|---|------------------|-------|--------------------------------|--------------|------------|
+| 1 | `2002a817b2e74f84` | A quantifier after a non-ASCII literal binds to the last UTF-8 byte under `LC_ALL=C`; group it `(─){3,}` and test under C | POSIX grep spec (already cited on the page); bug-grep list thread on unibyte vs multibyte code paths | Reproduced on macOS BSD grep 2.6.0-FreeBSD and BSD sed: `─{3,}` → 0 under C, 1 under UTF-8; `(─){3,}` → 1 in both; a `─` + two bare `0x80` bytes matches `─{3,}` under C (last-byte binding). GNU grep not installed → GNU result stated as untested | verified (BSD); GNU untested, said so on the page |
+| 2 | `6b8811c6c3b0f983` | `permissions.deny` is enforced in `bypassPermissions`; deny wins at every level; compound commands split per subcommand; wrappers stripped | https://code.claude.com/docs/en/permission-modes ("Deny rules block in every mode, including bypassPermissions … Allow rules have no effect in bypassPermissions"); https://code.claude.com/docs/en/permissions (deny-at-any-level, separator list, stripped-wrapper list) | Direct quotes. **Correction:** the candidate listed `env` among stripped wrappers; the docs' list is `timeout, time, nice, nohup, stdbuf, command, builtin, noglob` plus a leading `VAR=value` — `env` is not stripped. Page says so | verified |
+| 3 | `a9ebd8fda72aade6` | Slow Kotlin build + `Exception during IR lowering` → suspect heap; raise Gradle + Kotlin daemon heap at user level | https://docs.gradle.org/current/userguide/build_environment.html (user-level precedence quote); https://kotlinlang.org/docs/gradle-compilation-and-caches.html (`kotlin.daemon.jvmargs` vs `-Dkotlin.daemon.jvm.options`, inheritance); https://kotlinlang.org/docs/kotlin-daemon.html (inherits `-Xmx`) | Docs fetched and the property keys re-grepped from the raw HTML by me. **Correction:** the candidate's `kotlin.daemon.jvm.options=-Xmx4g` line is a system property valid only inside `org.gradle.jvmargs`; the Gradle key is `kotlin.daemon.jvmargs`. The symptom→heap link has no external source (documented causes of that message are compiler bugs), only the session's one measured build (19 min fail at 1g → 4m13s pass at 4g) | field-tested; page keeps the compiler-defect hypothesis explicit |
+| 4 | `44cd212b53946b62` | Bash-hook guard misses Write/Edit escapes; on escalation check main `git status`, transfer by patch (`diff` → `apply --check`/`apply` → `checkout --`) | https://code.claude.com/docs/en/hooks (matcher `Edit\|Write`, exit-2 block); https://git-scm.com/docs/git-worktree; https://git-scm.com/docs/git-apply (`--check` quote) | Mechanics doc-confirmed; the recovery recipe is the session's field reproduction (lo-2 files transferred, main restored, `MAIN_CLEAN`). Merged into a page already `verified` | verified page, field-tested addition |
+| 5 | `2e3d108012a7e164` | Unbound method extraction loses `this`; bind at extraction; a `vi.fn()` test cannot catch it | https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/this; https://vitest.dev/api/mock.html | `node -e` repro: unbound → `TypeError: Cannot read properties of undefined`; bound → 42. **Correction:** Vitest's `mock.contexts` records `this` per call, so a `vi.fn()` test *can* catch it when it asserts `mock.contexts[0] === obj`; page offers that as the third test shape | verified |
+| 6 | `28897d4a24a46ae9` | Parallel branches green alone can fail on merge (E0004); build+test the merged tree before dispatching dependents | https://martinfowler.com/bliki/SemanticConflict.html; https://git-scm.com/docs/git-merge; https://doc.rust-lang.org/error_codes/E0004.html | Quotes: "safely merged on a textual level but cause the program to behave differently"; git merge documented as textual 3-way only; E0004 non-exhaustive patterns. Field run slk1 as the reproduction | verified |
+| 7 | `f978fd126f72956f` | Write the interpreter by path in worker briefs; measure and record the baseline `Ran N / failures=M` first | https://docs.python.org/3/library/venv.html ("You don't specifically need to activate…"); https://docs.python.org/3/library/unittest.html | Docs quoted; `Ran 3 tests … FAILED (failures=1, errors=1)` reproduced locally; field measurement 3532/15+18 vs 3549/1 | verified (baseline-recording half is process advice grounded in completion-claims) |
+| 8 | `076309143096ed63` | A substring doc-coverage gate is vacuous; scope to heading lines with word boundaries; falsify against a known-bad revision | https://testing.googleblog.com/2020/08/code-coverage-best-practices.html ("Mutation testing can help detect such false coverage"); the page's existing mutation-testing and RuleTester sources | Source fetched; field reproduction (commit 7bdbb1c: pre-fix doc → `missing: ['grammar']`) | verified sources, merged into a field-tested page |
+| 9 | `5d4a63ae21e06d9e` | After an auditor reports mutation testing on your uncommitted tree, diff against a pre-audit patch and re-run the suite yourself | https://git-scm.com/docs/git-checkout (`checkout -- <path>` discards unstaged changes); https://pitest.org/quickstart/basic_concepts/; repo's own `agents/test-quality-auditor.md` (restore mechanism) | Docs quoted; repo file read; wiki's own caveat (untracked file diffs clean either way) supports the independent check. The "session must verify independently" step is the session's practice, not an external norm | field-tested |
+| 10 | `d3d8fdcc202b8760` | `tmux ls` sees one server only; before resuming as coordinator, prove no live coordinator via `ps` + artifact mtimes | `man tmux` (list-sessions scoped to a server; `-L`/`-S`); `man ps` (`-A`, `-o lstart,command`); repo `skills/orchestrate/SKILL.md` re-entry section | Man pages read; **nuance added:** a missing watcher process alone proves nothing (coordinator between polls), only presence proves liveness — page states both-absences rule. Field run: PID 54780 alive on ssh pty, duplicate commits on t3 | field-tested (man-page facts verified) |
+| 11 | `87d2a59d6b82953c` | argparse `required=True` accepts `""`; `realpath("")` is the CWD; reject empty before resolving | https://docs.python.org/3/library/argparse.html#required; https://docs.python.org/3/library/os.path.html#os.path.abspath | Quotes; local repro `parse_args(["--out",""])` → `Namespace(out='')`, `realpath('')` → cwd | verified |
+| 12 | `f301809d865f8865` | Guard bats suite inside a worker floods the run's escalation dir and reads the worktree's sandbox config via upward traversal; override the env + run from a clean cwd | https://bats-core.readthedocs.io/en/stable/writing-tests.html (`bats-run-*` naming); repo `skills/orchestrate/scripts/{escalation-dir,worker-guardrails,watch-status}.sh`; guard source `groundwork/plugins/guardrails/hooks/bash-guard.sh` + its bats tests (the two named tests do not `cd` into their tmpdir) | Mechanism confirmed by reading the real scripts; the 175-record count is the session's observation | field-tested |
 
 ## Existing-layer check
 
-Routed via `INDEX.md` → domain `index.md` → every page whose "load when" overlapped.
+Routing went through `INDEX.md`, then the domain indexes for infrastructure, backend (+ java, python, node subtrees), frontend, testing, platforms, qa, debugging, and the security agent-exposure section; every page whose "load when" overlapped a candidate was opened in full.
 
-Pages read: testing-quality-tests-that-cannot-fail, testing-quality-policy-at-several-return-sites, testing-quality-completion-predicates, testing-quality-surviving-mutant-equivalence-triage, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-code-graph-as-orientation-layer, platforms-processes-driving-a-tui-in-a-tmux-pane, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-autonomous-decision-rulings
+Pages read: platforms-environment-unicode-text-matching, platforms-shells-escapes-in-shell-string-literals, platforms-environment-timezone-and-locale, platforms-tools-agent-permission-classifier-denials, infrastructure-agent-orchestration-worktree-isolated-workers, qa-process-scope-purity-checks, backend-java-runtime-threads-and-memory, testing-mocking-what-to-mock, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-shared-run-state, backend-common-change-impact-cross-module-consumer-census, infrastructure-agent-orchestration-autonomous-decision-rulings, platforms-environment-path-resolution, platforms-toolchains-version-management, qa-process-completion-claims, testing-quality-spec-artifact-checks, qa-document-verification-spec-document-gates, testing-quality-checks-that-cannot-pass, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-config-path-valued-config, backend-python-boundaries-runtime-validation, testing-data-test-data-and-isolation, testing-data-artifact-leakage-from-a-suite
 
-(Directory-level scans of `wiki/testing/quality/`, `wiki/platforms/processes/`,
-`wiki/infrastructure/agent-orchestration/` plus keyword sweeps for `no-wiki`, `post-merge`,
-`capture-pane`/`send-keys`, and `precedence` over the whole wiki preceded these reads.)
+Per candidate:
 
-| Insight | Overlap found | Outcome |
-|---------|---------------|---------|
-| 1 precedence | `tests-that-cannot-fail` carries a co-occurring-writer edge case (two writers of one flag) and `policy-at-several-return-sites` carries per-site mutation — both are about *coverage of one site*, neither about *which of two live conditions wins* | **New page**, cross-linked to both; no conflicting directive |
-| 2 pane witness | `pane-delivery-confirmation` already rules that a pane *diff* is not delivery evidence (echo direction). The new rule is the opposite direction — a stale capture *falsely confirming* a witness | **Merged** into that page (Do-this #6, 1 edge row, 1 Instead-of row, 2 sources); 1 pointer row added to `driving-a-tui-in-a-tmux-pane` |
-| 3 graphify hooks | `code-graph-as-orientation-layer` already gates on freshness and its Sources line already names `hook install` post-commit/post-checkout — the hook-coverage consequence was missing | **Merged** into that page (2 edge rows, 2 sources, 1 clause on directive 1) |
-| 4 escape hatch | `session-completion-gates` and `spec-document-gates` cover gate *authoring*; none covers what a gate does with its own exemptions. Keyword sweep for `no-wiki`/`escape hatch`/`knowledge gap` returned no owning page | **New page** in the existing `agent-orchestration` category |
+| # | Overlap found | Decision |
+|---|---------------|----------|
+| 1 | `unicode-text-matching` already has a generic "quantifier over non-ASCII → test on both userlands" row | **Merged** into it: +1 edge row (last-byte binding under C, grouping fix), +1 Instead-of row, +2 sources; `related` +bsd-vs-gnu-cli both ways |
+| 2 | `agent-permission-classifier-denials` has the deny tier in its precedence table but is scoped to auto-mode classifier denials; `worktree-isolated-workers` covers path isolation, not command classes | **New page** `platforms/tools/deny-rules-under-bypassed-permissions`; links both ways with classifier-denials, worktree-isolated-workers, control-signals, binding-instructions, checks-that-cannot-pass |
+| 3 | `threads-and-memory` covers runtime heap diagnosis, not the build daemons; no Gradle/Kotlin-compiler page exists | **New page** `backend/java/kotlin/compiler-daemon-heap-pressure`; links both ways with threads-and-memory, reading-error-messages, hypothesis-testing |
+| 4 | `worktree-isolated-workers` already carries the Bash-hook-vs-Edit/Write edge row and Instead-of row | **Merged**: +1 edge row (escalation-time main-tree check + patch transfer, complete hook matcher), +1 Instead-of row, +git-apply source, +field reproduction. No conflict with the existing directive — it extends it |
+| 5 | `what-to-mock` and `tests-that-cannot-fail` cover mock-hides-bug generally; nothing on `this` binding | **New page** `testing/mocking/extracted-method-this-binding`; links both ways with what-to-mock, tests-that-cannot-fail, captured-call-arguments, test-level-choice |
+| 6 | `shared-run-state` (default branch moved), `cross-module-consumer-census` (integration-time census), `widening-a-closed-value-table` (enum/table widening) are adjacent; none covers the post-merge build gate | **New page** `infrastructure/agent-orchestration/semantic-conflicts-after-parallel-merge`; links both ways with those three, autonomous-decision-rulings, worktree-isolated-workers, completion-claims |
+| 7 | `path-resolution` (pin binaries in automation), `version-management` (shims absent non-interactively), `completion-claims` (dropped total = red) each hold one third | **New page** `infrastructure/agent-orchestration/verify-command-in-a-worker-brief` composing them for the brief-authoring trigger; links both ways with all three, compiler-sysroot-on-macos, tests-that-cannot-fail, worktree-isolated-workers |
+| 8 | `spec-document-gates` axis table ("token survives in a nearby paragraph"), `spec-artifact-checks` (negative control per check), `checks-that-cannot-pass` (known-good/known-bad) already own the principle | **Merged** into `spec-document-gates`: +1 edge row (heading-scoped word-boundary match + pre-fix revision as negative control), +1 Instead-of row, +2 sources. Near-duplicate; the heading/word-boundary scoping and revision-as-mutant detail were the only additions |
+| 9 | `tests-that-cannot-fail` (restore mechanism by commit state; multi-agent shared tree), `mutation-harness-file-custody` (untracked file diffs clean either way), `completion-claims` (relaying subagent reports) | **Merged** into `completion-claims` claim/evidence table (+1 row, +git-checkout source, +field reproduction); `related` +mutation-harness-file-custody both ways. Not added to tests-that-cannot-fail (115 body lines, near the cap) |
+| 10 | `shared-run-state` step 3 confirms a foreign run from the repo; `autonomous-decision-rulings` step 3 re-reads the ledger on resume | **Merged** into `shared-run-state`: +1 edge row (coordinator liveness on resume: tmux-server scope, `ps`, artifact mtimes, both-absences rule), +1 Instead-of row, +man ps citation, +field reproduction |
+| 11 | `path-valued-config` already rejects non-absolute paths (an empty string is non-absolute) and lists rejection test inputs | **Merged**: When-this-applies widened to required CLI flags, `""` added to the rejection test set, +1 edge row (argparse presence-only, realpath("") = CWD), +1 Instead-of row, +3 sources |
+| 12 | `test-data-and-isolation` already has two rows on harness-injected env vars and "the code under test is the harness that spawned the session" (issue #100, same shape) | **Merged** (delta only): +1 edge row (cwd-walking config discovery + override the exported escalation dir), +bats source, +field reproduction; coordinator-side cleanup row added to `shared-run-state` |
 
-Conflicts flagged: none — no existing directive is contradicted.
-Related links added both ways: `tests-that-cannot-fail`, `policy-at-several-return-sites`,
-`completion-predicates` ↔ the new precedence page; `session-completion-gates`,
-`autonomous-decision-rulings`, `spec-document-gates` ↔ the new escape-hatch page.
-
-Lint after the edits: `wiki-structure-checks.js` → **278 pages, 13 indexes, 0 findings**;
-`wiki-lint-prohibitions.js` → no findings on any touched page (the 2 repo-wide violations it
-reports are pre-existing, in `plans/` and `tests/fixtures/`). New pages are 67 and 69 body
-lines; amended pages are 92, 92 and 65 — all under the 120-line cap.
+Conflicts flagged: none — every merge extends an existing directive; no existing directive was contradicted or overwritten.
 
 ## Open-PR check
 
-Listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` —
-12 open heads: #191, #190, #189, #188, #187, #186, #185, #183, #182, #181, #180, #179.
-Each head was fetched and its **added** wiki lines (`git diff <merge-base> pr-N -- wiki/`)
-grepped for `post-merge|graphify|graph.json|no-wiki|capture-pane|send-keys|precedence|knowledge gap`.
+```
+gh pr list --repo choiyounggi/dev-loop --state open --json number,headRefName,title --search "head:knowledge/"
+```
+returned no rows, and `gh pr list --state open --limit 50` (any head) also returned no rows at flush time (2026-09-03 17:28 KST, as `choiyounggi`). No sibling knowledge branch exists, so no candidate could fold into or duplicate an in-flight PR.
 
-| Candidate | Overlapping open head | Verdict |
-|-----------|----------------------|---------|
-| 1 precedence | none — #189's `proving-a-critical-section-is-lock-protected` and `sequential-dispatch-assumption-under-concurrency` are concurrency-window tests, not exit-condition ordering; its only `precedence` hits are Gradle property precedence (#179) | **new** |
-| 2 pane witness | none — #183's single `send-keys` hit is a pointer row in a stdin-vs-send-keys edge case | **new** |
-| 3 graphify hooks | #185 edits the *same page* but adds an unrelated row (`update` exits 1 on a >5,000-node HTML viz); #186 only mentions this page in an INGEST_REPORT dedup note | **new** (no content overlap; noted below as a textual merge risk) |
-| 4 escape hatch | none — #189's `gate-evidence-exit-code-class` is about a gate's own exit-code classes, not about recording exemptions | **new** |
-
-Merge-risk note for the reviewer: **#185 and this PR both append to
-`wiki/infrastructure/agent-orchestration/code-graph-as-orientation-layer.md`** (different
-edge-case rows and different source bullets). Whichever lands second may need a one-hunk
-textual merge; the content does not conflict semantically.
+Per-candidate verdict: all 12 → **new** (no overlapping open head).
 
 ## Routing decision
 
-| Insight | Target | New category? |
-|---------|--------|---------------|
-| 1 | `testing/quality/precedence-between-competing-exit-conditions.md` (**new page**) | No — `testing/quality` already owns "can this test actually fail" |
-| 2 | `infrastructure/agent-orchestration/pane-delivery-confirmation.md` (**merge**), + 1 pointer row in `platforms/processes/driving-a-tui-in-a-tmux-pane.md` | No |
-| 3 | `infrastructure/agent-orchestration/code-graph-as-orientation-layer.md` (**merge**) | No |
-| 4 | `infrastructure/agent-orchestration/escape-hatch-uses-as-a-knowledge-gap-signal.md` (**new page**) | No — `agent-orchestration` already carries the gate-authoring pages (`session-completion-gates`, `autonomous-decision-rulings`); a `knowledge-base` category would hold one page and split gate knowledge across two places |
+| # | Target | Category fit |
+|---|--------|--------------|
+| 1 | platforms/environment/unicode-text-matching (merge) | existing |
+| 2 | platforms/tools/deny-rules-under-bypassed-permissions (new page) | `tools` already holds Claude Code harness pages (classifier denials, plugin MCP registration, version-keyed cache); no new category |
+| 3 | backend/java/kotlin/compiler-daemon-heap-pressure (new page) | `kotlin` is the Kotlin-only subtree category; the Kotlin compile daemon is Kotlin-only; no new category |
+| 4 | infrastructure/agent-orchestration/worktree-isolated-workers (merge) | existing |
+| 5 | testing/mocking/extracted-method-this-binding (new page) | the changed artifact is the test's mock choice → `mocking`; frontend has no language-mechanics category and the lesson is not React-specific |
+| 6 | infrastructure/agent-orchestration/semantic-conflicts-after-parallel-merge (new page) | the coordinator's integration step owns the merged tree → `agent-orchestration` |
+| 7 | infrastructure/agent-orchestration/verify-command-in-a-worker-brief (new page) | brief authoring is `agent-orchestration` (same category as worktree-isolated-workers' brief rules) |
+| 8 | qa/document-verification/spec-document-gates (merge) | existing |
+| 9 | qa/process/completion-claims (merge) | existing |
+| 10 | infrastructure/agent-orchestration/shared-run-state (merge) | existing |
+| 11 | infrastructure/config/path-valued-config (merge) | existing |
+| 12 | testing/data/test-data-and-isolation (merge) + shared-run-state (coordinator side) | existing |
 
-Plumbing: `wiki/testing/index.md` +1 row; `wiki/infrastructure/index.md` +1 row and two
-extended "load when" lines (pane-delivery-confirmation, code-graph-as-orientation-layer);
-`log.md` +1 `ingest` entry.
+No new category was needed. Indexes updated: `wiki/platforms/index.md`, `wiki/infrastructure/index.md`, `wiki/backend/java/index.md`, `wiki/testing/index.md`, `wiki/qa/index.md`, root `INDEX.md` (infrastructure and platforms route lines); `log.md` appended.
+
+Checks run before the PR: `node scripts/wiki-lint-prohibitions.js wiki`, `node scripts/wiki-structure-checks.js wiki`, body-line counts of every touched page (≤120), and a resolver over every `related:` id, inline `[id]` reference, and page-to-index listing (results in the PR conversation).

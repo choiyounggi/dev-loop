@@ -8,7 +8,7 @@ sources:
   - https://www.debuggingbook.org/html/Intro_Debugging.html
   - https://sre.google/sre-book/effective-troubleshooting/
 last_verified: 2026-08-06
-related: [debugging-methodology-reproduce-first, debugging-methodology-isolate-by-bisection, qa-deliverables-exclusivity-and-absence-claims, debugging-methodology-probe-path-vs-operation-path]
+related: [debugging-methodology-reproduce-first, debugging-methodology-isolate-by-bisection, qa-deliverables-exclusivity-and-absence-claims, debugging-methodology-probe-path-vs-operation-path, backend-java-kotlin-compiler-daemon-heap-pressure]
 ---
 
 # Testing a Suspected Cause Before Changing Code
