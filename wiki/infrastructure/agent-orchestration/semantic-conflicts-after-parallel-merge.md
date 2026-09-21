@@ -11,7 +11,7 @@ sources:
   - https://pnpm.io/cli/install
   - https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/generating-prisma-client
 last_verified: 2026-09-06
-related: [infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-autonomous-decision-rulings, backend-common-change-impact-cross-module-consumer-census, backend-common-change-impact-widening-a-closed-value-table, qa-process-completion-claims]
+related: [infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-autonomous-decision-rulings, backend-common-change-impact-cross-module-consumer-census, backend-common-change-impact-widening-a-closed-value-table, qa-process-completion-claims, infrastructure-agent-orchestration-ours-resolution-on-a-mixed-content-conflict]
 ---
 
 # Merging Parallel Branches That Each Pass on Their Own

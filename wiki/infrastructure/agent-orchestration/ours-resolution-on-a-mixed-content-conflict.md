@@ -8,7 +8,7 @@ sources:
   - https://git-scm.com/docs/git-checkout
   - https://git-scm.com/docs/git-merge
 last_verified: 2026-09-03
-related: [infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-worktree-isolated-workers, backend-common-change-impact-widening-a-closed-value-table, qa-deliverables-quantitative-claims-in-a-published-document]
+related: [infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-worktree-isolated-workers, backend-common-change-impact-widening-a-closed-value-table, qa-deliverables-quantitative-claims-in-a-published-document, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge]
 ---
 
 # Resolving a Parallel-Branch Document Conflict With `--ours` Plus a Count Fix
