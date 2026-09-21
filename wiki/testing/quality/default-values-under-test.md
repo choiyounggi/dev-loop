@@ -15,6 +15,7 @@ related: [
     testing-mocking-captured-call-arguments,
     testing-quality-harness-reverse-controls,
     testing-quality-expectation-sets-with-one-distinct-value,
+    testing-quality-path-resolver-fixtures-with-coincident-cwd,
   ]
 ---
 

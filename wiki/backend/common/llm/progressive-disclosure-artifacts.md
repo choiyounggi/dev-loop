@@ -8,7 +8,7 @@ sources:
   - https://github.com/virgiliojr94/book-to-skill
   - https://github.com/virgiliojr94/book-to-skill/blob/main/SKILL.md
 last_verified: 2026-08-24
-related: [backend-common-llm-binding-instructions-for-agents, backend-common-llm-context-window-budget]
+related: [backend-common-llm-binding-instructions-for-agents, backend-common-llm-context-window-budget, backend-common-llm-project-local-layer-over-shared-guidance]
 ---
 
 # Splitting a Large Knowledge Artifact an Agent Loads On Demand
