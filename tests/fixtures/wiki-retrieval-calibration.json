@@ -1,0 +1,287 @@
+[
+  {
+    "query": "Reads from an HTTP endpoint keep stalling while a batch importer writes to the same embedded file store",
+    "expected_page_id": "databases-sqlite-concurrent-access-for-a-read-api",
+    "path": "wiki/databases/sqlite/concurrent-access-for-a-read-api.md",
+    "source": "wiki-retrieval-cases.json:0"
+  },
+  {
+    "query": "Making sure a single worker performs a job at once, using an owner token and an expiry",
+    "expected_page_id": "backend-common-concurrency-distributed-locks",
+    "path": "wiki/backend/common/concurrency/distributed-locks.md",
+    "source": "wiki-retrieval-cases.json:1"
+  },
+  {
+    "query": "Keeping a watcher alive after the shell that launched it exits, and picking between cron and a launch agent",
+    "expected_page_id": "platforms-processes-background-services",
+    "path": "wiki/platforms/processes/background-services.md",
+    "source": "wiki-retrieval-cases.json:2"
+  },
+  {
+    "query": "Auditing a suite that never goes red to see whether its assertions could catch a real defect",
+    "expected_page_id": "testing-quality-tests-that-cannot-fail",
+    "path": "wiki/testing/quality/tests-that-cannot-fail.md",
+    "source": "wiki-retrieval-cases.json:3"
+  },
+  {
+    "query": "Vetting a new package before pulling it in, and defending a build against compromised or typosquatted libraries",
+    "expected_page_id": "security-dependencies-supply-chain",
+    "path": "wiki/security/dependencies/supply-chain.md",
+    "source": "wiki-retrieval-cases.json:4"
+  },
+  {
+    "query": "A value I am about to keep in component state can be recomputed from what is already there",
+    "expected_page_id": "frontend-state-derived-state",
+    "path": "wiki/frontend/state/derived-state.md",
+    "source": "wiki-retrieval-cases.json:5"
+  },
+  {
+    "query": "Several worker processes share progress through files inside a single checkout and I need the folder layout",
+    "expected_page_id": "infrastructure-agent-orchestration-shared-run-state",
+    "path": "wiki/infrastructure/agent-orchestration/shared-run-state.md",
+    "source": "wiki-retrieval-cases.json:6"
+  },
+  {
+    "query": "Deciding if this build is safe to ship and what checklist that call should follow",
+    "expected_page_id": "qa-process-release-gates",
+    "path": "wiki/qa/process/release-gates.md",
+    "source": "wiki-retrieval-cases.json:7"
+  },
+  {
+    "query": "A defect was reported and I want to make it happen on demand before changing any code",
+    "expected_page_id": "debugging-methodology-reproduce-first",
+    "path": "wiki/debugging/methodology/reproduce-first.md",
+    "source": "wiki-retrieval-cases.json:8"
+  },
+  {
+    "query": "The app has to keep working on patchy connectivity, queueing what the user does locally and merging it later",
+    "expected_page_id": "mobile-offline-offline-first-sync",
+    "path": "wiki/mobile/offline/offline-first-sync.md",
+    "source": "wiki-retrieval-cases.json:9"
+  },
+  {
+    "query": "Walking a big table in batches without OFFSET so pages do not shift or repeat rows",
+    "expected_page_id": "databases-query-optimization-keyset-pagination",
+    "path": "wiki/databases/query-optimization/keyset-pagination.md",
+    "source": "wiki-retrieval-cases.json:10"
+  },
+  {
+    "query": "Which column comes first in a composite index when a query filters on equality and then sorts",
+    "expected_page_id": "databases-indexing-composite-index-column-order",
+    "path": "wiki/databases/indexing/composite-index-column-order.md",
+    "source": "wiki-retrieval-cases.json:11"
+  },
+  {
+    "query": "Two requests read the same row, both modify it, and the second silently overwrites the first",
+    "expected_page_id": "databases-transactions-optimistic-vs-pessimistic-locking",
+    "path": "wiki/databases/transactions/optimistic-vs-pessimistic-locking.md",
+    "source": "wiki-retrieval-cases.json:12"
+  },
+  {
+    "query": "A payments endpoint may be called twice by a retrying client and must not double-charge",
+    "expected_page_id": "backend-common-api-design-idempotency",
+    "path": "wiki/backend/common/api-design/idempotency.md",
+    "source": "wiki-retrieval-cases.json:13"
+  },
+  {
+    "query": "Caching an expensive query result and preventing a thundering herd when the entry expires",
+    "expected_page_id": "backend-common-caching-invalidation-and-stampede",
+    "path": "wiki/backend/common/caching/invalidation-and-stampede.md",
+    "source": "wiki-retrieval-cases.json:14"
+  },
+  {
+    "query": "Our FastAPI service has only ever been reachable from localhost; next week ops will publish it through a Cloudflare tunnel. Which protections must the application code add itself, and why do our security response headers go missing when a handler crashes with a 500?",
+    "expected_page_id": "security-api-exposure-exposing-an-origin-http-api",
+    "path": "wiki/security/api-exposure/exposing-an-origin-http-api.md",
+    "source": "log.md:2026-07-11 ingest"
+  },
+  {
+    "query": "A standalone sync process sets logging to INFO and now the vendor API key appears in our log files, because the HTTP client prints every full request URL, including the key passed as a query parameter.",
+    "expected_page_id": "security-secrets-secrets-in-code",
+    "path": "wiki/security/secrets/secrets-in-code.md",
+    "source": "log.md:2026-07-12 revise"
+  },
+  {
+    "query": "We need to dump a table with several million rows into a CSV, and the export process runs out of memory even though we call fetchmany in batches on a normal cursor.",
+    "expected_page_id": "databases-query-optimization-streaming-large-result-sets",
+    "path": "wiki/databases/query-optimization/streaming-large-result-sets.md",
+    "source": "log.md:2026-07-13 ingest"
+  },
+  {
+    "query": "We must add a NOT NULL column with a foreign key and an index to a busy Postgres orders table during business hours without freezing reads and writes.",
+    "expected_page_id": "databases-schema-design-online-schema-changes",
+    "path": "wiki/databases/schema-design/online-schema-changes.md",
+    "source": "log.md:2026-07-23 ingest"
+  },
+  {
+    "query": "The nightly settlement batch sometimes runs past its interval, so the next cron tick starts while the previous run is unfinished and some customers got charged twice.",
+    "expected_page_id": "backend-common-jobs-scheduled-job-overlap",
+    "path": "wiki/backend/common/jobs/scheduled-job-overlap.md",
+    "source": "log.md:2026-07-10 ingest"
+  },
+  {
+    "query": "Three chained useEffect hooks each set state that triggers the next one; the screen flickers and the same request fires twice. Where should this derived logic live instead?",
+    "expected_page_id": "frontend-state-effects-usage",
+    "path": "wiki/frontend/state/effects-usage.md",
+    "source": "log.md:2026-07-10 ingest"
+  },
+  {
+    "query": "Our Jest suite for a debounced search box passes, but the runner warns that work continued after the test finished, and the following test fails now and then.",
+    "expected_page_id": "testing-async-async-testing",
+    "path": "wiki/testing/async/async-testing.md",
+    "source": "log.md:2026-07-10 ingest"
+  },
+  {
+    "query": "When the database went offline for a minute, all replicas of our API were restarted in a loop, and a few pods keep getting OOMKilled. Review the probe and memory settings in the deployment manifest.",
+    "expected_page_id": "infrastructure-containers-resource-limits-and-probes",
+    "path": "wiki/infrastructure/containers/resource-limits-and-probes.md",
+    "source": "log.md:2026-07-10 ingest"
+  },
+  {
+    "query": "A ticket only says the export should be 'fast and user-friendly', and QA and the product owner disagree about whether it is finished. Rewrite it into conditions that can be checked.",
+    "expected_page_id": "qa-process-acceptance-criteria",
+    "path": "wiki/qa/process/acceptance-criteria.md",
+    "source": "log.md:2026-07-10 ingest"
+  },
+  {
+    "query": "A cron-driven report goes out an hour early after the clocks change, and a case-insensitive string comparison fails on a developer's Turkish-locale laptop while CI passes.",
+    "expected_page_id": "platforms-environment-timezone-and-locale",
+    "path": "wiki/platforms/environment/timezone-and-locale.md",
+    "source": "log.md:2026-07-10 ingest"
+  },
+  {
+    "query": "Tapping a push notification should open a specific order screen, but on a cold start the app lands on home, and pressing back from that screen closes the app. How should entry routing be built?",
+    "expected_page_id": "mobile-navigation-deep-links-and-entry-points",
+    "path": "wiki/mobile/navigation/deep-links-and-entry-points.md",
+    "source": "log.md:2026-07-10 ingest"
+  },
+  {
+    "query": "One missing import made the build print two hundred errors. Which one should I read first, and how should I phrase a web search for the fix?",
+    "expected_page_id": "debugging-signals-reading-error-messages",
+    "path": "wiki/debugging/signals/reading-error-messages.md",
+    "source": "log.md:2026-07-10 ingest"
+  },
+  {
+    "query": "We pointed our agent CLI at a self-hosted vLLM model with a much smaller context, and the very first request returns HTTP 400 about the context length even though the same client worked against the hosted model.",
+    "expected_page_id": "backend-common-llm-context-window-budget",
+    "path": "wiki/backend/common/llm/context-window-budget.md",
+    "source": "log.md:2026-08-03 ingest"
+  },
+  {
+    "query": "Our LightGBM model trained with L1 loss on log price looks accurate but keeps overshooting when scored by MAPE. What number should we actually emit as the prediction?",
+    "expected_page_id": "backend-common-ml-mape-aligned-point-prediction",
+    "path": "wiki/backend/common/ml/mape-aligned-point-prediction.md",
+    "source": "log.md:2026-08-07 ingest"
+  },
+  {
+    "query": "A shell test starts our CLI in the background, sends kill -INT to its pid and then waits forever, so the Ctrl-C shutdown test only ever fails by timeout.",
+    "expected_page_id": "testing-strategy-signal-delivery-to-a-process-under-test",
+    "path": "wiki/testing/strategy/signal-delivery-to-a-process-under-test.md",
+    "source": "log.md:2026-08-07 ingest"
+  },
+  {
+    "query": "Before we release the README claiming '312 tests and 24 rules', how do we make sure every number in it is correct, given that someone already found one wrong count?",
+    "expected_page_id": "qa-deliverables-quantitative-claims-in-a-published-document",
+    "path": "wiki/qa/deliverables/quantitative-claims-in-a-published-document.md",
+    "source": "log.md:2026-08-06 ingest"
+  },
+  {
+    "query": "The graph freshness script must read a file's modification time on both macOS and Linux runners, where date -r and the stat flags behave differently.",
+    "expected_page_id": "platforms-tools-bsd-vs-gnu-cli",
+    "path": "wiki/platforms/tools/bsd-vs-gnu-cli.md",
+    "source": "plans/graphify-explore-role/design.md D3"
+  },
+  {
+    "query": "Each parallel worker runs in its own git worktree, but its prompt tells it to read a graph file that lives in the main checkout; how should the brief handle a path outside the worktree?",
+    "expected_page_id": "infrastructure-agent-orchestration-worktree-isolated-workers",
+    "path": "wiki/infrastructure/agent-orchestration/worktree-isolated-workers.md",
+    "source": "plans/graphify-explore-role/design.md D7"
+  },
+  {
+    "query": "We are adding a check that flags stale model-coupled pages: the countable part (keyword and field presence) should be a plain script, while deciding whether a flagged page needs rewriting stays with the model.",
+    "expected_page_id": "qa-process-llm-review-pipelines",
+    "path": "wiki/qa/process/llm-review-pipelines.md",
+    "source": "plans/wiki-model-era/design.md D1"
+  },
+  {
+    "query": "We need to add a new check row to a skill document that grep gates and lint scan, and record the audit result inside that same file without tripping those gates on wording changes.",
+    "expected_page_id": "qa-document-verification-editing-a-gated-document",
+    "path": "wiki/qa/document-verification/editing-a-gated-document.md",
+    "source": "plans/wiki-model-era/design.md D6"
+  },
+  {
+    "query": "The README's agents directory tree needs one new line for the bundled per-task reviewer agent, placed right after the test-quality-auditor line, leaving the Korean README alone.",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t1-reviewer/D13"
+  },
+  {
+    "query": "Which log.md verb should record that one wiki page superseded another or was retired, given that the invariant-3 verb set must not change?",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t3-status/D7"
+  },
+  {
+    "query": "AGENTS.md needs one sentence saying that a page's status is its current validity while confidence is evidence strength, so verified plus superseded is a legal pair.",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t3-status/D9"
+  },
+  {
+    "query": "The page template should show the optional status and superseded_by frontmatter keys as commented lines, using the same comment convention as verified_model, without adding a live key.",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t3-status/D14"
+  },
+  {
+    "query": "How should the wiki indexer script be laid out so it works both as a command-line tool and as an importable module used by a thin MCP adapter that resolves the plugin root from its own file path?",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t8-index/D16"
+  },
+  {
+    "query": "Where should a project's local wiki layer live, given the user decided against any config knob or environment variable for its location?",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t4-local-layer/D1"
+  },
+  {
+    "query": "When a project-local page and a bundled page match the same trigger, which one wins, and what happens to the bundled page's other cases?",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t4-local-layer/D5"
+  },
+  {
+    "query": "Who should run the plan-reviewer agent when a planning subagent finishes its design document: the subagent itself or the coordinator, and how is a failing verdict handed back?",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t2-planner/D6"
+  },
+  {
+    "query": "The README agents tree and the plan step line need wording for the new per-task planner agent, without touching the Korean README.",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t2-planner/D14"
+  },
+  {
+    "query": "The structure checker script should take a layer selector as the third positional argument after the root, with the one-argument call unchanged and an invalid value exiting 4.",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t5-ref-impl/D2"
+  },
+  {
+    "query": "Should wiki-lint's check row about contradictions change when a new contradiction-recording script is added, and where does the README mention the script?",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t6-falsify/D11"
+  },
+  {
+    "query": "Where does the README tree mention the new usage telemetry script and lint check, and how is the matching log.md entry worded?",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t7-usage/D13"
+  },
+  {
+    "query": "How should the fail-open behaviour when the wiki_search tool is missing or returns nothing be worded so it is identical in all three skills?",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t9-rag-skills/D2"
+  },
+  {
+    "query": "In the ingest skill's dedupe step, how should the candidate's trigger sentence be used with wiki_search to choose the page to merge into?",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t9-rag-skills/D3"
+  },
+  {
+    "query": "Should the RAG-skills task append one combined log.md line covering the code-graph page revision, the skill changes and the neardup subcommand, or one line per change?",
+    "expected_page_id": null,
+    "source": "log.md:2026-09-17 gap t9-rag-skills/D13"
+  }
+]
