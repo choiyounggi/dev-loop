@@ -9,7 +9,7 @@ sources:
   - https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html
   - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html
 last_verified: 2026-07-10
-related: [testing-data-test-data-and-isolation, testing-mocking-what-to-mock, debugging-concurrency-intermittent-failures]
+related: [testing-data-test-data-and-isolation, testing-mocking-what-to-mock, debugging-concurrency-intermittent-failures, testing-quality-sequential-dispatch-assumption-under-concurrency]
 ---
 
 # Fixing a Test That Fails Intermittently

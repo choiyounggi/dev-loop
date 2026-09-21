@@ -11,7 +11,7 @@ sources:
   - https://docs.python.org/3/library/multiprocessing.html
   - https://docs.python.org/3/howto/free-threading-python.html
 last_verified: 2026-07-10
-related: [backend-common-concurrency-shared-state-and-pools, backend-common-jobs-idempotent-handlers, backend-python-serving-app-servers-and-workers]
+related: [backend-common-concurrency-shared-state-and-pools, backend-common-jobs-idempotent-handlers, backend-python-serving-app-servers-and-workers, testing-quality-sequential-dispatch-assumption-under-concurrency, testing-quality-proving-a-critical-section-is-lock-protected]
 ---
 
 # The GIL and Choosing Threads vs asyncio vs Processes

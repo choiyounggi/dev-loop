@@ -8,7 +8,9 @@ sources:
   - https://react.dev/learn/you-might-not-need-an-effect
   - https://react.dev/learn/synchronizing-with-effects
   - https://react.dev/learn/removing-effect-dependencies
-last_verified: 2026-07-10
+  - https://react.dev/reference/react/useRef
+  - https://github.com/darkroomengineering/lenis
+last_verified: 2026-09-08
 related: [frontend-state-derived-state, frontend-state-client-vs-server-state, frontend-data-fetching-race-conditions]
 ---
 
@@ -57,6 +59,7 @@ Rules for the effects that remain:
 | Analytics "view" event fires twice in development | Expected under StrictMode dev remounting; production mounts once. Keep the effect as-is |
 | Effect must read a value without re-running when it changes | Split the effect so the frequently-changing value lives in its own effect, or move the logic into the event handler that owns the change |
 | The external subscription is a data store | Subscribing in a raw effect is replaceable with `useSyncExternalStore`, which handles the subscribe/read contract |
+| The effect starts/stops an imperative loop (`requestAnimationFrame`, a canvas/WebGL draw loop) and also reads a value that changes identity without changing anything the loop needs (a theme/colors hook, or any hook whose return value is derived by watching `<html>`/`<body>` attribute or class mutations) | Key the setup/teardown effect only on the values that actually start or stop the loop. Mirror the frequently-changing value into a ref via its own tiny effect (`useEffect(() => { colorsRef.current = colors }, [colors])`) and read `colorsRef.current` inside the frame callback — the loop then survives identity churn instead of tearing down and re-seeding |
 
 ## Instead of
 
@@ -66,9 +69,13 @@ Rules for the effects that remain:
 | Add `eslint-disable` on `exhaustive-deps` | Restructure: move the function into the effect, `useCallback` it, or split the effect | Every suppressed dependency reads stale values on later renders |
 | Guard an effect with a `didRun` ref to survive StrictMode | Write the cleanup that undoes the setup | The double-invoke exists to expose missing cleanup; the ref also masks real remount bugs in production |
 | Reset state via an effect that watches a prop | Remount with `key={prop}` | The effect version renders one frame of stale state, then re-renders |
+| Key a canvas/animation setup effect on every hook value the frame callback reads (`useEffect(setup, [reduced, colors])`) | Key it only on the values that start/stop the loop; read the rest through a ref updated by its own effect | A class-toggling scroll library (Lenis adds/removes `lenis-scrolling`/`lenis-stopped` on its root element on every scroll start/stop) or any hook that derives state from DOM mutations returns a fresh object each time even when the underlying values are identical, so the whole effect — and whatever expensive setup it runs — re-fires on every toggle |
 
 ## Sources
 
 - https://react.dev/learn/you-might-not-need-an-effect — compute in render, event-handler logic, key-based resets, effect chains, app init, fetching
 - https://react.dev/learn/synchronizing-with-effects — external systems, cleanup contract, StrictMode dev remount
-- https://react.dev/learn/removing-effect-dependencies — honest dependency arrays; change the code, never suppress the linter
+- https://react.dev/learn/removing-effect-dependencies — honest dependency arrays; change the code, never suppress the linter; "Object and function dependencies can make your Effect re-synchronize more often than you need"
+- https://react.dev/reference/react/useRef — "Changing a ref does not trigger a re-render"; the mechanism for reading a latest value inside a callback (including an animation-frame loop) without depending on it
+- https://github.com/darkroomengineering/lenis — `packages/core/src/lenis.ts` `updateClassName()` adds/removes `lenis-scrolling`/`lenis-stopped` on the root element (`<html>` by default) from the scroll start/stop lifecycle (read 2026-09-08)
+- Field reproduction 2026-09 (a React canvas hero keyed on `[reduced, colors]` from a theme hook watching `<html>` classes): `seedNodes` calls went 2 → 3 → 4 across one `lenis-scrolling` add/remove; holding colors in a ref and keying the lifecycle effect on `[reduced]` alone stopped the re-seeding, pinned by a regression test

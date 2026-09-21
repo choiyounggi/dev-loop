@@ -9,7 +9,7 @@ sources:
   - https://code.claude.com/docs/en/mcp
   - https://github.com/modelcontextprotocol/typescript-sdk/issues/216
 last_verified: 2026-08-12
-related: [platforms-tools-version-keyed-artifact-cache, platforms-tools-harness-mediated-tool-results, infrastructure-config-environment-config]
+related: [platforms-tools-version-keyed-artifact-cache, platforms-tools-harness-mediated-tool-results, infrastructure-config-environment-config, infrastructure-agent-orchestration-gate-evidence-exit-code-class]
 ---
 
 # A Plugin-Bundled MCP Server That Does Not Appear in the Harness

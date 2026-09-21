@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://github.com/obra/superpowers
 last_verified: 2026-09-03
-related: [debugging-methodology-verify-the-fix, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, testing-quality-tests-that-cannot-fail, qa-process-release-gates, testing-quality-mutation-harness-file-custody, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, infrastructure-agent-orchestration-verify-command-in-a-worker-brief]
+related: [debugging-methodology-verify-the-fix, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, testing-quality-tests-that-cannot-fail, qa-process-release-gates, testing-quality-mutation-harness-file-custody, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, infrastructure-agent-orchestration-verify-command-in-a-worker-brief, testing-strategy-real-cli-spot-check-for-new-execution-paths]
 ---
 
 # Claiming Work Is Done, Fixed, or Passing

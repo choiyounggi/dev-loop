@@ -8,7 +8,7 @@ sources:
   - https://12factor.net/build-release-run
   - https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/caching-dependencies-to-speed-up-workflows
 last_verified: 2026-07-10
-related: [infrastructure-containers-image-builds, infrastructure-ci-cd-secrets-handling]
+related: [infrastructure-containers-image-builds, infrastructure-ci-cd-secrets-handling, infrastructure-ci-cd-secret-needing-gate-on-fork-prs, infrastructure-ci-cd-review-bot-adopted-as-a-blocking-gate]
 ---
 
 # Ordering and Structuring CI Pipeline Stages

@@ -8,7 +8,7 @@ sources:
   - https://google.github.io/styleguide/docguide/best_practices.html
   - https://www.writethedocs.org/guide/writing/docs-principles/
 last_verified: 2026-08-06
-related: [qa-deliverables-generated-artifacts-as-deliverable-source, qa-document-verification-spec-document-gates, testing-quality-spec-artifact-checks, testing-quality-synthetic-corpus-measurement-floor, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan]
+related: [qa-deliverables-generated-artifacts-as-deliverable-source, qa-document-verification-spec-document-gates, testing-quality-spec-artifact-checks, testing-quality-synthetic-corpus-measurement-floor, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, qa-document-verification-sweeping-pre-gate-citations-for-fabrication, qa-document-verification-editing-a-gated-document, qa-deliverables-documented-behavior-of-a-third-party-tool]
 ---
 
 # Numbers in a Document About to Be Published Outside the Team

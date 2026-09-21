@@ -15,20 +15,7 @@ sources:
   - https://github.com/DavidAnson/markdownlint/issues/1206
   - https://google.github.io/styleguide/docguide/best_practices.html
 last_verified: 2026-09-03
-related:
-  [
-    qa-process-acceptance-criteria,
-    testing-quality-tests-that-cannot-fail,
-    platforms-environment-unicode-text-matching,
-    qa-deliverables-generated-artifacts-as-deliverable-source,
-    testing-quality-spec-artifact-checks,
-    testing-quality-checks-that-cannot-pass,
-    qa-deliverables-command-transcripts-in-a-document,
-    qa-deliverables-exclusivity-and-absence-claims,
-    qa-document-verification-generated-reference-drift-gates,
-    infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal,
-    infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan
-  ]
+related: [qa-process-acceptance-criteria, testing-quality-tests-that-cannot-fail, platforms-environment-unicode-text-matching, qa-deliverables-generated-artifacts-as-deliverable-source, testing-quality-spec-artifact-checks, testing-quality-checks-that-cannot-pass, qa-deliverables-command-transcripts-in-a-document, qa-deliverables-exclusivity-and-absence-claims, qa-document-verification-generated-reference-drift-gates, infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, qa-document-verification-sweeping-pre-gate-citations-for-fabrication, qa-deliverables-obligation-row-without-a-named-actor, qa-document-verification-superseding-a-knowledge-record]
 ---
 
 # Automated Gates on a Specification Document

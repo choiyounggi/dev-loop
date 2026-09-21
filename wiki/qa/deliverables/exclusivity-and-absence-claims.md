@@ -9,7 +9,7 @@ sources:
   - https://plato.stanford.edu/entries/popper/
   - https://google.github.io/styleguide/docguide/best_practices.html
 last_verified: 2026-08-09
-related: [qa-deliverables-generated-artifacts-as-deliverable-source, qa-document-verification-spec-document-gates, debugging-methodology-hypothesis-testing]
+related: [qa-deliverables-generated-artifacts-as-deliverable-source, qa-document-verification-spec-document-gates, debugging-methodology-hypothesis-testing, qa-deliverables-obligation-row-without-a-named-actor, qa-deliverables-documented-behavior-of-a-third-party-tool]
 ---
 
 # An Exclusivity or Absence Claim in a Document

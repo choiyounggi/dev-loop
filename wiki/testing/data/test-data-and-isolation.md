@@ -13,7 +13,7 @@ sources:
   - https://nodejs.org/api/fs.html
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/env.html
 last_verified: 2026-09-03
-related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-strategy-import-time-side-effects, testing-data-artifact-leakage-from-a-suite, testing-quality-behavior-not-implementation, platforms-filesystems-permissions-and-exec-bits, backend-common-change-impact-call-site-enumeration, testing-data-harness-vs-run-path-fixtures, infrastructure-agent-orchestration-shared-run-state]
+related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-strategy-import-time-side-effects, testing-data-artifact-leakage-from-a-suite, testing-quality-behavior-not-implementation, platforms-filesystems-permissions-and-exec-bits, backend-common-change-impact-call-site-enumeration, testing-data-harness-vs-run-path-fixtures, infrastructure-agent-orchestration-shared-run-state, testing-mocking-autouse-fixture-shadows-function-under-test, testing-data-adjacent-tokens-in-extractor-fixtures]
 ---
 
 # Owning Test Data and Isolating Test State

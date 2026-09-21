@@ -10,7 +10,7 @@ sources:
   - https://docs.astral.sh/uv/reference/cli/
   - https://peps.python.org/pep-0735/
 last_verified: 2026-08-07
-related: [platforms-toolchains-version-management, platforms-processes-background-services]
+related: [platforms-toolchains-version-management, platforms-processes-background-services, platforms-toolchains-regeneration-silently-drops-hand-edited-state]
 ---
 
 # A Dependency Command Resyncing the Whole Environment and Deleting Undeclared Packages
