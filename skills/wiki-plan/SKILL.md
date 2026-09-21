@@ -178,8 +178,10 @@ Every hit is a **candidate, never an adoption**: open the hit's own page
 confirm, that cost was already paid by the routing sweep. Adopt the page
 into `Wiki basis` only when that section's trigger text describes the same
 situation as the decision — never on score alone, and no numeric score
-floor gates this step (a false-positive survey found unrelated pages
-scoring inside the same 0.69-0.82 range true hits occupy). A hit whose
+floor gates this step (the 50-case calibration set in
+tests/fixtures/wiki-retrieval-calibration.json, run with wiki-index.py eval
+--report, found no separable floor: unrelated pages score inside the same
+range true hits occupy). A hit whose
 trigger does not match is left unadopted: record it as one bullet per
 checked decision (`<page id> — <one-line reason it did not match>`) under a
 new `### Considered, not adopted` subsection placed directly below the
