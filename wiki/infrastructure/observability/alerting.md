@@ -52,6 +52,7 @@ a condition should page, open a ticket, or only appear on a dashboard.
 | No SLO defined yet | Interim: static symptom thresholds with duration conditions, set from the current baseline; define the SLO, then convert to burn-rate alerts |
 | Single instance down, load balancer keeps user error rate at zero | Ticket or auto-heal, never a page — users are unaffected |
 | Batch/cron job with no live traffic to measure | Alert on absence of success ("job has not succeeded within its window"), not only on failure events — a job that never ran emits no failure |
+| A pipeline has a fallback source and a primary-source failure silently switches to it | Alert on the primary source's success count reaching zero (or the fallback share crossing a threshold) as its own symptom: a run that completes on the fallback is degraded operation, not success, and the downstream symptom ("not enough signals today") is worded as the consumer's own shortfall, so it never names the outage |
 | Low-traffic service where one error spikes the error rate | Add a minimum-request-count condition alongside duration |
 
 ## Instead of
@@ -62,8 +63,10 @@ a condition should page, open a ticket, or only appear on a dashboard.
 | Page on CPU > 80% | Page on latency/error SLO burn; keep CPU on the diagnosis dashboard | High CPU with healthy latency is not user impact |
 | Keep an "acknowledge and ignore" alert because it has always existed | Delete it or demote it to a ticket within the week | Every tolerated false page erodes trust in the next real one |
 | Page a human for a failure with a known automatic remediation | Automate the remediation; page only when it fails | Pages are for judgment, not for running a script |
+| Count a run as healthy because the fallback filled every slot | Emit and alert on the primary-source usage count | The fallback masks the outage; the field case below ran green for seven days with zero output |
 
 ## Sources
 
 - https://sre.google/sre-book/monitoring-distributed-systems/ — symptoms vs causes; maximum signal, minimum noise; pages must be actionable
 - https://sre.google/workbook/alerting-on-slos/ — burn-rate alerting; fast-burn page vs slow-burn ticket, multiwindow conditions
+- Field incident 2026-08-14 to 08-21 (korea-data-suite / stock-signal-bot): after the KRX credential expired, the pykrx primary failed on every run and the Naver fallback succeeded 29/30; every run logged normal completion while the signal count stayed at 0 for seven consecutive days and the Telegram notice said only "a day with too few signals"; a primary-success-count-is-zero alert was added

@@ -34,6 +34,7 @@ progress by running a script that writes outside its worktree.
 | "worker dead" | The substrate's own liveness call (runtime/task API, `tmux has-session -t <exact-session>`, container inspect) *plus* whether new commits appeared since the last check |
 | "worker produced file X" | `test -e`/`stat` on X |
 | "nothing happened yet" | Worker log mtime; an idle-looking worker mid-run and a worker that never started look identical from the status file |
+| "this queued candidate is still pending" (an ingest/harvest queue row, a review-request ticket) | The destination store itself — grep it for the candidate's distinctive phrase. A producer that writes the store directly (a feature PR merging the same lesson, a manual edit) never touches the queue, so the row stays pending after the work has landed |
 
 2. **Emit and consume status by an exact identifier the orchestrator assigned.**
    Have the worker write the run-scoped task id the orchestrator gave it, not an
@@ -67,6 +68,7 @@ progress by running a script that writes outside its worktree.
 | An editor/Write tool succeeds where Bash was refused for the same path | The guardrail inspects Bash command text only, so the two channels disagree by design. Do not use the working channel to route around the rule — report it |
 | Heartbeat is fresh but no commits in N intervals | Fresh heartbeat plus unchanged primary artifact is the stalled state, distinct from alive-and-progressing and from dead; handle it as its own case |
 | The monitor is the only thing that can see the worker | Add the primary-artifact check to the monitor rather than trusting its verdict; a monitor with no artifact check cannot produce evidence |
+| A queue row's content is already in the destination store (its distinctive phrase greps on `main`) | Retire the row as already-landed, recording the landing change's id (PR number, commit) in its outcome, and skip the processing round; a pending row nobody can promote re-crosses every batch threshold and re-spends the same research each run |
 | Several workers go quiet almost simultaneously: liveness checks pass, heartbeats stay fresh, diffs stop growing | Before restarting anything, search each worker's pane/terminal tail for the CLI's usage-limit marker (e.g. `You've hit your session limit · resets HH:MM`) — a usage-limit pause is idle waiting, not a crash, so every liveness probe passes. After the stated reset time, send a resume prompt that orders: re-verify state (`git status`, rerun the tests) → remaining definition-of-done → completion signal. A bare "continue" sent before the reset is consumed by the same limit message, and a resume without the state re-check makes the worker guess where it stopped |
 | The next task is dispatched to the same terminal immediately after the worker's done signal and fails runtime-unavailable | The done message is the worker's report time, not the substrate's release time — the CLI is still tearing down its stop-hook chain and the previous dispatch still occupies the terminal. Wait for the substrate's own idle signal (e.g. `orca terminal wait --for tui-idle`) before dispatching; and when the failed dispatch consumed the task, create a new task from the same spec — the consumed one cannot be retried |
 
@@ -77,6 +79,7 @@ progress by running a script that writes outside its worktree.
 | Restart a worker because the watch script exited "dead" | Run the substrate liveness call and `git log` on its branch first | The verdict can come from an identifier the worker picked up from its environment, naming a different process entirely |
 | Let a worker resolve its own session/pane id for the status file | Pass the orchestrator-assigned task id into the worker and have it echo that back | Discovered identifiers are ambient state; assigned ids are the orchestrator's own namespace |
 | Trust a status script's silence as "signal sent" | `stat` the status file after the call and report the mtime | A gate-blocked command exits without writing and without printing |
+| Research a queued candidate because its row says `pending` | Grep the destination store for its distinctive phrase first | The queue records intent at enqueue time; a direct write to the store after that leaves the row stale, and the row's status is a control signal about the store, not the store |
 | Retry a blocked status write with a rewritten path | Report the block and the rule id to the orchestrator | The rule is protecting the shared checkout; a workaround reintroduces exactly the corruption it prevents |
 
 ## Sources
@@ -84,4 +87,5 @@ progress by running a script that writes outside its worktree.
 - https://man.openbsd.org/tmux — `has-session`, `display-message` behavior and session naming
 - https://code.claude.com/docs/en/hooks — hook architecture and path guardrails
 - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html — exit codes and output redirection
+- Field evidence 2026-09-06 (dev-loop knowledge-flush run 20260906-003715): queue row f1ba9bf617fbd101 (graphify exit-0 handling) matched verbatim a row and a source line already on `main` in code-graph-as-orientation-layer.md, merged by PR #184 on 2026-09-04 from the same session that had harvested it; retired as dropped-already-merged with no wiki change
 - Field evidence 2026-08-06 (Claude CLI workers under tmux/Orca orchestration): three workers paused simultaneously on one usage-limit reset — identical `You've hit your session limit · resets 01:10` marker in each terminal tail while every liveness check passed; a state-recheck resume prompt sent after the reset resumed all three exactly at their interrupted step (test re-run). Same run: two dispatches issued immediately after `worker_done` both failed `runtime_unavailable` and consumed their tasks; dispatches issued after a `tui-idle` wait succeeded first try

@@ -8,7 +8,7 @@ sources:
   - https://www.postgresql.org/docs/current/transaction-iso.html
   - https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html
 last_verified: 2026-07-10
-related: [databases-query-optimization-existence-and-count-checks, databases-schema-design-requirements-to-tables, databases-transactions-optimistic-vs-pessimistic-locking]
+related: [databases-query-optimization-existence-and-count-checks, databases-schema-design-requirements-to-tables, databases-transactions-optimistic-vs-pessimistic-locking, databases-transactions-multi-row-reorder-on-a-shared-resource]
 ---
 
 # Choosing Transaction Behavior for Concurrent Writes

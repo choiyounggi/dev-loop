@@ -9,7 +9,7 @@ sources:
   - "https://claude.com/blog/improving-frontend-design-through-skills — Anthropic Engineering, 2025-11-12 (distributional-convergence mechanism, font avoid-list + taxonomy, extreme-contrast thresholds, domain-derived aesthetic direction, second-order convergence warning; Korean translation: velog.io/@xxziiko)"
   - "https://github.com/pbakaus/impeccable — README (gray-text-on-colored-background and bounce/elastic-easing anti-patterns; command list unstable across versions, cited for README-level rules only)"
 last_verified: 2026-08-21
-related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements, frontend-design-responsive-layout, frontend-design-design-canvas-workflow]
+related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements, frontend-design-responsive-layout, frontend-design-design-canvas-workflow, frontend-design-lightness-steps-on-dark-surfaces]
 ---
 
 # Making Web UI Look Designed, Not Generated
@@ -53,7 +53,7 @@ Color:
 | No pure `#000`/`#fff` | Tint paper and ink toward the anchor hue: light paper `oklch(96–98% 0.005–0.015 H)`, dark paper `oklch(12–16% 0.008–0.015 H)` |
 | Tint the grays toward the anchor hue | A warm accent with cool-gray body copy reads wrong even to viewers who can't name why; on colored surfaces, tint the text toward the surface hue too — neutral gray text on a colored background is a recognized generated-design tell |
 | One dominant color field, sharp minority accent | "Dominant colors with sharp accents outperform timid, evenly-distributed palettes" (Anthropic); draw palette direction from IDE themes and cultural aesthetics rather than generic web-palette generators |
-| Dark mode: elevation is lightness, not shadow | Higher surface ≈ +3% lightness per level; keep the hue fixed across modes; reduce body font-weight by ~50 to offset light-on-dark optical bolding |
+| Dark mode: elevation is lightness, not shadow | Higher surface ≈ +3% lightness per level; keep the hue fixed across modes; reduce body font-weight by ~50 to offset light-on-dark optical bolding; a state a user must *identify* (selected, on/off) cannot ride on a lightness step below L 30% — measure the sRGB ratio and carry it on outline, chroma, or shape ([frontend-design-lightness-steps-on-dark-surfaces]) |
 
 Typography, layout, motion, states:
 
