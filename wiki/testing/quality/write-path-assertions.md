@@ -8,7 +8,7 @@ sources:
   - https://github.com/encode/httpx/blob/master/httpx/_content.py
   - https://www.python-httpx.org/quickstart/
 last_verified: 2026-08-05
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, backend-python-boundaries-runtime-validation, testing-quality-signed-link-verification-assertions]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, backend-python-boundaries-runtime-validation, testing-quality-signed-link-verification-assertions, testing-quality-store-assertions-after-a-rolled-back-run]
 ---
 
 # Testing an Endpoint That Writes: Asserting Past the Status Code

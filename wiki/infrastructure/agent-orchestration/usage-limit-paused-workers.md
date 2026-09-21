@@ -10,7 +10,7 @@ sources:
   - https://github.com/anthropics/claude-code/issues/5977
   - https://code.claude.com/docs/en/interactive-mode#wait-for-a-usage-limit-to-reset
 last_verified: 2026-08-29
-related: [infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-dispatching-after-a-completion-report, infrastructure-agent-orchestration-shared-run-state]
+related: [infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-dispatching-after-a-completion-report, infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-login-expiry-during-unattended-turns]
 ---
 
 # Worker Sessions Paused by a Provider Usage Limit

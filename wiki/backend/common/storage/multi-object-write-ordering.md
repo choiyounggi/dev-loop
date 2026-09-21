@@ -8,7 +8,7 @@ sources:
   - https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html
   - https://man7.org/linux/man-pages/man2/rename.2.html
 last_verified: 2026-08-14
-related: [backend-common-storage-object-key-persistence, backend-common-jobs-idempotent-handlers, backend-common-concurrency-distributed-locks]
+related: [backend-common-storage-object-key-persistence, backend-common-jobs-idempotent-handlers, backend-common-concurrency-distributed-locks, infrastructure-agent-orchestration-concurrent-blackboard-append-file]
 ---
 
 # Writing Two or More Objects With No Transaction Around Them
