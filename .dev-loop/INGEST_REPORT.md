@@ -1,88 +1,95 @@
-# Knowledge flush — 21 insight(s)
+# Knowledge flush — 5 insight(s)
 
-Run: auto-flush headless child (run id `20260908-154254-28665`), queue drained from 14 session files (21 claimed rows). Outcome: 12 new pages, 8 merges into existing pages, 1 fold onto open PR #183, 0 drops. Lint after ingest: `wiki-structure-checks.js` 288 pages / 13 indexes / 0 findings; `wiki-lint-prohibitions.js` directives 75 / violations 0 (count unchanged, so the bats pin needs no bump); every touched page ≤ 120 body lines.
+Claimed queue ids: `44e28bb8c99c1d0c`, `f2d90d5048826870`, `fb7d73874bac6eaa`,
+`5f3e5eb58ec373e4`, `6e83a02b449a8dff`. All five are plan-gap rows emitted by
+`skills/wiki-plan/scripts/emit-gaps.sh` — decisions a wiki-plan marked
+`[no-wiki]`. Result: 1 new page (4 rows merged into it), 1 row dropped.
 
 ## Verified best-practice
 
-Five research agents vetted each candidate against primary sources (WebFetch/curl of official docs and source code, plus local reproductions where a claim was runnable). Confidence per candidate:
+**Candidates `f2d90d5048826870`, `fb7d73874bac6eaa`, `5f3e5eb58ec373e4`, `6e83a02b449a8dff`
+(all t3-status, issue #195)** — the four rows are facets of one reusable lesson:
+how to change a cited knowledge/decision record that turned out wrong.
 
-**New pages**
-1. `infrastructure-ci-cd-secret-needing-gate-on-fork-prs` — **verified**. GitHub docs `events-that-trigger-workflows#pull_request_target` ("With the exception of GITHUB_TOKEN, secrets are not passed to the runner when a workflow is triggered from a forked repository"; "Running untrusted code on the pull_request_target trigger may lead to security vulnerabilities"); GitHub Security Lab "Preventing pwn requests" ("Combining pull_request_target workflow trigger with an explicit checkout of an untrusted PR is a dangerous practice"); anthropics/claude-code-action `docs/security.md` ("Do not check out an untrusted ref into the workspace root"; "Preferred — check out the base ref (default)"). Local: dev-loop `wiki-agent-gate.yml` + 12 bats tests read directly. Note: the "instruction-shaped diff text is a finding" stance is this repo's gate prompt, not security.md — cited accordingly.
-2. `infrastructure-ci-cd-review-bot-adopted-as-a-blocking-gate` — **verified**. alibaba/open-code-review `action.yml` (result written to `/tmp/ocr-result.json`; "Fail job on OCR error" keyed on exit code), `cmd/opencodereview/review_cmd.go` `reviewResultError` ("non-zero only for a run-level failure, or when every selected item failed. Any usable coverage — even incomplete — exits 0"), `scripts/github-actions/post-review-comments.js` (every `createReview` uses `event: "COMMENT"`, zero `REQUEST_CHANGES`/`setFailed` matches in 2657 lines), `sarif.go` exists.
-3. `infrastructure-agent-orchestration-tool-retirement-knowledge-transplant` — **field-tested**. dev-loop PR #130 fetched via gh: 14 + ~30 skills inventoried, 8 gaps ported, skip list in log.md, lint 0 findings. No external canonical source for the methodology found; not upgraded.
-4. `backend-python-language-dict-subclass-attribute-loss-on-copy` — **verified**. Python reference "A dictionary display yields a new dictionary object"; `copy` docs "copy.copy() normally returns an instance of the same type" (both quotes re-fetched by curl this run); local python3 3.14.6 reproduction (subclass attr lost under `dict()`/`{**}`; preserved under `copy.copy`; `getattr` default silent vs direct access `AttributeError`).
-5. `backend-python-language-iterative-dfs-for-unbounded-graph-depth` — **verified**. `sys.getrecursionlimit`/`setrecursionlimit` docs; What's New 3.12 "The recursion limit now applies only to Python code. Builtin functions do not use the recursion limit, but are protected by a different mechanism" (re-fetched by curl this run; the agent's discuss.python.org source was replaced with the official page); local reproduction: recursive DFS on a 2000-chain raises `RecursionError`, iterative completes with matching cycle output.
-6. `qa-document-verification-sweeping-pre-gate-citations-for-fabrication` — **field-tested**. dev-loop issue #156 fetched via gh (8 agents, ~440 fetches, 270/270 pages, 33 blockers on 24 pages, per-category breakdown; the page reports the breakdown rather than the monolithic "33 citation defects"). External LLM-citation-hallucination papers confirm the phenomenon, not the sweep methodology.
-7. `qa-process-session-identity-leak-in-plugin-prose` — **field-tested**. Incident re-verified: installed marketplace copy + two cached plugin versions contain no occurrence of the leaked name. 12factor.net/config cited as analogy only ("strict separation of config from code"); the page itself does not contain the user's personal name.
-8. `platforms-toolchains-regeneration-silently-drops-hand-edited-state` — **verified**. XcodeGen README ("Generate projects on demand and remove your .xcodeproj from git"), Docs/FAQ.md ("you can also check it in as a halfway step"), issues #515 (GUI-created shared schemes "will be overwritten the next time they generate") and #572 ("running xcodegen will overwrite that xcscheme file"). Field: 118 pbxproj lines + xcscheme deleted by xcodegen 2.45.4 on a one-key change.
-9. `testing-quality-narration-based-ordering-assertions` — **field-tested**. Apple `terminationHandler` API doc confirms the invariant class; the mutation narrative is session-relayed (no repo located) and stated as such in the page.
-10. `testing-mocking-autouse-fixture-shadows-function-under-test` — **verified**. pytest monkeypatch how-to ("monkeypatch.setattr must be called before the function which will use the patched function is called"; "All modifications will be undone after the requesting test function or fixture has finished"), fixtures how-to (autouse fixtures run as setup "even though neither test requested it").
-11. `testing-quality-cross-task-stub-assertions` — **field-tested**. The cited commit `de8c07c` and HANDOFF.md §5 item 18 were read directly in the source checkout (`git show`), confirming the placeholder-text → root-class rewrite.
-12. `testing-strategy-real-cli-spot-check-for-new-execution-paths` — **field-tested**. Commits `e761ed3`, `b25ff04`, `656d763` and HANDOFF.md §5 item 19 read directly (`git show`): ENOENT cwd hang and permit-scope deadlock, both "found by the coordinator's real-CLI spot check".
+| Claim | Source checked | How verified |
+|-------|----------------|--------------|
+| Keep the reversed record, mark it superseded, reference the replacement | https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions | Live-fetched 2026-09-17; quote: "If a decision is reversed, we will keep the old one around, but mark it as superseded. (It's still relevant to know that it *was* the decision, but is *no longer* the decision.)" and "may be marked as 'deprecated' or 'superseded' with a reference to its replacement" |
+| Amend-in-place vs. stand-alone successor is a real, named distinction | https://www.rfc-editor.org/rfc/rfc2223.txt §12 | Raw text read with curl; *Updates* = supplement that "cannot stand on its own", *Obsoletes* = "can be used alone, without reference to the older document" |
+| Status is an optional field whose value carries the successor | https://adr.github.io/madr/ | Live-fetched; template status values `proposed / rejected / accepted / deprecated / … / superseded by ADR-0123`, marked "These are optional elements" |
+| Validity status lives apart from the document's content and can change later | https://www.rfc-editor.org/faq/ | Raw page read with curl; "the status of an RFC can change", published on the info page and a status-changes list |
 
-**Merges**
-13. `security-data-commit-identity-in-public-repos` — **verified**. git-log pretty formats (`%ae`/`%ce`), git-filter-repo docs (`--mailmap` "rewriting author, committer, and tagger names and emails"; `--replace-message`), github.blog changelog 2019-12-19 ("we will automatically credit every commit author in the pull request as a co-author on the squash commit"). Note: the docs.github.com "about pull request merges" page does not state the trailer behavior; the changelog does.
-14. `security-data-masking-verification` — **field-tested** (page stays field-tested). The OWASP API3:2023 fetch was not completed by the agent, so it is NOT cited. Evidence is the direct read of the mask implementation and the two bypassing read endpoints.
-15. `infrastructure-agent-orchestration-session-completion-gates` — **verified**. Leonxlnx/unlazy `scripts/stop-hook.mjs` (`MAX_BLOCKS = 6`, ledger-hash no-progress counter) and CHANGELOG (1.0.0 instruction-only → 2.0.0 gate files + Stop hook) fetched; dev-loop `hooks/loop-gate.sh` Gate 2 + `tests/loop-gate.bats` read directly. The candidate's claim that loop-gate.sh is self-report-only was wrong (Gate 2 already exists); the page documents the mechanism, not the mischaracterization.
-16. `debugging-methodology-probe-path-vs-operation-path` — **field-tested** row on a verified page (84/84 events, store-state polling via `useRunStore.getState()`).
-17. `frontend-state-effects-usage` — **verified**. react.dev removing-effect-dependencies ("Object and function dependencies can make your Effect re-synchronize more often than you need"), useRef reference ("Changing a ref does not trigger a re-render"), Lenis `packages/core/src/lenis.ts` `updateClassName()` toggling `lenis-scrolling`/`lenis-stopped`.
-18. `platforms-toolchains-flag-availability-at-the-execution-site` — **verified**. code.claude.com CLI reference documents `--max-turns`; local reproduction on claude 2.1.263 (`--help` has zero matches; `-p --max-turns 3 --output-format json` returns `is_error:false`).
-19. `qa-document-verification-editing-a-gated-document` — **verified** by reproduction in this repo (`wiki-lint-prohibitions.js` prints `directives: 75`, bats pins the same literal). PR #151 numbers could not be re-fetched by that agent (401) and are cited as field evidence.
-20. `infrastructure-agent-orchestration-worktree-isolated-workers` — **verified**. gitignore docs (`.gitignore` = distributed via clone; `$GIT_COMMON_DIR/info/exclude` = repository-local), git-worktree docs; local reproduction: from a linked worktree `git rev-parse --git-path info/exclude` resolves to the main `.git/info/exclude`, and one pattern silenced `git status` in both checkouts.
+Correction made during verification: the candidates' evidence cited a Stack
+Overflow answer for the Obsoletes/Updates semantics, and a first fetch of
+RFC 7322 §4.1.4 returned a summary that *added* definitions the RFC does not
+contain. Reading the raw RFC 7322 text showed §4.1.4 only gives the header
+format; the definitions are in RFC 2223 §12, which is what the page cites.
+The candidates' secondary sources (ctaverna.github.io, docsio.co, the
+runenwerk issue) were not needed and are not cited.
 
-**Fold**
-21. Multi-line `CHECK:` truncation in `gate-check.sh` — **verified** by source read (`skills/loop-implement/scripts/gate-check.sh:117-118`, no wildcard case) and a scratch-dir reproduction (`exit=2: unexpected EOF while looking for matching quote` vs `exit=0 matched: WSGI_APP_OK` on one line). Folded onto PR #183 (see Open-PR check).
+Directive 7 of the page (log the transition under the existing `revise`-class
+verb) has no external source; it is stated conditionally ("when nothing parses
+the verb set mechanically") and rests on the field context of issue #195.
+Confidence: **verified** (directives 1–6 are backed by the primary sources above).
+
+**Candidate `44e28bb8c99c1d0c` (t1-reviewer, README agents-tree line)** — not a
+best-practice claim. It is a one-repo scope ruling ("add one README line, leave
+README.ko.md and the sibling reviewer lines alone"). No transferable trigger or
+directive; nothing to verify. **Dropped.**
 
 ## Existing-layer check
 
-Routing went INDEX.md → domain `index.md` → every page whose "load when" overlapped; second-domain indexes were read where the queue's domain tag was doubtful (eaa97ef1 tagged platforms → infrastructure; 5f1e60e7 tagged platforms → qa; 27598bf7/15c19bc4 untagged → testing, the domain that owns the test artifact per AGENTS.md routing step 1).
+Routed via `INDEX.md` → qa (document deliverables / document-verification), and
+cross-checked infrastructure (agent-orchestration, where the gap-queue page
+lives) and backend (api-versioning, the nearest "deprecation" page).
 
-Pages read: infrastructure-ci-cd-secrets-handling, infrastructure-ci-cd-pipeline-structure, infrastructure-ci-cd-changed-files-only-gates, qa-process-llm-review-pipelines, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-session-context-token-budget, qa-process-scope-purity-checks, backend-python-language-mutable-state-traps, databases-transactions-optimistic-vs-pessimistic-locking, security-data-masking-verification, security-data-pii-handling, backend-common-change-impact-call-site-enumeration, backend-common-change-impact-cross-module-consumer-census, debugging-methodology-probe-path-vs-operation-path, debugging-methodology-hypothesis-testing, debugging-methodology-reproduce-first, security-data-commit-identity-in-public-repos, security-secrets-secrets-in-code, qa-process-adversarial-change-review, qa-process-defect-class-resweep-after-review, security-dependencies-agent-skill-supply-chain, platforms-tools-plugin-mcp-server-registration, backend-common-llm-binding-instructions-for-agents, qa-document-verification-spec-document-gates, qa-document-verification-editing-a-gated-document, qa-deliverables-quantitative-claims-in-a-published-document, frontend-state-effects-usage, frontend-design-html-in-canvas, platforms-toolchains-compiler-sysroot-on-macos, platforms-toolchains-version-management, platforms-toolchains-environment-resync-removes-undeclared-packages, platforms-toolchains-flag-availability-at-the-execution-site, platforms-processes-non-interactive-cli-invocation, testing-quality-tests-that-cannot-fail, testing-quality-mutation-harness-file-custody, testing-async-async-testing, testing-mocking-captured-call-arguments, testing-quality-source-text-wiring-assertions, testing-mocking-what-to-mock, testing-data-test-data-and-isolation, testing-quality-stale-artifact-baselines, testing-strategy-test-level-choice, qa-process-completion-claims, testing-quality-checks-that-cannot-pass
+Pages read: qa-document-verification-retiring-a-provisional-marker, infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal, qa-document-verification-spec-document-gates, backend-common-api-design-api-versioning-and-breaking-changes
 
-Overlaps and outcomes:
-- **Merged (same trigger, extending directive):** commit-identity (author-only → committer + squash trailer + cross-repo audit + named rewrite tool), masking-verification (per-channel sweep → mask shape classification + direct-store-read call sites), session-completion-gates (phase gate items 1–6 → ledger gate items 7–8 + release valve), probe-path-vs-operation-path (auth probe case → multi-layer pipeline row), effects-usage ("read a value without re-running" row → rAF-loop ref-mirror row), flag-availability (cross-environment version drift → `--help`-as-source-of-truth row), editing-a-gated-document (author side → reviewer-side pinned-count row), worktree-isolated-workers (ignored state dirs → where the ignore pattern lives).
-- **Created (new trigger, nothing covering it):** the 12 pages above. Closest neighbours checked and cross-linked rather than merged: tests-that-cannot-fail (at 115/120 lines; narration/mutation case is a distinct failure mode), what-to-mock and test-data-and-isolation (no autouse-shadowing case), environment-resync-removes-undeclared-packages (same abstract shape as xcodegen regen, different artifact → related), llm-review-pipelines (same OCR example, disjoint case), secrets-handling item 6 (general "no secrets on fork PRs" principle → the new page is the sanctioned exception pattern).
-- **Conflicts flagged:** none. One candidate mischaracterized dev-loop's own hook as self-report-only (loop-gate.sh already has a ledger gate); the merge documents the pattern without repeating the mischaracterization.
-- **Related links added both ways** for every new page and every merge (see log.md entry). Five reverse links are deferred because the target ids exist only on open PRs (listed under Open-PR check).
-- **Domain routing overrides:** eaa97ef1 platforms→infrastructure/agent-orchestration (platforms owns OS portability, not hook design); 5f1e60e7 platforms→qa/process (a review-checklist page, sibling of adversarial-change-review; kept separate from the git-identity page because trigger, artifact, detection command and remediation all differ); 27598bf7 and 15c19bc4 → testing (the artifact changed is a test / test strategy; orchestration pages are linked, not the owner).
+- `grep -rli "supersed|ADR|architecture decision" wiki/` → 4 hits, none about
+  the lifecycle of a record: retiring-a-provisional-marker covers removing
+  `[추정]`/TBD markers inside one document; escape-hatch-uses covers emitting
+  gap rows; the other two only mention the word.
+- `grep '^status:'` over the wiki → 0 pages; AGENTS.md has no lifecycle field
+  (issue #195 is what introduces it). No existing directive conflicts.
+- Result: **new page** `wiki/qa/document-verification/superseding-a-knowledge-record.md`
+  (72 body lines). The four t3-status rows were merged into it rather than
+  ingested as four pages: supersede-vs-overwrite (D8) → Do-this 1–3, status vs.
+  confidence (D9) → Do-this 5, absent-means-active template line (D14) →
+  Do-this 6, `revise` verb (D7) → Do-this 7.
+- Related links added both ways: retiring-a-provisional-marker,
+  spec-document-gates, escape-hatch-uses-as-a-knowledge-gap-signal.
+- `wiki/qa/index.md` document-verification table +1 row; `log.md` +1 ingest entry.
+- Checks after the edit: `node scripts/wiki-structure-checks.js wiki` →
+  279 pages / 13 indexes / 0 findings; `node scripts/wiki-lint-prohibitions.js wiki`
+  → directives 75, violations 0 (bats pin unchanged at 75);
+  wiki-structure-checks / wiki-lint-prohibitions / wiki-lint-model-era bats → 0 failures.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed via `gh pr list` and fetched: #187 (`knowledge/choiyounggi-20260906-213635`), #186 (`…-20260906-013856`), #185 (`…-20260906-003745`), #183 (`…-20260904-133717`), #182 (`…-20260903-214027`), #181 (`…-20260903-203836`), #180 (`…-20260903-184706`), #179 (`…-20260903-172728`). Each candidate was diffed against every head's `wiki/` changes (138 page entries summarized, overlapping pages read via `git show origin/<head>:<path>`).
+Open `knowledge/*` heads listed 2026-09-17: #205, #191, #190, #189, #188, #187,
+#186, #185, #183, #182, #181, #180, #179. Each head was fetched and
+`git diff origin/main origin/<head> -- wiki/` grepped for
+`supersed|superseded_by|status: retired|decision record|obsoletes` → 0 added
+lines on every head. Nearest neighbour: #186's
+`model-coupled-guidance-aging-detector` — it detects pages that may have aged;
+it says nothing about what to do with a refuted record, so no overlap.
 
-Per-candidate verdicts:
-- **fold:#183** — 5f41fd94 (multi-line CHECK truncation). #183 adds `testing/quality/gate-parsing-vs-command-execution.md`, which covers the same script and case family but not this failure mode. Not re-ingested here; the exact edge-case row + source bullet is posted as a comment on PR #183 for the owner to fold in (the page does not exist on main, so it cannot be edited on this branch).
-- **new (no overlap)** — all other 20. Specific checks: c5ac7430 vs #187 `workflow-authored-pull-requests` (bot-PR/ruleset, different failure) and #182 `llm-review-pipelines` (byte-identical to main); acd8c8f6 vs #182/#187 (none touch exit-code gating); eaa97ef1 vs #183 `session-completion-gates` and #186/#179 `control-signals-vs-primary-artifacts` (related-only / orchestrator-side, no ledger-gate content; my additions append to section ends to minimize textual conflict with #183); 39d73731 vs #186 `model-coupled-guidance-aging-detector` (temporal staleness detector, not citation accuracy — no fold); a3e368c1 vs #187 `reproduce-first` (assertion-boundary of an existing test vs live layer probing — adjacent, cross-linked, not folded); 44ebf34c vs #187 `pointer-attracted-particle-fields` (sibling canvas page, different case); 7b689559 vs #186 "literal-constant re-assertion" row and #179 (unrelated); 1db78612 vs #181 `synthetic-corpus-measurement-floor` (pigeonhole floor, unrelated); 15c19bc4 vs #179 `verify-command-in-a-worker-brief` (venv path in a brief, different mechanism); 27598bf7 vs #181 `checkable-claims-in-an-adopted-plan` (plan numeric claims, different); 4b17b2af vs #179 `worktree-isolated-workers` (adds an item on the same directories but not where the ignore pattern lives); 0e9f9b6d vs #183 `non-interactive-cli-invocation` (related-id only); 158ef7ac, d30e0ceb, e9ed0c65, 600d2698, 70ebcc34, 5f1e60e7, f9f7e64e, c36cb938 — no open head touches a relevant page.
-- **drop** — none.
+| Candidate | Verdict |
+|-----------|---------|
+| `f2d90d5048826870` (log verb for supersede/retire) | new |
+| `fb7d73874bac6eaa` (ingest third case: page wrong as a whole) | new |
+| `5f3e5eb58ec373e4` (status vs. confidence) | new |
+| `6e83a02b449a8dff` (template optional status lines) | new |
+| `44e28bb8c99c1d0c` (README agents-tree line) | drop — not generalizable (not a pending duplicate) |
 
-Deferred `related:` links (target ids not on main yet; add after the PR merges): `frontend-design-pointer-attracted-particle-fields` (#187) ↔ effects-usage; `infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan` (#181) ↔ cross-task-stub-assertions; `infrastructure-agent-orchestration-verify-command-in-a-worker-brief` (#179) ↔ real-cli-spot-check; `qa-document-verification-model-coupled-guidance-aging-detector` (#186) ↔ sweeping-pre-gate-citations; `testing-quality-gate-parsing-vs-command-execution` (#183) ↔ session-completion-gates.
+Note for the reviewer: issue #195 (t3-status) will itself add `status` /
+`superseded_by` to AGENTS.md. This page is the general practice behind that
+schema, written so it stays correct whether or not #195 has landed.
 
 ## Routing decision
 
-No new category or domain was created; every candidate fit an existing category.
-
-| Candidate | Target |
-|---|---|
-| c5ac7430 | infrastructure/ci-cd/secret-needing-gate-on-fork-prs.md (new) |
-| acd8c8f6 | infrastructure/ci-cd/review-bot-adopted-as-a-blocking-gate.md (new) |
-| f9f7e64e | infrastructure/agent-orchestration/tool-retirement-knowledge-transplant.md (new) |
-| d30e0ceb | backend/python/language/dict-subclass-attribute-loss-on-copy.md (new) |
-| e9ed0c65 | backend/python/language/iterative-dfs-for-unbounded-graph-depth.md (new) |
-| 39d73731 | qa/document-verification/sweeping-pre-gate-citations-for-fabrication.md (new) |
-| 5f1e60e7 | qa/process/session-identity-leak-in-plugin-prose.md (new; queue tag platforms overridden) |
-| 158ef7ac | platforms/toolchains/regeneration-silently-drops-hand-edited-state.md (new; mobile considered, toolchains owns generator fidelity per the environment-resync precedent) |
-| 7b689559 | testing/quality/narration-based-ordering-assertions.md (new) |
-| c36cb938 | testing/mocking/autouse-fixture-shadows-function-under-test.md (new) |
-| 27598bf7 | testing/quality/cross-task-stub-assertions.md (new; agent proposed infrastructure/agent-orchestration, routed to testing as the owner of the test artifact) |
-| 15c19bc4 | testing/strategy/real-cli-spot-check-for-new-execution-paths.md (new; same reasoning) |
-| 70ebcc34 | security/data/commit-identity-in-public-repos.md (merge) |
-| 600d2698 | security/data/masking-verification.md (merge) |
-| eaa97ef1 | infrastructure/agent-orchestration/session-completion-gates.md (merge; queue tag platforms overridden) |
-| a3e368c1 | debugging/methodology/probe-path-vs-operation-path.md (merge) |
-| 44ebf34c | frontend/state/effects-usage.md (merge) |
-| 0e9f9b6d | platforms/toolchains/flag-availability-at-the-execution-site.md (merge; queue tag testing overridden) |
-| 1db78612 | qa/document-verification/editing-a-gated-document.md (merge) |
-| 4b17b2af | infrastructure/agent-orchestration/worktree-isolated-workers.md (merge) |
-| 5f41fd94 | fold → PR #183 gate-parsing-vs-command-execution.md (comment) |
-
-Domain indexes updated: infrastructure (+3 rows, 2 rows refreshed), backend/python (+2), qa (+2, 1 refreshed), platforms (+1, 1 refreshed), testing (+4), security (2 refreshed), debugging (1 refreshed), frontend (1 refreshed). INDEX.md unchanged (existing domain route lines already cover the new pages). `tests/wiki-lint-prohibitions.bats` pin untouched (directive count still 75).
+- 4 t3-status rows → `qa / document-verification /
+  superseding-a-knowledge-record` (new page, existing category). The category
+  already owns ADR/RFC/spec document lifecycle pages
+  (retiring-a-provisional-marker, editing-a-gated-document), so no new
+  category was needed.
+- 1 t1-reviewer row → no page (dropped).

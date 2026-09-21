@@ -8,7 +8,7 @@ sources:
   - https://cwe.mitre.org/data/definitions/78.html
   - https://man7.org/linux/man-pages/man1/timeout.1.html
 last_verified: 2026-09-04
-related: [testing-quality-checks-that-cannot-pass, qa-document-verification-spec-document-gates, platforms-shells-command-text-inspected-before-execution, security-agent-exposure-in-session-tool-exposure]
+related: [testing-quality-checks-that-cannot-pass, qa-document-verification-spec-document-gates, platforms-shells-command-text-inspected-before-execution, security-agent-exposure-in-session-tool-exposure, infrastructure-agent-orchestration-gate-evidence-exit-code-class]
 ---
 
 # Separating a Document/Plan Parser From the Command Executor It Feeds

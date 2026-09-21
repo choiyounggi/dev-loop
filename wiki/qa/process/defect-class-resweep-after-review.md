@@ -8,7 +8,7 @@ sources:
   - https://www.eecg.utoronto.ca/~yuan/papers/incorrect_fix_abstract.html
   - https://dl.acm.org/doi/10.1145/2025113.2025121
 last_verified: 2026-08-11
-related: [qa-process-regression-scope, backend-common-change-impact-call-site-enumeration, testing-quality-tests-that-cannot-fail, qa-process-evaluating-review-feedback, qa-document-verification-sweeping-pre-gate-citations-for-fabrication, qa-process-session-identity-leak-in-plugin-prose]
+related: [qa-process-regression-scope, backend-common-change-impact-call-site-enumeration, testing-quality-tests-that-cannot-fail, qa-process-evaluating-review-feedback, qa-document-verification-sweeping-pre-gate-citations-for-fabrication, qa-process-session-identity-leak-in-plugin-prose, qa-document-verification-rationale-prose-after-a-config-value-change]
 ---
 
 # Re-Sweeping the Reviewed Defect Class Across Your Own Remediation Diff

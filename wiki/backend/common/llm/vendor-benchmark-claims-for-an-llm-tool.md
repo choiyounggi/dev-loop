@@ -12,7 +12,7 @@ sources:
   - https://github.com/volcengine/OpenViking/blob/main/benchmark/locomo/openclaw/stat_judge_result.py
   - https://github.com/volcengine/OpenViking/blob/main/benchmark/locomo/openclaw/judge.py
 last_verified: 2026-09-03
-related: [backend-common-llm-context-window-budget, qa-deliverables-quantitative-claims-in-a-published-document, qa-process-llm-review-pipelines]
+related: [backend-common-llm-context-window-budget, qa-deliverables-quantitative-claims-in-a-published-document, qa-process-llm-review-pipelines, debugging-performance-attributing-a-benchmark-speedup]
 ---
 
 # Evaluating a Vendor's Token-Savings or Accuracy-Gain Benchmark Claim for a Memory or RAG Tool

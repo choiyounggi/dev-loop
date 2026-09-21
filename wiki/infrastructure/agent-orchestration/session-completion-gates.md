@@ -9,7 +9,7 @@ sources:
   - https://csf.tools/reference/nist-sp-800-53/r5/ac/ac-5/
   - https://github.com/Leonxlnx/unlazy/blob/main/scripts/stop-hook.mjs
 last_verified: 2026-09-08
-related: [infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-worktree-isolated-workers, platforms-processes-tool-diagnostics-without-a-failing-exit-code, infrastructure-agent-orchestration-dispatching-after-a-completion-report, infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal, infrastructure-agent-orchestration-client-bound-pty-coordinator-loss]
+related: [infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-worktree-isolated-workers, platforms-processes-tool-diagnostics-without-a-failing-exit-code, infrastructure-agent-orchestration-dispatching-after-a-completion-report, infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal, infrastructure-agent-orchestration-client-bound-pty-coordinator-loss, infrastructure-agent-orchestration-gate-evidence-exit-code-class]
 ---
 
 # A Gate That Blocks a Worker Session from Ending Mid-Workflow
