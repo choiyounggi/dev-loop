@@ -1,77 +1,105 @@
-# Knowledge flush — 7 insight(s) claimed: 1 ingested, 6 dropped
-
-Run id (inherited from `hooks/auto-flush.sh`): `20260917-224552-43083`. Claimed ids:
-`dbedb1f0f153ea80`, `a0f287cdc70eac92`, `4b3490c5bb95a48a`, `62e2909c3f9f7f5e`,
-`e5b99a9fc624776f`, `bf8a6eee857f7808`, `5306e2de6142b95e`.
+# Knowledge flush — 3 insight(s): 1 new page, 2 project-specific plan-gap drops
 
 ## Verified best-practice
 
-### 1. `dbedb1f0f153ea80` — inherited lock owner id in a spawned session → **ingested, `confidence: verified`**
+### 1. `2b99ac7bc23f307f` — custom-property alias tokens read from script under jsdom → **verified**
 
-**Claim.** When a session is spawned by a hook/parent that already holds a
-run-id-keyed single-flight lock, acquire under the id exported in the
-environment rather than a freshly generated one; when an acquire reports `held`
-seconds after session start, compare the holder id with the inherited env before
-concluding a foreign run is live.
+Claim: `getComputedStyle(el).getPropertyValue('--a')` for `--a: var(--b)` returns the
+substituted value in a browser but the literal `var(--b)` under jsdom; the string is
+non-empty so an empty-value fallback never fires, and a canvas consumer silently
+ignores it.
 
-**Sources checked (fetched 2026-09-18):**
-- https://man7.org/linux/man-pages/man2/flock.2.html — "Locks created by flock() are associated with an open file description … duplicate file descriptors (created by, for example, fork(2) or dup(2)) refer to the same lock"; "If a process uses open(2) … to obtain more than one file descriptor for the same file, these file descriptors are treated independently by flock(). An attempt to lock the file using one of these file descriptors may be denied by a lock that the calling process has already placed via another file descriptor." — the OS-level form of the same failure (a re-opened path is a stranger to its own lock).
-- https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html — "A ReentrantLock is owned by the thread last successfully locking, but not yet unlocking it"; `lock()` "will return immediately if the current thread already owns the lock" — re-entrancy is defined by *identity equality with the recorded owner*.
-- https://www.gnu.org/software/make/manual/html_node/Job-Slots.html — the parent make provides jobserver access "through the environment to its children, in the MAKEFLAGS environment variable" via `--jobserver-auth=`; "Only the last instance is relevant" — a documented case of a parent handing a coordination token to children through the environment.
+- **Reproduced** (2026-09-21, jsdom 30.1.0, scratch project, since removed). Printed output of
+  `getPropertyValue` on `:root` with
+  `--b:#ff0000; --a:var(--b); --c:var(--a); --u:var(--missing); --x:var(--y); --y:var(--x)`:
+  `--b "#ff0000"`, `--a "var(--b)"`, `--c "var(--a)"`, `--u "var(--missing)"`,
+  `--x "var(--y)"`, undeclared `--none ""`. This matches the candidate's own evidence
+  (`--color-go: var(--color-accent)` read back as `var(--color-accent)` in a Vitest jsdom env).
+- https://www.w3.org/TR/css-variables-1/ — §2 computed value of `--*`: "specified value with
+  variables substituted, or the guaranteed-invalid value"; §2.2 that value "serializes as the
+  empty string"; §2.3 every property in a cycle is invalid at computed-value time. This is the
+  browser column of the page's table (derived from the spec, not separately measured in a browser).
+- https://html.spec.whatwg.org/multipage/canvas.html — `fillStyle`: "Invalid values are
+  ignored" (extracted from the fetched spec text), which is why the failure is silent.
+- https://github.com/jsdom/jsdom/issues/1895 — "Implement CSS custom properties", state OPEN
+  (read via `gh issue view`): jsdom's support is partial.
 
-**Reproduction (this session, 2026-09-17 22:46 KST):** `flush-lock.sh acquire`
-under a freshly generated `RUNID=flush-20260917-224603-43624` →
-`held 20260917-224552-43083 11s`, exit 3. `env | grep DEV_LOOP` showed
-`DEV_LOOP_FLUSH_RUN_ID=20260917-224552-43083` exported by `auto-flush.sh`
-(lines 77–79: acquire, `export DEV_LOOP_FLUSH_RUN_ID`, spawn). Re-running
-acquire under the inherited id → `already-owned 20260917-224552-43083`, exit 0.
-`flush-lock.sh` lines 76–86 implement the re-entrant branch by comparing the
-owner-file id to `$DEV_LOOP_FLUSH_RUN_ID`. Matches the candidate's own evidence
-from the 17:16 run (`held 20260917-171642-20541 19s` → `already-owned`).
+One sentence in my first draft (that each simulated DOM implements a different subset) had no
+source; it was replaced with a statement limited to what was measured (jsdom only).
 
-Both the official semantics (ownership = identity match; inheritance via env /
-open file description) and a two-way local reproduction (known-bad: fresh id →
-held; known-good: inherited id → already-owned) confirm the directive → `verified`.
+### 2. `27f30a2498bd57d3` — resolve `expected_page_id` via a frontmatter-id map → **not ingested (project-specific)**
 
-### 2–7. Plan-gap rows from `dev-loop-cockle` → **dropped (project-specific)**
+The directive names dev-loop's own id scheme (`<domain>-<category>-<slug>`, `wiki/**/*.md`,
+`index.md`) and one eval-case field. No external verification was attempted because it is not
+bundled-wiki material; see Local-layer candidates.
 
-| id | Decision | Why it is not reusable knowledge |
-|----|----------|----------------------------------|
-| `a0f287cdc70eac92` (t7-usage README tree line + log.md entry) | drop | Names one repo's README line and log grammar; no directive applies outside `dev-loop` |
-| `4b3490c5bb95a48a` (t9 fail-open sentence identical in three skills) | drop | The directive is one repo's skill wording; the cited sources (near-dup thresholds, MCP token cost) do not support the wording decision |
-| `62e2909c3f9f7f5e` (t9 wiki-ingest dedupe via `wiki_search`) | drop | A step-ordering edit to one skill in one repo; the sources cited are about cosine thresholds, unrelated to the decision |
-| `e5b99a9fc624776f` (t9 `neardup` subparser spec) | drop | A CLI design that has not shipped — `git ls-tree origin/main` finds no `scripts/wiki-index.py`, and the cockle worktree's `scripts/` has none either; the generic kernel (dot product on L2-normalised vectors = cosine) is textbook, and the threshold sources say "calibrate", which yields no page-grade directive |
-| `bf8a6eee857f7808` (t9 README subsection) | drop | Documentation layout for one repo |
-| `5306e2de6142b95e` (t9 combined log.md line) | drop | One repo's log convention ("one entry per task") |
+### 3. `d6771df1f2a91b34` — default `eval` recall counts only positive cases → **not ingested (project-specific)**
+
+The directive specifies one function's signature (`evaluate(cfg, cases, k)`), one output format
+string and this repo's case counts (15 / 35+15). The general kernel (recall = hits over cases
+that have a relevant item) is the textbook definition and adds no routable situation; see
+Local-layer candidates.
 
 ## Existing-layer check
 
-Pages read: backend-common-concurrency-distributed-locks, infrastructure-agent-orchestration-shared-run-state, backend-common-jobs-scheduled-job-overlap, testing-data-test-data-and-isolation, databases-selection-vector-search-engine-selection
+Routed candidate 1 via `INDEX.md` → `wiki/frontend/index.md` (owning artifact: the UI helper),
+and checked `wiki/testing/index.md` as the second domain. Whole-wiki grep: `jsdom` / `happy-dom`
+→ 0 files; `getPropertyValue|custom propert|var(--` → 1 file (anti-slop-visual-design, directive 4:
+declare tokens once and reference `var(--token)` — authoring tokens, not reading them from
+script; no overlap, no conflict). `wiki_search` top-5 for the trigger sentence:
+frontend-security-xss-safe-rendering (×2), frontend-design-anti-slop-visual-design,
+testing-e2e-e2e-stability, backend-common-change-impact-compiler-as-call-site-inventory — none
+describes the same situation. Result: **new page**
+`wiki/frontend/design/custom-property-values-read-from-script.md`, no merge target.
 
-Also read: `INDEX.md`, `wiki/infrastructure/index.md` (agent-orchestration section, rows 15–26), `AGENTS.md` lines 90–116, `templates/page.md`.
+Related links added both ways: frontend-design-anti-slop-visual-design (token declaration),
+frontend-design-html-in-canvas (canvas consumers), testing-mocking-what-to-mock (the Instead-of
+row about mocking `getComputedStyle`). `wiki/frontend/index.md` gained the design row; `log.md`
+gained the ingest entry.
 
-Search evidence (whole `wiki/`, untruncated): `grep -rniE 're-?entran|inherited (run|owner|id|env)|RUN_ID|owner id|holder id|already-owned|lock owner|lockfile|lock file|flock'` → 46 lines, all in: dependency lockfiles (supply-chain, image-builds, uv), `flock -n` for cron overlap (scheduled-job-overlap, background-services), `ReentrantLock` vs `synchronized` (java threads-and-memory), and the `LO_RUN_ID` env-leak test incident (test-data-and-isolation). None covers a spawned session inheriting a lock owner id. `grep -rliE 'cosine|embedding|near-?dup'` → 5 files, all datastore selection — no near-dup page (moot after the drop).
+For candidates 2–3, `wiki_search` on the recall trigger returned
+testing-quality-stale-artifact-baselines, databases-indexing-trigram-index-short-patterns,
+qa-process-completion-claims, testing-quality-generated-sql-property-assertions,
+databases-indexing-index-write-cost — no page on retrieval-eval scoring; the plan's own
+grounding page testing-quality-harness-reverse-controls covers harness discrimination, not
+denominators.
 
-- **Overlap / merge candidates:** `distributed-locks` (owner token, atomic release-if-mine) is the parent concept and is linked, not merged into — its trigger is multi-instance services, not a spawned child session; adding a re-entrancy section there would violate one-case-per-page. `shared-run-state` covers "a repo that may already have a run" (foreign-run detection) — the new page is the complement: the holder that is *not* foreign. `scheduled-job-overlap` documents `flock -n` — the new page's flock edge case links back. `test-data-and-isolation` holds the `LO_RUN_ID` env-inheritance incident — same mechanism, opposite direction (env leaking into tests vs. env intentionally carrying the owner id).
-- **Conflicts:** none — no existing directive tells a spawned session to mint its own id.
-- **Created new:** `wiki/infrastructure/agent-orchestration/inherited-lock-ownership-in-a-spawned-session.md` (69 body lines).
-- **Related links added both ways:** distributed-locks, scheduled-job-overlap, shared-run-state, test-data-and-isolation → new page; new page → all four.
-- **Lint:** `node scripts/wiki-lint-prohibitions.js` → `directives: 75, compliant: 75, violations: 0` (the 1 info item is pre-existing in keys-ahead-of-their-consumer). Vague-qualifier grep on the new page → none. All 4 `related:` ids resolve to exactly one `id:` line each.
+Pages read: frontend-design-anti-slop-visual-design, frontend-design-html-in-canvas, testing-mocking-what-to-mock, testing-quality-harness-reverse-controls
+
+Checks run in the checkout: `node scripts/wiki-lint-prohibitions.js` → `directives: 75,
+compliant: 75, violations: 0` (count unchanged, matches the bats pin); new page body = 77 lines;
+banned-qualifier grep on the new page → 0 hits; `bats tests/wiki-lint-prohibitions.bats
+tests/wiki-structure-checks.bats tests/wiki-lint-score.bats` → 35 ok, 0 not ok.
 
 ## Open-PR check
 
-`gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` → 17 open heads: #210 (…-171731), #209 (…-160110), #208 (…-150057), #207 (…-135945), #205 (…-100145), #191, #190, #189, #188, #187, #186, #185, #183, #182, #181, #180, #179.
+Listed 18 open `knowledge/*` heads (#179, #180, #181, #182, #183, #185, #186, #187, #188, #189,
+#190, #191, #205, #207, #208, #209, #210, #212). Fetched each and searched
+`git diff origin/main origin/<head> -- wiki/`:
 
-Every head fetched; `git diff origin/main origin/<head> -- wiki/` grepped for added lines matching `re-?entran|inherited (run|owner|id|env)|RUN_ID|owner id|holder id|already-owned|foreign holder|near-?dup|cosine|embedding`: 16 heads → 0 hits; #209 → 3 hits, all "embedding store" in `input-manifest-freshness-with-skipped-inputs` (derived-index freshness — unrelated). Page names across all heads matching `lock|env|inherit|spawn|parent|child|dedup|similar|vector|hook` were also inspected: #189's `testing-quality-proving-a-critical-section-is-lock-protected` (testing a mutex-guarded increment — unrelated) and #208's `environment-config.md` change (a `related:` link only).
-
-| Candidate | Overlapping open head | Verdict |
-|-----------|-----------------------|---------|
-| `dbedb1f0f153ea80` inherited lock owner id | none | **new** — ingested here |
-| `a0f287…`, `4b3490…`, `62e290…`, `e5b99a…`, `bf8a6e…`, `5306e2…` | none | **drop** (project-specific, see above; not pending-duplicates) |
+- `jsdom|getPropertyValue|happy-dom` → 0 matches in all 18 heads. Candidate 1: **new**.
+- `recall@|negative cases|denominator|frontmatter id|hyphenated id` → two unrelated
+  "denominator" hits (#185 benchmark-relative grade, #182 vendor benchmark claims), neither about
+  retrieval-eval scoring or id resolution. Candidates 2–3: no overlap; **drop** as
+  project-specific (not as pending duplicates).
 
 ## Routing decision
 
-| Insight | Domain / category / page | Why here |
-|---------|--------------------------|----------|
-| `dbedb1f0f153ea80` | `infrastructure/agent-orchestration/inherited-lock-ownership-in-a-spawned-session` (new page) | The trigger is a spawned agent/hook session coordinating with its parent through a single-flight lock — the `agent-orchestration` category already holds the sibling cases (`shared-run-state`, `session-completion-gates`, `worktree-isolated-workers`). `backend/common/concurrency` was rejected because its pages are about service instances contending for a resource, not a parent/child pair sharing one identity. No new category needed. `INDEX.md` infrastructure route line and `wiki/infrastructure/index.md` updated; `log.md` entry appended. |
-| 6 plan-gap rows | — (dropped) | No layer: not reusable outside `dev-loop-cockle` |
+| Candidate | Decision |
+|-----------|----------|
+| `2b99ac7bc23f307f` | **new page** → `frontend/design/custom-property-values-read-from-script` (id `frontend-design-custom-property-values-read-from-script`). Existing category `design` fits: it already owns token declaration and canvas effect layers; the artifact changed is the UI helper, so frontend owns it over testing. No new category. |
+| `27f30a2498bd57d3` | excluded — project-specific (layer test) |
+| `d6771df1f2a91b34` | excluded — project-specific (layer test) |
+
+## Local-layer candidates
+
+Both belong to the `dev-loop` project (run wiki-ingest inside that project; it has no
+`wiki-local/` yet, and the decisions are already recorded in
+`plans/t2-eval-calibration/design.md` D3/D4 and implemented in commit da64d40):
+
+- `27f30a2498bd57d3` → `wiki-local/testing/quality/eval-case-page-id-resolution.md` — resolve
+  `expected_page_id` through a map built from every page's frontmatter `id:` line; categories
+  such as `query-optimization` contain hyphens, so the id string cannot be split into a path.
+- `d6771df1f2a91b34` → `wiki-local/testing/quality/eval-recall-over-positive-cases.md` — the
+  default `eval` recall counts a case only when `expected_page_id` is truthy; negatives stay out
+  of `hits`/`total` and the output line format is unchanged.
