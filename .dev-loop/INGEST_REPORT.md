@@ -1,53 +1,95 @@
-# Knowledge flush — 3 insight(s)
+# Knowledge flush — 5 insight(s)
 
-Queue rows claimed by this run: `e025ad454c4fa162` (stale rationale after a config removal), `2d18b514c5263d8a` (tier-table obligation row vs. a pinned sibling contract), `dee63eaab5ef0e5d` (doc sentence about a third-party installer's side effect). All three ingested as new pages; 0 dropped, 0 folded onto an open PR.
+Claimed queue ids: `44e28bb8c99c1d0c`, `f2d90d5048826870`, `fb7d73874bac6eaa`,
+`5f3e5eb58ec373e4`, `6e83a02b449a8dff`. All five are plan-gap rows emitted by
+`skills/wiki-plan/scripts/emit-gaps.sh` — decisions a wiki-plan marked
+`[no-wiki]`. Result: 1 new page (4 rows merged into it), 1 row dropped.
 
 ## Verified best-practice
 
-**1. Rationale prose left behind when a pinned config value is removed** — `confidence: verified`
-- Claim: after removing/changing a pinned config value (agent frontmatter `model:`, a version pin, a flag default), grep the whole file and its quoting siblings for the old value's narration (literal, decision verb, reason words) and, per hit, delete mechanism-only rationale, rewrite a still-live trade-off as one sentence about the new behavior, rename tests titled for the old rule, keep history lines; state the sweep in the PR; route the diff through a reader that did not write it.
-- Sources checked (all live-fetched 2026-09-17): https://peps.python.org/pep-0008/#comments — "Comments that contradict the code are worse than no comments. Always make a priority of keeping the comments up-to-date when the code changes!"; https://google.github.io/eng-practices/review/reviewer/looking-for.html — Documentation section: developer "also updates associated documentation" and, on removal, "whether the documentation should also be deleted"; https://google.github.io/styleguide/docguide/best_practices.html — "Dead docs are bad. They misinform"; "Change your documentation in the same CL as the code change"; https://code.claude.com/docs/en/sub-agents — `model` frontmatter values (`sonnet`/`opus`/`haiku`/`fable`, full id, `inherit`) and the four-step precedence order when omitted.
-- Field evidence: dev-loop t3-agent-pin (issue #200): `.orchestration/reviews/t3-agent-pin-r0.md` records the pin removal from `agents/test-quality-auditor.md` + `agents/integration-reviewer.md` and the deleted "pinned rather than inherit" blockquotes; 35/35 bats green and self-review passed the contradiction, the independent test-quality-auditor call returned FAIL first.
+**Candidates `f2d90d5048826870`, `fb7d73874bac6eaa`, `5f3e5eb58ec373e4`, `6e83a02b449a8dff`
+(all t3-status, issue #195)** — the four rows are facets of one reusable lesson:
+how to change a cited knowledge/decision record that turned out wrong.
 
-**2. A table row that states an obligation another contract already fixes** — `confidence: verified`
-- Claim: before committing a tier/profile/policy row whose label names an obligation ("test audit") that a checksum-pinned sibling contract makes mandatory, grep sibling contracts for the obligation noun; name the actor in the row label and every cell; add the one clause that the other contract is unchanged; review the row against the sibling contract rather than the plan.
-- Sources checked: INCOSE Guide to Writing Requirements v4 summary sheet, rule R2 — "Use the active voice in the need or requirement statement with the responsible entity clearly identified as the subject of the sentence" (the PDF at incose.org returned 403 to WebFetch and an HTML error page to curl on 2026-09-17; the wording was confirmed via two independent restatements, both live-fetched: https://www.jamasoftware.com/legacy/requirements-management-guide/writing-requirements/incose-requirements-writing-guide/ — "'The system shall use a 20 V electrical input' names an owner, while 'A 20 V electrical input shall be used' names nobody." and https://www.altium.com/documentation/altium-365/requirements-systems-portal/valiassistant/quality-assessment — R2 verbatim); https://alistairmavin.com/ears/ — "While <optional pre-condition>, when <optional trigger>, the <system name> shall <system response>", one system name required; http://principles-wiki.net/principles:don_t_repeat_yourself — "at some point in time the different representations diverge which is a fault".
-- Field evidence: `.orchestration/reviews/t5-risk-tier-r1.md` F1 and the fixing diff in `.worktrees/t5-risk-tier/skills/orchestrate/SKILL.md` ("coordinator auditor cross-call" row + "the worker's own step 6.5 auditor call is unchanged at every tier"); lens 1 plan conformance passed because the plan carried the row.
+| Claim | Source checked | How verified |
+|-------|----------------|--------------|
+| Keep the reversed record, mark it superseded, reference the replacement | https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions | Live-fetched 2026-09-17; quote: "If a decision is reversed, we will keep the old one around, but mark it as superseded. (It's still relevant to know that it *was* the decision, but is *no longer* the decision.)" and "may be marked as 'deprecated' or 'superseded' with a reference to its replacement" |
+| Amend-in-place vs. stand-alone successor is a real, named distinction | https://www.rfc-editor.org/rfc/rfc2223.txt §12 | Raw text read with curl; *Updates* = supplement that "cannot stand on its own", *Obsoletes* = "can be used alone, without reference to the older document" |
+| Status is an optional field whose value carries the successor | https://adr.github.io/madr/ | Live-fetched; template status values `proposed / rejected / accepted / deprecated / … / superseded by ADR-0123`, marked "These are optional elements" |
+| Validity status lives apart from the document's content and can change later | https://www.rfc-editor.org/faq/ | Raw page read with curl; "the status of an RFC can change", published on the info page and a status-changes list |
 
-**3. A sentence in your docs stating what a third-party tool does** — `confidence: verified`
-- Claim: locate the tool's source as installed where the reader runs it (pipx/pip/npm/brew lookup table), grep it for the named object, attribute each effect to the component that produces it, record version + check, and treat issue/plan-sourced claims as unverified input; link instead of restating where the tool documents the effect.
-- Sources checked (live-fetched): https://diataxis.fr/reference/ — "accuracy, precision, completeness and clarity"; "The only purpose of a reference guide is to describe, as succinctly as possible, and in an orderly way"; "neutral description"; https://google.github.io/styleguide/docguide/best_practices.html — "Link to it instead."; Google reviewer guide as above.
-- Reproduction 2026-09-17: graphifyy 0.4.23 (pipx venv, `site-packages/graphify/hooks.py`, 220 lines): `grep -nE 'exclude|gitignore|graphify-out' hooks.py` → only lines 91–92 (`if [ ! -d "graphify-out" ]` existence guard); hooks installed are `post-commit` and `post-checkout`; no `.git/info/exclude` or `.gitignore` handling. dev-loop's own `scripts/graph-hooks.sh` (line 20 comment + line 128 `git rev-parse --git-path info/exclude`) is the component that writes the exclude entry.
-- Field evidence: `.orchestration/reviews/t7-graph-setup-r1.md` F1 and the fixed sentence at `.worktrees/t7-graph-setup/skills/graph-setup/SKILL.md:80`.
+Correction made during verification: the candidates' evidence cited a Stack
+Overflow answer for the Obsoletes/Updates semantics, and a first fetch of
+RFC 7322 §4.1.4 returned a summary that *added* definitions the RFC does not
+contain. Reading the raw RFC 7322 text showed §4.1.4 only gives the header
+format; the definitions are in RFC 2223 §12, which is what the page cites.
+The candidates' secondary sources (ctaverna.github.io, docsio.co, the
+runenwerk issue) were not needed and are not cited.
+
+Directive 7 of the page (log the transition under the existing `revise`-class
+verb) has no external source; it is stated conditionally ("when nothing parses
+the verb set mechanically") and rests on the field context of issue #195.
+Confidence: **verified** (directives 1–6 are backed by the primary sources above).
+
+**Candidate `44e28bb8c99c1d0c` (t1-reviewer, README agents-tree line)** — not a
+best-practice claim. It is a one-repo scope ruling ("add one README line, leave
+README.ko.md and the sibling reviewer lines alone"). No transferable trigger or
+directive; nothing to verify. **Dropped.**
 
 ## Existing-layer check
 
-Routed via `INDEX.md` → qa (release-quality process, document deliverables and their verification); read `wiki/qa/index.md` in full, plus `wiki/testing/index.md` (candidate 1 was tagged `testing`) and `wiki/backend/index.md` (agent-facing artifacts) and the `agent-orchestration` section of `wiki/infrastructure/index.md` to rule those domains out.
+Routed via `INDEX.md` → qa (document deliverables / document-verification), and
+cross-checked infrastructure (agent-orchestration, where the gap-queue page
+lives) and backend (api-versioning, the nearest "deprecation" page).
 
-Pages read: qa-document-verification-retiring-a-provisional-marker, qa-document-verification-editing-a-gated-document, qa-document-verification-spec-document-gates, qa-deliverables-exclusivity-and-absence-claims, qa-deliverables-quantitative-claims-in-a-published-document, qa-process-defect-class-resweep-after-review, backend-common-llm-binding-instructions-for-agents, backend-common-integrations-externally-owned-defaults, platforms-toolchains-flag-availability-at-the-execution-site
+Pages read: qa-document-verification-retiring-a-provisional-marker, infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal, qa-document-verification-spec-document-gates, backend-common-api-design-api-versioning-and-breaking-changes
 
-Overlaps and decisions:
-- Candidate 1 vs `retiring-a-provisional-marker` (a checklist row stays `[x]` on evidence you just deleted): same mechanism (one file, two independently edited axes) but a different trigger (provisional markers in an ADR/RFC vs. a config value with narrating prose). Created new; cross-linked both ways and reused its history-line rule in the decision table. vs `editing-a-gated-document`: it owns machine anchors; new page points to it for the gate-in-same-commit edge and for scoping the sweep count. vs `defect-class-resweep-after-review`: reused for the copied-siblings edge. No conflict with any existing directive.
-- Candidate 2 vs `exclusivity-and-absence-claims` (write the generating rule, not the enumeration): adjacent — cited for the "cite the contract instead of restating its condition" row. vs `spec-document-gates` cross-reference axis: that page gates a document against itself; the new page is the authoring rule for the row. vs `binding-instructions-for-agents` edge "two instruction sources conflict → state the precedence inside the artifact": the new page is the specific case where the two sources bind different actors under one obligation noun; linked both ways rather than merged (different trigger, and the lesson is not agent-specific). No conflict.
-- Candidate 3 vs `exclusivity-and-absence-claims` edge "claim about an external system you do not control → state the version and the check": that row covers absence claims; the new page covers positive side-effect claims and how to locate the installed source. vs `externally-owned-defaults` (re-query the owner's catalog at review): same principle for a named resource; linked. vs `flag-availability-at-the-execution-site` (resolve a flag against the version present): same lens, different artifact (a doc sentence vs. a CLI flag); linked both ways. vs `quantitative-claims-in-a-published-document`: adjacent (claims in docs); linked. No conflict.
-
-Merged vs created: 3 new pages, 0 merges. Amended pages carry only reverse `related:` links (9 pages, 11 link additions). `wiki/qa/index.md` +3 rows; `INDEX.md` qa route line extended; `log.md` entry appended.
-
-Lint on the checkout: `node scripts/wiki-lint-prohibitions.js` → directives 75 / compliant 75 / violations 0; `node scripts/wiki-structure-checks.js .` → no findings under `wiki/` (only the pre-existing `tests/fixtures/**` orphan noise); `node scripts/wiki-lint-model-era.js .` → the 6 pre-existing revalidate candidates, none of the new pages; new page body lines 72 / 70 / 73 (≤120); no vague qualifiers in directive sentences.
+- `grep -rli "supersed|ADR|architecture decision" wiki/` → 4 hits, none about
+  the lifecycle of a record: retiring-a-provisional-marker covers removing
+  `[추정]`/TBD markers inside one document; escape-hatch-uses covers emitting
+  gap rows; the other two only mention the word.
+- `grep '^status:'` over the wiki → 0 pages; AGENTS.md has no lifecycle field
+  (issue #195 is what introduces it). No existing directive conflicts.
+- Result: **new page** `wiki/qa/document-verification/superseding-a-knowledge-record.md`
+  (72 body lines). The four t3-status rows were merged into it rather than
+  ingested as four pages: supersede-vs-overwrite (D8) → Do-this 1–3, status vs.
+  confidence (D9) → Do-this 5, absent-means-active template line (D14) →
+  Do-this 6, `revise` verb (D7) → Do-this 7.
+- Related links added both ways: retiring-a-provisional-marker,
+  spec-document-gates, escape-hatch-uses-as-a-knowledge-gap-signal.
+- `wiki/qa/index.md` document-verification table +1 row; `log.md` +1 ingest entry.
+- Checks after the edit: `node scripts/wiki-structure-checks.js wiki` →
+  279 pages / 13 indexes / 0 findings; `node scripts/wiki-lint-prohibitions.js wiki`
+  → directives 75, violations 0 (bats pin unchanged at 75);
+  wiki-structure-checks / wiki-lint-prohibitions / wiki-lint-model-era bats → 0 failures.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed via `gh pr list --search "head:knowledge/"`: #191 (20260914-213301), #190 (20260914-180008), #189 (20260910-162026), #188 (20260908-154412), #187 (20260906-213635), #186 (20260906-013856), #185 (20260906-003745), #183 (20260904-133717), #182 (20260903-214027), #181 (20260903-203836), #180 (20260903-184706), #179 (20260903-172728). Each head was fetched and `git diff --name-status origin/main origin/<head> -- wiki/` inspected; pages with plausibly overlapping triggers were read from the head.
+Open `knowledge/*` heads listed 2026-09-17: #205, #191, #190, #189, #188, #187,
+#186, #185, #183, #182, #181, #180, #179. Each head was fetched and
+`git diff origin/main origin/<head> -- wiki/` grepped for
+`supersed|superseded_by|status: retired|decision record|obsoletes` → 0 added
+lines on every head. Nearest neighbour: #186's
+`model-coupled-guidance-aging-detector` — it detects pages that may have aged;
+it says nothing about what to do with a refuted record, so no overlap.
 
-- Candidate 1 (stale rationale after a config removal) — #191 amends `usage-limit-paused-workers` with the subagent `model` frontmatter under a 429 (different trigger: a rate limit, not an edit); #188 `session-identity-leak-in-plugin-prose` (a personal name in redistributed prose, not a contradiction with config); #186 `model-coupled-guidance-aging-detector` (a lint for model-era aging). No head carries this trigger → **new**.
-- Candidate 2 (obligation row vs. pinned sibling contract) — #189 `worker-reported-plan-contradiction` (resolving a doc/doc fact dispute at implement time by running the suite; adjacent, not the authoring rule); #181 `checkable-claims-in-an-adopted-plan` (recompute a plan's numbers / dependency table vs. Steps prose); #180 `forward-references-in-a-numbered-protocol` (graft ordering). None names the actor-in-the-row rule or the unchanged-clause → **new**.
-- Candidate 3 (doc sentence about a third-party tool's side effect) — #188 `sweeping-pre-gate-citations-for-fabrication` (wiki citation sweeps) and `real-cli-spot-check-for-new-execution-paths` (test paths, not docs); #182 `vendor-benchmark-claims-for-an-llm-tool` (vendor benchmark numbers); #181 `checkable-claims-in-an-adopted-plan` (plan numbers/symbols). None covers locating the installed tool's source for a documented side effect → **new**.
+| Candidate | Verdict |
+|-----------|---------|
+| `f2d90d5048826870` (log verb for supersede/retire) | new |
+| `fb7d73874bac6eaa` (ingest third case: page wrong as a whole) | new |
+| `5f3e5eb58ec373e4` (status vs. confidence) | new |
+| `6e83a02b449a8dff` (template optional status lines) | new |
+| `44e28bb8c99c1d0c` (README agents-tree line) | drop — not generalizable (not a pending duplicate) |
 
-No fold, no pending-duplicate drop; no sibling PR was modified.
+Note for the reviewer: issue #195 (t3-status) will itself add `status` /
+`superseded_by` to AGENTS.md. This page is the general practice behind that
+schema, written so it stays correct whether or not #195 has landed.
 
 ## Routing decision
 
-- Candidate 1 → `qa/document-verification/rationale-prose-after-a-config-value-change.md` (`qa-document-verification-rationale-prose-after-a-config-value-change`). Not `testing` (the queue's domain hint): the lesson is about the edited artifact's prose, not about test code; the auditor that caught it is recorded as field context. Not `backend/common/llm`: the rule applies to any config+prose file (Dockerfile comments, CI yaml), not only agent artifacts. Existing category fits (document self-consistency pages already live here).
-- Candidate 2 → `qa/deliverables/obligation-row-without-a-named-actor.md` (`qa-deliverables-obligation-row-without-a-named-actor`). The artifact is a spec/policy table being authored; `deliverables` already holds the claim-form pages (exclusivity/absence, quantitative claims). Not `infrastructure/agent-orchestration`: the field case is an orchestration skill, but the rule (actor as subject, unchanged-clause) is generic requirements-writing.
-- Candidate 3 → `qa/deliverables/documented-behavior-of-a-third-party-tool.md` (`qa-deliverables-documented-behavior-of-a-third-party-tool`). Same category as the other claim-form pages; not `platforms/toolchains` because the artifact under review is the document, with the toolchain page linked for the version-at-execution-site lens.
-- No new category; `INDEX.md` qa route line extended with the three triggers.
+- 4 t3-status rows → `qa / document-verification /
+  superseding-a-knowledge-record` (new page, existing category). The category
+  already owns ADR/RFC/spec document lifecycle pages
+  (retiring-a-provisional-marker, editing-a-gated-document), so no new
+  category was needed.
+- 1 t1-reviewer row → no page (dropped).

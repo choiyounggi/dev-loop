@@ -8,7 +8,7 @@ sources:
   - https://docs.github.com/en/code-security/code-scanning/managing-code-scanning-alerts/resolving-code-scanning-alerts
   - https://github.blog/changelog/2025-07-01-delegated-alert-dismissal-for-code-scanning-is-now-generally-available/
 last_verified: 2026-09-16
-related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-autonomous-decision-rulings, qa-document-verification-spec-document-gates, backend-common-llm-binding-instructions-for-agents]
+related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-autonomous-decision-rulings, qa-document-verification-spec-document-gates, backend-common-llm-binding-instructions-for-agents, qa-document-verification-superseding-a-knowledge-record]
 ---
 
 # Recording Every Use of a Grounding Gate's Escape Hatch
