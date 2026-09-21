@@ -11,7 +11,7 @@ sources:
   - https://code.claude.com/docs/en/env-vars
   - https://docs.vllm.ai/en/stable/serving/integrations/claude_code/
 last_verified: 2026-08-01
-related: [backend-common-reliability-timeouts-and-retries, backend-common-api-design-error-responses, backend-common-llm-progressive-disclosure-artifacts]
+related: [backend-common-reliability-timeouts-and-retries, backend-common-api-design-error-responses, backend-common-llm-progressive-disclosure-artifacts, backend-common-llm-vendor-benchmark-claims-for-an-llm-tool]
 ---
 
 # Sizing an LLM Client's Output Cap to the Model Actually Serving It

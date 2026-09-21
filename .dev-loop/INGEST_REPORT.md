@@ -1,84 +1,69 @@
 # Knowledge flush — 12 insight(s)
 
-Run `20260903-203800-24176` (auto-flush parent lock reused), branch `knowledge/choiyounggi-20260903-203836`, base `origin/main` @ 484dd9d. Claimed 12 queue rows (`queue-claim.js claim --max 12`): 10 ingested on this branch (6 new pages, 4 merges), 2 folded into open PRs. Lint on the checkout: `wiki-structure-checks.js wiki` → 0 findings; `wiki-lint-prohibitions.js` → 0 violations; every touched page ≤ 120 body lines.
+Flush run `20260903-213946-4161` (headless auto-flush, lock re-entered under the parent hook's run id). Queue rows are keyed by `hash`. Outcome: 4 new pages, 3 merges into existing pages, 4 folds pushed to open knowledge PRs, 1 dropped as a pending duplicate.
 
 ## Verified best-practice
 
-| # | Queue hash | Claim | Sources checked | How verified | Confidence |
-|---|-----------|-------|-----------------|--------------|------------|
-| 1 | e76b481f | "Drag and drop" copy on a styled dropzone is honest only when `dragover`+`drop` handlers with `preventDefault()` exist; an unhandled drop makes the browser open the file | https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/File_drag_and_drop | Quoted MDN: "the browser may process them by default (such as opening or downloading the file) even when the file is not dropped into a valid drop target"; drop fires only when dragover is cancelled | verified |
-| 2 | e1c0754b | Per-shape `destination-in` chains intersections; draw mask shapes `source-over` on an offscreen canvas and apply once | https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation | MDN definition: content kept "where both the new shape and existing canvas content overlap. Everything else is made transparent" — repeated application is an intersection chain | verified |
-| 3 | f9c05d73 (two identical queue rows) | A media query that overrides `position` must also reset the inset properties; an SDK inline `position:relative` beats the author `static` and reactivates a dormant `top` | https://developer.mozilla.org/en-US/docs/Web/CSS/position ; https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_cascade/Specificity | MDN: `static` → "top, right, bottom, left, and z-index properties have no effect"; inline styles "always overwrite any normal styles in author stylesheets"; production repro 217px→22px | verified |
-| 4 | 1ba282d0 | Clamp persisted position/scale to domain bounds on the server; shape validation alone lets `x=-9999`/`scale=0.01` through | https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html ; https://zod.dev/api | OWASP syntactic vs semantic validation + range checks; zod `.min()/.max()` reject only, no clamp | verified |
-| 5 | 3080d06a | Save-and-restore (or `patch.dict`/`monkeypatch`) instead of `pop` in tearDown; local green with a fallback path is not proof of no pollution | https://docs.python.org/3/library/unittest.mock.html ; https://docs.pytest.org/en/stable/how-to/monkeypatch.html | `patch.dict` "restore the dictionary to its original state after the test"; monkeypatch "All modifications will be undone" | verified (mechanism) / field-tested (fallback masking, 122 failures) |
-| 6 | a85300017 | A fixed-pool generator forces repeats ≥ N − k by pigeonhole; ask whether the number would move with X absent, publish pool parameters | https://en.wikipedia.org/wiki/Pigeonhole_principle ; https://en.wikipedia.org/wiki/Scientific_control (general references) | In-memory python3 reproduction: k=10, N=30 → repeats 21 ≥ 20; N=50 → 40 = floor; matches the reported values exactly | verified (reproducible computation) |
-| 7 | d9e98911 | Recompute a plan's derived numbers from its own inputs, check the symbol contract and deliverable reachability (`git check-ignore -v`), escalate discrepancies | https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html ; https://git-scm.com/docs/git-check-ignore | WCAG luminance/contrast formulas quoted; `check-ignore -v` semantics quoted; four in-session defects confirmed by the plan owner | verified (method) / field-tested (defects) |
-| 8 | 142c89b3 | Run a mass-failing gate against already-merged, shipped code; uniform failure there proves the gate is the defect | Own reproducible check: `test-floor.sh` vs linkly 305f8e2 (PR #81) → exit 3 | Folded into PR #180's page (see Open-PR check) | verified |
-| 9 | c5d4ba2e | Multi-name `command -v a b c` is OR in bash/macOS sh (exit 0 if any resolves), exit 1 in zsh; loop per name | https://pubs.opengroup.org/onlinepubs/9699919799/utilities/command.html ; `bash -c 'help command'` | Reproduced this session: bash 5.3 / `/bin/sh` rc 0, zsh 5.9 rc 1 for `command -v ls definitely_missing_xyz`; POSIX synopsis has one `command_name` | verified |
-| 10 | e8b72499 | Key alert suppression on the rendered message text, re-send daily, suppress the notification not the retry | https://prometheus.io/docs/alerting/latest/configuration/ ; https://sre.google/sre-book/monitoring-distributed-systems/ ; https://developer.pagerduty.com/docs/events-api-v2/trigger-events/index.html | Sources establish stable-key + re-send window and caller-chosen dedup strings; none prescribes text keying itself, so the page stays field-tested (151→1 send in production) | field-tested |
-| 11 | 3e979f78 | Attribute a dirty main checkout to a live worker by mtime, stop it first, transfer by patch, verify, then discard | https://git-scm.com/docs/git-worktree ; https://git-scm.com/docs/git-apply | Folded into PR #179's page (see Open-PR check); git mechanics verified, mtime heuristic field-tested | verified / field-tested |
-| 12 | 68257e11 | Widening one check on a node: enumerate the other static checks on the same node/verb; admit the new case at one call site | No external source found (compiler texts describe multi-pass semantic checks without naming this practice) | linkly `_check_aggregate` widened while `_Scope._dimension_of` still rejected; scoped `allow_money` fix with the original regression test unchanged | field-tested |
+Every external quote below was re-checked against the raw page with `curl -sL … | grep` on 2026-09-03 (not only through a summarizing fetch), except where noted.
 
-No URL was invented; every source above was opened and quoted.
+1. **520214f2e52d14c4 — sequential artifact numbers across parallel workers** → `confidence: verified`. Claim: the coordinator assigns RFC/ADR/migration numbers at dispatch; a worker's branch point cannot see a sibling's unmerged number and distinct filenames merge without conflict, so the uniqueness lint runs on the merged tree. Sources: Django migrations topic ("two migrations with the same number"), Django `makemigrations --merge` ("Enables fixing of migration conflicts"), Rails 3.2 migrations guide (creation-time timestamps to avoid clashes), git-merge ("incorporated in the final result verbatim"), adr-tools issue #102 (two devs both denote ADR 6). Field evidence: linkly t112/t119 both created RFC-0034.
+2. **3fb0fd84e5ec5aa4 — inbound validation ownership when a plan splits a process boundary across tasks** → `confidence: verified`. Source: OWASP Input Validation Cheat Sheet ("as early as possible in the data flow, preferably as soon as the data is received from the external party"). Field evidence: agent-crew M2 `handle_envelope` missing `validate()` caught only by integration review.
+3. **e5bc5ce7cb8508b4 — vendor benchmark claims for a memory/RAG tool** → `confidence: verified`. Sources: LoCoMo paper (arXiv 2402.17753), Zheng et al. LLM-as-a-judge (arXiv 2306.05685, "over 80% agreement"), Zep blog disputing Mem0's LoCoMo SOTA claim, Mem0's counter-reply (getzep/zep-papers#5, "58.44%"), OpenViking `stat_judge_result.py` (QA and Import token usage counted separately) and `judge.py` ("be generous with your grading"). The candidate's `judge.py:239` line reference no longer matches the 203-line file; the leniency instruction itself is confirmed and the page says so.
+4. **b5e0cd6b60242fb6 — element crop screenshots (`clip` from `boundingBox()`)** → `confidence: field-tested`. Playwright semantics verified (element screenshot via `locator.screenshot()`, `clip` option, `boundingBox()` is viewport-relative and scroll-dependent); the Aside CLI clip misbehaviour itself is single-session field evidence, not reproduced here (no browser run). Directive generalised to: element-screenshot primitive first, read back the first crop before a batch, fall back to full-page capture on a persistent wrong-region clip.
+5. **a019efb64f7bf316 — WebFetch summary vs raw page** → `confidence: verified`. Source: Claude Code tools reference ("runs the prompt against the content using a small, fast model. For most fetches, Claude receives that model's answer, not the raw page"; "use curl via Bash for the unprocessed page"). Field evidence re-confirmed: the tmap-skopenapi `routeSequential30` page contains the exact string "경유지는 최대 30개까지 설정할 수 있습니다." in the raw response.
+6. **c2665906bb4df3a9 — Steps-prose resilience guarantee needs its own test** → `confidence: verified` (merged into an already-verified page). Source: SWE book ch12 ("A behavior is any guarantee that a system makes…"). Field evidence: wt-t4-event-push task 03 auditor FAIL→PASS after one added test.
+7. **ee33bdf217330afe — split a CI fact-checker's "fabricated" verdict** → `confidence: verified` for the evidence (dev-loop PR #164 is public and merged; commit `f5d2395` message confirmed via `gh api`), directive itself field-tested; merged into a `field-tested` page.
+8. **e040b9a62688a56e — Depends-on table vs Steps prose** → fold (see Open-PR check); field evidence only, no new external source claimed.
+9. **a3560e8f5bd8f249 — brief workers to write measured counts** → fold; field evidence only (linkly t119 vs t112/t115/t117).
+10. **0fa9c12c34ec038c — doc-currency gates inside the doc task** → fold; field evidence only (linkly enf0829, 10 integration failures).
+11. **4977fec4fae1c1db — route worker edits through Bash when the guard is Bash-only** → fold; field evidence only. The claim that Edit/Write ignore cwd could not be confirmed in the Claude Code docs (only the Read tool section says "always pass absolute paths"), so the inserted row relies on the page's existing verified evidence that Edit/Write bypass a Bash-matched hook and does not state the cwd claim.
+12. **a2023caa7c6da204 — multi-name `command -v`** → dropped, pending duplicate: PR #181's `path-resolution.md` already carries this exact edge case, instead-of row, POSIX synopsis source and the same local reproduction.
 
 ## Existing-layer check
 
-Pages read: backend-common-change-impact-widening-a-closed-value-table, backend-common-change-impact-call-site-enumeration, backend-common-errors-diagnostics-from-a-shared-code-path, backend-common-errors-exception-handling, security-input-validation-at-trust-boundaries, frontend-forms-validation-timing, frontend-accessibility-interactive-elements, frontend-design-html-in-canvas, frontend-design-responsive-layout, frontend-rendering-long-lists, frontend-rendering-rerender-and-memoization, testing-data-test-data-and-isolation, testing-flaky-diagnosing-flaky-tests, testing-quality-harness-reverse-controls, qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-observability-alerting, infrastructure-observability-suppression-state-and-delivery-failure, platforms-shells-portable-shell-scripts, platforms-environment-path-resolution
+Pages read: platforms-environment-path-resolution, security-input-validation-at-trust-boundaries, qa-document-verification-spec-document-gates, qa-deliverables-quantitative-claims-in-a-published-document, infrastructure-agent-orchestration-worktree-isolated-workers, qa-process-completion-claims, platforms-tools-harness-mediated-tool-results, testing-quality-minimum-case-set, qa-process-evaluating-review-feedback, qa-process-llm-review-pipelines, qa-document-verification-generated-reference-drift-gates, backend-common-llm-context-window-budget, qa-process-adversarial-change-review, qa-bug-reports-reproducible-reports, qa-environments-browser-console-capture-gaps
 
-Also read: `INDEX.md`, `AGENTS.md`, `templates/page.md`, and the domain indexes for backend, backend/python, frontend, security, infrastructure, platforms, testing, qa, debugging.
+Also read on open-PR heads (not on this checkout): checkable-claims-in-an-adopted-plan, sibling-validators-on-a-shared-node (#181); semantic-conflicts-after-parallel-merge, verify-command-in-a-worker-brief (#179); ours-resolution-on-a-mixed-content-conflict, forward-references-in-a-numbered-protocol (#180).
 
-| # | Overlap found | Action | Related links |
-|---|---------------|--------|---------------|
-| 1 | None — forms/accessibility pages never mention drop targets | New page `frontend/forms/dropzone-copy-without-drop-handlers` | ↔ interactive-elements, validation-timing |
-| 2 | None — html-in-canvas is a different technique; rendering/ is React perf | New page `frontend/design/multi-shape-canvas-mask` (design owns canvas mechanics) | ↔ html-in-canvas |
-| 3 | responsive-layout has no `position`/inset guidance; same trigger family | Merged: edge-case row, Instead-of row, 2 sources, field repro; index load-when extended | — |
-| 4 | validation-at-trust-boundaries already says "range" generically | Merged: edge-case row (domain-rule range, clamp vs reject at the write), Instead-of row, OWASP quote + zod source; index load-when extended | — |
-| 5 | test-data-and-isolation has the generic "restore in teardown" row | Merged: Do-row (assignment vs `patch.dict`/monkeypatch), edge case (fallback-masked green), Instead-of (`pop`), 2 doc sources + incident. Rows placed mid-table to stay clear of PR #179's appended hunks | — |
-| 6 | harness-reverse-controls covers verification harnesses; quantitative-claims covers repo counts — different artifact (a measurement generator) | New page `testing/quality/synthetic-corpus-measurement-floor` | ↔ harness-reverse-controls, quantitative-claims; → stale-artifact-baselines |
-| 7 | spec-document-gates has the recompute axis for authored gates; autonomous-decision-rulings / unattended-worker-questions give the escalation channel but not the pre-build verification | New page `infrastructure/agent-orchestration/checkable-claims-in-an-adopted-plan` | ↔ quantitative-claims, spec-document-gates (back-links added there only; the two orchestration pages' `related:` lines are edited by open PRs, so links there are one-directional) |
-| 8 | Same incident as PR #180's `assertion-scanner-false-positive-on-unittest-convention`; harness-reverse-controls covers synthetic controls | Fold (PR #180) | ↔ harness-reverse-controls added on that branch |
-| 9 | portable-shell-scripts is the shell-semantics home but PR #180 adds ~14 lines to it (would exceed 120 combined); path-resolution owns "how a script locates its correctness-critical tools" and has room | Merged into path-resolution: edge-case row, Instead-of row, 3 sources | — (its `related:` and index line are touched by PR #179) |
-| 10 | alerting = what pages; suppression-state = where the mark is written; exception-handling = in-process log-once. None chooses the key | New page `infrastructure/observability/suppression-key-for-a-recurring-failure` | ↔ alerting, suppression-state |
-| 11 | PR #179 already adds the detection + patch-transfer recovery row to worktree-isolated-workers | Fold (PR #179) | — |
-| 12 | widening-a-closed-value-table's mechanism is inlined table copies; its Do-steps (value grep) cannot find a second validator function | New page `backend/common/change-impact/sibling-validators-on-a-shared-node` | ↔ call-site-enumeration, diagnostics-from-a-shared-code-path; → widening (one-directional: its `related:` is edited by PR #179) |
-
-Conflicts flagged: none — no merged row contradicts an existing directive. Conflict-avoidance with open PRs: rows and sources were inserted mid-table/mid-list in files those PRs also touch (test-data-and-isolation, path-resolution, testing/infrastructure indexes), and `last_verified` bumps use the same date PR #179 writes.
+- **Merged (3):** WebFetch-summary case → `harness-mediated-tool-results` (new when-this-applies sentence, edge-case row, instead-of row, source, field context; index cell widened). Steps-prose guarantee → `minimum-case-set` (edge-case row, instead-of row, SWE-book quote + field evidence; index cell widened). Split verdict → `evaluating-review-feedback` (edge-case row, instead-of row, PR #164 source; index cell widened). None of these three pages is touched by an open knowledge PR.
+- **Created (4):** `infrastructure/agent-orchestration/sequential-identifiers-across-parallel-workers`, `infrastructure/agent-orchestration/inbound-validation-ownership-in-task-decomposition`, `backend/common/llm/vendor-benchmark-claims-for-an-llm-tool`, `qa/environments/element-crop-screenshots`. Each has an index row and a log line.
+- **Conflicts flagged:** none. The inbound-validation page agrees with `security-input-validation-at-trust-boundaries` ("validate at the consumer boundary anyway") and adds the task-decomposition angle.
+- **Related links:** new pages link to existing ones; back-links added on `qa-process-adversarial-change-review`, `backend-common-llm-context-window-budget`, `qa-process-llm-review-pipelines`, `qa-environments-browser-console-capture-gaps`, `qa-bug-reports-reproducible-reports`. Back-links deliberately NOT added on `worktree-isolated-workers`, `shared-run-state`, `spec-document-gates`, `validation-at-trust-boundaries`, `quantitative-claims-in-a-published-document`, `completion-claims`: their `related:`/frontmatter lines are rewritten by PR #179/#180/#181 and a second edit would conflict at merge. Owner may add them after those PRs land.
+- Lint on this branch: `wiki-structure-checks` 279 pages / 0 findings, `wiki-lint-prohibitions` 0 violations, all touched pages ≤ 120 body lines.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`:
+Open `knowledge/*` heads listed via `gh pr list --search "head:knowledge/"`: #179 `knowledge/choiyounggi-20260903-172728`, #180 `knowledge/choiyounggi-20260903-184706`, #181 `knowledge/choiyounggi-20260903-203836`. Each was fetched and diffed against `origin/main -- wiki/`.
 
-- #180 `knowledge/choiyounggi-20260903-184706` — fetched; `git diff origin/main origin/<head> -- wiki/` read in full (21 files).
-- #179 `knowledge/choiyounggi-20260903-172728` — fetched; diff read in full (36 files).
+| Candidate | Overlapping open head | Verdict |
+|-----------|-----------------------|---------|
+| a2023caa7c6da204 multi-name `command -v` | #181 `path-resolution.md` (identical edge case + reproduction) | **drop** (pending duplicate) |
+| e040b9a62688a56e Depends-on table vs Steps prose | #181 `checkable-claims-in-an-adopted-plan.md` (same trigger: checking an adopted plan) | **fold** → pushed as `4bc6de8` on #181 + PR comment |
+| a3560e8f5bd8f249 workers write measured counts | #180 `ours-resolution-on-a-mixed-content-conflict.md` (merge-time count reconciliation) | **fold** → pushed as `3b78273` on #180 + PR comment |
+| 0fa9c12c34ec038c doc-currency gates in the doc task | #179 `verify-command-in-a-worker-brief.md` (what the brief's verify line names) | **fold** → pushed as `e242b2c` on #179 + PR comment |
+| 4977fec4fae1c1db Bash-routed edits under a Bash-only guard | #179 `worktree-isolated-workers.md` (Edit/Write bypass + matcher widening) | **fold** → same commit `e242b2c` on #179 |
+| 520214f2e52d14c4 sequential numbers | #179 `semantic-conflicts-after-parallel-merge.md` (enum/match semantic conflicts), #180 `ours-resolution` (count conflicts) — adjacent, different trigger (distinct new files, no conflict at all) | **new** |
+| 3fb0fd84e5ec5aa4 inbound validation ownership | #181 `validation-at-trust-boundaries.md` edit (spatial-value clamping) — different trigger | **new** (separate page; no edit to the security page to avoid conflicting with #181) |
+| e5bc5ce7cb8508b4 vendor benchmark claims | #181 `synthetic-corpus-measurement-floor.md` (measuring on your own corpus) — different trigger | **new** |
+| b5e0cd6b60242fb6 element crop screenshots | none | **new** |
+| a019efb64f7bf316 WebFetch summary | #181 touched `quantitative-claims-in-a-published-document.md` related line only | **new** (merged into `harness-mediated-tool-results`, untouched by open PRs) |
+| c2665906bb4df3a9 Steps-prose guarantee | none (`minimum-case-set.md` untouched) | **new** (merge) |
+| ee33bdf217330afe split verdict | #179 touched `completion-claims.md`, not `evaluating-review-feedback.md` | **new** (merge) |
 
-| # | Overlapping head | Verdict | Detail |
-|---|------------------|---------|--------|
-| 8 (142c89b3) | #180 `testing/quality/assertion-scanner-false-positive-on-unittest-convention.md` | **fold** | Pushed 75b0354 to that branch: Do-step 4 (run the checker against a shipped commit), Instead-of row, related link, field reproduction (305f8e2). PR comment posted. |
-| 11 (3e979f78) | #179 `infrastructure/agent-orchestration/worktree-isolated-workers.md` (escalation → patch-transfer row) | **fold** | Pushed 84eefc9 to that branch: stop-worker-first + mtime attribution appended to the recovery row, new edge-case row for the post-merge symptom, linkly t112 evidence. PR comment posted. |
-| 9 (c5d4ba2e) | #180 touches `portable-shell-scripts.md` (jq membership, zsh word-split) — different content | **new** (routed to path-resolution to keep the merged page under 120 lines) | |
-| 5 (3080d06a) | #179 touches `test-data-and-isolation.md` (bats cwd row) — different content | **new** (merged mid-table) | |
-| 12 (68257e11) | #179 touches `widening-a-closed-value-table.md` `related:` only | **new** | |
-| 1, 2, 3, 4, 6, 7, 10 | no open head touches these pages or topics | **new** | |
-
-No sibling duplicate PR was opened; both folds live on the existing PR branches.
+Lint (`wiki-structure-checks`, `wiki-lint-prohibitions`) was run on each fold branch after the edit: 0 findings, 0 violations; fold pages remain ≤ 120 body lines (83/55/73/93 for #181/#180/#179 verify/#179 worktree).
 
 ## Routing decision
 
-| # | Target | Page | New category? |
-|---|--------|------|---------------|
-| 1 | frontend / forms | `dropzone-copy-without-drop-handlers` (new) | no |
-| 2 | frontend / design | `multi-shape-canvas-mask` (new; `rendering/` is React re-render/list perf, `design/` already holds html-in-canvas) | no |
-| 3 | frontend / design | `responsive-layout` (merge) | no |
-| 4 | security / input | `validation-at-trust-boundaries` (merge) | no |
-| 5 | testing / data | `test-data-and-isolation` (merge) | no |
-| 6 | testing / quality | `synthetic-corpus-measurement-floor` (new) | no |
-| 7 | infrastructure / agent-orchestration | `checkable-claims-in-an-adopted-plan` (new; the adopter is a worker in an orchestrated run, the recompute technique is linked from qa/document-verification rather than duplicated) | no |
-| 8 | testing / quality | fold into PR #180 page | no |
-| 9 | platforms / environment | `path-resolution` (merge) | no |
-| 10 | infrastructure / observability | `suppression-key-for-a-recurring-failure` (new) | no |
-| 11 | infrastructure / agent-orchestration | fold into PR #179 page | no |
-| 12 | backend / common / change-impact | `sibling-validators-on-a-shared-node` (new) | no |
+| Insight | Target |
+|---------|--------|
+| 520214f2 sequential numbers | `infrastructure/agent-orchestration/sequential-identifiers-across-parallel-workers` — NEW page; agent-orchestration already owns worker briefs and shared run state |
+| 3fb0fd84 inbound validation ownership | `infrastructure/agent-orchestration/inbound-validation-ownership-in-task-decomposition` — NEW page; the lesson is about which task's brief carries the decision, so orchestration rather than security (linked to the security page) |
+| e5bc5ce7 vendor benchmark claims | `backend/common/llm/vendor-benchmark-claims-for-an-llm-tool` — NEW page; backend/common/llm owns consuming LLM tooling; no new category needed |
+| b5e0cd6b element crop screenshots | `qa/environments/element-crop-screenshots` — NEW page; qa/environments already holds browser-tooling gaps (console capture, bot blocking) |
+| a019efb6 WebFetch summary | merged into `platforms/tools/harness-mediated-tool-results` — same class (a tool result mediated before the agent sees it) |
+| c2665906 Steps-prose guarantee | merged into `testing/quality/minimum-case-set` — it is a "which cases are required" rule |
+| ee33bdf2 split verdict | merged into `qa/process/evaluating-review-feedback` — it is a response-to-review-finding rule |
+| e040b9a6 / a3560e8f / 0fa9c12c / 4977fec4 | folded into PR #181 / #180 / #179 / #179 pages respectively (see Open-PR check) |
+| a2023caa multi-name `command -v` | dropped — already on #181 `platforms/environment/path-resolution` |
 
-Every existing category covered its candidate; no new category was needed. Indexes updated: frontend, security, testing, infrastructure, backend. `log.md` has the ingest entry.
-
-Queue retirement: all 12 claimed rows (10 ingested + 2 folded) retired to `.processed.jsonl`; the duplicate f9c05d73 row in a second session file retired with its twin.
+No new category was added; every insight fit an existing domain/category.

@@ -6,7 +6,8 @@ applies_to: [claude-code, agent-harness]
 confidence: verified
 sources:
   - https://code.claude.com/docs/en/hooks
-last_verified: 2026-08-05
+  - https://code.claude.com/docs/en/tools-reference
+last_verified: 2026-09-03
 related: [platforms-shells-command-text-inspected-before-execution, platforms-processes-non-interactive-cli-invocation, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-agent-permission-classifier-denials]
 ---
 
@@ -18,6 +19,9 @@ A file-reading or search tool returns content that does not match the file on
 disk — truncated to the first line, summarized, or replaced by a note telling you
 to call something else; a plugin/hook is installed in the session; or you are
 about to brief worker sessions that will read files in the same repo.
+Also when a fetch tool (`WebFetch`) returns a summary written by a small,
+fast intermediary model rather than the page's raw text, and you are about
+to record a quoted sentence or number from that summary as verified.
 
 ## Do this
 
@@ -66,6 +70,7 @@ about to brief worker sessions that will read files in the same repo.
 | A second agent reports the tool working normally | Hook config is per settings scope (user/project/local); confirm which scope each session loaded before concluding the hook was removed |
 | The tool is mediated but writes still land | `PostToolUse` runs after execution, so write tools take effect even when their reported result is rewritten — verify the write on disk, not from the returned text |
 | The wrapping hook also intercepts your shell fallback | Read through a different mechanism (an editor/Write-tool round trip, `base64` of a byte range) and escalate the harness configuration to the human — a harness that blocks every read path is a configuration fault, not a puzzle to route around |
+| The mediating tool is a fetch/summarize call (`WebFetch`) rather than a file read, and its result is about to be recorded as a verified quote or number | Fetch the raw page yourself (`curl -sL <url>`) and grep for the literal string before recording it — treat the tool's summary as a lead, not proof |
 
 ## Instead of
 
@@ -75,10 +80,12 @@ about to brief worker sessions that will read files in the same repo.
 | Conclude the file is empty, one line, or missing | Check `wc -l` on the path | The one-line result is the hook's message, not the file's length |
 | Let each spawned worker discover the mediation itself | Name the mediated tool and the fallback command in the brief | The cost is per agent otherwise, and each pays it before doing any real work |
 | Disable the plugin to get a clean read | Use the unmediated tool for the read you need | The plugin serves the session's other work; a per-read fallback is reversible and scoped |
+| Cite a WebFetch summary's quoted sentence or number as a verified fact | Fetch the raw page with `curl -sL <url>` and grep for the literal string before recording it | The summary is produced by a small, fast intermediary model that can paraphrase or fabricate specifics even when the general gist is accurate |
 
 ## Sources
 
 - https://code.claude.com/docs/en/hooks — `PostToolUse` `hookSpecificOutput.updatedToolOutput` "replaces the tool's result"; `PreToolUse` `hookSpecificOutput.updatedInput` "replaces a tool's arguments before it runs"; "For redaction or transformation use cases, intercept at `PreToolUse` for outbound tool inputs and `PostToolUse` for inbound tool results"; `PostToolUse` fires after the tool has executed
+- https://code.claude.com/docs/en/tools-reference — "WebFetch takes a URL and a prompt describing what to extract. It fetches the page, converts the response to Markdown when the server returns HTML, and runs the prompt against the content using a small, fast model. For most fetches, Claude receives that model's answer, not the raw page"; the docs' own remedy: "use curl via Bash for the unprocessed page" (raw page grep 2026-09-03)
 
 ## Field context
 
@@ -88,3 +95,12 @@ the suggested retry (`offset=151, limit=120`) returned line 1 again. Two
 orchestrated worker sessions independently logged the same interception and each
 fell back to `cat -n`/`sed` on its own, having spent three to four tool calls
 apiece rediscovering it.
+
+Observed 2026-09-02 (repo wt-v3-docs): WebFetch on tmap-skopenapi.readme.io's
+`routeSequential30` page reported the quoted sentence "경유지는 최대 30개까지
+설정할 수 있습니다." (waypoints up to a maximum of 30); a direct `curl` + grep
+against the raw page confirmed the exact string inside the `viaPoints` field's
+description (re-confirmed 2026-09-03). The same check on the `matrix` page
+showed WebFetch's negative claim (no limit stated) was also accurate — the
+summary is not always wrong, which is why a spot-check, not blanket distrust,
+is the right response.
