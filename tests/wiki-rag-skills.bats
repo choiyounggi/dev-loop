@@ -12,6 +12,7 @@ setup() {
   WQ="${REPO_ROOT}/skills/wiki-query/SKILL.md"
   WI="${REPO_ROOT}/skills/wiki-ingest/SKILL.md"
   WL="${REPO_ROOT}/skills/wiki-lint/SKILL.md"
+  WP="${REPO_ROOT}/skills/wiki-plan/SKILL.md"
   TP="${REPO_ROOT}/references/tool-profile.md"
   CG="${REPO_ROOT}/wiki/infrastructure/agent-orchestration/code-graph-as-orientation-layer.md"
   RM="${REPO_ROOT}/README.md"
@@ -87,11 +88,12 @@ fail_open_count() {
 
 # --- (g): the fail-open sentence is byte-identical and appears once per file ---
 
-@test "(g) the fail-open sentence appears exactly once in each of the three SKILL.md files" {
+@test "(g) the fail-open sentence appears exactly once in each of the four SKILL.md files" {
   cq=$(fail_open_count "$WQ")
   ci=$(fail_open_count "$WI")
   cl=$(fail_open_count "$WL")
-  [ "$cq" -eq 1 ] && [ "$ci" -eq 1 ] && [ "$cl" -eq 1 ]
+  cp=$(fail_open_count "$WP")
+  [ "$cq" -eq 1 ] && [ "$ci" -eq 1 ] && [ "$cl" -eq 1 ] && [ "$cp" -eq 1 ]
 }
 
 # --- (h)/(i): references/tool-profile.md ------------------------------------
@@ -144,4 +146,22 @@ fail_open_count() {
 @test "(l) log.md carries exactly one revise entry citing issue #202 A4-A6" {
   count=$(grep -F -c 'issue #202 A4-A6' "$LOG")
   [ "$count" -eq 1 ]
+}
+
+# --- (m)/(n): wiki-plan Phase B semantic candidate check --------------------
+
+@test "(m) wiki-plan Phase B carries the semantic candidate check, the CLI form, and the candidates-only sentence" {
+  run grep -F 'Semantic candidate check' "$WP"
+  [ "$status" -eq 0 ]
+  run grep -F 'index search --query' "$WP"
+  [ "$status" -eq 0 ]
+  run grep -F 'never on score alone' "$WP"
+  [ "$status" -eq 0 ]
+  [ "$(fail_open_count "$WP")" -eq 1 ]
+}
+
+@test "(n) negative control: stripping the semantic candidate check heading removes the wiring match" {
+  grep -v 'Semantic candidate check' "$WP" > "$BATS_TEST_TMPDIR/wp.md"
+  run grep -F 'Semantic candidate check' "$BATS_TEST_TMPDIR/wp.md"
+  [ "$status" -ne 0 ]
 }

@@ -154,6 +154,42 @@ Example, for a login feature:
 never leave it blank; a row missing any of the six cells fails
 `decision-rows-complete`.
 
+**Semantic candidate check** — after the routing sweep, run the bundled-wiki
+vector index as a fail-open second path: once for the task as a whole (a
+query built from the design's central goal sentence), and once more for each
+decision routing left at `[no-wiki]`. Call the MCP tool when present
+(`wiki_search(query, k=5, domain?)` / `wiki_page(page_id)` from the
+`dev-loop-wiki` server); from a Bash-only context with no MCP tool (the
+`task-planner` agent, any subagent), call the CLI form instead —
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/wiki-mcp-launch.sh index search --query
+"<text>" --k 5 --json` — resolving `${CLAUDE_PLUGIN_ROOT}` exactly as this
+skill's opening note above already resolves it, not a second rule. Both
+forms return the same JSON row shape (`page_id`, `path`, `section`,
+`snippet`, `score`, `confidence`, `last_verified`). Example:
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/wiki-mcp-launch.sh index search --query
+"retry a failing GitHub API call with exponential backoff" --k 5 --json`
+returns hits including `backend-common-reliability-timeouts-and-retries` —
+open that page and confirm its "When this applies" matches before citing it.
+When the `wiki_search` tool is absent from the session or returns an empty list, continue exactly as this step read before the tool existed.
+
+Every hit is a **candidate, never an adoption**: open the hit's own page
+(`wiki_page(page_id)`, or Read the JSON row's `path` directly) and read its
+"When this applies" section — never re-read the domain `index.md` to
+confirm, that cost was already paid by the routing sweep. Adopt the page
+into `Wiki basis` only when that section's trigger text describes the same
+situation as the decision — never on score alone, and no numeric score
+floor gates this step (the 50-case calibration set in
+tests/fixtures/wiki-retrieval-calibration.json, run with wiki-index.py eval
+--report, found no separable floor: unrelated pages score inside the same
+range true hits occupy). A hit whose
+trigger does not match is left unadopted: record it as one bullet per
+checked decision (`<page id> — <one-line reason it did not match>`) under a
+new `### Considered, not adopted` subsection placed directly below the
+`## Decisions` table in `design.md` — plain bullets, not table rows, so they
+never feed `decision-rows-complete`. Only after this check finds no
+matching page does the decision's `Wiki basis` cell take the literal
+`[no-wiki]`.
+
 **Independent review** — call the `plan-reviewer` subagent (Agent tool) with:
 the `analysis.md` path (including its `## Research` section), the `design.md`
 path, the requester's original goal text, and the wiki root
