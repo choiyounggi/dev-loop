@@ -1,138 +1,77 @@
-# Knowledge flush — 4 insight(s)
+# Knowledge flush — 7 insight(s) claimed: 1 ingested, 6 dropped
 
-Claimed queue ids: `475884eefc1cdb16`, `4d7177433b8112d0`, `2552c5c6c0431371`, `f8015ebd7aa0489d`.
-Outcome: 1 new page, 0 merges, 3 drops (project-specific plan-gap rows). Nothing is left `unverified`.
+Run id (inherited from `hooks/auto-flush.sh`): `20260917-224552-43083`. Claimed ids:
+`dbedb1f0f153ea80`, `a0f287cdc70eac92`, `4b3490c5bb95a48a`, `62e2909c3f9f7f5e`,
+`e5b99a9fc624776f`, `bf8a6eee857f7808`, `5306e2de6142b95e`.
 
 ## Verified best-practice
 
-**1. `475884eefc1cdb16` — a root resolver with a cwd fallback is unobserved while the fixture root is the test's cwd** (→ `confidence: verified`)
+### 1. `dbedb1f0f153ea80` — inherited lock owner id in a spawned session → **ingested, `confidence: verified`**
 
-Claim: when a test harness `cd`s into its temp directory and builds the fixture project
-there, the resolver's fallback (the working directory) returns the expected root, so
-deleting the search leaves every test green. Separate the fixture root from the cwd
-(`$WORK/proj` vs `$WORK/elsewhere`) and give each documented stage — start directory,
-ancestor, fallback — its own case. "One mutant went red" does not establish that the
-search is guarded.
+**Claim.** When a session is spawned by a hook/parent that already holds a
+run-id-keyed single-flight lock, acquire under the id exported in the
+environment rather than a freshly generated one; when an acquire reports `held`
+seconds after session start, compare the holder id with the inherited env before
+concluding a foreign run is live.
 
-How it was verified:
+**Sources checked (fetched 2026-09-18):**
+- https://man7.org/linux/man-pages/man2/flock.2.html — "Locks created by flock() are associated with an open file description … duplicate file descriptors (created by, for example, fork(2) or dup(2)) refer to the same lock"; "If a process uses open(2) … to obtain more than one file descriptor for the same file, these file descriptors are treated independently by flock(). An attempt to lock the file using one of these file descriptors may be denied by a lock that the calling process has already placed via another file descriptor." — the OS-level form of the same failure (a re-opened path is a stranger to its own lock).
+- https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html — "A ReentrantLock is owned by the thread last successfully locking, but not yet unlocking it"; `lock()` "will return immediately if the current thread already owns the lock" — re-entrancy is defined by *identity equality with the recorded owner*.
+- https://www.gnu.org/software/make/manual/html_node/Job-Slots.html — the parent make provides jobserver access "through the environment to its children, in the MAKEFLAGS environment variable" via `--jobserver-auth=`; "Only the last instance is relevant" — a documented case of a parent handing a coordination token to children through the environment.
 
-- **Reproducible check, run in this flush** (POSIX `sh`, macOS arm64; marker-walk resolver
-  with a `$PWD` fallback; 3 mutants x 2 fixture layouts; known-good control = the
-  unmutated resolver, green in both layouts):
+**Reproduction (this session, 2026-09-17 22:46 KST):** `flush-lock.sh acquire`
+under a freshly generated `RUNID=flush-20260917-224603-43624` →
+`held 20260917-224552-43083 11s`, exit 3. `env | grep DEV_LOOP` showed
+`DEV_LOOP_FLUSH_RUN_ID=20260917-224552-43083` exported by `auto-flush.sh`
+(lines 77–79: acquire, `export DEV_LOOP_FLUSH_RUN_ID`, spawn). Re-running
+acquire under the inherited id → `already-owned 20260917-224552-43083`, exit 0.
+`flush-lock.sh` lines 76–86 implement the re-entrant branch by comparing the
+owner-file id to `$DEV_LOOP_FLUSH_RUN_ID`. Matches the candidate's own evidence
+from the 17:16 run (`held 20260917-171642-20541 19s` → `already-owned`).
 
-  | Variant | Coincident layout (cwd is the root) | Separated layout (`proj` / `elsewhere`) |
-  |---------|-------------------------------------|------------------------------------------|
-  | original | GREEN | GREEN |
-  | walk deleted | **GREEN** (blind) | RED — ancestor, start-directory |
-  | walk starts at the parent | **GREEN** (blind) | RED — start-directory only |
-  | overshoot (returns the found dir's parent) | RED | RED |
+Both the official semantics (ownership = identity match; inheritance via env /
+open file description) and a two-way local reproduction (known-bad: fresh id →
+held; known-good: inherited id → already-owned) confirm the directive → `verified`.
 
-  This reproduces both halves of the claim: the deletion survives under the coincident
-  layout *while another mutant reddens*, and under the separated layout the
-  start-at-parent mutant is caught by exactly one stage case. A second check confirmed the
-  page's nested-fixture edge row: with a marker on a directory above the scratch tree, the
-  no-marker case returned that host directory instead of the `elsewhere` fallback.
-- https://bats-core.readthedocs.io/en/stable/faq.html (fetched 2026-09-17) — "The working
-  directory is simply the directory where you started when executing bats. If you want to
-  enforce a specific directory, you can use cd in the setup_file/setup functions." The
-  runner does not separate cwd from the fixture; the `cd` in `setup` is what creates the
-  coincident layout.
-- https://en.wikipedia.org/wiki/Mutation_testing (fetched 2026-09-17) — the kill
-  conditions: reach the mutated statement, infect the state, and "The incorrect program
-  state … must propagate to the program's output and be checked by the test." The
-  coincident cwd is a propagation failure: the fallback maps the infected state back to
-  the expected output.
-- https://arxiv.org/abs/2410.21904 (fetched 2026-09-17) — Mirian-Hosseinabadi, "Formal
-  Analysis of Reachability, Infection and Propagation Conditions in Mutation Testing";
-  cited for the RIP terminology only. The abstract page does not define the three
-  conditions individually, and the page quotes only the sentence that was actually there.
-- Field evidence: the originating session's resolver (`project_root_for` in dev-loop
-  `skills/wiki-plan/scripts/plan-gate.sh`, worktree commit `5afddde`) and its
-  `elsewhere`-separated bats cases were read and confirmed to exist. **Its mutants were not
-  re-run in this flush**; the page labels that bullet a field report and says so.
+### 2–7. Plan-gap rows from `dev-loop-cockle` → **dropped (project-specific)**
 
-Not used: pytest's rootdir documentation was fetched as a candidate second resolver
-example, but its fallback is "the already determined common ancestor", not plainly the
-cwd, so it is not cited.
-
-**2. `4d7177433b8112d0` — `--layer bundled|local` flag shape for wiki-structure-checks** → dropped.
-**3. `2552c5c6c0431371` — the literal log.md entry text for t5-ref-impl** → dropped.
-**4. `f8015ebd7aa0489d` — wiki-lint row 9 stays, README gains one tree line** → dropped.
-
-All three are `plan-gap` rows whose trigger is "Planning <task>: deciding <one repo's
-artifact>" and whose directive is that repo's design record (argv positions, a log line's
-wording, a README tree entry). None has a situation a task in another repo could route on,
-and the cited research URLs support the surrounding plan, not the directive. Row 2's
-rejected alternative (inferring a mode from a path substring) is the only generalizable
-fragment; it arrives with no evidence beyond the design doc, so it was not promoted.
-These are recorded in the repo's own `plans/*/design.md`, which is where they belong.
+| id | Decision | Why it is not reusable knowledge |
+|----|----------|----------------------------------|
+| `a0f287cdc70eac92` (t7-usage README tree line + log.md entry) | drop | Names one repo's README line and log grammar; no directive applies outside `dev-loop` |
+| `4b3490c5bb95a48a` (t9 fail-open sentence identical in three skills) | drop | The directive is one repo's skill wording; the cited sources (near-dup thresholds, MCP token cost) do not support the wording decision |
+| `62e2909c3f9f7f5e` (t9 wiki-ingest dedupe via `wiki_search`) | drop | A step-ordering edit to one skill in one repo; the sources cited are about cosine thresholds, unrelated to the decision |
+| `e5b99a9fc624776f` (t9 `neardup` subparser spec) | drop | A CLI design that has not shipped — `git ls-tree origin/main` finds no `scripts/wiki-index.py`, and the cockle worktree's `scripts/` has none either; the generic kernel (dot product on L2-normalised vectors = cosine) is textbook, and the threshold sources say "calibrate", which yields no page-grade directive |
+| `bf8a6eee857f7808` (t9 README subsection) | drop | Documentation layout for one repo |
+| `5306e2de6142b95e` (t9 combined log.md line) | drop | One repo's log convention ("one entry per task") |
 
 ## Existing-layer check
 
-Routed via `INDEX.md` → `wiki/testing/index.md` → category `quality` (verifying that tests
-can fail). A whole-wiki keyword sweep (`cwd|working director|project.root|ancestor|walk up|
-upward|path.resol|fallback`) matched 42 files; the testing-domain and path-resolution hits
-were opened.
+Pages read: backend-common-concurrency-distributed-locks, infrastructure-agent-orchestration-shared-run-state, backend-common-jobs-scheduled-job-overlap, testing-data-test-data-and-isolation, databases-selection-vector-search-engine-selection
 
-Pages read: testing-quality-tests-that-cannot-fail, testing-quality-default-values-under-test, testing-quality-surviving-mutant-equivalence-triage, testing-quality-harness-reverse-controls, testing-data-test-data-and-isolation
+Also read: `INDEX.md`, `wiki/infrastructure/index.md` (agent-orchestration section, rows 15–26), `AGENTS.md` lines 90–116, `templates/page.md`.
 
-- `tests-that-cannot-fail` — owns the general "break it and require red" procedure and the
-  "another writer sets the same observable" row. Adjacent mechanism, different trigger: it
-  has no row for a fallback path that coincides with the expected value, and at its size a
-  new section would not fit the 120-line budget. → linked, not merged.
-- `default-values-under-test` — closest sibling: a mechanism-test fixture that repeats the
-  shipped default makes the dropped-lookup mutant unkillable. Same shape (defect in the
-  input, not the assertion), different subject (a numeric default vs. a filesystem search
-  and its cwd). → new page cross-references it; reciprocal `related:` added.
-- `test-data-and-isolation` — covers temp directories and env isolation; nothing on cwd vs
-  fixture root in the merged copy (the open-PR copy is discussed below).
-- `surviving-mutant-equivalence-triage`, `harness-reverse-controls` — linked for the
-  "deletion survives although cwd is separate" edge; no overlap.
+Search evidence (whole `wiki/`, untruncated): `grep -rniE 're-?entran|inherited (run|owner|id|env)|RUN_ID|owner id|holder id|already-owned|lock owner|lockfile|lock file|flock'` → 46 lines, all in: dependency lockfiles (supply-chain, image-builds, uv), `flock -n` for cron overlap (scheduled-job-overlap, background-services), `ReentrantLock` vs `synchronized` (java threads-and-memory), and the `LO_RUN_ID` env-leak test incident (test-data-and-isolation). None covers a spawned session inheriting a lock owner id. `grep -rliE 'cosine|embedding|near-?dup'` → 5 files, all datastore selection — no near-dup page (moot after the drop).
 
-Created: `wiki/testing/quality/path-resolver-fixtures-with-coincident-cwd.md` (72 body lines).
-Updated: `wiki/testing/index.md` (+1 row), `default-values-under-test.md` (+1 related id), `log.md` (+1 entry).
-Conflicts flagged: none. One deliberate asymmetry: `tests-that-cannot-fail` is linked from
-the new page only — three open PRs (#179, #188, #191) each rewrite its single-line
-`related:` list (a fourth, #186, edits the file elsewhere), and another edit of that line
-would conflict with each of them.
-Checks: `wiki-structure-checks.js wiki` — baseline 278 pages / 0 findings → 279 pages / 0
-findings; `wiki-lint-prohibitions.js wiki` — 0 violations before and after.
+- **Overlap / merge candidates:** `distributed-locks` (owner token, atomic release-if-mine) is the parent concept and is linked, not merged into — its trigger is multi-instance services, not a spawned child session; adding a re-entrancy section there would violate one-case-per-page. `shared-run-state` covers "a repo that may already have a run" (foreign-run detection) — the new page is the complement: the holder that is *not* foreign. `scheduled-job-overlap` documents `flock -n` — the new page's flock edge case links back. `test-data-and-isolation` holds the `LO_RUN_ID` env-inheritance incident — same mechanism, opposite direction (env leaking into tests vs. env intentionally carrying the owner id).
+- **Conflicts:** none — no existing directive tells a spawned session to mint its own id.
+- **Created new:** `wiki/infrastructure/agent-orchestration/inherited-lock-ownership-in-a-spawned-session.md` (69 body lines).
+- **Related links added both ways:** distributed-locks, scheduled-job-overlap, shared-run-state, test-data-and-isolation → new page; new page → all four.
+- **Lint:** `node scripts/wiki-lint-prohibitions.js` → `directives: 75, compliant: 75, violations: 0` (the 1 info item is pre-existing in keys-ahead-of-their-consumer). Vague-qualifier grep on the new page → none. All 4 `related:` ids resolve to exactly one `id:` line each.
 
 ## Open-PR check
 
-Listed 16 open `knowledge/*` heads and fetched all 16: #179, #180, #181, #182, #183, #185,
-#186, #187, #188, #189, #190, #191, #205, #207, #208, #209. For each head, the added lines
-of every changed `wiki/` file were searched for the same overlap keywords.
+`gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` → 17 open heads: #210 (…-171731), #209 (…-160110), #208 (…-150057), #207 (…-135945), #205 (…-100145), #191, #190, #189, #188, #187, #186, #185, #183, #182, #181, #180, #179.
 
-- **#179** (`knowledge/choiyounggi-20260903-172728`) adds a row to `test-data-and-isolation`:
-  tests that never `cd` into their temp directory read a real sandbox config through the
-  code's upward walk, so "make every such test `cd "$BATS_TEST_TMPDIR"`". This is the
-  **inverse** failure, and its remedy is the precondition for the one here — after that
-  `cd`, a fixture built at `.` is the coincident layout. No shared directive. The new page
-  points at `test-data-and-isolation` for that case. Verdict for candidate 1: **new**.
-- Other keyword hits, each read: #188 `real-cli-spot-check-for-new-execution-paths` (a
-  never-created spawn cwd → ENOENT), #179 `path-valued-config` (an empty `--out` resolving to
-  the CWD), #183 `unix-domain-socket-path-length` (socket paths derived from the project
-  root), #180 `portable-shell-scripts` (zsh word-splitting giving sessions one shared cwd),
-  #208 `project-local-layer-over-shared-guidance` (where a local guidance layer lives —
-  same originating feature, a design rule, nothing about testing the resolver). The
-  `path-resolution.md` hits in #179/#181/#189 were the file path matching the pattern, not
-  content. No overlap with testing a resolver.
-- No open head touches `default-values-under-test.md` or creates a page on resolver tests.
-- Candidates 2–4: #207 and #208 carry plan-gap batches from the same repo. Their added
-  `wiki/` lines, and #209's, were searched for `--layer`, `reference_impl`,
-  `wiki-contradiction`, `README`, `argv`, `positional`, `infer`: 0 hits in #207 and #208; 2
-  in #209, both an unrelated `grep -qF … README.md` quoting example. They are dropped as
-  project-specific, not as pending duplicates. Verdict: **drop**.
+Every head fetched; `git diff origin/main origin/<head> -- wiki/` grepped for added lines matching `re-?entran|inherited (run|owner|id|env)|RUN_ID|owner id|holder id|already-owned|foreign holder|near-?dup|cosine|embedding`: 16 heads → 0 hits; #209 → 3 hits, all "embedding store" in `input-manifest-freshness-with-skipped-inputs` (derived-index freshness — unrelated). Page names across all heads matching `lock|env|inherit|spawn|parent|child|dedup|similar|vector|hook` were also inspected: #189's `testing-quality-proving-a-critical-section-is-lock-protected` (testing a mutex-guarded increment — unrelated) and #208's `environment-config.md` change (a `related:` link only).
 
-Expected merge friction: `wiki/testing/index.md` and `log.md` are edited by most open
-heads, so this PR will need the usual one-row rebase there.
+| Candidate | Overlapping open head | Verdict |
+|-----------|-----------------------|---------|
+| `dbedb1f0f153ea80` inherited lock owner id | none | **new** — ingested here |
+| `a0f287…`, `4b3490…`, `62e290…`, `e5b99a…`, `bf8a6e…`, `5306e2…` | none | **drop** (project-specific, see above; not pending-duplicates) |
 
 ## Routing decision
 
-| Candidate | Target | Decision |
-|-----------|--------|----------|
-| `475884eefc1cdb16` | `testing/quality/path-resolver-fixtures-with-coincident-cwd` (new page, existing category) | The harvested hint `domain: testing` holds. `quality` rather than `data`: the subject is whether a test can detect a defect (mutation-proven), which is what `quality` owns; `data` owns fixture creation and isolation, and receives the cross-link for the inverse case. No new category. |
-| `4d7177433b8112d0` | — | Dropped: one repo's CLI argument spec. |
-| `2552c5c6c0431371` | — | Dropped: one repo's log line. |
-| `f8015ebd7aa0489d` | — | Dropped: one repo's README/skill-row decision. |
+| Insight | Domain / category / page | Why here |
+|---------|--------------------------|----------|
+| `dbedb1f0f153ea80` | `infrastructure/agent-orchestration/inherited-lock-ownership-in-a-spawned-session` (new page) | The trigger is a spawned agent/hook session coordinating with its parent through a single-flight lock — the `agent-orchestration` category already holds the sibling cases (`shared-run-state`, `session-completion-gates`, `worktree-isolated-workers`). `backend/common/concurrency` was rejected because its pages are about service instances contending for a resource, not a parent/child pair sharing one identity. No new category needed. `INDEX.md` infrastructure route line and `wiki/infrastructure/index.md` updated; `log.md` entry appended. |
+| 6 plan-gap rows | — (dropped) | No layer: not reusable outside `dev-loop-cockle` |

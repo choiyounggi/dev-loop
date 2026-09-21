@@ -8,7 +8,7 @@ sources:
   - https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/
   - https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
 last_verified: 2026-07-10
-related: [backend-common-concurrency-shared-state-and-pools, backend-common-jobs-scheduled-job-overlap, databases-transactions-isolation-level-selection]
+related: [backend-common-concurrency-shared-state-and-pools, backend-common-jobs-scheduled-job-overlap, databases-transactions-isolation-level-selection, infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session]
 ---
 
 # Distributed Locks
