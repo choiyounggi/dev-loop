@@ -30,6 +30,7 @@ work now", "probably fixed", or "tests pass" without a run in front of you.
 |-------|-------------------|--------------|
 | "Tests pass" | A fresh run: zero failures and the expected total count | An earlier run; "should pass"; a subset run reported as the whole suite |
 | "Bug fixed" | The recorded reproduction re-run per [debugging-methodology-verify-the-fix] | "The code changed"; the symptom gone after unrelated restarts |
+| "That stage is healthy — its existing test passes" | The test's last assertion lies past the point where the symptom appears (it waits for, or reads, the state that goes wrong) | A green test whose assertions stop before the symptom: a pump test that awaits events 1–2 says nothing about event 3 ([debugging-methodology-reproduce-first]) |
 | "Feature works" | The feature executed end-to-end with its observable output | A clean build; unit tests of the parts |
 | "Worker/subagent finished its task" | Its diff and artifacts inspected per [infrastructure-agent-orchestration-control-signals-vs-primary-artifacts] | The worker's own completion report |
 | "Regression test added" | The red-green flip: test fails with the fix reverted, passes with it ([testing-quality-tests-that-cannot-fail]) | A test written once and seen green once |
@@ -59,6 +60,7 @@ work now", "probably fixed", or "tests pass" without a run in front of you.
 
 ## Sources
 
+- https://github.com/choiyounggi/linkly-crew/pull/10 — field reproduction 2026-09-02: `core.rs:426-431` waited for `RunStarted` + `SpecReady` and was cited as "core is fine"; the app stopped exactly after `SpecReady`, so the evidence ended where the symptom began, and a whole run proceeded on that premise until a test asserting `TaskStateChanged` + message after `SpecReady` reproduced it
 - https://github.com/obra/superpowers — verification-before-completion skill: fresh-evidence gate, claim/evidence table, hedge-word red flags, distrust of delegated self-reports; field-tested across agentic coding sessions
 - https://git-scm.com/docs/git-checkout — `git checkout -- <path>` replaces the file with the index version and discards unstaged changes; an auditor that runs it on your uncommitted work has discarded that work until its restore lands
 - Field reproduction 2026-08-18 (dev-loop task lo-t1-teardown): the test-quality auditor reported running `git checkout --` on `safe-cleanup.sh` during mutation testing and restoring it with `git apply`; the implementing session's own `diff <(git diff) <pre-audit patch>` was byte-identical and `bats tests/safe-cleanup.bats` re-ran 44/44 — that, not the auditor's sentence, established the restore
