@@ -3,7 +3,7 @@ id: infrastructure-ci-cd-write-time-limit-guards
 domain: infrastructure
 category: ci-cd
 applies_to: [general]
-confidence: verified
+confidence: field-tested
 sources:
   - https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/admission/plugin/resourcequota/controller.go
   - https://kubernetes.io/docs/concepts/policy/resource-quotas/

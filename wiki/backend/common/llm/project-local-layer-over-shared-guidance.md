@@ -5,7 +5,7 @@ category: llm
 applies_to: [general]
 confidence: field-tested
 sources:
-  - https://developers.openai.com/codex/guides/agents-md
+  - https://learn.chatgpt.com/docs/agent-configuration/agents-md
   - https://git-scm.com/docs/git-config
   - https://spec.editorconfig.org/
 last_verified: 2026-09-17
@@ -70,7 +70,7 @@ trigger.
 
 ## Sources
 
-- https://developers.openai.com/codex/guides/agents-md — "By layering global guidance with project-specific overrides…"; "Codex concatenates files from the root down, joining them with blank lines. Files closer to your current directory override earlier guidance because they appear later in the combined prompt."; `AGENTS.override.md` is checked before `AGENTS.md` and "Codex includes at most one file per directory" (page text read 2026-09-17)
+- https://learn.chatgpt.com/docs/agent-configuration/agents-md — "By layering global guidance with project-specific overrides…"; "Codex concatenates files from the root down, joining them with blank lines. Files closer to your current directory override earlier guidance because they appear later in the combined prompt."; `AGENTS.override.md` is checked before `AGENTS.md` and "Codex includes at most one file per directory" (page text read 2026-09-17)
 - https://git-scm.com/docs/git-config — system, global, then repository files: "The files are read in the order given above, with last value found taking precedence over values read earlier."
 - https://spec.editorconfig.org/ — "If multiple EditorConfig files have matching sections, the pairs from the closer EditorConfig file are read last, so pairs in closer files take precedence."
 - Field context 2026-09-17 (`dev-loop` t4-local-layer plan, decisions D1 and D5): a fixed `wiki-local/` under the project root was chosen over a tools-config path knob, a git-ignored state directory, and a `CLAUDE_PROJECT_DIR` read (unset in agent Bash commands and in bats); precedence chosen as local-wins-with-shared-retained over specificity-only and local-only loading. Confidence is `field-tested` because rule 1's no-knob stance, rule 4 and the env-var and ignored-directory rows rest on this planning context alone; the precedence directives (rules 2–3, the decision table, the nested and override rows) are additionally confirmed by the three tool documents above
