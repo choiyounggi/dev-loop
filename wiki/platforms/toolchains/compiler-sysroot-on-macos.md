@@ -11,7 +11,7 @@ sources:
   - https://clang.llvm.org/docs/DiagnosticsReference.html
   - https://discourse.llvm.org/t/stdio-h-not-found-on-mac-how-to-add-system-headers-includes-into-clang/77604
 last_verified: 2026-08-29
-related: [platforms-toolchains-version-management, platforms-environment-path-resolution, debugging-signals-reading-error-messages]
+related: [platforms-toolchains-version-management, platforms-environment-path-resolution, debugging-signals-reading-error-messages, infrastructure-agent-orchestration-verify-command-in-a-worker-brief]
 ---
 
 # A Non-Apple Compiler Resolving the macOS SDK

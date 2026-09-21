@@ -12,8 +12,9 @@ sources:
   - https://www.shellcheck.net/
   - https://www.gnu.org/software/bash/manual/html_node/Double-Quotes.html
   - https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
-last_verified: 2026-08-05
-related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution, platforms-shells-escapes-in-shell-string-literals, platforms-shells-env-var-off-switches, platforms-shells-unset-versus-empty-parameters, platforms-shells-option-like-argument-values, platforms-processes-tool-diagnostics-without-a-failing-exit-code, testing-quality-completion-predicates]
+  - https://jqlang.org/manual/
+last_verified: 2026-09-03
+related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution, platforms-shells-escapes-in-shell-string-literals, platforms-shells-env-var-off-switches, platforms-shells-unset-versus-empty-parameters, platforms-shells-option-like-argument-values, platforms-processes-tool-diagnostics-without-a-failing-exit-code, testing-quality-completion-predicates, platforms-processes-driving-a-tui-in-a-tmux-pane, infrastructure-agent-orchestration-shared-run-state, infrastructure-ci-cd-changed-files-only-gates, testing-quality-tests-that-cannot-fail]
 ---
 
 # Shell Scripts That Must Run on More Than One Machine or Shell
@@ -86,6 +87,13 @@ non-interactive environment).
    an argument.
 8. Run `shellcheck` on every script before it ships or gates anything; it flags
    unquoted expansions, bashisms under `#!/bin/sh`, and `set -e` blind spots.
+9. When a `for` loop would iterate another tool's structured output (`jq -r`, `git diff
+   --name-only`) to test membership against a second list, do the test inside that tool:
+
+   ```sh
+   jq --arg t "$target" '.producers | index($t) != null' graph.json   # one value stays one value
+   jq --argjson xs "$(jq -c '[.consumers[]]' graph.json)" --arg t "$target" '$xs | IN($t)' graph.json
+   ```
 
 ## Edge cases
 
@@ -100,6 +108,7 @@ non-interactive environment).
 | A flag is parsed correctly but still appears among the operands | The reordering loop is inside a function. Flags set globals (which survive), operands are set positionally (which do not) — so detection works and the argument list stays wrong, with no error. Move the loop inline (step 5) |
 | A payload argument begins with `-` | Pass it after a `--` separator (`cmd -- "$text"`); quoting does not help, because the option parser, not the shell, is what claims it ([platforms-shells-option-like-argument-values]) |
 | Message text must contain a command example | Single-quote the whole argument, or write the text to a file and pass the path — a double-quoted backtick executes and the message ships with the output spliced in |
+| A coordinator launches several tmux sessions or jobs from one shared multi-word variable (`set -- $args`) instead of calling the launcher per task | zsh keeps `$args` as one word (`SH_WORD_SPLIT` is off by default), so every session inherits one malformed name or cwd — `tmux ls` shows names containing spaces sharing a directory. Call the launcher once per task with its own quoted arguments, and verify each session right after start (`tmux display-message -t "$name" -p '#{session_name} #{pane_current_path}'`) so a malformed launch fails at its launch site instead of exiting 0 |
 
 ## Instead of
 
@@ -114,6 +123,8 @@ non-interactive environment).
 | Wrap POSIX-sh flag parsing in a `parse_flags "$@"` helper | Keep the `set --` reordering loop inline in the dispatcher | Positional parameters are restored when the function returns, so the caller runs with the original, unfiltered arguments |
 | Accumulate POSIX-sh operands into a string to work around the missing array | Reorder `"$@"` in place with `set -- "$@" "$a"` | A string re-splits on whitespace, so a path containing a space becomes two operands |
 | Double-quote a message that quotes a command | Single-quote it, or pass it with `--body-file` | `` "…`cmd`…" `` runs `cmd`, substitutes its output, and can exit 0 with the message silently gutted |
+| Split a multi-launch helper's arguments with `set -- $shared_var` | Call the launcher per task with explicit, separately quoted arguments, or an array | zsh does not word-split unquoted expansions unless `SH_WORD_SPLIT` is set; the idiom yields one argument in zsh where bash yields several, and the difference shows only in the launched sessions' names and paths, never in the launcher's exit code |
+| Loop `for x in $(jq -r '…')` and compare with `[ "$x" = "$y" ]` or `case` | Pass both sides into jq (`--arg`/`--argjson`) and test with `index`, `IN`, or `any(…; IN(…))` | The shell loop re-splits a multi-word jq value before the comparison runs, so a value containing a space compares as two shorter values and a guard built to reject that id passes it |
 
 ## Sources
 
@@ -122,3 +133,6 @@ non-interactive environment).
 - https://zsh.sourceforge.io/Doc/Release/Parameters.html — zsh arrays numbered from 1 (KSH_ARRAYS excepted)
 - https://google.github.io/styleguide/shellguide.html — quote variables, prefer bash for scripts, arrays over eval
 - https://www.shellcheck.net/ — shell script static analysis
+- https://jqlang.org/manual/ — `index(s)` outputs the index of the first occurrence of `s` in the input; `IN(s)` outputs true if `.` appears in the stream; `--arg`/`--argjson` bind shell values as jq variables without re-tokenizing them
+- Field reproduction 2026-08-21 (dev-loop orchestrate on macOS zsh, issue choiyounggi/dev-loop#123): a shared `set -- $args` launch helper started three tmux sessions with space-containing names and one shared cwd (`tmux ls`); calling the launcher once per task with explicit arguments produced the intended sessions
+- Field reproduction 2026-08-27 (graph-drop guard, review t1-graph-drop-r1 F1): a `for id in $(jq -r …)` membership loop let a producer named `"Auth Token"` through (0 rejections); moving the test into jq with `--arg` rejected it (3 rejections)
