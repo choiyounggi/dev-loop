@@ -56,6 +56,7 @@ where mocks are breaking on refactors.
 | The fake and the real implementation can diverge | Run one shared contract test suite against both; the fake stays trustworthy only while it passes the real thing's tests |
 | The dependency is consumed as ESM named imports (e.g. `import { spawnSync } from "node:child_process"`) and you planned to monkey-patch it | Inject it behind a deps interface the subject receives instead — imported bindings are read-only live bindings the importer cannot reassign, and `node:test`'s `mock.module()` only works under the `--experimental-test-module-mocks` flag (still Stability 1 as of Node 26), so DI is the unflagged interception point |
 | The test must prove a negative — "no real child process / external command ran" | Route every spawn through the injected deps interface, then in the test empty `process.env.PATH` as a tripwire and deep-equal the full stub-recorded call sequence: a clean exit fully explained by the stubs proves no PATH-resolved spawn could have succeeded, turning "trust the structure" into an executable assertion ([testing-quality-tests-that-cannot-fail]) |
+| The mock invents an identifier (correlation/request id) that the real producer formats differently, and the consumer keys on it | Lift the literal from the producer's own tests, treat the id as an opaque token, and map it through the binding message — [testing-mocking-producer-wire-format-in-mocks] |
 
 ## Instead of
 

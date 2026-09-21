@@ -10,7 +10,7 @@ sources:
   - https://nextjs.org/docs/pages/building-your-application/configuring/environment-variables
   - https://vite.dev/guide/env-and-mode
 last_verified: 2026-07-12
-related: [infrastructure-ci-cd-secrets-handling]
+related: [infrastructure-ci-cd-secrets-handling, security-secrets-ciphertext-orphaned-by-a-regenerated-key]
 ---
 
 # Keeping Secrets Out of Code and Responding to a Leak

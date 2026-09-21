@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://12factor.net/dev-prod-parity
 last_verified: 2026-07-10
-related: [qa-process-release-gates, qa-process-post-release-verification, qa-bug-reports-reproducible-reports, testing-strategy-orm-generated-test-schema]
+related: [qa-process-release-gates, qa-process-post-release-verification, qa-bug-reports-reproducible-reports, testing-strategy-orm-generated-test-schema, testing-data-testcontainers-reaper-on-docker-desktop-macos]
 ---
 
 # Knowing What a Staging Pass Actually Clears

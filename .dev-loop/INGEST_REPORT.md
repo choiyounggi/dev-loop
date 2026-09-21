@@ -1,65 +1,161 @@
 # Knowledge flush — 12 insight(s)
 
-12 candidates claimed from `~/.dev-loop/queue` (harvested 2026-08-19 … 2026-09-02). Outcome: 5 new pages, 4 amended main pages, 3 candidates folded onto open knowledge PRs (#180 ×2, #181 ×1), 1 dropped as stale. Every quote below was re-fetched with `curl` in this run after three read-only research agents drafted it; local reproductions were re-run in this session.
+Run `20260906-213602-52875` (headless auto-flush), branch `knowledge/choiyounggi-20260906-213635`.
+Claimed 12 rows with `queue-claim.js claim --max 12`; 18 rows remain pending for later flushes.
+Outcome: 6 new pages, 5 merges into existing pages (one reconciling a contradiction), 0 drops, 0 folds.
 
 ## Verified best-practice
 
-1. **Fresh-context review of LLM output** (af294fb3f88881a1) — `verified`. https://arxiv.org/abs/2603.12123 (Song, "Cross-Context Review", Mar 2026) re-fetched: abstract reads "CCR reached an F1 of 28.6%, outperforming SR (24.6%, p=0.008, d=0.52), SR2 (21.7%, p<0.001, d=0.72), and SA (23.8%, p=0.004, d=0.57)"; SR2 vs SR p=0.11. Corroborated by this repo's own `agents/test-quality-auditor.md` ("so the session that wrote the code does not grade its own tests") and `agents/integration-reviewer.md` ("from a fresh context the coordinator's own session never reaches").
-2. **Bypass-string construction + coordinator reproduction for allowlist code** (5f91d867cf785a08) — `verified` for the technique (CWE-88 https://cwe.mitre.org/data/definitions/88.html; Cargo docs: `--manifest-path` package selection https://doc.rust-lang.org/cargo/commands/cargo-test.html, build scripts "It will then run the script" https://doc.rust-lang.org/cargo/reference/build-scripts.html, `--config` "should be in TOML syntax" https://doc.rust-lang.org/cargo/reference/config.html); the linkly-crew incident itself is field evidence (2026-08-31).
-3. **Copied-plan premise must be read from the target manifest** (412141e74acbc743) — `field-tested` (dev-loop mpa1 run, 2026-08-23); the mechanism is an internal-repo fact (dev-loop's marketplace entry is a url-source self-reference — confirmed by `scripts/check-versions.sh`'s own comment).
-4. **Parser vs executor separation in gate scripts** (2548049fc5087ca2) — `verified`. CWE-78 https://cwe.mitre.org/data/definitions/78.html; `timeout(1)` https://man7.org/linux/man-pages/man1/timeout.1.html ("run a command with a time limit", exit 124 "if COMMAND times out"); local read of `skills/loop-implement/scripts/gate-check.sh` (`--status … never executes CHECK`, `GATE_CHECK_TIMEOUT … via a perl alarm`).
-5. **Teardown build-cache bloat** (fe6628a56fefc20b) — **dropped**. Candidate observed 2026-08-31; commit `d37fd67` (2026-09-02, "fix(orchestrate): stop archive_scratch from archiving gitignored deps (#170)") switched enumeration to `git ls-files --others --exclude-standard` and `tests/safe-cleanup.bats:746` guards it. The proposed manual recursive delete of `.worktrees/*/target` before teardown would be stale advice against the current tool.
-6. **Coordinator under tmux, not a client-bound relay PTY** (c4ab8de2e9c06271) — `field-tested`. tmux(1) https://man7.org/linux/man-pages/man1/tmux.1.html ("Each session is persistent and will survive accidental disconnection", "all sessions are managed by a single server"); POSIX §11.1.10 https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap11.html ("the SIGHUP signal shall be sent to the controlling process for which the terminal is the controlling terminal"); Orca docs https://www.onorca.dev/docs/ssh ("A short grace period (5 minutes by default, configurable per target)") — this **corrects** the candidate's `--grace-time 0`, which is not carried into the page as fact.
-7. **False login expiry with idle sibling sessions** (9a9038861c1d93fc) — `field-tested`, causal claim labelled hypothesis. https://code.claude.com/docs/en/authentication ("credentials are stored in `~/.claude/.credentials.json`", a different `CLAUDE_CONFIG_DIR` "reads a different entry"); RFC 9700 §2.2.2 https://www.rfc-editor.org/rfc/rfc9700.txt ("Refresh tokens for public clients MUST be sender-constrained or use refresh token rotation") supports the general pattern only.
-8. **Plugin version drift gate** (5b73ca3b8aeee489) — `verified`. https://code.claude.com/docs/en/plugin-marketplaces ("Avoid setting `version` in both `plugin.json` and the marketplace entry. Claude Code always uses the `plugin.json` value without warning"); https://raw.githubusercontent.com/mattpocock/skills/main/scripts/sync-plugin-version.mjs (`--check` → `process.exit(1)`, wired as `check-plugin-version`); this repo's `scripts/check-versions.sh` + `.github/workflows/test.yml` "Version gate (marketplace.json vs plugin.json)" step.
-9. **Rust inline tests invisible to test-floor.sh** (b9e2ed778fd6d661) — `verified`. Local read of `skills/orchestrate/scripts/test-floor.sh` `classify()` (patterns `*.bats`, `test_*.py`, `*_test.go`, `*.test.*`, `*/tests/*` — no `.rs`); Rust Book https://doc.rust-lang.org/book/ch11-03-test-organization.html ("put unit tests in the src directory in each file with the code that they're testing … create a module named tests in each file").
-10. **Unix socket `sun_path` limit in deep worktrees** (886a2b6aff8e8a6b) — `verified`. macOS SDK `sys/un.h` line 79 `char sun_path[104];`; Linux https://man7.org/linux/man-pages/man7/unix.7.html `char sun_path[108]`; Node https://nodejs.org/api/net.html ("Typical values are 107 bytes on Linux and 103 bytes on macOS"); **local reproduction this run**: `net.createServer().listen(<131-byte path under ~/.dev-loop/tmp>)` → `listen EINVAL`.
-11. **Top-level await for sentinel-driven REPL payloads** (285976623fb9d890) — `verified`. https://nodejs.org/api/repl.html ("Support for the `await` keyword is enabled at the top level"); **local reproduction this run** (Node v26.7.0, `node -i` via piped stdin): unawaited IIFE printed only `Promise { <pending> }`, awaited form printed `done-awaited`.
-12. **Stamp mock event timestamps at emit, assert monotonicity** (966887be5b42f5fc) — `field-tested`. Research agent read linkly-crew commit `530e7e2` ("stamp MockEventSource ts at delivery, not build time") and its regression test; no external doc names this specific pattern, so it rides on the host pages' verified methodology.
+1. **Pointer-attracted particle field collapses (8a6e99abdfe31e54)** — `p += (t−p)·k` with a
+   stationary pointer is a contraction; nodes converge onto the cursor. Sources checked:
+   Wikipedia Banach fixed-point theorem ("admits a unique fixed point"), MDN `pointerleave`
+   ("moved out of the hit test boundaries"), MDN `requestAnimationFrame` ("paused in most
+   browsers when running in background tabs"). Field: cover-letter review
+   `.orchestration/reviews/t2-hero-code-intro-r1.md` F1 (collapse to ~8.7e-8 px; fix
+   `POINTER_INNER_RADIUS=32`, clamped step, out-of-bounds null, 1000-step test; 374 green).
+   Confidence: **verified** (mechanism doc-backed; numbers field).
+2. **Firecrawl `onlyMainContent` drops the regions that hold contact details (407808eb70bcaf43)**
+   — docs.firecrawl.dev `/scrape` reference: `onlyMainContent` default `true`, "Only return the
+   main content of the page excluding headers, navs, footers, etc."; `includeTags`/`excludeTags`
+   exist. `tel:` preservation is not documented — kept as field data (22/30 sites expose `tel:`,
+   16/30 have the number only outside main content, 0/30 gain a number from JS rendering).
+   Confidence: **verified** (mechanism) with the survey stated as field measurement.
+3. **"Ask the user" binds only when the question tool is named and a hook checks the transcript
+   (ebbe51aeb2082d16)** — code.claude.com hooks doc: PreToolUse input carries `transcript_path`,
+   exit code 2 blocks. dev-loop PR #136 (merged 2026-08-23) introduced the wording without the
+   tool name; PR #144 (merged 2026-08-25) named `AskUserQuestion` and added
+   `hooks/orchestrate-ask-gate.sh` (present on main; 27 bats cases). Confidence: **field-tested**
+   directive on top of doc-verified hook mechanics (page stays `field-tested`).
+4. **Column-0 line in `run: |` silently unregisters a workflow (d5776de0b6e9bedb)** — YAML 1.2.2
+   §8.1.2 "terminated when encountering a line which is less indented"; GitHub workflow-syntax
+   doc: without `name` the file path is displayed; `gh workflow run` manual: needs
+   `on.workflow_dispatch`. Local repro: Ruby Psych fails at `line 13 column 1`; two `-m` flags
+   parse. Field: groundwork PR #16 (merged; 422 before, `sync dev-loop pin` listed after). The
+   "listed as active with no triggers" behavior is observed, not documented — said so on the
+   page. Confidence: **verified**.
+5. **Actions may not create PRs until the repo setting is on (e88fdc004757a742)** — docs.github.com
+   Actions settings page ("Allow GitHub Actions to create and approve pull requests") and REST
+   `actions/permissions/workflow` with `can_approve_pull_request_reviews`. groundwork now reports
+   `true`; PR #18 (bot, closed) → #22 (bot, merged). Confidence: **verified**.
+6. **Personal-repo ruleset refuses an `Integration` bypass actor (d58c3d2dc6afce8f)** — REST
+   rules reference lists `Integration` as an actor type; the personal-repo 422 is NOT in the
+   docs (agent searched; only `OrganizationAdmin` is documented as personal-inapplicable). Field:
+   groundwork ruleset 21371046 exists with `bypass_actors: []`, `pull_request` rule at 0
+   approvals, required checks `bats/shellcheck/version-sync`. Row marked field-observed on the
+   page; the page as a whole stays **verified** because the recommended path (PR + self-merge)
+   rests on documented settings.
+7. **GITHUB_TOKEN-pushed branches get no check runs (5a15e973f89b9ab8)** — docs.github.com
+   `github_token`: "events triggered by the GITHUB_TOKEN will not create a new workflow run"
+   (exceptions `workflow_dispatch`/`repository_dispatch`); PAT/App token advised. `gh pr merge`
+   manual (`--auto`, `--delete-branch`), auto-delete-branches doc, cli/cli#9073 (open: `--auto -d`
+   does not delete). Field re-checked live: PR #22 check-runs `total_count=0`, #25 and #27 = 6,
+   `delete_branch_on_merge=true`. Confidence: **verified**.
+8. **`testcontainers.community.redis` (401fd399afd7f97b)** — upstream `src/testcontainers/redis.py`
+   shim emits the exact DeprecationWarning; `community/redis/__init__.py` is the new home;
+   commit ab6cca8e (2026-06-05) in release `testcontainers-v4.15.0` (PyPI 2026-07-24). Local
+   repro in a fresh Python 3.13 venv: warning printed, same class object, identical constructor
+   signature, 45 shims ↔ 45 `community/` packages. Confidence: **verified**.
+9. **Reproduce a shell bug under the script's own interpreter (c04820c7f2947876)** — bash manual
+   Aliases ("Aliases are not expanded when the shell is not interactive"), Bash Startup Files,
+   zsh Files (`.zshrc` only "if the shell is interactive"). Field: dev-loop issue #145 (exists,
+   closed). On this machine today `command -v grep` is `/usr/bin/grep` in both contexts, so the
+   ugrep half is field-only; the directive is doc-backed. Confidence: **verified** mechanism,
+   field example.
+10. **Assertion boundary vs symptom (c4350dda424a817e)** — Wikipedia Regression testing ("record a
+    test that exposes the bug"); field: linkly-crew PR #10 (public, merged) `core.rs:426-431`.
+    Confidence: **field-tested** rows on two `field-tested`/`verified` pages.
+11. **Mock fabricates an id the producer formats differently (7ad0888f88a13776)** — Google Testing
+    Blog "Don't mock types you don't own" ("assumptions built into mocks may get out of date"),
+    Fowler ContractTest, Pact docs; field: linkly-crew PR #10 (`derive.ts` vs `dispatch.rs`,
+    0/125 → 25/25). A Stripe "ids are opaque" quote the agent could not re-fetch was NOT cited.
+    Confidence: **verified**.
+12. **Homebrew clang ignores `SDKROOT` (57aa89b96c58268f)** — the trigger already had a page
+    (`compiler-sysroot-on-macos`, verified 2026-08-29) whose step-2 row says "Export SDKROOT;
+    clang reads it as the default sysroot". Local repro on Homebrew clang 22.1.8 CONTRADICTS
+    that row for Homebrew LLVM: `clang -###` loads
+    `etc/clang/arm64-apple-darwin25.cfg` = `-isysroot …/MacOSX26.sdk` (absent), so `SDKROOT`
+    (unset / xcrun path / CLT path) all fail; `-isysroot` works; `--no-default-config` +
+    `SDKROOT` works. Mechanism sourced: clang UsersManual configuration files
+    (`--no-default-config`), Homebrew `llvm.rb` `write_config_files`. The candidate's own
+    "SDKROOT is not a fix" claim is therefore correct **for Homebrew LLVM only**, so the
+    contradiction was reconciled as a condition (see routing). Confidence: **verified**.
 
 ## Existing-layer check
 
-Pages read: qa-process-llm-review-pipelines, qa-process-evaluating-review-feedback, qa-process-adversarial-change-review, infrastructure-agent-orchestration-session-context-token-budget, security-input-validation-at-trust-boundaries, platforms-shells-option-like-argument-values, qa-exploratory-guard-true-path-coverage, qa-document-verification-spec-document-gates, infrastructure-config-keys-ahead-of-their-consumer, platforms-shells-command-text-inspected-before-execution, security-agent-exposure-in-session-tool-exposure, testing-quality-checks-that-cannot-pass, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-usage-limit-paused-workers, platforms-tools-version-keyed-artifact-cache, qa-document-verification-generated-reference-drift-gates, infrastructure-ci-cd-pipeline-structure, platforms-tools-plugin-mcp-server-registration, testing-quality-tests-that-cannot-fail, testing-quality-unasserted-return-fields, testing-mocking-what-to-mock, platforms-filesystems-paths-case-and-line-endings, infrastructure-agent-orchestration-worktree-isolated-workers, testing-async-async-testing, platforms-processes-driving-a-tui-in-a-tmux-pane, platforms-processes-non-interactive-cli-invocation, qa-environments-browser-console-capture-gaps, databases-transactions-application-clock-vs-database-timestamps
+Pages read: platforms-toolchains-compiler-sysroot-on-macos, infrastructure-agent-orchestration-unattended-worker-questions, platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-tools-bsd-vs-gnu-cli, debugging-methodology-reproduce-first, testing-mocking-what-to-mock, backend-common-llm-binding-instructions-for-agents, qa-process-completion-claims, infrastructure-ci-cd-pipeline-structure, frontend-design-html-in-canvas, backend-common-integrations-robots-txt-and-source-selection, testing-strategy-failing-test-first, testing-quality-write-path-assertions
 
-Also read on open-PR branches (not on main, so not listed above): `infrastructure-agent-orchestration-login-expiry-during-unattended-turns` and `testing-quality-assertion-scanner-false-positive-on-unittest-convention` (PR #180), `infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan` (PR #181).
+Also read the PR-only page testcontainers-reaper-on-docker-desktop-macos on the #186 branch
+(different trigger: Ryuk socket mount, not import paths) and the root `INDEX.md` plus the
+infrastructure, testing, frontend, backend, debugging, qa, platforms domain indexes.
 
-- **Merged, not duplicated:** #2 → `qa/process/adversarial-change-review` (sharpens its technique 4 + confirm-before-blocking step; index row extended). #8 → `platforms/tools/version-keyed-artifact-cache` (the only main page mentioning `marketplace.json`; it stopped at "bump both by hand"). #12 → `testing/quality/unasserted-return-fields` (assertion side) + `testing/mocking/what-to-mock` (mock-authoring side, sibling of its clock row).
-- **New pages** (no page with the same trigger): #1 `qa/process/fresh-context-code-review` (llm-review-pipelines is about building a CI pipeline, not which session reviews); #4 `testing/quality/gate-parsing-vs-command-execution` (spec-document-gates explicitly delegates check authoring to testing/quality); #6 `infrastructure/agent-orchestration/client-bound-pty-coordinator-loss` (sibling pages cover worker liveness, not coordinator PTY hosting); #10 `platforms/filesystems/unix-domain-socket-path-length` (paths-case-and-line-endings covers OS path limits, not the socket-address buffer); #11 `platforms/processes/sentinel-driven-repl-payloads` (driving-a-tui covers tmux echo, not the stdin sentinel race).
-- **Conflicts:** none found.
-- **Related links added both ways** only on main pages no open PR rewrites: session-context-token-budget ↔ fresh-context-code-review; command-text-inspected-before-execution and in-session-tool-exposure ↔ gate-parsing-vs-command-execution; pane-delivery-confirmation and session-completion-gates ↔ client-bound-pty-coordinator-loss; paths-case-and-line-endings ↔ unix-domain-socket-path-length (+1 edge row); driving-a-tui-in-a-tmux-pane, non-interactive-cli-invocation, async-testing ↔ sentinel-driven-repl-payloads; unasserted-return-fields → what-to-mock.
-- **Back-links deliberately skipped** because an open PR rewrites that page's `related:` line (forward link only): llm-review-pipelines, evaluating-review-feedback, adversarial-change-review (#182); checks-that-cannot-pass (#179/#180); spec-document-gates (#179/#181); control-signals-vs-primary-artifacts, worktree-isolated-workers, tests-that-cannot-fail, what-to-mock (#179); usage-limit-paused-workers (#180); browser-console-capture-gaps (#182).
+- grep of main for `workflow_dispatch`, `can_approve`, `bypass_actors`, `GITHUB_TOKEN`,
+  `testcontainers`, `firecrawl`/`onlyMainContent`, `wire format`: no hits → new pages 1–6.
+- `AskUserQuestion` hits only unattended-worker-questions (worker-side out-of-band channel; a
+  different trigger) → merged into binding-instructions-for-agents (body rows + sources; the
+  `related:` line was left untouched because #179 rewrites it — the back-link to
+  unattended-worker-questions is in the new edge-case row text instead).
+- `sysroot` hits compiler-sysroot-on-macos → **conflict flagged and reconciled**: the step-2
+  `SDKROOT` row now carries the "when no `-isysroot` reaches the driver" condition, a new edge
+  row explains the Homebrew config file, an Instead-of row and three Sources bullets were added;
+  `log.md` records it as a reconciled contradiction. Frontmatter untouched (#179 rewrites
+  `related:`), so the new URLs live in the body Sources section only.
+- reproduce-first (untouched by any open PR): two edge rows + two Instead-of rows + sources +
+  frontmatter (`sources`, `last_verified`, `related` += path-resolution, completion-claims).
+- completion-claims: one claim/evidence row inserted after "Bug fixed" and one Sources bullet
+  before the superpowers bullet — positions chosen so #179's hunks (last table row, appended
+  sources) stay one unchanged line away. Frontmatter untouched (#179 rewrites it).
+- what-to-mock: one edge-case row linking the new producer-wire-format page; #179/#183 rewrite
+  its frontmatter and #183 edits the Do table and Sources, so nothing else was touched.
+- Back-links NOT added (frontmatter owned by open PRs): html-in-canvas → pointer page (#181),
+  what-to-mock → producer-wire-format (#179/#183), unattended-worker-questions → binding
+  instructions (frontmatter untouched by PRs but the row text link suffices).
+- Index rows: 6 new rows (infrastructure ci-cd ×2, backend integrations, testing data, testing
+  mocking, frontend design); load-when text extended on compiler-sysroot (platforms),
+  binding-instructions (backend), reproduce-first (debugging), completion-claims (qa).
+- Lint: `wiki-structure-checks.js wiki` 282 pages / 0 findings; `wiki-lint-prohibitions.js wiki`
+  0 violations; every new page ≤ 65 body lines, merged pages ≤ 94.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed via `gh pr list --search "head:knowledge/"`: #179 `knowledge/choiyounggi-20260903-172728`, #180 `knowledge/choiyounggi-20260903-184706`, #181 `knowledge/choiyounggi-20260903-203836`, #182 `knowledge/choiyounggi-20260903-214027`. Each head was fetched and diffed against `origin/main -- wiki/`.
+Open `knowledge/*` heads listed and fetched: #186 (20260906-013856), #185 (20260906-003745),
+#183 (20260904-133717), #182 (20260903-214027), #181 (20260903-203836), #180 (20260903-184706),
+#179 (20260903-172728). Each diffed against `origin/main -- wiki/` and grepped for the candidate
+terms (GitHub Actions, GITHUB_TOKEN, firecrawl, community.redis, AskUserQuestion, corr-, ugrep,
+`/bin/sh`, assertion boundary, wire format).
 
-| Candidate | Overlapping head | Verdict |
-|---|---|---|
-| #7 false login expiry (9a9038861c1d93fc) | #180 `login-expiry-during-unattended-turns.md` — same symptom, but that page treats expiry as always genuine | **fold** — pushed to #180 as commit `bc1cac7` (+1 edge row, +3 sources, index row extended), PR comment posted |
-| #9 Rust inline tests vs test-floor (b9e2ed778fd6d661) | #180 `assertion-scanner-false-positive-on-unittest-convention.md` — same root cause (path/name classifier with no entry for the convention) | **fold** — same commit `bc1cac7` (+When-this-applies paragraph, +Do item 6, +1 edge row, +3 sources, `applies_to` +rust, index row extended) |
-| #3 copied-plan premise (412141e74acbc743) | #181 `checkable-claims-in-an-adopted-plan.md` — same page family, case not yet present | **fold** — pushed to #181 as commit `58c6bd1` (+Do item 7, +1 Finding row, +1 source, log line), PR comment posted |
-| #2 allowlist bypass | #181 touches `validation-at-trust-boundaries` (spatial-range case), #182 touches `adversarial-change-review` `related:` line only | **new** (merge on main, body hunks do not collide) |
-| #4 parser vs executor | #179/#181 touch `spec-document-gates` (word-boundary fix, `related:`), #179/#180 touch `checks-that-cannot-pass` `related:` | **new** page; skipped those back-links |
-| #1, #6, #8, #10, #11, #12 | none | **new** |
-| #5 teardown cache | none | **drop** (stale against `d37fd67`, see above) |
+| Candidate | Overlapping open head | Verdict |
+|-----------|-----------------------|---------|
+| 8a6e99ab pointer field | none (#181 "spatial clamp" is server-side coordinate validation) | new |
+| 407808eb Firecrawl | none | new |
+| ebbe51ae ask-tool gate | #179 touches binding-instructions `related:` only; #180 unattended-worker-questions is worker-side | new (merge on main page, body only) |
+| d5776de0 YAML block scalar | none | new |
+| e88fdc00 create-PR setting | none | new |
+| d58c3d2d ruleset bypass | none | new |
+| 5a15e973 required checks | none | new |
+| 401fd399 testcontainers import | #186 testcontainers-reaper (Ryuk socket; different trigger) | new (separate page; no link to the PR-only page so main stays link-clean) |
+| c04820c7 shell repro path | #180/#181 edit portable-shell-scripts / path-resolution bodies on other rows | new (merged into reproduce-first, which no PR touches) |
+| c4350dda assertion boundary | #179 edits completion-claims (different rows) | new (rows placed away from its hunks) |
+| 7ad0888f mock wire format | #183 edits what-to-mock Do table + Sources | new (own page + one edge row) |
+| 57aa89b9 sysroot | #179 touches compiler-sysroot `related:` only | new (body-only merge) |
 
-No sibling duplicate PR was opened; this flush's PR carries only main-branch changes.
+No fold and no pending-duplicate drop this run. The earlier sibling hash 35922b00 (same
+sysroot trigger, 2026-08-05) is already `processed`; this row added the config-file mechanism
+that page lacked, so it was merged rather than dropped.
 
 ## Routing decision
 
-| Candidate | Target | Why |
-|---|---|---|
-| #1 fresh-context review | `qa/process/fresh-context-code-review` (new) | Review-process decision; peer of llm-review-pipelines / evaluating-review-feedback with a distinct trigger |
-| #2 allowlist bypass construction | `qa/process/adversarial-change-review` (merge) | Same trigger family — high-risk diff review at integration stage |
-| #3 copied-plan premise | `infrastructure/agent-orchestration/checkable-claims-in-an-adopted-plan` (fold, PR #181) | Plan-adoption checks live there |
-| #4 parser vs executor | `testing/quality/gate-parsing-vs-command-execution` (new) | spec-document-gates states check authoring belongs to testing/quality |
-| #5 teardown cache | dropped | Fixed on main 2026-09-02 (#170) |
-| #6 coordinator PTY | `infrastructure/agent-orchestration/client-bound-pty-coordinator-loss` (new) | Sibling of the tmux/orchestration lifecycle pages |
-| #7 false login expiry | `infrastructure/agent-orchestration/login-expiry-during-unattended-turns` (fold, PR #180) | Same symptom page |
-| #8 version drift gate | `platforms/tools/version-keyed-artifact-cache` (merge) | Only page on the plugin.json/marketplace.json pair; adds the CI-prevention half |
-| #9 Rust inline tests | `testing/quality/assertion-scanner-false-positive-on-unittest-convention` (fold, PR #180) | Same scanner-gap root cause |
-| #10 sun_path | `platforms/filesystems/unix-domain-socket-path-length` (new) | Path-length is a filesystem concern per the domain description |
-| #11 REPL sentinel | `platforms/processes/sentinel-driven-repl-payloads` (new) | Driving an external process, matching the category's existing pages |
-| #12 mock timestamps | `testing/quality/unasserted-return-fields` + `testing/mocking/what-to-mock` (merge rows) | Assertion side and mock-authoring side each have an exact host page |
+| Candidate | Target | Page |
+|-----------|--------|------|
+| 8a6e99ab | frontend/design | **new** `pointer-attracted-particle-fields` |
+| 407808eb | backend/common/integrations | **new** `contact-details-from-scraped-pages` |
+| ebbe51ae | backend/common/llm | **merge** `binding-instructions-for-agents` |
+| d5776de0 | infrastructure/ci-cd | **new** `unparseable-workflow-file` |
+| e88fdc00 + d58c3d2d + 5a15e973 | infrastructure/ci-cd | **new** `workflow-authored-pull-requests` (one situation — a workflow landing its own PR — with four settings as a decision table) |
+| 401fd399 | testing/data | **new** `testcontainers-python-community-namespace` |
+| c04820c7 | debugging/methodology | **merge** `reproduce-first` |
+| c4350dda | qa/process + debugging/methodology | **merge** `completion-claims` (claim/evidence row) and `reproduce-first` (edge row) |
+| 7ad0888f | testing/mocking | **new** `producer-wire-format-in-mocks` + edge row in `what-to-mock` |
+| 57aa89b9 | platforms/toolchains | **merge** `compiler-sysroot-on-macos` (contradiction reconciled as a condition) |
 
-No new category was needed. Lint: `wiki-structure-checks.js wiki` → 280 pages, 0 findings; `wiki-lint-prohibitions.js wiki` → 0 violations (1 pre-existing info).
+No new category: ci-cd, integrations, data, design, mocking, methodology, process, llm and
+toolchains all cover their candidates' triggers under their existing "route here" lines.
