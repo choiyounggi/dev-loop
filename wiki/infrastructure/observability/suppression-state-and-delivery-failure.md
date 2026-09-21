@@ -9,14 +9,7 @@ sources:
   - https://runbooks.prometheus-operator.dev/runbooks/general/watchdog/
   - https://prometheus.io/docs/alerting/latest/configuration/
 last_verified: 2026-08-10
-related:
-  [
-    infrastructure-observability-alerting,
-    infrastructure-observability-logs-metrics-signals,
-    backend-common-jobs-idempotent-handlers,
-    testing-quality-tests-that-cannot-fail,
-    testing-quality-harness-reverse-controls,
-  ]
+related: [infrastructure-observability-alerting, infrastructure-observability-logs-metrics-signals, backend-common-jobs-idempotent-handlers, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, infrastructure-observability-suppression-key-for-a-recurring-failure]
 ---
 
 # Where the Cooldown Mark Is Written Relative to the Send

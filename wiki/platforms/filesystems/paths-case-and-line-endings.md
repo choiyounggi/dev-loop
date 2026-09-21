@@ -9,7 +9,7 @@ sources:
   - https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
   - https://git-scm.com/docs/gitattributes
 last_verified: 2026-07-10
-related: [platforms-shells-portable-shell-scripts, platforms-environment-unicode-text-matching]
+related: [platforms-shells-portable-shell-scripts, platforms-environment-unicode-text-matching, platforms-filesystems-unix-domain-socket-path-length]
 ---
 
 # Files That Break When a Repo Moves Between macOS, Windows, and Linux
@@ -62,6 +62,7 @@ a script fails with `bad interpreter`, or generated paths break on Windows.
 | A file must keep CRLF (`.bat`, `.ps1` consumed by cmd) | Per-pattern override in `.gitattributes`: `*.bat text eol=crlf` |
 | Long paths are unavoidable on a Windows target | The 260 limit is removable via registry/Group Policy and the `\\?\` prefix, but tools without long-path support still fail — shallow trees remain the fix that works everywhere |
 | Case-renamed file loops as modified/untracked in git | `git config core.ignorecase` disagrees with the filesystem — redo the rename as two steps and leave `core.ignorecase` at git's auto-detected value |
+| The path being generated will be used to bind a unix domain socket, not just opened as a file | The filesystem's own path limit does not apply — `sun_path` is a fixed 104-byte (macOS) / 108-byte (Linux) buffer regardless of the OS's general path limit ([platforms-filesystems-unix-domain-socket-path-length]) |
 
 ## Instead of
 
