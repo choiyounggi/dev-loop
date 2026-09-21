@@ -6,8 +6,8 @@ applies_to: [general]
 confidence: field-tested
 sources:
   - https://github.com/obra/superpowers
-last_verified: 2026-08-22
-related: [debugging-methodology-verify-the-fix, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, testing-quality-tests-that-cannot-fail, qa-process-release-gates]
+last_verified: 2026-09-03
+related: [debugging-methodology-verify-the-fix, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, testing-quality-tests-that-cannot-fail, qa-process-release-gates, testing-quality-mutation-harness-file-custody, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, infrastructure-agent-orchestration-verify-command-in-a-worker-brief]
 ---
 
 # Claiming Work Is Done, Fixed, or Passing
@@ -33,6 +33,7 @@ work now", "probably fixed", or "tests pass" without a run in front of you.
 | "Feature works" | The feature executed end-to-end with its observable output | A clean build; unit tests of the parts |
 | "Worker/subagent finished its task" | Its diff and artifacts inspected per [infrastructure-agent-orchestration-control-signals-vs-primary-artifacts] | The worker's own completion report |
 | "Regression test added" | The red-green flip: test fails with the fix reverted, passes with it ([testing-quality-tests-that-cannot-fail]) | A test written once and seen green once |
+| "The auditor mutated files and restored them" (a test-quality auditor or any delegated agent that ran mutation testing on your uncommitted tree) | Your own byte comparison of the tree against a patch saved before delegating — `git diff > pre-audit.patch` before, `diff <(git diff) pre-audit.patch` after — plus a fresh suite run with the pre-audit total | The agent's "restored" sentence; a clean `git status --porcelain`, which an untracked file shows whether restored or destroyed ([testing-quality-mutation-harness-file-custody]) |
 
 3. Treat hedge words in a completion sentence — "should", "probably", "seems
    to" — as markers of an unverified claim: run the proving command, or
@@ -59,3 +60,5 @@ work now", "probably fixed", or "tests pass" without a run in front of you.
 ## Sources
 
 - https://github.com/obra/superpowers — verification-before-completion skill: fresh-evidence gate, claim/evidence table, hedge-word red flags, distrust of delegated self-reports; field-tested across agentic coding sessions
+- https://git-scm.com/docs/git-checkout — `git checkout -- <path>` replaces the file with the index version and discards unstaged changes; an auditor that runs it on your uncommitted work has discarded that work until its restore lands
+- Field reproduction 2026-08-18 (dev-loop task lo-t1-teardown): the test-quality auditor reported running `git checkout --` on `safe-cleanup.sh` during mutation testing and restoring it with `git apply`; the implementing session's own `diff <(git diff) <pre-audit patch>` was byte-identical and `bats tests/safe-cleanup.bats` re-ran 44/44 — that, not the auditor's sentence, established the restore

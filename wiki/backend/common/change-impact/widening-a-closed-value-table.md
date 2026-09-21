@@ -8,7 +8,7 @@ sources:
   - https://refactoring.com/catalog/replaceMagicLiteral.html
   - https://pragprog.com/tips/
 last_verified: 2026-08-29
-related: [backend-common-change-impact-call-site-enumeration, backend-common-api-design-unenforced-declarations, backend-common-errors-diagnostics-from-a-shared-code-path, backend-common-change-impact-compiler-as-call-site-inventory]
+related: [backend-common-change-impact-call-site-enumeration, backend-common-api-design-unenforced-declarations, backend-common-errors-diagnostics-from-a-shared-code-path, backend-common-change-impact-compiler-as-call-site-inventory, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge]
 ---
 
 # Widening a Closed Value Table Whose Consumers Inlined It
