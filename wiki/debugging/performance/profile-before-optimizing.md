@@ -8,7 +8,7 @@ sources:
   - https://www.brendangregg.com/flamegraphs.html
   - https://sre.google/sre-book/effective-troubleshooting/
 last_verified: 2026-07-10
-related: [debugging-methodology-hypothesis-testing, databases-query-optimization-reading-execution-plans]
+related: [debugging-methodology-hypothesis-testing, databases-query-optimization-reading-execution-plans, debugging-performance-attributing-a-benchmark-speedup]
 ---
 
 # Locating Where Time Goes Before Optimizing

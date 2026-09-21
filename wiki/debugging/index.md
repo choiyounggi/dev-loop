@@ -29,6 +29,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [profile-before-optimizing](performance/profile-before-optimizing.md) | Something is slow (endpoint, job, test suite, page) and you are about to optimize; choosing CPU profiling vs wall-clock tracing; cold vs warm measurement; verifying a speedup (a single slow SQL statement → databases/query-optimization/reading-execution-plans) |
+| [attributing-a-benchmark-speedup](performance/attributing-a-benchmark-speedup.md) | A benchmark reports a speedup/slowdown and you are about to attribute it to a specific code change in a commit message, PR, or report; reviewing a PR that cites a benchmark number as evidence a specific change helped; a claimed removed-cost change (deleted sleep, removed retry) shows no measured effect because the harness already zeroed that knob for the baseline arm |
 
 ## concurrency
 
