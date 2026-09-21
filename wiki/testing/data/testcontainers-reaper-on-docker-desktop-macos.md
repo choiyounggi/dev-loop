@@ -15,7 +15,7 @@ sources:
   - https://github.com/testcontainers/testcontainers-java/issues/7678
   - https://github.com/testcontainers/testcontainers-go/issues/399
 last_verified: 2026-09-06
-related: [testing-data-test-data-and-isolation, qa-environments-test-environment-parity, debugging-signals-reading-error-messages]
+related: [testing-data-test-data-and-isolation, qa-environments-test-environment-parity, debugging-signals-reading-error-messages, testing-data-testcontainers-python-community-namespace]
 ---
 
 # Testcontainers' Reaper Cannot Mount the Docker Socket on Docker Desktop for macOS

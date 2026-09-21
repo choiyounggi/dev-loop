@@ -9,6 +9,7 @@ sources:
   - https://cwe.mitre.org/data/definitions/88.html
   - https://doc.rust-lang.org/cargo/commands/cargo-test.html
   - https://doc.rust-lang.org/cargo/reference/config.html
+  - https://doc.rust-lang.org/cargo/reference/build-scripts.html
 last_verified: 2026-09-04
 related: [qa-process-evaluating-review-feedback, qa-process-regression-scope, qa-process-post-release-verification, infrastructure-agent-orchestration-inbound-validation-ownership-in-task-decomposition, qa-process-session-identity-leak-in-plugin-prose]
 ---

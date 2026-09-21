@@ -10,7 +10,7 @@ sources:
   - https://www.anthropic.com/engineering/multi-agent-research-system
   - http://principles-wiki.net/principles:don_t_repeat_yourself
 last_verified: 2026-09-10
-related: [infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-shared-run-state, debugging-methodology-hypothesis-testing, qa-process-evaluating-review-feedback]
+related: [infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-shared-run-state, debugging-methodology-hypothesis-testing, qa-process-evaluating-review-feedback, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan]
 ---
 
 # A Worker Reports the Design Doc and Step Files Disagree
@@ -54,6 +54,7 @@ threshold — not a matter of taste.
 
 | Case | Then |
 |------|------|
+| The discrepancy is found before any worker reports it — you are adopting the plan and its derived numbers or wiring do not recompute | [infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan] governs: recompute and escalate before implementing; this page governs a contradiction a worker has already reported |
 | The worker is the one who is wrong (misread a document, ran the wrong test target) | Correct the worker's step, cite the passing baseline that proves it, and leave both documents alone |
 | Both documents are wrong — neither matches the codebase's actual constraint | Patch both, and record one ruling listing both edits so a reader of either document sees the correction |
 | No test covers the disputed behavior either way | Write the missing test first instead of guessing, from behavior the codebase already depends on elsewhere, then apply steps 2-4 |

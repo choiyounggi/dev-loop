@@ -80,7 +80,7 @@ running.
 | Have your watcher act on every status file it sees | Filter to the task ids this run created | Otherwise another run's completion signal reads as your own task finishing |
 | Continue after noticing the default branch moved | Identify what merged, then decide | Your integration branch may already be missing or duplicating merged work |
 | Re-seed a task's status to `pending` after delivering a re-prompt | Reset first, then send, and let the worker's next write own the file | Two uncoordinated writers on one status file resolve by last write; the coordinator's late reset erases the worker's progress signal and the pane log and the file then disagree |
-| Take over as coordinator because `tmux ls` shows no coordinator session | Check `ps` for the coordinator/watcher process and the run's artifact mtimes against your session start | The coordinator usually runs outside tmux; "not in tmux" is not "dead" |
+| Take over as coordinator because `tmux ls` shows no coordinator session | Check `ps` for the coordinator/watcher process and the run's artifact mtimes against your session start | A coordinator can run outside tmux (an ssh pty, another terminal, another tmux socket); "not in tmux" is not "dead" |
 
 ## Sources
 

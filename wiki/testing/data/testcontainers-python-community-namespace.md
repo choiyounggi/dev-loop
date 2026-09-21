@@ -11,7 +11,7 @@ sources:
   - https://github.com/testcontainers/testcontainers-python/releases/tag/testcontainers-v4.15.0
   - https://pypi.org/pypi/testcontainers/json
 last_verified: 2026-09-06
-related: [testing-data-test-data-and-isolation, testing-strategy-test-level-choice]
+related: [testing-data-test-data-and-isolation, testing-strategy-test-level-choice, testing-data-testcontainers-reaper-on-docker-desktop-macos]
 ---
 
 # Importing Testcontainers-python Modules After the `community` Namespace Move

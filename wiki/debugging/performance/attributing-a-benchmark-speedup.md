@@ -8,8 +8,8 @@ sources:
   - https://www.brendangregg.com/activebenchmarking.html
   - https://www.brendangregg.com/blog/2018-06-30/benchmarking-checklist.html
   - https://gernot-heiser.org/benchmarking-crimes.html
-last_verified: 2026-09-10
-related: [debugging-performance-profile-before-optimizing, debugging-methodology-hypothesis-testing, testing-quality-harness-reverse-controls, qa-deliverables-quantitative-claims-in-a-published-document]
+last_verified: 2026-09-21
+related: [debugging-performance-profile-before-optimizing, debugging-methodology-hypothesis-testing, testing-quality-harness-reverse-controls, qa-deliverables-quantitative-claims-in-a-published-document, backend-common-llm-vendor-benchmark-claims-for-an-llm-tool]
 ---
 
 # Attributing a Benchmark Speedup to a Specific Code Change
@@ -44,7 +44,12 @@ reviewing a PR that cites a benchmark number as evidence a specific change helpe
    the candidate change applied against the same baseline config; the
    plausible story ("we removed a sleep, so it's faster") is not evidence on
    its own — an untested co-change can be doing all the work.
-5. **Explain the limiting factor before publishing the number.** State what
+5. **Run each arm several times and compare the delta against the run-to-run
+   spread before attributing it.** When the before/after gap is smaller than the
+   spread between repeated runs of the same arm, report it as noise, not a
+   speedup; when it is larger, record the run count and spread beside the number.
+   Caching, CPU frequency boost, GC, and background jobs perturb a single run.
+6. **Explain the limiting factor before publishing the number.** State what
    made the after-arm's result the value it is (CPU-bound loop, network round
    trip removed, cache hit) — a number without a named mechanism is not yet an
    attribution, it is an observation.
@@ -54,6 +59,7 @@ reviewing a PR that cites a benchmark number as evidence a specific change helpe
 | Baseline arm's harness-level config for the changed knob | The harness zeroes/mocks/short-circuits the exact setting the change touches, so the "before" cost was already absent in the measurement |
 | Where the changed code reads that setting | The component reads a package-level/module default instead of the harness's injected config, so the harness's knob never reached the code path |
 | Whether the change's code path executed at all in the baseline arm | A feature flag, early return, or stub in the baseline arm skips the code entirely — the delta then measures something else that also changed |
+| Run-to-run spread of each arm | One run per arm; the delta is inside the variance of repeated runs of the same arm |
 | Attribution when multiple changes landed together | Only one change was benchmarked in isolation; the others are credited by narrative, not measurement |
 
 ## Edge cases
@@ -76,6 +82,6 @@ reviewing a PR that cites a benchmark number as evidence a specific change helpe
 ## Sources
 
 - https://www.brendangregg.com/activebenchmarking.html — "casual benchmarking: you benchmark A, but actually measure B, and conclude you've measured C"; verify what is being exercised while the benchmark runs rather than trusting the intended target
-- https://www.brendangregg.com/blog/2018-06-30/benchmarking-checklist.html — "Can they explain why the benchmark result was X, and not 2X (twice as fast)? ie, what is the limiting factor?"; a misconfiguration (e.g. a firewall silently blocking traffic) can make a benchmark client believe it measured something it never ran
+- https://www.brendangregg.com/blog/2018-06-30/benchmarking-checklist.html — "5. Does it reproduce? If you run the benchmark ten times, how consistent are the results? There may be variance (e.g., due to caching or turbo boost) or perturbations (e.g., system cron tasks, GC) that skew a single benchmark result"; "Can they explain why the benchmark result was X, and not 2X (twice as fast)? ie, what is the limiting factor?"; a misconfiguration (e.g. a firewall silently blocking traffic) can make a benchmark client believe it measured something it never ran
 - https://gernot-heiser.org/benchmarking-crimes.html — "it does not at all follow that" a measured throughput delta equals the overhead of the change believed to cause it; comparisons must be made against the real, correctly configured baseline, not an assumed one
 - Field evidence (a Python web-scraping pipeline, 2026-09-09): its `scripts/bench_pipeline.py:354` constructed the "before" arm with `Pipeline({"delay_seconds": 0.0, ...})`; `src/local_scraper.py:126` read `default_config.DELAY_SECONDS` (3.0) rather than the pipeline's injected value. The benchmark's headline speedup was attributed to a removed 3-second sleep, whose cost was already zero in the baseline arm's measurement; the actual driver was a real ~3s-per-host cost added by the sleep's replacement

@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://code.claude.com/docs/en/permission-modes
   - https://code.claude.com/docs/en/permissions
-last_verified: 2026-09-03
+last_verified: 2026-09-21
 related: [platforms-tools-agent-permission-classifier-denials, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, backend-common-llm-binding-instructions-for-agents, testing-quality-checks-that-cannot-pass]
 ---
 
@@ -51,11 +51,14 @@ prompt or CLAUDE.md is the only thing currently forbidding it. Also when a
 
 4. **Count on the documented wrapper set being stripped, and on nothing else.**
    Before matching, a leading `timeout`, `time`, `nice`, `nohup`, `stdbuf`, the
-   builtins `command`/`builtin`, zsh `noglob`, and a leading `VAR=value`
-   assignment of known-safe variables are removed. `env cmd`, `sh -c 'cmd'`,
-   `xargs cmd`, and `bash script.sh` are not — add a deny entry for each wrapper
-   shape the boundary must hold against (`Bash(sh -c:*)`), or record that those
-   shapes stay covered only by the prose rule.
+   builtins `command`/`builtin`, zsh `noglob`, and a bare `xargs` (no flags)
+   are removed. A leading `VAR=value` assignment is skipped for every variable
+   when a deny or ask rule is matched (`Bash(rm *)` in deny still matches
+   `FOO=bar rm -rf x`); allow rules skip only known-safe variables.
+   `env cmd`, `sh -c 'cmd'`, `bash script.sh`, and a flagged `xargs -n1 cmd`
+   are matched as their own command, not the inner one — add a deny entry for
+   each wrapper shape the boundary must hold against (`Bash(sh -c:*)`), or
+   record that those shapes stay covered only by the prose rule.
 
 5. **Probe the rule from inside one worker before fanning out.** Launch a
    session in the intended mode and have it run the forbidden command in its
@@ -84,5 +87,5 @@ prompt or CLAUDE.md is the only thing currently forbidding it. Also when a
 ## Sources
 
 - https://code.claude.com/docs/en/permission-modes — "Deny rules block in every mode, including `bypassPermissions`. … Allow rules have no effect in `bypassPermissions`"
-- https://code.claude.com/docs/en/permissions — "If a tool is denied at any level, no other level can allow it. For example, a managed settings deny can't be overridden by `--allowedTools`"; deny rules from any scope are evaluated before allow rules; "The recognized command separators are `&&`, `||`, `;`, `|`, `|&`, `&`, and newlines. A rule must match each subcommand independently"; "The stripped wrappers are `timeout`, `time`, `nice`, `nohup`, and `stdbuf`, plus the shell builtins `command` and `builtin`, and zsh's `noglob`"; "also strips a leading assignment of certain known-safe environment variables"
+- https://code.claude.com/docs/en/permissions — "If a tool is denied at any level, no other level can allow it. For example, a managed settings deny can't be overridden by `--allowedTools`"; deny rules from any scope are evaluated before allow rules; "The recognized command separators are `&&`, `||`, `;`, `|`, `|&`, `&`, and newlines. A rule must match each subcommand independently"; "The stripped wrappers are `timeout`, `time`, `nice`, `nohup`, and `stdbuf`, plus the shell builtins `command` and `builtin`, and zsh's `noglob`"; "also strips a leading assignment of certain known-safe environment variables"; "A deny or ask rule matches past any leading assignment, so `Bash(rm *)` in deny still matches `FOO=bar rm -rf tmp/`"; "Bare `xargs` is also stripped … Stripping applies only when `xargs` has no flags" (re-fetched 2026-09-21)
 - Field context 2026-09-02 (dev-loop orchestration, workers launched with permissions bypassed): the stash stack shared across worktrees was protected by a prose rule alone; the deny form above was adopted after the docs confirmed deny applies under bypass. The session's first draft listed `env` among the stripped wrappers — the docs' list does not include it, which is why step 4 names it
