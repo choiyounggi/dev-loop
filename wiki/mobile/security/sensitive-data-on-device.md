@@ -14,7 +14,7 @@ sources:
   - https://developer.android.com/develop/ui/views/touch-and-input/copy-paste
   - https://developer.apple.com/documentation/uikit/uipasteboard
 last_verified: 2026-07-10
-related: [mobile-lifecycle-process-death-and-state, security-data-pii-handling, frontend-auth-token-handling-client-side]
+related: [mobile-lifecycle-process-death-and-state, security-data-pii-handling, frontend-auth-token-handling-client-side, qa-environments-offscreen-render-capture-without-screen-recording]
 ---
 
 # Sensitive Data on Device — Storage Classes and Leak Surfaces
