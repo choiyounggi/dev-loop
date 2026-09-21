@@ -8,7 +8,7 @@ sources:
   - https://vladmihalcea.com/optimistic-vs-pessimistic-locking/
   - https://www.postgresql.org/docs/current/explicit-locking.html
 last_verified: 2026-07-10
-related: [databases-transactions-isolation-level-selection, databases-transactions-multi-row-reorder-on-a-shared-resource]
+related: [databases-transactions-isolation-level-selection, databases-transactions-multi-row-reorder-on-a-shared-resource, backend-python-language-dict-subclass-attribute-loss-on-copy]
 ---
 
 # Optimistic vs Pessimistic Locking

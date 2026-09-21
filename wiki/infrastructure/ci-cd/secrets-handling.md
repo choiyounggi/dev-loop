@@ -12,7 +12,7 @@ sources:
   - https://cli.github.com/manual/gh_auth_login
   - https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests
 last_verified: 2026-08-06
-related: [infrastructure-containers-image-builds, infrastructure-ci-cd-pipeline-structure]
+related: [infrastructure-containers-image-builds, infrastructure-ci-cd-pipeline-structure, infrastructure-ci-cd-secret-needing-gate-on-fork-prs]
 ---
 
 # Credentials Flowing Through Build and Deploy Pipelines

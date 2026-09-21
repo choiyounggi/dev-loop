@@ -1,161 +1,88 @@
-# Knowledge flush — 12 insight(s)
+# Knowledge flush — 21 insight(s)
 
-Run `20260906-213602-52875` (headless auto-flush), branch `knowledge/choiyounggi-20260906-213635`.
-Claimed 12 rows with `queue-claim.js claim --max 12`; 18 rows remain pending for later flushes.
-Outcome: 6 new pages, 5 merges into existing pages (one reconciling a contradiction), 0 drops, 0 folds.
+Run: auto-flush headless child (run id `20260908-154254-28665`), queue drained from 14 session files (21 claimed rows). Outcome: 12 new pages, 8 merges into existing pages, 1 fold onto open PR #183, 0 drops. Lint after ingest: `wiki-structure-checks.js` 288 pages / 13 indexes / 0 findings; `wiki-lint-prohibitions.js` directives 75 / violations 0 (count unchanged, so the bats pin needs no bump); every touched page ≤ 120 body lines.
 
 ## Verified best-practice
 
-1. **Pointer-attracted particle field collapses (8a6e99abdfe31e54)** — `p += (t−p)·k` with a
-   stationary pointer is a contraction; nodes converge onto the cursor. Sources checked:
-   Wikipedia Banach fixed-point theorem ("admits a unique fixed point"), MDN `pointerleave`
-   ("moved out of the hit test boundaries"), MDN `requestAnimationFrame` ("paused in most
-   browsers when running in background tabs"). Field: cover-letter review
-   `.orchestration/reviews/t2-hero-code-intro-r1.md` F1 (collapse to ~8.7e-8 px; fix
-   `POINTER_INNER_RADIUS=32`, clamped step, out-of-bounds null, 1000-step test; 374 green).
-   Confidence: **verified** (mechanism doc-backed; numbers field).
-2. **Firecrawl `onlyMainContent` drops the regions that hold contact details (407808eb70bcaf43)**
-   — docs.firecrawl.dev `/scrape` reference: `onlyMainContent` default `true`, "Only return the
-   main content of the page excluding headers, navs, footers, etc."; `includeTags`/`excludeTags`
-   exist. `tel:` preservation is not documented — kept as field data (22/30 sites expose `tel:`,
-   16/30 have the number only outside main content, 0/30 gain a number from JS rendering).
-   Confidence: **verified** (mechanism) with the survey stated as field measurement.
-3. **"Ask the user" binds only when the question tool is named and a hook checks the transcript
-   (ebbe51aeb2082d16)** — code.claude.com hooks doc: PreToolUse input carries `transcript_path`,
-   exit code 2 blocks. dev-loop PR #136 (merged 2026-08-23) introduced the wording without the
-   tool name; PR #144 (merged 2026-08-25) named `AskUserQuestion` and added
-   `hooks/orchestrate-ask-gate.sh` (present on main; 27 bats cases). Confidence: **field-tested**
-   directive on top of doc-verified hook mechanics (page stays `field-tested`).
-4. **Column-0 line in `run: |` silently unregisters a workflow (d5776de0b6e9bedb)** — YAML 1.2.2
-   §8.1.2 "terminated when encountering a line which is less indented"; GitHub workflow-syntax
-   doc: without `name` the file path is displayed; `gh workflow run` manual: needs
-   `on.workflow_dispatch`. Local repro: Ruby Psych fails at `line 13 column 1`; two `-m` flags
-   parse. Field: groundwork PR #16 (merged; 422 before, `sync dev-loop pin` listed after). The
-   "listed as active with no triggers" behavior is observed, not documented — said so on the
-   page. Confidence: **verified**.
-5. **Actions may not create PRs until the repo setting is on (e88fdc004757a742)** — docs.github.com
-   Actions settings page ("Allow GitHub Actions to create and approve pull requests") and REST
-   `actions/permissions/workflow` with `can_approve_pull_request_reviews`. groundwork now reports
-   `true`; PR #18 (bot, closed) → #22 (bot, merged). Confidence: **verified**.
-6. **Personal-repo ruleset refuses an `Integration` bypass actor (d58c3d2dc6afce8f)** — REST
-   rules reference lists `Integration` as an actor type; the personal-repo 422 is NOT in the
-   docs (agent searched; only `OrganizationAdmin` is documented as personal-inapplicable). Field:
-   groundwork ruleset 21371046 exists with `bypass_actors: []`, `pull_request` rule at 0
-   approvals, required checks `bats/shellcheck/version-sync`. Row marked field-observed on the
-   page; the page as a whole stays **verified** because the recommended path (PR + self-merge)
-   rests on documented settings.
-7. **GITHUB_TOKEN-pushed branches get no check runs (5a15e973f89b9ab8)** — docs.github.com
-   `github_token`: "events triggered by the GITHUB_TOKEN will not create a new workflow run"
-   (exceptions `workflow_dispatch`/`repository_dispatch`); PAT/App token advised. `gh pr merge`
-   manual (`--auto`, `--delete-branch`), auto-delete-branches doc, cli/cli#9073 (open: `--auto -d`
-   does not delete). Field re-checked live: PR #22 check-runs `total_count=0`, #25 and #27 = 6,
-   `delete_branch_on_merge=true`. Confidence: **verified**.
-8. **`testcontainers.community.redis` (401fd399afd7f97b)** — upstream `src/testcontainers/redis.py`
-   shim emits the exact DeprecationWarning; `community/redis/__init__.py` is the new home;
-   commit ab6cca8e (2026-06-05) in release `testcontainers-v4.15.0` (PyPI 2026-07-24). Local
-   repro in a fresh Python 3.13 venv: warning printed, same class object, identical constructor
-   signature, 45 shims ↔ 45 `community/` packages. Confidence: **verified**.
-9. **Reproduce a shell bug under the script's own interpreter (c04820c7f2947876)** — bash manual
-   Aliases ("Aliases are not expanded when the shell is not interactive"), Bash Startup Files,
-   zsh Files (`.zshrc` only "if the shell is interactive"). Field: dev-loop issue #145 (exists,
-   closed). On this machine today `command -v grep` is `/usr/bin/grep` in both contexts, so the
-   ugrep half is field-only; the directive is doc-backed. Confidence: **verified** mechanism,
-   field example.
-10. **Assertion boundary vs symptom (c4350dda424a817e)** — Wikipedia Regression testing ("record a
-    test that exposes the bug"); field: linkly-crew PR #10 (public, merged) `core.rs:426-431`.
-    Confidence: **field-tested** rows on two `field-tested`/`verified` pages.
-11. **Mock fabricates an id the producer formats differently (7ad0888f88a13776)** — Google Testing
-    Blog "Don't mock types you don't own" ("assumptions built into mocks may get out of date"),
-    Fowler ContractTest, Pact docs; field: linkly-crew PR #10 (`derive.ts` vs `dispatch.rs`,
-    0/125 → 25/25). A Stripe "ids are opaque" quote the agent could not re-fetch was NOT cited.
-    Confidence: **verified**.
-12. **Homebrew clang ignores `SDKROOT` (57aa89b96c58268f)** — the trigger already had a page
-    (`compiler-sysroot-on-macos`, verified 2026-08-29) whose step-2 row says "Export SDKROOT;
-    clang reads it as the default sysroot". Local repro on Homebrew clang 22.1.8 CONTRADICTS
-    that row for Homebrew LLVM: `clang -###` loads
-    `etc/clang/arm64-apple-darwin25.cfg` = `-isysroot …/MacOSX26.sdk` (absent), so `SDKROOT`
-    (unset / xcrun path / CLT path) all fail; `-isysroot` works; `--no-default-config` +
-    `SDKROOT` works. Mechanism sourced: clang UsersManual configuration files
-    (`--no-default-config`), Homebrew `llvm.rb` `write_config_files`. The candidate's own
-    "SDKROOT is not a fix" claim is therefore correct **for Homebrew LLVM only**, so the
-    contradiction was reconciled as a condition (see routing). Confidence: **verified**.
+Five research agents vetted each candidate against primary sources (WebFetch/curl of official docs and source code, plus local reproductions where a claim was runnable). Confidence per candidate:
+
+**New pages**
+1. `infrastructure-ci-cd-secret-needing-gate-on-fork-prs` — **verified**. GitHub docs `events-that-trigger-workflows#pull_request_target` ("With the exception of GITHUB_TOKEN, secrets are not passed to the runner when a workflow is triggered from a forked repository"; "Running untrusted code on the pull_request_target trigger may lead to security vulnerabilities"); GitHub Security Lab "Preventing pwn requests" ("Combining pull_request_target workflow trigger with an explicit checkout of an untrusted PR is a dangerous practice"); anthropics/claude-code-action `docs/security.md` ("Do not check out an untrusted ref into the workspace root"; "Preferred — check out the base ref (default)"). Local: dev-loop `wiki-agent-gate.yml` + 12 bats tests read directly. Note: the "instruction-shaped diff text is a finding" stance is this repo's gate prompt, not security.md — cited accordingly.
+2. `infrastructure-ci-cd-review-bot-adopted-as-a-blocking-gate` — **verified**. alibaba/open-code-review `action.yml` (result written to `/tmp/ocr-result.json`; "Fail job on OCR error" keyed on exit code), `cmd/opencodereview/review_cmd.go` `reviewResultError` ("non-zero only for a run-level failure, or when every selected item failed. Any usable coverage — even incomplete — exits 0"), `scripts/github-actions/post-review-comments.js` (every `createReview` uses `event: "COMMENT"`, zero `REQUEST_CHANGES`/`setFailed` matches in 2657 lines), `sarif.go` exists.
+3. `infrastructure-agent-orchestration-tool-retirement-knowledge-transplant` — **field-tested**. dev-loop PR #130 fetched via gh: 14 + ~30 skills inventoried, 8 gaps ported, skip list in log.md, lint 0 findings. No external canonical source for the methodology found; not upgraded.
+4. `backend-python-language-dict-subclass-attribute-loss-on-copy` — **verified**. Python reference "A dictionary display yields a new dictionary object"; `copy` docs "copy.copy() normally returns an instance of the same type" (both quotes re-fetched by curl this run); local python3 3.14.6 reproduction (subclass attr lost under `dict()`/`{**}`; preserved under `copy.copy`; `getattr` default silent vs direct access `AttributeError`).
+5. `backend-python-language-iterative-dfs-for-unbounded-graph-depth` — **verified**. `sys.getrecursionlimit`/`setrecursionlimit` docs; What's New 3.12 "The recursion limit now applies only to Python code. Builtin functions do not use the recursion limit, but are protected by a different mechanism" (re-fetched by curl this run; the agent's discuss.python.org source was replaced with the official page); local reproduction: recursive DFS on a 2000-chain raises `RecursionError`, iterative completes with matching cycle output.
+6. `qa-document-verification-sweeping-pre-gate-citations-for-fabrication` — **field-tested**. dev-loop issue #156 fetched via gh (8 agents, ~440 fetches, 270/270 pages, 33 blockers on 24 pages, per-category breakdown; the page reports the breakdown rather than the monolithic "33 citation defects"). External LLM-citation-hallucination papers confirm the phenomenon, not the sweep methodology.
+7. `qa-process-session-identity-leak-in-plugin-prose` — **field-tested**. Incident re-verified: installed marketplace copy + two cached plugin versions contain no occurrence of the leaked name. 12factor.net/config cited as analogy only ("strict separation of config from code"); the page itself does not contain the user's personal name.
+8. `platforms-toolchains-regeneration-silently-drops-hand-edited-state` — **verified**. XcodeGen README ("Generate projects on demand and remove your .xcodeproj from git"), Docs/FAQ.md ("you can also check it in as a halfway step"), issues #515 (GUI-created shared schemes "will be overwritten the next time they generate") and #572 ("running xcodegen will overwrite that xcscheme file"). Field: 118 pbxproj lines + xcscheme deleted by xcodegen 2.45.4 on a one-key change.
+9. `testing-quality-narration-based-ordering-assertions` — **field-tested**. Apple `terminationHandler` API doc confirms the invariant class; the mutation narrative is session-relayed (no repo located) and stated as such in the page.
+10. `testing-mocking-autouse-fixture-shadows-function-under-test` — **verified**. pytest monkeypatch how-to ("monkeypatch.setattr must be called before the function which will use the patched function is called"; "All modifications will be undone after the requesting test function or fixture has finished"), fixtures how-to (autouse fixtures run as setup "even though neither test requested it").
+11. `testing-quality-cross-task-stub-assertions` — **field-tested**. The cited commit `de8c07c` and HANDOFF.md §5 item 18 were read directly in the source checkout (`git show`), confirming the placeholder-text → root-class rewrite.
+12. `testing-strategy-real-cli-spot-check-for-new-execution-paths` — **field-tested**. Commits `e761ed3`, `b25ff04`, `656d763` and HANDOFF.md §5 item 19 read directly (`git show`): ENOENT cwd hang and permit-scope deadlock, both "found by the coordinator's real-CLI spot check".
+
+**Merges**
+13. `security-data-commit-identity-in-public-repos` — **verified**. git-log pretty formats (`%ae`/`%ce`), git-filter-repo docs (`--mailmap` "rewriting author, committer, and tagger names and emails"; `--replace-message`), github.blog changelog 2019-12-19 ("we will automatically credit every commit author in the pull request as a co-author on the squash commit"). Note: the docs.github.com "about pull request merges" page does not state the trailer behavior; the changelog does.
+14. `security-data-masking-verification` — **field-tested** (page stays field-tested). The OWASP API3:2023 fetch was not completed by the agent, so it is NOT cited. Evidence is the direct read of the mask implementation and the two bypassing read endpoints.
+15. `infrastructure-agent-orchestration-session-completion-gates` — **verified**. Leonxlnx/unlazy `scripts/stop-hook.mjs` (`MAX_BLOCKS = 6`, ledger-hash no-progress counter) and CHANGELOG (1.0.0 instruction-only → 2.0.0 gate files + Stop hook) fetched; dev-loop `hooks/loop-gate.sh` Gate 2 + `tests/loop-gate.bats` read directly. The candidate's claim that loop-gate.sh is self-report-only was wrong (Gate 2 already exists); the page documents the mechanism, not the mischaracterization.
+16. `debugging-methodology-probe-path-vs-operation-path` — **field-tested** row on a verified page (84/84 events, store-state polling via `useRunStore.getState()`).
+17. `frontend-state-effects-usage` — **verified**. react.dev removing-effect-dependencies ("Object and function dependencies can make your Effect re-synchronize more often than you need"), useRef reference ("Changing a ref does not trigger a re-render"), Lenis `packages/core/src/lenis.ts` `updateClassName()` toggling `lenis-scrolling`/`lenis-stopped`.
+18. `platforms-toolchains-flag-availability-at-the-execution-site` — **verified**. code.claude.com CLI reference documents `--max-turns`; local reproduction on claude 2.1.263 (`--help` has zero matches; `-p --max-turns 3 --output-format json` returns `is_error:false`).
+19. `qa-document-verification-editing-a-gated-document` — **verified** by reproduction in this repo (`wiki-lint-prohibitions.js` prints `directives: 75`, bats pins the same literal). PR #151 numbers could not be re-fetched by that agent (401) and are cited as field evidence.
+20. `infrastructure-agent-orchestration-worktree-isolated-workers` — **verified**. gitignore docs (`.gitignore` = distributed via clone; `$GIT_COMMON_DIR/info/exclude` = repository-local), git-worktree docs; local reproduction: from a linked worktree `git rev-parse --git-path info/exclude` resolves to the main `.git/info/exclude`, and one pattern silenced `git status` in both checkouts.
+
+**Fold**
+21. Multi-line `CHECK:` truncation in `gate-check.sh` — **verified** by source read (`skills/loop-implement/scripts/gate-check.sh:117-118`, no wildcard case) and a scratch-dir reproduction (`exit=2: unexpected EOF while looking for matching quote` vs `exit=0 matched: WSGI_APP_OK` on one line). Folded onto PR #183 (see Open-PR check).
 
 ## Existing-layer check
 
-Pages read: platforms-toolchains-compiler-sysroot-on-macos, infrastructure-agent-orchestration-unattended-worker-questions, platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-tools-bsd-vs-gnu-cli, debugging-methodology-reproduce-first, testing-mocking-what-to-mock, backend-common-llm-binding-instructions-for-agents, qa-process-completion-claims, infrastructure-ci-cd-pipeline-structure, frontend-design-html-in-canvas, backend-common-integrations-robots-txt-and-source-selection, testing-strategy-failing-test-first, testing-quality-write-path-assertions
+Routing went INDEX.md → domain `index.md` → every page whose "load when" overlapped; second-domain indexes were read where the queue's domain tag was doubtful (eaa97ef1 tagged platforms → infrastructure; 5f1e60e7 tagged platforms → qa; 27598bf7/15c19bc4 untagged → testing, the domain that owns the test artifact per AGENTS.md routing step 1).
 
-Also read the PR-only page testcontainers-reaper-on-docker-desktop-macos on the #186 branch
-(different trigger: Ryuk socket mount, not import paths) and the root `INDEX.md` plus the
-infrastructure, testing, frontend, backend, debugging, qa, platforms domain indexes.
+Pages read: infrastructure-ci-cd-secrets-handling, infrastructure-ci-cd-pipeline-structure, infrastructure-ci-cd-changed-files-only-gates, qa-process-llm-review-pipelines, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-session-context-token-budget, qa-process-scope-purity-checks, backend-python-language-mutable-state-traps, databases-transactions-optimistic-vs-pessimistic-locking, security-data-masking-verification, security-data-pii-handling, backend-common-change-impact-call-site-enumeration, backend-common-change-impact-cross-module-consumer-census, debugging-methodology-probe-path-vs-operation-path, debugging-methodology-hypothesis-testing, debugging-methodology-reproduce-first, security-data-commit-identity-in-public-repos, security-secrets-secrets-in-code, qa-process-adversarial-change-review, qa-process-defect-class-resweep-after-review, security-dependencies-agent-skill-supply-chain, platforms-tools-plugin-mcp-server-registration, backend-common-llm-binding-instructions-for-agents, qa-document-verification-spec-document-gates, qa-document-verification-editing-a-gated-document, qa-deliverables-quantitative-claims-in-a-published-document, frontend-state-effects-usage, frontend-design-html-in-canvas, platforms-toolchains-compiler-sysroot-on-macos, platforms-toolchains-version-management, platforms-toolchains-environment-resync-removes-undeclared-packages, platforms-toolchains-flag-availability-at-the-execution-site, platforms-processes-non-interactive-cli-invocation, testing-quality-tests-that-cannot-fail, testing-quality-mutation-harness-file-custody, testing-async-async-testing, testing-mocking-captured-call-arguments, testing-quality-source-text-wiring-assertions, testing-mocking-what-to-mock, testing-data-test-data-and-isolation, testing-quality-stale-artifact-baselines, testing-strategy-test-level-choice, qa-process-completion-claims, testing-quality-checks-that-cannot-pass
 
-- grep of main for `workflow_dispatch`, `can_approve`, `bypass_actors`, `GITHUB_TOKEN`,
-  `testcontainers`, `firecrawl`/`onlyMainContent`, `wire format`: no hits → new pages 1–6.
-- `AskUserQuestion` hits only unattended-worker-questions (worker-side out-of-band channel; a
-  different trigger) → merged into binding-instructions-for-agents (body rows + sources; the
-  `related:` line was left untouched because #179 rewrites it — the back-link to
-  unattended-worker-questions is in the new edge-case row text instead).
-- `sysroot` hits compiler-sysroot-on-macos → **conflict flagged and reconciled**: the step-2
-  `SDKROOT` row now carries the "when no `-isysroot` reaches the driver" condition, a new edge
-  row explains the Homebrew config file, an Instead-of row and three Sources bullets were added;
-  `log.md` records it as a reconciled contradiction. Frontmatter untouched (#179 rewrites
-  `related:`), so the new URLs live in the body Sources section only.
-- reproduce-first (untouched by any open PR): two edge rows + two Instead-of rows + sources +
-  frontmatter (`sources`, `last_verified`, `related` += path-resolution, completion-claims).
-- completion-claims: one claim/evidence row inserted after "Bug fixed" and one Sources bullet
-  before the superpowers bullet — positions chosen so #179's hunks (last table row, appended
-  sources) stay one unchanged line away. Frontmatter untouched (#179 rewrites it).
-- what-to-mock: one edge-case row linking the new producer-wire-format page; #179/#183 rewrite
-  its frontmatter and #183 edits the Do table and Sources, so nothing else was touched.
-- Back-links NOT added (frontmatter owned by open PRs): html-in-canvas → pointer page (#181),
-  what-to-mock → producer-wire-format (#179/#183), unattended-worker-questions → binding
-  instructions (frontmatter untouched by PRs but the row text link suffices).
-- Index rows: 6 new rows (infrastructure ci-cd ×2, backend integrations, testing data, testing
-  mocking, frontend design); load-when text extended on compiler-sysroot (platforms),
-  binding-instructions (backend), reproduce-first (debugging), completion-claims (qa).
-- Lint: `wiki-structure-checks.js wiki` 282 pages / 0 findings; `wiki-lint-prohibitions.js wiki`
-  0 violations; every new page ≤ 65 body lines, merged pages ≤ 94.
+Overlaps and outcomes:
+- **Merged (same trigger, extending directive):** commit-identity (author-only → committer + squash trailer + cross-repo audit + named rewrite tool), masking-verification (per-channel sweep → mask shape classification + direct-store-read call sites), session-completion-gates (phase gate items 1–6 → ledger gate items 7–8 + release valve), probe-path-vs-operation-path (auth probe case → multi-layer pipeline row), effects-usage ("read a value without re-running" row → rAF-loop ref-mirror row), flag-availability (cross-environment version drift → `--help`-as-source-of-truth row), editing-a-gated-document (author side → reviewer-side pinned-count row), worktree-isolated-workers (ignored state dirs → where the ignore pattern lives).
+- **Created (new trigger, nothing covering it):** the 12 pages above. Closest neighbours checked and cross-linked rather than merged: tests-that-cannot-fail (at 115/120 lines; narration/mutation case is a distinct failure mode), what-to-mock and test-data-and-isolation (no autouse-shadowing case), environment-resync-removes-undeclared-packages (same abstract shape as xcodegen regen, different artifact → related), llm-review-pipelines (same OCR example, disjoint case), secrets-handling item 6 (general "no secrets on fork PRs" principle → the new page is the sanctioned exception pattern).
+- **Conflicts flagged:** none. One candidate mischaracterized dev-loop's own hook as self-report-only (loop-gate.sh already has a ledger gate); the merge documents the pattern without repeating the mischaracterization.
+- **Related links added both ways** for every new page and every merge (see log.md entry). Five reverse links are deferred because the target ids exist only on open PRs (listed under Open-PR check).
+- **Domain routing overrides:** eaa97ef1 platforms→infrastructure/agent-orchestration (platforms owns OS portability, not hook design); 5f1e60e7 platforms→qa/process (a review-checklist page, sibling of adversarial-change-review; kept separate from the git-identity page because trigger, artifact, detection command and remediation all differ); 27598bf7 and 15c19bc4 → testing (the artifact changed is a test / test strategy; orchestration pages are linked, not the owner).
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed and fetched: #186 (20260906-013856), #185 (20260906-003745),
-#183 (20260904-133717), #182 (20260903-214027), #181 (20260903-203836), #180 (20260903-184706),
-#179 (20260903-172728). Each diffed against `origin/main -- wiki/` and grepped for the candidate
-terms (GitHub Actions, GITHUB_TOKEN, firecrawl, community.redis, AskUserQuestion, corr-, ugrep,
-`/bin/sh`, assertion boundary, wire format).
+Open `knowledge/*` heads listed via `gh pr list` and fetched: #187 (`knowledge/choiyounggi-20260906-213635`), #186 (`…-20260906-013856`), #185 (`…-20260906-003745`), #183 (`…-20260904-133717`), #182 (`…-20260903-214027`), #181 (`…-20260903-203836`), #180 (`…-20260903-184706`), #179 (`…-20260903-172728`). Each candidate was diffed against every head's `wiki/` changes (138 page entries summarized, overlapping pages read via `git show origin/<head>:<path>`).
 
-| Candidate | Overlapping open head | Verdict |
-|-----------|-----------------------|---------|
-| 8a6e99ab pointer field | none (#181 "spatial clamp" is server-side coordinate validation) | new |
-| 407808eb Firecrawl | none | new |
-| ebbe51ae ask-tool gate | #179 touches binding-instructions `related:` only; #180 unattended-worker-questions is worker-side | new (merge on main page, body only) |
-| d5776de0 YAML block scalar | none | new |
-| e88fdc00 create-PR setting | none | new |
-| d58c3d2d ruleset bypass | none | new |
-| 5a15e973 required checks | none | new |
-| 401fd399 testcontainers import | #186 testcontainers-reaper (Ryuk socket; different trigger) | new (separate page; no link to the PR-only page so main stays link-clean) |
-| c04820c7 shell repro path | #180/#181 edit portable-shell-scripts / path-resolution bodies on other rows | new (merged into reproduce-first, which no PR touches) |
-| c4350dda assertion boundary | #179 edits completion-claims (different rows) | new (rows placed away from its hunks) |
-| 7ad0888f mock wire format | #183 edits what-to-mock Do table + Sources | new (own page + one edge row) |
-| 57aa89b9 sysroot | #179 touches compiler-sysroot `related:` only | new (body-only merge) |
+Per-candidate verdicts:
+- **fold:#183** — 5f41fd94 (multi-line CHECK truncation). #183 adds `testing/quality/gate-parsing-vs-command-execution.md`, which covers the same script and case family but not this failure mode. Not re-ingested here; the exact edge-case row + source bullet is posted as a comment on PR #183 for the owner to fold in (the page does not exist on main, so it cannot be edited on this branch).
+- **new (no overlap)** — all other 20. Specific checks: c5ac7430 vs #187 `workflow-authored-pull-requests` (bot-PR/ruleset, different failure) and #182 `llm-review-pipelines` (byte-identical to main); acd8c8f6 vs #182/#187 (none touch exit-code gating); eaa97ef1 vs #183 `session-completion-gates` and #186/#179 `control-signals-vs-primary-artifacts` (related-only / orchestrator-side, no ledger-gate content; my additions append to section ends to minimize textual conflict with #183); 39d73731 vs #186 `model-coupled-guidance-aging-detector` (temporal staleness detector, not citation accuracy — no fold); a3e368c1 vs #187 `reproduce-first` (assertion-boundary of an existing test vs live layer probing — adjacent, cross-linked, not folded); 44ebf34c vs #187 `pointer-attracted-particle-fields` (sibling canvas page, different case); 7b689559 vs #186 "literal-constant re-assertion" row and #179 (unrelated); 1db78612 vs #181 `synthetic-corpus-measurement-floor` (pigeonhole floor, unrelated); 15c19bc4 vs #179 `verify-command-in-a-worker-brief` (venv path in a brief, different mechanism); 27598bf7 vs #181 `checkable-claims-in-an-adopted-plan` (plan numeric claims, different); 4b17b2af vs #179 `worktree-isolated-workers` (adds an item on the same directories but not where the ignore pattern lives); 0e9f9b6d vs #183 `non-interactive-cli-invocation` (related-id only); 158ef7ac, d30e0ceb, e9ed0c65, 600d2698, 70ebcc34, 5f1e60e7, f9f7e64e, c36cb938 — no open head touches a relevant page.
+- **drop** — none.
 
-No fold and no pending-duplicate drop this run. The earlier sibling hash 35922b00 (same
-sysroot trigger, 2026-08-05) is already `processed`; this row added the config-file mechanism
-that page lacked, so it was merged rather than dropped.
+Deferred `related:` links (target ids not on main yet; add after the PR merges): `frontend-design-pointer-attracted-particle-fields` (#187) ↔ effects-usage; `infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan` (#181) ↔ cross-task-stub-assertions; `infrastructure-agent-orchestration-verify-command-in-a-worker-brief` (#179) ↔ real-cli-spot-check; `qa-document-verification-model-coupled-guidance-aging-detector` (#186) ↔ sweeping-pre-gate-citations; `testing-quality-gate-parsing-vs-command-execution` (#183) ↔ session-completion-gates.
 
 ## Routing decision
 
-| Candidate | Target | Page |
-|-----------|--------|------|
-| 8a6e99ab | frontend/design | **new** `pointer-attracted-particle-fields` |
-| 407808eb | backend/common/integrations | **new** `contact-details-from-scraped-pages` |
-| ebbe51ae | backend/common/llm | **merge** `binding-instructions-for-agents` |
-| d5776de0 | infrastructure/ci-cd | **new** `unparseable-workflow-file` |
-| e88fdc00 + d58c3d2d + 5a15e973 | infrastructure/ci-cd | **new** `workflow-authored-pull-requests` (one situation — a workflow landing its own PR — with four settings as a decision table) |
-| 401fd399 | testing/data | **new** `testcontainers-python-community-namespace` |
-| c04820c7 | debugging/methodology | **merge** `reproduce-first` |
-| c4350dda | qa/process + debugging/methodology | **merge** `completion-claims` (claim/evidence row) and `reproduce-first` (edge row) |
-| 7ad0888f | testing/mocking | **new** `producer-wire-format-in-mocks` + edge row in `what-to-mock` |
-| 57aa89b9 | platforms/toolchains | **merge** `compiler-sysroot-on-macos` (contradiction reconciled as a condition) |
+No new category or domain was created; every candidate fit an existing category.
 
-No new category: ci-cd, integrations, data, design, mocking, methodology, process, llm and
-toolchains all cover their candidates' triggers under their existing "route here" lines.
+| Candidate | Target |
+|---|---|
+| c5ac7430 | infrastructure/ci-cd/secret-needing-gate-on-fork-prs.md (new) |
+| acd8c8f6 | infrastructure/ci-cd/review-bot-adopted-as-a-blocking-gate.md (new) |
+| f9f7e64e | infrastructure/agent-orchestration/tool-retirement-knowledge-transplant.md (new) |
+| d30e0ceb | backend/python/language/dict-subclass-attribute-loss-on-copy.md (new) |
+| e9ed0c65 | backend/python/language/iterative-dfs-for-unbounded-graph-depth.md (new) |
+| 39d73731 | qa/document-verification/sweeping-pre-gate-citations-for-fabrication.md (new) |
+| 5f1e60e7 | qa/process/session-identity-leak-in-plugin-prose.md (new; queue tag platforms overridden) |
+| 158ef7ac | platforms/toolchains/regeneration-silently-drops-hand-edited-state.md (new; mobile considered, toolchains owns generator fidelity per the environment-resync precedent) |
+| 7b689559 | testing/quality/narration-based-ordering-assertions.md (new) |
+| c36cb938 | testing/mocking/autouse-fixture-shadows-function-under-test.md (new) |
+| 27598bf7 | testing/quality/cross-task-stub-assertions.md (new; agent proposed infrastructure/agent-orchestration, routed to testing as the owner of the test artifact) |
+| 15c19bc4 | testing/strategy/real-cli-spot-check-for-new-execution-paths.md (new; same reasoning) |
+| 70ebcc34 | security/data/commit-identity-in-public-repos.md (merge) |
+| 600d2698 | security/data/masking-verification.md (merge) |
+| eaa97ef1 | infrastructure/agent-orchestration/session-completion-gates.md (merge; queue tag platforms overridden) |
+| a3e368c1 | debugging/methodology/probe-path-vs-operation-path.md (merge) |
+| 44ebf34c | frontend/state/effects-usage.md (merge) |
+| 0e9f9b6d | platforms/toolchains/flag-availability-at-the-execution-site.md (merge; queue tag testing overridden) |
+| 1db78612 | qa/document-verification/editing-a-gated-document.md (merge) |
+| 4b17b2af | infrastructure/agent-orchestration/worktree-isolated-workers.md (merge) |
+| 5f41fd94 | fold → PR #183 gate-parsing-vs-command-execution.md (comment) |
+
+Domain indexes updated: infrastructure (+3 rows, 2 rows refreshed), backend/python (+2), qa (+2, 1 refreshed), platforms (+1, 1 refreshed), testing (+4), security (2 refreshed), debugging (1 refreshed), frontend (1 refreshed). INDEX.md unchanged (existing domain route lines already cover the new pages). `tests/wiki-lint-prohibitions.bats` pin untouched (directive count still 75).

@@ -9,7 +9,7 @@ sources:
   - https://docs.pytest.org/en/stable/reference/reference.html#pytest.LogCaptureFixture.messages
   - https://github.com/pytest-dev/pytest/blob/main/src/_pytest/logging.py
 last_verified: 2026-08-14
-related: [testing-quality-tests-that-cannot-fail]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-narration-based-ordering-assertions]
 ---
 
 # Asserting on Captured Log Messages

@@ -10,16 +10,7 @@ sources:
   - https://git-scm.com/docs/git-status
   - https://docs.python.org/3/library/pathlib.html
 last_verified: 2026-08-27
-related:
-  [
-    testing-quality-tests-that-cannot-fail,
-    testing-quality-harness-reverse-controls,
-    testing-quality-surviving-mutant-equivalence-triage,
-    testing-quality-completion-predicates,
-    testing-data-artifact-leakage-from-a-suite,
-    qa-process-scope-purity-checks,
-    qa-process-completion-claims,
-  ]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-surviving-mutant-equivalence-triage, testing-quality-completion-predicates, testing-data-artifact-leakage-from-a-suite, qa-process-scope-purity-checks, qa-process-completion-claims, testing-quality-narration-based-ordering-assertions]
 ---
 
 # A Hand-Rolled Mutation Harness That Edits and Restores Files In Place

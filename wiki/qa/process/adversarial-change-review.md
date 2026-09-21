@@ -11,7 +11,7 @@ sources:
   - https://doc.rust-lang.org/cargo/reference/config.html
   - https://doc.rust-lang.org/cargo/reference/build-scripts.html
 last_verified: 2026-09-04
-related: [qa-process-evaluating-review-feedback, qa-process-regression-scope, qa-process-post-release-verification, infrastructure-agent-orchestration-inbound-validation-ownership-in-task-decomposition]
+related: [qa-process-evaluating-review-feedback, qa-process-regression-scope, qa-process-post-release-verification, infrastructure-agent-orchestration-inbound-validation-ownership-in-task-decomposition, qa-process-session-identity-leak-in-plugin-prose]
 ---
 
 # Constructing Failure Scenarios for a High-Risk Diff
