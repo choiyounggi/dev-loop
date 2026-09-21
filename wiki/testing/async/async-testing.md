@@ -11,7 +11,7 @@ sources:
   - https://testing-library.com/docs/dom-testing-library/api-async/
   - https://martinfowler.com/articles/nonDeterminism.html
 last_verified: 2026-08-29
-related: [testing-quality-tests-that-cannot-fail, testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-injected-clock-duration-assertions]
+related: [testing-quality-tests-that-cannot-fail, testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-injected-clock-duration-assertions, platforms-processes-sentinel-driven-repl-payloads]
 ---
 
 # Testing Asynchronous Code Deterministically
