@@ -10,7 +10,7 @@ sources:
   - https://getautonoma.com/blog/parallel-ai-agent-prs
   - https://www.tiarebalbi.com/en/blog/code-graphs-coding-agents-delivery-shape
   - https://github.com/Graphify-Labs/graphify
-last_verified: 2026-09-172026-09-06
+last_verified: 2026-09-17
 related: [infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-session-context-token-budget, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, qa-process-completion-claims]
 ---
 
