@@ -8,7 +8,7 @@ sources:
   - https://sre.google/sre-book/monitoring-distributed-systems/
   - https://sre.google/workbook/alerting-on-slos/
 last_verified: 2026-07-10
-related: [infrastructure-observability-logs-metrics-signals, infrastructure-deploy-rollout-and-rollback, infrastructure-observability-suppression-state-and-delivery-failure]
+related: [infrastructure-observability-logs-metrics-signals, infrastructure-deploy-rollout-and-rollback, infrastructure-observability-suppression-state-and-delivery-failure, infrastructure-observability-suppression-key-for-a-recurring-failure]
 ---
 
 # Deciding What Pages a Human
