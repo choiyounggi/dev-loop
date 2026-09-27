@@ -10,7 +10,7 @@ sources:
   - https://docs.semgrep.dev/writing-rules/testing-rules
   - https://docs.pytest.org/en/stable/reference/exit-codes.html
 last_verified: 2026-08-06
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, backend-common-change-impact-call-site-enumeration, platforms-processes-tool-diagnostics-without-a-failing-exit-code, qa-process-scope-purity-checks, testing-quality-history-dependent-checks-on-shallow-clones, platforms-tools-deny-rules-under-bypassed-permissions, testing-quality-assertion-scanner-false-positive-on-unittest-convention, infrastructure-agent-orchestration-gate-evidence-exit-code-class]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, backend-common-change-impact-call-site-enumeration, platforms-processes-tool-diagnostics-without-a-failing-exit-code, qa-process-scope-purity-checks, testing-quality-history-dependent-checks-on-shallow-clones, platforms-tools-deny-rules-under-bypassed-permissions, testing-quality-assertion-scanner-false-positive-on-unittest-convention, infrastructure-agent-orchestration-gate-evidence-exit-code-class, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan]
 ---
 
 # Validating a Check Whose Target Does Not Exist Yet
