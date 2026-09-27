@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html
   - https://git-scm.com/docs/git-check-ignore
-last_verified: 2026-09-04
+last_verified: 2026-09-28
 related: [qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-worker-reported-plan-contradiction]
 ---
 
@@ -25,7 +25,10 @@ Also applies when the plan lists a multi-task "Task order / Depends on" table
 together with each task's own Steps or Inputs section, before implementing any
 task in it. Also applies when you are the plan's author, about to state a code
 wiring (a value threaded between two call sites, a lookup keyed by an id built
-elsewhere) or a pre-computed number (a contrast ratio) as fact.
+elsewhere) or a pre-computed number (a contrast ratio) as fact. Also applies
+when an adopt-only plan states two execution rules whose joint satisfiability
+depends on the current suite ("do not modify existing test bodies" together
+with "stop on any new failure").
 
 ## Do this
 
@@ -73,6 +76,7 @@ elsewhere) or a pre-computed number (a contrast ratio) as fact.
 | A deliverable is gitignored or a decision has no enactment | Escalate as a plan defect; it blocks every consumer, not only you |
 | A task's Steps prose names another task's not-yet-built symbol in a direction the dependency table contradicts | Escalate as a plan defect with both readings attached; do not implement in the table's order until the plan owner rules |
 | A plan's structural premise (a manifest field's shape, a source type) was copied from a sibling repo's or task's plan rather than read from this target | Read the target's real manifest field once before dispatch; escalate if it differs from the copied premise instead of implementing a gate that would compare nothing |
+| The plan freezes existing test bodies and also forbids new failures | Apply one production slice, run the whole suite, diff the failing set against the pre-change baseline, revert the probe, and report the delta as a plan defect — reading the plan cannot show whether its rule flips an existing assertion; only a run can |
 
 ## Edge cases
 
@@ -83,6 +87,7 @@ elsewhere) or a pre-computed number (a contrast ratio) as fact.
 | The plan pre-approves silent correction of arithmetic | Correct it, cite the pre-approval in the ruling, and still report the original value alongside |
 | You are the plan's author and a step threads a value from one call site to another, or keys a lookup by an id built elsewhere (`sink[step_id]` read against a `step["id"]` written as `step_id + ".net"`) | Grep both ends before dispatch — the write site and the read site — and paste both expressions into the plan so the adopter checks a match rather than a claim; confirm too that the call path meant to carry a new argument reaches the target (a second entry point such as `_do_post → _respond` that bypasses the wrapper leaves the parameter unset). A mismatched key or an unreached path raises nothing — a default value, an unset field — so the plan reads as correct until an output is subtly wrong; have the implementer re-run the same greps against source before writing code |
 | You are the plan's author fixing design-token values (a palette) and pre-computing WCAG contrast for the plan | Open the contract test file and enumerate every (foreground role, background surface) pair it asserts — a role is checked on more surfaces than the visible ones (`muted` on `surfaceSoft` as well as on canvas and card) — then compute all of them; a pair the plan skipped comes back one round later as a worker's plan-gap report or a red contract test |
+| The only way to test a rule's compatibility is a probe that touches production code | Probe production code only, never the frozen tests; revert the probe (`git checkout -- <the probed files>`) and confirm `git status --porcelain` is empty before reporting, so the gap report is not itself a forbidden edit |
 | You are the plan's author, about to write "reuse existing component X" or "token Y supports Z" | Grep the implementation and its consumer count before writing the sentence, and record the command beside the claim (`grep -rn <Symbol> <src> \| wc -l`) so the adopter's check is a re-run rather than a discovery — a file named for the concept can implement something else (a "modal" file that is a bottom sheet with a grabber and one consumer) or have zero consumers |
 
 ## Instead of
@@ -103,4 +108,5 @@ elsewhere) or a pre-computed number (a contrast ratio) as fact.
 - Field evidence 2026-08-23 (dev-loop mpa1 orchestration run, dl-version-gate task): a coordinator wrote the version-gate plan for dev-loop by copying a sibling task's plan for a different repo, carrying over a local-path source pairing. dev-loop's own marketplace entry is a `url`-source self-reference, not a local path, so the copied pairing would have compared nothing and the gate would always pass. The worker's adopt-or-report gate flagged the premise instead of implementing it; the coordinator re-planned to a name-match pairing (r2), approved on 6 green bats cases — a full re-plan round that one `jq` read of the real `source` field would have avoided
 - Field evidence 2026-08-26 (linkly, plan authoring): two silent-failure wirings caught by grepping both ends before dispatch — `verb_sink[step_id]` read against a `step["id"]` written as `step_id + ".net"` (lower.py:2148 vs 1138), and `_respond` reachable through `_do_post` without the JSON-log wrapper meant to pass its new argument (wsgi.py:818-830); neither path would have raised, and the implementer's re-verification against source was the second catch
 - Field evidence 2026-08-30 (linkly-calendar t1, `TokenContractTests.swift`): the coordinator pre-computed contrast for canvas and card backgrounds only; the contract test also checks `muted` on `surfaceSoft`, which measured 4.41:1 (below the 4.5:1 AA floor) and forced a palette re-adjustment round recorded in `.orchestration/notes/decisions.md`
+- Field evidence 2026-09-27 (seagrass, t174-inworkflow-write-state, adopt-only plan): the plan froze existing test bodies and required a stop on any new failure; replacing only the `repo_policy.seeded_entities` body with the plan's order-aware rule and running the whole suite moved failures from 1 to 2, the new one at `test_repo_policy.py:221` inside a class the plan froze. The probe was reverted (`git checkout --`, tree clean) and the contradiction reported as a plan gap before any implementation
 - Field evidence 2026-08-31 (linkly-calendar iOS design review): `LinklyModal.swift`, named in the draft as a reusable modal, was a bottom sheet (`grabber` + `.rect(topLeadingRadius:)`) with one consumer, and `LinklyCalendarRangeLozenge` had zero consumers by `grep -rn`; the design that planned to reuse both was corrected before implementation, and the grep commands were kept in the document

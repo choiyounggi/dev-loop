@@ -1,149 +1,181 @@
-# Knowledge ingest — WebMCP as the development standard: 2 pages re-verified, 2 new pages, routing widened
+# Knowledge flush — 12 insight(s) + 77 plan-gap rows
 
-Trigger: a Korean WebMCP explainer video (2026-09) pasted for evaluation. Its own content
-(declarative vs imperative API, shared page logic, token savings vs browser agents) was already
-covered by the two pages ingested 2026-08-18; adoption advocacy and proposal history were again
-left out. Verifying the video's claims against primary sources found the wiki a month behind its
-sources; the owner then decided (2026-09-28) that the additive WebMCP tool layer is the
-development standard for web UI work, QA, and bug fixes, which changes routing.
+Flush run id `20260928-082510-51682` (inherited from the auto-flush hook that spawned this session via `DEV_LOOP_FLUSH_RUN_ID`; step-0 acquire returned `already-owned` — a first attempt with a freshly generated id was correctly refused as `held`). Claimed queue ids: 12 session-harvested insights (`132b858e49df7e86`, `06c2127a32c50870`, `b144167a310dd409`, `f3aa894173b74a56`, `bb26106b019128e2`, `5cc5ca049c547407`, `0eaa58be75d0934d`, `21f8661fbab9c65f`, `b7c75b8ce0c9c759`, `1ad754070391a970`, `4dc7dd52cf801076`, `36d3d44f9cfe1f21`) plus the 77 rows of `plan-gaps.jsonl` (all `sessionId: plan-gaps`, harvested 2026-09-27).
+
+Outcome: **7 new pages, 1 amended page, 5 domain indexes + INDEX.md updated, no new category**; 12 of 12 session candidates handled — 11 ingested into 7 new pages (three rows merged into one page, two rows merged into another), 1 merged into an existing page; 77 plan-gap rows dropped as project-specific (listed under Local-layer candidates). Lint after the edits: `node scripts/wiki-structure-checks.js wiki` → **pages: 361, indexes: 13, findings: 0**; `node scripts/wiki-lint-prohibitions.js wiki` → **directives: 81, compliant: 81, violations: 0, info: 1** (the info line is the pre-existing `keys-ahead-of-their-consumer` cell, present on the untouched baseline: 353 pages / 0 findings / 0 violations / info 1). Largest touched body: `checkable-claims-in-an-adopted-plan` 100 lines; new pages 53–69 lines — all ≤ 120.
+
+Method: three read-only research agents fetched sources and quoted them; the coordinator then re-checked every URL cited below with `curl -sL -o /dev/null -w '%{http_code}'` (all 200; the Ollama FAQ moved from `faq.md` (404) to `faq.mdx` (200) and the page cites the live path), re-read the framer-motion 13.2.0 `observers.mjs` source itself, re-extracted the AGP `buildConfigField` sentence and the gradle-tips `BUILD_TIME` example from the live HTML, and re-fetched the Ollama FAQ and the TkDodo article. `git status --porcelain` on the checkout was re-read after the agents returned: only the coordinator's own edits were present.
 
 ## Verified best-practice
 
-### 1. `consequentialHint` / `debugging` annotations, ChatGPT site-tools constraints, DevTools pane → **verified**
+**1. `132b858e49df7e86` + `06c2127a32c50870` + `b144167a310dd409` — a fake IntersectionObserver under motion/framer-motion `whileInView`** (→ `confidence: verified`, new page `testing-mocking-fake-intersection-observer-for-viewport-animations`)
+Claims: (a) the wrapper caches one observer per (root, `JSON.stringify(options)`) in a module-level WeakMap, so constructor-count probes read 0 from the second test in a file and `observe(element)` is the countable event; (b) the per-element callback is resolved by `observerCallbacks.get(entry.target)`, so a fake entry without `target` makes the animation silently never fire while first-paint styles keep the suite green; (c) a timing suite needs an end-state positive control and a hardcoded-defaults mutation.
+Sources checked: `/Users/choeyeong-gi/Desktop/workspace/cover-letter/node_modules/framer-motion/dist/es/motion/features/viewport/observers.mjs` (v13.2.0, read in full — `observers = new WeakMap()`, `key = JSON.stringify(options)`, `fireObserverCallback = (entry) => { const callback = observerCallbacks.get(entry.target); ... }`, `rootInteresectionObserver.observe(element)`); upstream `https://raw.githubusercontent.com/motiondivision/motion/main/packages/framer-motion/src/motion/features/viewport/observers.ts` (200, same logic); `https://developer.mozilla.org/en-US/docs/Web/API/IntersectionObserverEntry/target` (200); `https://developer.mozilla.org/en-US/docs/Web/API/IntersectionObserver/observe` (200); `https://vitest.dev/api/vi.html` (200). No official motion doc on jsdom testing exists (agent checked motion.dev docs; the repo tests `whileInView` under Cypress, not jsdom) — the page does not claim one.
+Verification: source read + the session's own reproductions (constructor probe `expected +0 to be 1`; element probe 1 vs mutant 4; target-less fake green for a hardcoded-transition mutant, with `target` 2 red and run time 1 ms → 1018 ms). The third row (`b144…`, the reviewer's restatement with empty domain) carries no separate claim and is folded into the same page.
 
-- https://webmachinelearning.github.io/webmcp/ — Draft Community Group Report dated 2026-09-26;
-  IDL `partial interface Document { readonly attribute ModelContext modelContext }` (Document
-  only); `dictionary ToolAnnotations { readOnlyHint, untrustedContentHint, consequentialHint,
-  debugging }`; no user-confirmation primitive defined. (fetched 2026-09-28)
-- https://developer.chrome.com/docs/ai/webmcp/imperative-api — page dated 2026-09-21;
-  `document.modelContext.registerTool({ name, description, inputSchema, execute, annotations },
-  { signal, exposedTo })`; `consequentialHint` "allows agents and browsers to enforce mandatory
-  user confirmation prompts before executing high-stakes tools"; `debugging` Chrome 156+; no
-  `requestUserInteraction` mention (the security page's old note on it was removed).
-- https://developer.chrome.com/docs/devtools/application/webmcp — page dated 2026-05-12; the
-  WebMCP pane is in the Application panel; Available Tools (name, description, invocation count),
-  Invoked Tools (status, input, output), Run tool with manual parameters, schema-mismatch errors
-  in the output pane.
-- https://learn.chatgpt.com/docs/webmcp — "Site tools are ChatGPT's implementation of the
-  proposed WebMCP standard"; feature-detects `document.modelContext.registerTool`; declarative
-  API and iframe registrations unsupported; "Each tool invocation receives a safety review before
-  it runs"; GPT-5.6 Sol / GPT-6 Sol only, Luna disabled; desktop app; not in Enterprise/Edu;
-  surfaces: built-in browser, ChatGPT Work, Codex; user toggle under Settings → Browser →
-  Permissions. (help.openai.com's site-tools article was dropped as a source: it returns 403 to
-  fetchers, so its claims could not be verified.)
-- https://developer.chrome.com/docs/ai/webmcp/secure-tools — page dated 2026-09-01; budgets
-  30 / 500 / 150 / 1.5K. Contains no auth-state guidance, so the parity gate's both-auth-states
-  row is derived from security-agent-exposure-in-session-tool-exposure (PII via read tools,
-  server-side authz unchanged), not from this page.
-- https://developer.chrome.com/docs/ai/webmcp — page dated 2026-08-07; origin trial from Chrome
-  149; Model Context Tool Inspector extension; prompts go to `gemini-3-flash-preview`.
+**2. `f3aa894173b74a56` + `bb26106b019128e2` — concurrent optimistic per-field PATCH updates against one server-owned object** (→ `confidence: verified`, new page `frontend-state-concurrent-optimistic-updates`)
+Claim: per-call snapshot + whole-object replace-on-success lets one call's response or rollback overwrite another in-flight call's optimistic field; keep a confirmed snapshot plus an ordered pending-patch overlay, serialize the requests, set `confirmed = response` on success and drop only the failed patch on failure; with a query cache invalidate only when `isMutating() === 1`.
+Sources checked: `https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates` (200 — cancels refetches "so they don't overwrite our optimistic update", "multiple mutations running at the same time", links the concurrent-updates guide as further reading); `https://tkdodo.eu/blog/concurrent-optimistic-updates-in-react-query` (200, TanStack Query maintainer — "If that refetch is faster than our second mutation, our UI will revert…", `if (queryClient.isMutating() === 1) { queryClient.invalidateQueries(...) }`). The Apollo optimistic-UI page was not examined; the page cites only the two above.
+Verification: sources + field test (4 overlap tests with `CompletableDeferred` gates red on the snapshot version, green after; auditor reproduced the red; 131/0). The two rows are the same fix seen from the implementer (mobile) and the reviewer (frontend); one page, `applies_to: [general, react, android]`.
 
-### 2. WebMCP-as-standard routing (owner decision) → **policy, not a sourced claim**
+**3. `5cc5ca049c547407` — AGP `buildConfigField` writes the value as Java source** (→ `confidence: verified`, new page `infrastructure-config-config-values-emitted-as-source-text`)
+Claim: the value argument is emitted verbatim into `BuildConfig.java`, so user/env input must be escaped (`\` then `"`) and a hostile-character compile probe belongs in the verification step because javac fails before any runtime validation.
+Sources checked: `https://developer.android.com/reference/tools/gradle-api/8.7/com/android/build/api/dsl/VariantDimension` (200; live text re-extracted: "The field is generated as: <type> <name> = <value>; This means each of these must have valid Java content. If the type is a String, then the value should include quotes."); `https://developer.android.com/build/gradle-tips` (200; live example `buildConfigField("String", "BUILD_TIME", "\"${minutesSinceEpoch}\"")`). The escaping requirement and the `unclosed string literal` error are consequences of the documented "valid Java content" rule plus the session's javac 17 reproduction (exit 1 vs control exit 0) — the page states them as such.
 
-The widened triggers (any new or changed user action in a web UI) and the parity gate's
-"every action has a tool unless on the exclusion list" are the owner's development standard,
-stated as such in log.md. Every mechanical directive inside those pages is sourced as above.
-The standard keeps the existing "human UI primary, tool layer additive" directive unchanged.
+**4. `0eaa58be75d0934d` — kotlinx.serialization `coerceInputValues` and enum defaults** (→ `confidence: verified`, new page `backend-java-kotlin-coerced-enum-defaults-in-kotlinx-serialization`)
+Claim: with `coerceInputValues = true`, an unknown enum value on a property with a default is silently replaced by the default; a required enum property (no default) still throws.
+Sources checked: `https://github.com/Kotlin/kotlinx.serialization/blob/master/docs/json.md` (200; raw text re-read: supported invalid values are "`null` inputs for non-nullable types" and "unknown values for enums"; "If value is missing, it is replaced either with a default property value if it exists, or with a `null` if explicitNulls flag is set to `false` and a property is nullable (for enums)"; the `Brush` example). Field test: adding `= TripPlaceCategory.ETC` made `tripPlace_unknownCategory_throws` fail (9 tests, 1 failed); removing it restored green.
+
+**5. `21f8661fbab9c65f` — a top-level fixture helper shadowed by a receiver member inside `apply {}`** (→ `confidence: verified`, new page `backend-java-kotlin-implicit-receiver-shadowing-in-scope-functions`)
+Claim: inside a lambda with receiver an unqualified call resolves to the implicit receiver's member before a same-named top-level function.
+Sources checked: `https://kotlinlang.org/spec/overload-resolution.html` (200; "Call without an explicit receiver": local callables → "overload candidate sets for each pair of implicit receivers … in order of the receiver priority" → "top-level non-extension functions named f"); `https://kotlinlang.org/docs/scope-functions.html` (200; `apply`/`run`/`with` = `this`, `also`/`let` = `it`). No compiler inspection for this shadowing was found (the agent reports "none found", not "confirmed absent"); the page says the member call "compiles cleanly", which the field evidence shows. Field test: 3 failures with the fake's `NoSuchElementException` → rename to `tripFixture` → 13 pass.
+
+**6. `b7c75b8ce0c9c759` — an adopt-only plan that freezes test bodies and forbids new failures** (→ `confidence: field-tested` for this addition; merged into the existing `verified` page `infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan`)
+Claim: only a run reveals whether the plan's rule flips an existing assertion — apply one production slice, run the whole suite, diff the failing set against the baseline, revert, report the gap.
+Sources checked: `http://www.extremeprogramming.org/rules/spike.html` (200 on http only; "A spike solution is a very simple program to explore potential solutions … expect to throw it away") supports the throwaway-probe principle; the compound procedure is field evidence only (seagrass t174: failures 1→2, the new one at `test_repo_policy.py:221` inside a frozen class; reverted, tree clean). The page's `sources:` list is unchanged (the XP page was not added because the addition is recorded as field evidence, not as a sourced directive); the new material is a trigger sentence, one Do-table row, one edge row and one field-evidence line.
+
+**7. `1ad754070391a970` — first request to a self-hosted model server after idle** (→ `confidence: verified` for the keep-alive mechanics, new page `backend-common-llm-self-hosted-model-load-latency`)
+Claim: the first call after idle pays the model's disk load, which exceeds a 10 s SDK default timeout for a multi-GB model; raise the timeout, warm up before measuring, set keep-alive longer than the caller's idle interval.
+Sources checked: `https://github.com/ollama/ollama/blob/main/docs/faq.mdx` (200; re-fetched: "By default models are kept in memory for 5 minutes before being unloaded"; `keep_alive` accepts duration strings, seconds, negative numbers, `0`; "The `keep_alive` API parameter … will override the `OLLAMA_KEEP_ALIVE` setting"); `https://github.com/ollama/ollama/blob/main/docs/api.md` (200; `keep_alive` "default: 5m"). The candidate named the server "ollaya" (`OLLAYA_KEEP_ALIVE`) and the client "typesafe-sdk": the research agent found only GitHub repos created 2026-09-17 → 2026-09-27 with copy-pasted descriptions across unrelated accounts and flagged them as not a genuine established project. **The page names neither**; it describes "Ollama or a server with the same keep-alive model" and cites Ollama's docs, and the field evidence (`31334 ms ERROR … Request timed out (timeout=10.0)`; warm-up 1588 ms; p50 786 ms; "4 minutes from now") is recorded brand-free. The load-time-vs-timeout numbers are field evidence, not a documented figure.
+
+**8. `4dc7dd52cf801076` — row-for-row test of a compatibility alias table** (→ `confidence: field-tested`, new page `testing-quality-alias-table-contract-tests`)
+Claim: assert every alias from the design document's mapping with a size assertion and prove detection by retargeting one alias; a 4-of-18 spot check lets wrong forwards through.
+Sources checked: `https://pitest.org/quickstart/basic_concepts/` (200; killed mutant = a test failed), `https://testing.googleblog.com/2021/04/mutation-testing.html` (200), `https://junit.org/junit5/docs/current/user-guide/` (200; parameterized tests). These support the mechanics (table-driven + mutation), not the specific alias-table rule, hence field-tested. Field evidence: t1-design-tokens r1 → 20-row table with size check; r2 reviewer retargeted `ButtonMd` and exactly that test failed.
+
+**9. `36d3d44f9cfe1f21` — a `scrub` ScrollTrigger is outside `globalTimeline.timeScale()`'s reach** (→ `confidence: verified`, new page `frontend-design-scrubbed-scroll-animations-under-reduced-motion`)
+Claim: scrub sets the tween's progress from scroll position, so a global time-scale reduced-motion switch never affects it; read the preference where the effect is created, skip the trigger, set the final state.
+Sources checked: `https://gsap.com/docs/v3/Plugins/ScrollTrigger/` (200; scrub "Links the progress of the animation directly to the scrollbar so it acts like a scrubber"), `https://gsap.com/docs/v3/GSAP/Timeline/timeScale()/` (200; "Factor that's used to scale time in the animation"), `https://gsap.com/docs/v3/GSAP/gsap.matchMedia()/` (200; "Accessible animations with prefers-reduced-motion" section). The docs do not state the scrub/timeScale interaction in one sentence; it follows from the two definitions, and the page says so ("the engine sets `progress()` from scroll position instead of playing the tween, so a clock factor … has nothing to scale"). Field evidence: cover-letter `DurationMeter.tsx`, caught by the integration reviewer.
 
 ## Existing-layer check
 
-Pages read: frontend-agent-interfaces-agent-facing-tool-surfaces, security-agent-exposure-in-session-tool-exposure, qa-process-release-gates, testing-strategy-differential-testing, testing-strategy-cross-layer-effect-tests, testing-strategy-failing-test-first
+Pages read: infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, infrastructure-agent-orchestration-worker-reported-plan-contradiction, testing-quality-spec-artifact-checks, testing-quality-tests-that-cannot-fail, backend-common-reliability-timeouts-and-retries, backend-common-llm-context-window-budget, frontend-state-client-vs-server-state, testing-quality-mutation-harness-file-custody, testing-quality-value-preserving-refactor-assertions
 
-Whole-wiki grep `webmcp|modelContext|toolname|agent-friendly|answer engine` → 7 files (the two
-WebMCP pages, their two domain indexes, INDEX.md, log.md, platforms/tools/plugin-mcp-server-
-registration which matches only on a modelcontextprotocol URL). skills/, hooks/, agents/,
-templates/, AGENTS.md → 0 mentions. qa/testing/debugging indexes → no WebMCP routing line (the
-one qa hit is the model-coupled-guidance-aging-detector page, unrelated). `wiki_search` was
-unavailable (dev-loop-wiki MCP server failed to connect this session); the category pages were
-read directly per the skill's fallback.
+Domain indexes read in full: testing, mobile, frontend, infrastructure, backend, backend/java. `wiki_search` (k=5) was run once per candidate unit (9 queries); no hit described the same trigger for any unit. Top hits considered and why they are not merge targets:
+- Unit 1 (fake IntersectionObserver): `testing-e2e-e2e-stability` (entry animations under Playwright auto-wait — E2E, not a jsdom fake), `frontend-data-fetching-infinite-scroll` (production use of IntersectionObserver on a sentinel). New page; `related:` to tests-that-cannot-fail, what-to-mock, async-testing, infinite-scroll.
+- Unit 2 (concurrent optimistic updates): `frontend-state-client-vs-server-state` (where server state lives — read in full, no optimistic-update guidance), `databases-selection-relational-jsonb-vs-document-store` (server-side concurrent JSONB writes), `mobile-lifecycle-process-death-and-state`. New page; `related:` to client-vs-server-state, race-conditions, async-ui-states, mobile-offline-first-sync.
+- Unit 3 (buildConfigField): `backend-java-kotlin-compiler-daemon-heap-pressure`, `platforms-shells-option-like-argument-values` (text re-parsed as source — the closest analogue, linked as `related:`), `backend-common-change-impact-compiler-as-call-site-inventory`. New page under infrastructure/config (existing category: "per-environment config"); `related:` to environment-config.
+- Unit 4 (coerceInputValues): `backend-java-kotlin-frameworks-and-jpa` (Kotlin defaults vs DDL — a different default trap, linked), `testing-quality-schema-additions-under-a-golden-gate` (enum mutation in a golden gate, linked), `backend-java-kotlin-null-safety-interop` (linked). New page under backend/java/kotlin.
+- Unit 5 (implicit receiver shadowing): `backend-java-kotlin-null-safety-interop`, `testing-mocking-extracted-method-this-binding` (a JS `this`-binding trap, different mechanism), `testing-quality-value-preserving-refactor-assertions`. New page under backend/java/kotlin; `related:` to test-data-and-isolation, what-to-mock, null-safety-interop.
+- Unit 6 (adopt-only plan contradiction): `infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan` (read in full, 94 body lines) and `infrastructure-agent-orchestration-worker-reported-plan-contradiction` (read in full, 64 lines — governs a contradiction a worker has already reported between a design doc and step files, with the same "run it and read the suite" mechanism). The new case is a rule-vs-rule contradiction discovered before implementation, which is the adopting-side page's scope → **merged into checkable-claims** (trigger sentence, Do row, edge row, field-evidence line; 94 → 100 body lines); its index load-when line extended. No conflict with either page.
+- Unit 7 (model load latency): `backend-common-llm-context-window-budget` (read in full — repointing at a self-hosted server and the 400 context-window failure; different failure, linked), `backend-common-reliability-timeouts-and-retries` (read — generic timeout/retry policy, linked), `platforms-processes-non-interactive-cli-invocation`. New page under backend/common/llm.
+- Unit 8 (alias table test): `testing-quality-spec-artifact-checks` (read in full — coverage vs validity checks on a Markdown/spec artifact; the alias table is a code contract, so a new page linked both ways), `checkable-claims` step 2 (alias-name collisions, linked), `testing-quality-value-preserving-refactor-assertions`. New page under testing/quality.
+- Unit 9 (scrub vs timeScale): `frontend-data-fetching-infinite-scroll`, `testing-e2e-e2e-stability`; frontend/design has no motion page and the domain index's route line already names "motion styling". New page under frontend/design; `related:` to effects-usage (scroll/animation-library effects), accessibility-interactive-elements, and the new fake-IntersectionObserver page.
 
-Merge targets: both existing WebMCP pages were **revised in place** (same trigger, same
-directive, newer sources) — no new page for that material. The two new pages have new triggers
-(a release gate; a test strategy) that no existing qa/testing page covers: release-gates is the
-generic checklist page and is linked, not extended; differential-testing / cross-layer-effect-
-tests / failing-test-first are referenced from the testing page's edge cases.
-
-Related links added both ways: qa-process-release-gates ↔ qa-process-agent-tool-parity-gate;
-testing-strategy-cross-layer-effect-tests ↔ testing-strategy-agent-tool-shared-handler-tests;
-frontend agent-facing-tool-surfaces and security in-session-tool-exposure ↔ both new pages.
+Conflicts flagged: none. Related links: the new pages link outward to the existing pages named above; the existing pages' `related:` lists were left unchanged so this PR's footprint on existing pages stays at the one merged page plus index rows — back-links are for the owner to add at review if wanted.
 
 ## Open-PR check
 
-`gh pr list --state open` (2026-09-28): one open PR, #223 (knowledge/choiyounggi-20260927-220735,
-15 insights). Its file list contains none of the four WebMCP-related pages; the only overlap is
-appended log.md entries (union merge).
+`gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` → one open head: **#223 `knowledge/choiyounggi-20260927-220735`** (15 insights: gitignore re-inclusion, union-merge reassembly, hook input fields, silenced-write redirection, jq unicode escape, EPIPE write ordering, fake-server forward-before-reply, shared-helper invariant; 100 plan-gaps retired). Fetched and diffed `origin/main...origin/knowledge/choiyounggi-20260927-220735 -- wiki/ INDEX.md` (53 files): its new pages are `platforms/tools/hook-input-fields-from-the-reference`, `platforms/tools/unicode-escape-in-a-jq-regex`, `testing/mocking/fake-server-forward-before-reply`, `testing/quality/cross-component-invariant-via-shared-helper` and others in platforms/qa/security; its 100 plan-gap rows are a different, earlier set (harvested 2026-09-21 → 2026-09-23).
+
+| Candidate | Overlapping open head | Verdict |
+|-----------|-----------------------|---------|
+| Unit 1 fake IntersectionObserver (3 rows) | none — #223's `fake-server-forward-before-reply` is a network fake's reply ordering, not a DOM observer fake | **new** |
+| Unit 2 concurrent optimistic updates (2 rows) | none | **new** |
+| Unit 3 buildConfigField | none | **new** |
+| Unit 4 coerceInputValues | none | **new** |
+| Unit 5 implicit receiver shadowing | none | **new** |
+| Unit 6 adopt-only plan contradiction | none — #223 amends `qa/process/completion-claims` and `testing/flaky/diagnosing-flaky-tests`, not the adopted-plan pages | **new** (merged into a main page) |
+| Unit 7 model load latency | none | **new** |
+| Unit 8 alias table test | none — #223's `cross-component-invariant-via-shared-helper` is a shared test helper across components, not an alias mapping | **new** |
+| Unit 9 scrub vs timeScale | none | **new** |
+| 77 plan-gap rows | none (disjoint hash set from #223's 100) | **drop** — project-specific (below), not pending-duplicate |
 
 ## Routing decision
 
-- frontend/agent-interfaces/agent-facing-tool-surfaces — revised (owning artifact: the UI code).
-- security/agent-exposure/in-session-tool-exposure — revised (confirmation gating).
-- **qa/process/agent-tool-parity-gate** — new page in the existing `process` category beside
-  release-gates: it is a release-decision checklist for one surface, so it belongs where
-  release-gates and regression-scope live; no new category.
-- **testing/strategy/agent-tool-shared-handler-tests** — new page in the existing `strategy`
-  category beside test-level-choice / cross-layer-effect-tests: it decides what to test and at
-  which level for a two-entry-point action; no new category.
-- AGENTS.md routing step 7 — one row added (web UI user action → frontend agent-interfaces,
-  then the qa parity gate); tests/review-routing.bats pin 6 → 7 rows in the same commit.
-- INDEX.md frontend / qa / testing route lines and the three domain indexes updated; log.md
-  gained two ingest entries and two revise entries.
+| Insight(s) | Target | Page | Category decision |
+|------------|--------|------|-------------------|
+| `132b…`, `06c2…`, `b144…` | testing/mocking | `fake-intersection-observer-for-viewport-animations` (new) | existing category — fake/stub decisions |
+| `f3aa…`, `bb26…` | frontend/state | `concurrent-optimistic-updates` (new; `applies_to: [general, react, android]`) | existing category; the hazard is in the client state model, so frontend/state owns it and the INDEX.md frontend route line names "web or mobile view models" rather than a duplicate mobile page |
+| `5cc5…` | infrastructure/config | `config-values-emitted-as-source-text` (new) | existing category — config injection at build time; mobile has no build category and the rule holds for any codegen step |
+| `0eaa…` | backend/java/kotlin | `coerced-enum-defaults-in-kotlinx-serialization` (new) | existing Kotlin-only category (the index routes "Kotlin-only cases" here); applies to Android and Ktor clients alike |
+| `21f8…` | backend/java/kotlin | `implicit-receiver-shadowing-in-scope-functions` (new) | existing category — a language resolution rule, with testing pages as `related:` |
+| `b7c7…` | infrastructure/agent-orchestration | `checkable-claims-in-an-adopted-plan` (amended) | merge — same trigger family (adopting a plan you did not write), new Do row + edge row |
+| `1ad7…` | backend/common/llm | `self-hosted-model-load-latency` (new) | existing category — consuming LLM servers; brand-free wording |
+| `4dc7…` | testing/quality | `alias-table-contract-tests` (new) | existing category — test quality/mutation proof |
+| `36d3…` | frontend/design | `scrubbed-scroll-animations-under-reduced-motion` (new) | existing category — the frontend route line already lists "motion styling" |
 
-## Verification
+No new category. INDEX.md route lines extended for frontend, backend, infrastructure and testing so the new triggers are routable from the root.
 
-- `node scripts/wiki-lint-prohibitions.js wiki` → directives 79, violations 0 (pin unchanged).
-- `node scripts/wiki-structure-checks.js wiki --layer bundled` → pages 353, findings 0.
-- bats: tests/wiki-*.bats + tests/review-routing.bats + tests/orchestrate-review-pass.bats →
-  273/273 ok (one earlier `Recall@5` flake re-ran green; baseline on an untouched HEAD worktree
-  measured the same 0.87).
-- Body lines: frontend 110, security 76, qa 70, testing 66 (limit 120).
+## Local-layer candidates
 
-## Independent review (before commit)
+All 77 `plan-gaps.jsonl` rows are wiki-plan Phase B decisions of the form "Planning tN: deciding X (no owning wiki page)" whose directives name one repository's own files, symbols, values or routes (`TripApi` Retrofit paths, `LinklyRadius` numeric values, `.channel-view__side` CSS, `RFC_ROUTES` registration, `CLEANUP_REAP_TIMEOUT`, `network_security_config.xml` placement, …). Each is a design record for that repo, not a reusable trigger; the previous flushes (#188, #213, #223) retired the same class the same way. Retired as `drop: project-specific plan-gap`. Two rows sit next to general pages this PR adds — `f5966b045f97bab5` (the per-file `FakeIntersectionObserver` stub decision, whose general lesson is now `testing-mocking-fake-intersection-observer-for-viewport-animations`) and `71ab26670152561c` (required enum fields with no default, whose general lesson is `backend-java-kotlin-coerced-enum-defaults-in-kotlinx-serialization`) — the rows themselves remain project records. Targets below use the closest bundled category; run `wiki-ingest` inside the named project to land any of them.
 
-- General reviewer (feature-dev:code-reviewer, fresh context): FAIL → 2 major + 4 minor, all
-  applied: `consequentialHint` scope aligned with the security page's class table; gate edge row
-  for a vanished runtime (human-UI release not blocked); logout added to the AbortSignal edge
-  row and the Registration test; step 2/3 of the testing page conditioned on imperative vs
-  declarative; AGENTS.md step-7 row admits the exclusion list; qa index clause matched to the
-  page trigger.
-- Adversarial fact-checker (fresh context, every source re-fetched): 8/8 targeted claims
-  confirmed; FAIL on 2 unsupported sentences + 8 imprecisions, all applied: dropped the
-  `navigator.modelContext` history (no cited source has it); Run tool no longer claimed to write
-  Invoked Tools (that log is agent↔page); `consequentialHint` quote re-attributed (draft: "client
-  or agent"; Chrome: "agents and browsers"); secure-tools' stale `requestUserInteraction()`
-  mention recorded; `readOnlyHint` "requested" → "in its read-only example"; budgets labelled
-  as Chrome's recommendations applied as limits, parameter names included; cross-origin edge
-  row now names `allow="tools"` + `exposedTo` + `getTools({ fromOrigins })`; origin trial and
-  local flag separated; `SubmitEvent.agentInvoked` / `respondWith()` added to the declarative
-  test directive.
-
-## CI agent gate (run 36329841491) — blocker refuted, advisories applied
-
-- Blocker claimed the CG draft has no "client or agent … selectively enforce" language. Ground
-  truth (`curl -sL https://webmachinelearning.github.io/webmcp/`, 504,537 bytes, tags stripped,
-  2026-09-28): the phrase occurs once, in §6 Security considerations under the mitigation for
-  "Misrepresentation of Intent": "A boolean consequentialHint annotation acts as a signal to the
-  client or agent that the tool performs a consequential action … This way they can selectively
-  enforce mandatory user confirmation prompts before executing high-stakes tools". The gate's
-  fetch read a truncated page. The page now names the section beside the quote.
-- Advisory (chromestatus unverifiable from CI): confirmed via the JSON API — stage 150
-  desktop/Android 149–156; Firefox and Safari "No signal". The source line now records the API
-  path.
-- Advisory (Run tool vs Invoked Tools): Do 8 no longer implies manual runs are excluded from the
-  log; it states only what the DevTools page states.
-- Advisory (cross-link gap): qa parity gate ↔ backend-common-api-design-agent-tool-granularity
-  linked both ways, with one sentence placing the parity table as the release-time reading of
-  that page's design-time capability map.
-
-## CI agent gate, second run (36330523418) — blocker applied, quote advisory stands
-
-- Blocker: the frontend page stated "the development standard is an additive WebMCP tool per
-  action" as unconditional fact under confidence: verified. Applied: the trigger, the frontend
-  domain description and load-when line, and the INDEX.md frontend row now condition on "this
-  wiki's development standard (owner decision, log.md 2026-09-28, a policy rather than a sourced
-  fact)". Routing width is unchanged; the sentence is a policy the wiki declares, not a claim about
-  the world.
-- Advisory (§6 quote unverifiable from CI): the gate's fetch truncates before §6.3.2 and curl is
-  blocked in its sandbox; it records the quote as unverifiable, not refuted. Ground-truth grep is in
-  the PR comment; the two sources lines name the section.
-- Advisory (duplication with test-level-choice's extract-and-wire edge row): linked both ways and
-  named in step 1 as the general rule applied to two entry points.
+| Queue id | Project | Decision | Local target |
+|----------|---------|----------|--------------|
+| `d9055dd9c9c028d8` | cover-letter | Planning t1-motion-stagger: deciding `as` tag dispatch without `any` | `wiki-local/frontend/design/t1-motion-stagger-deciding-as-tag-dispatch-without-any.md` |
+| `fd03be655070a0ff` | cover-letter | Planning t1-motion-stagger: deciding `from` preset values | `wiki-local/frontend/design/t1-motion-stagger-deciding-from-preset-values.md` |
+| `f5966b045f97bab5` | cover-letter | Planning t1-motion-stagger: deciding Test IntersectionObserver stub | `wiki-local/frontend/design/t1-motion-stagger-deciding-test-intersectionobserver-stub.md` |
+| `474303a727bf72b2` | dace | Planning t3-trip-data: deciding HTTP boundary longitude field name | `wiki-local/mobile/networking/t3-trip-data-deciding-http-boundary-longitude-field-name.md` |
+| `7bbccf6326ea06d4` | dace | Planning t3-trip-data: deciding `TripApi` Retrofit path/method table | `wiki-local/mobile/networking/t3-trip-data-deciding-tripapi-retrofit-path-method-table.md` |
+| `71ab26670152561c` | dace | Planning t3-trip-data: deciding `category` / `mode` field types | `wiki-local/mobile/networking/t3-trip-data-deciding-category-mode-field-types.md` |
+| `92a1b76824103c14` | dace | Planning t3-trip-data: deciding Update-request body encoding (`UpdateTripRequest`, `UpdateTripPlaceRequest`, `UpdateItineraryItemRequest`) | `wiki-local/mobile/networking/t3-trip-data-deciding-update-request-body-encoding-updatetriprequest-u.md` |
+| `4d2ac156ca9d688b` | dace | Planning t3-trip-data: deciding `TripViewModel` structure | `wiki-local/mobile/networking/t3-trip-data-deciding-tripviewmodel-structure.md` |
+| `0ec3ed5e659f62a3` | dace | Planning t3-trip-data: deciding `TripViewModel` draft/form ownership | `wiki-local/mobile/networking/t3-trip-data-deciding-tripviewmodel-draft-form-ownership.md` |
+| `32963894c999e03d` | dace | Planning t3-trip-data: deciding `TripItineraryPlanner.applyOptimizedOrder` | `wiki-local/mobile/networking/t3-trip-data-deciding-tripitineraryplanner-applyoptimizedorder.md` |
+| `c6d694c43e1adb93` | dace | Planning t3-trip-data: deciding `updateItineraryItem` (16th `TripApi` route) | `wiki-local/mobile/networking/t3-trip-data-deciding-updateitineraryitem-16th-tripapi-route.md` |
+| `e4f4db6b5e9f0203` | dace | Planning t3-trip-data: deciding `TripViewModel` test doubles | `wiki-local/mobile/networking/t3-trip-data-deciding-tripviewmodel-test-doubles.md` |
+| `6432f4e1b6eaf63f` | dace | Planning t1-design-tokens: deciding LinklyRadius exact values | `wiki-local/mobile/presentation/t1-design-tokens-deciding-linklyradius-exact-values.md` |
+| `e72e9fbd49d08484` | dace | Planning t1-design-tokens: deciding Color palette source of truth | `wiki-local/mobile/presentation/t1-design-tokens-deciding-color-palette-source-of-truth.md` |
+| `65e9b90e50e73d58` | dace | Planning t1-design-tokens: deciding LinklyTextStyle representation | `wiki-local/mobile/presentation/t1-design-tokens-deciding-linklytextstyle-representation.md` |
+| `d9cf4fd545e20d29` | dace | Planning t1-design-tokens: deciding Legacy typography name to new role mapping | `wiki-local/mobile/presentation/t1-design-tokens-deciding-legacy-typography-name-to-new-role-mapping.md` |
+| `804b55b42f7e9eba` | dace | Planning t1-design-tokens: deciding linklyShadow to LinklyElevation forwarding | `wiki-local/mobile/presentation/t1-design-tokens-deciding-linklyshadow-to-linklyelevation-forwarding.md` |
+| `6c0445bafa4c6bc8` | dace | Planning t1-design-tokens: deciding Legacy LinklyColor alias targets | `wiki-local/mobile/presentation/t1-design-tokens-deciding-legacy-linklycolor-alias-targets.md` |
+| `4307412885ab1516` | dace | Planning t1-design-tokens: deciding LinklyEventListCard / LinklyPhotoGridCell scope of change | `wiki-local/mobile/presentation/t1-design-tokens-deciding-linklyeventlistcard-linklyphotogridcell-scop.md` |
+| `d2169dcb8d26bd41` | dace | Planning t1-design-tokens: deciding LinklyTabBar / LinklyChatBubble structural-redesign ownership | `wiki-local/mobile/presentation/t1-design-tokens-deciding-linklytabbar-linklychatbubble-structural-red.md` |
+| `5e3efbda6d43b7b9` | seagrass | Planning t176-http-retry-passthrough: deciding `path`-passthrough regression scope | `wiki-local/backend/common/api-design/t176-http-retry-passthrough-deciding-path-passthrough-regression-scope.md` |
+| `885247c1b820b2d6` | seagrass | Planning t176-http-retry-passthrough: deciding `breaker`-reaching-the-driver proof | `wiki-local/backend/common/api-design/t176-http-retry-passthrough-deciding-breaker-reaching-the-driver-proof.md` |
+| `7dba3e48db50231e` | seagrass | Planning t176-http-retry-passthrough: deciding CHANGELOG entry | `wiki-local/backend/common/api-design/t176-http-retry-passthrough-deciding-changelog-entry.md` |
+| `b887a52ab301fa4f` | seagrass | Planning t174-inworkflow-write-state: deciding Order-aware seed rule | `wiki-local/backend/common/api-design/t174-inworkflow-write-state-deciding-order-aware-seed-rule.md` |
+| `6534fb12c57590fe` | seagrass | Planning t174-inworkflow-write-state: deciding No `interp.py` change | `wiki-local/backend/common/api-design/t174-inworkflow-write-state-deciding-no-interp-py-change.md` |
+| `046386ad11f734ae` | seagrass | Planning t173-openapi-create-as: deciding Where `_response_schema` sources a `create ... as` alias's entity shape | `wiki-local/backend/common/api-design/t173-openapi-create-as-deciding-where-response-schema-sources-a-create.md` |
+| `39272f0714d7ecb0` | seagrass | Planning t173-openapi-create-as: deciding Lookup order when a binding name could match both the alias map and the entity map | `wiki-local/backend/common/api-design/t173-openapi-create-as-deciding-lookup-order-when-a-binding-name-could.md` |
+| `78525c7bad510519` | dace | Planning t4-notifications-presence: deciding Chat viewing-presence formula | `wiki-local/mobile/networking/t4-notifications-presence-deciding-chat-viewing-presence-formula.md` |
+| `dfc98d8efc0f1c7e` | dace | Planning t4-notifications-presence: deciding Chat-tab-active signal delivery in ChatScreen | `wiki-local/mobile/networking/t4-notifications-presence-deciding-chat-tab-active-signal-delivery-in.md` |
+| `58a09c1f2e2840bc` | dace | Planning t4-notifications-presence: deciding Ping payload shape | `wiki-local/mobile/networking/t4-notifications-presence-deciding-ping-payload-shape.md` |
+| `605d0efe38edbf26` | dace | Planning t4-notifications-presence: deciding Presence emission while disconnected | `wiki-local/mobile/networking/t4-notifications-presence-deciding-presence-emission-while-disconnecte.md` |
+| `1dd089d4720913de` | dace | Planning t4-notifications-presence: deciding NotificationPreference/Update DTO field names + bounds | `wiki-local/mobile/networking/t4-notifications-presence-deciding-notificationpreference-update-dto-f.md` |
+| `c7c574450273338b` | dace | Planning t4-notifications-presence: deciding PATCH partial-body encoding | `wiki-local/mobile/networking/t4-notifications-presence-deciding-patch-partial-body-encoding.md` |
+| `42c6515bc2a60c93` | dace | Planning t4-notifications-presence: deciding Reminder-offset clamping | `wiki-local/mobile/networking/t4-notifications-presence-deciding-reminder-offset-clamping.md` |
+| `efdba02159ef416b` | dace | Planning t4-notifications-presence: deciding Reminder-offset UI component | `wiki-local/mobile/networking/t4-notifications-presence-deciding-reminder-offset-ui-component.md` |
+| `e7a83bd5532a5f87` | dace | Planning t4-notifications-presence: deciding SettingsViewModel/AppRoot wiring | `wiki-local/mobile/networking/t4-notifications-presence-deciding-settingsviewmodel-approot-wiring.md` |
+| `800330f7e8da269d` | seagrass | Planning t179-migrate-silent-noop: deciding How `migrate` locates a candidate row whose scan-time key derivation (`row_key(entity_id, row)`) misses on re- | `wiki-local/backend/common/api-design/t179-migrate-silent-noop-deciding-how-migrate-locates-a-candidate-row.md` |
+| `f19196c74d13965b` | seagrass | Planning t179-migrate-silent-noop: deciding What happens when a run scans ≥1 candidate but ends up writing 0 of them, for ANY reason (all resolved via D1/ | `wiki-local/backend/common/api-design/t179-migrate-silent-noop-deciding-what-happens-when-a-run-scans-1-cand.md` |
+| `878d659c451b5fb0` | seagrass | Planning t179-migrate-silent-noop: deciding Whether `run_migration`'s success-path return dict may grow a new key (e.g. `"failed"`) to carry the D2/D3 sig | `wiki-local/backend/common/api-design/t179-migrate-silent-noop-deciding-whether-run-migration-s-success-path.md` |
+| `dfa0c5396f050af4` | seagrass | Planning t179-migrate-silent-noop: deciding What `docs/migration.md` must state about the new report/exit-code contract (covers R6) | `wiki-local/backend/common/api-design/t179-migrate-silent-noop-deciding-what-docs-migration-md-must-state-ab.md` |
+| `bd37a58d7ac48356` | dace | Planning t1-design-tokens: deciding Legacy typography name to new role mapping (all 20 Typography.kt enum entries accounted for: 18 explicit forwa | `wiki-local/mobile/presentation/t1-design-tokens-deciding-legacy-typography-name-to-new-role-mapping-a.md` |
+| `2cb5c98088b7a301` | dace | Planning t1-design-tokens: deciding LinklyDuoGradient representation, location, and test strategy | `wiki-local/mobile/presentation/t1-design-tokens-deciding-linklyduogradient-representation-location-an.md` |
+| `8680024116d50e24` | dace | Planning t1-design-tokens: deciding Buttons.kt / Inputs.kt / Surfaces.kt scope of change | `wiki-local/mobile/presentation/t1-design-tokens-deciding-buttons-kt-inputs-kt-surfaces-kt-scope-of-ch.md` |
+| `efbfa0706d867da3` | cover-letter | Planning t3-experience-motion: deciding Header "typing" mechanism for the code-frame data-file label | `wiki-local/frontend/design/t3-experience-motion-deciding-header-typing-mechanism-for-the-code-fra.md` |
+| `48d686795a34b696` | cover-letter | Planning t3-experience-motion: deciding duration.ts signature and month-counting rule | `wiki-local/frontend/design/t3-experience-motion-deciding-duration-ts-signature-and-month-counting.md` |
+| `e1db48ea4f707044` | cover-letter | Planning t3-experience-motion: deciding Count-up rendering mechanism | `wiki-local/frontend/design/t3-experience-motion-deciding-count-up-rendering-mechanism.md` |
+| `145207ef8dd603b2` | cover-letter | Planning t3-experience-motion: deciding achievements/techStack stagger wiring | `wiki-local/frontend/design/t3-experience-motion-deciding-achievements-techstack-stagger-wiring.md` |
+| `2848a10a1f784497` | cover-letter | Planning t3-experience-motion: deciding Final verification floor for this feature | `wiki-local/frontend/design/t3-experience-motion-deciding-final-verification-floor-for-this-featur.md` |
+| `9797dcb4361c60c6` | cover-letter | Planning t2-timeline-motion: deciding **General rule (apply everywhere in this plan and to any future change here): `StaggerGroup`/`StaggerItem` for | `wiki-local/frontend/design/t2-timeline-motion-deciding-general-rule-apply-everywhere-in-this-plan.md` |
+| `b877422f1b14561a` | cover-letter | Planning t2-timeline-motion: deciding Card slide-in composition | `wiki-local/frontend/design/t2-timeline-motion-deciding-card-slide-in-composition.md` |
+| `025f1a9158912f69` | cover-letter | Planning t2-timeline-motion: deciding Marker point-lighting trigger config + production import | `wiki-local/frontend/design/t2-timeline-motion-deciding-marker-point-lighting-trigger-config-produ.md` |
+| `1f1ac6e6e2c4f36a` | cover-letter | Planning t2-timeline-motion: deciding Year-header active-emphasis trigger config | `wiki-local/frontend/design/t2-timeline-motion-deciding-year-header-active-emphasis-trigger-config.md` |
+| `d64287dabbd1060e` | cover-letter | Planning t2-timeline-motion: deciding Scoped element lookup inside `useGsap`'s callback | `wiki-local/frontend/design/t2-timeline-motion-deciding-scoped-element-lookup-inside-usegsap-s-cal.md` |
+| `90f4f001067283fe` | cover-letter | Planning t2-timeline-motion: deciding Marker color+scale swap mechanism | `wiki-local/frontend/design/t2-timeline-motion-deciding-marker-color-scale-swap-mechanism.md` |
+| `4647e4ab8121308e` | cover-letter | Planning t2-timeline-motion: deciding Year-header color swap mechanism | `wiki-local/frontend/design/t2-timeline-motion-deciding-year-header-color-swap-mechanism.md` |
+| `d20621305ffcbbca` | cover-letter | Planning t2-timeline-motion: deciding Data-attribute + starting-className placement (exact JSX, per attribute) | `wiki-local/frontend/design/t2-timeline-motion-deciding-data-attribute-starting-classname-placemen.md` |
+| `7e69b6d5fab0c5db` | cover-letter | Planning t2-timeline-motion: deciding `TimelineItemCard.tsx` tech-chip stagger implementation | `wiki-local/frontend/design/t2-timeline-motion-deciding-timelineitemcard-tsx-tech-chip-stagger-imp.md` |
+| `68c498f5d1dd1db0` | cover-letter | Planning t2-timeline-motion: deciding `@/components/motion` test mock shape (pinned, verbatim code in the fenced block below the table) | `wiki-local/frontend/design/t2-timeline-motion-deciding-components-motion-test-mock-shape-pinned-v.md` |
+| `c26fecad5c0c4dfe` | dace | Planning t2-dev-env: deciding Debug-only cleartext policy mechanism | `wiki-local/infrastructure/config/t2-dev-env-deciding-debug-only-cleartext-policy-mechanism.md` |
+| `2723ba233882356e` | dace | Planning t2-dev-env: deciding Recording the final `AppEnvironment` API summary | `wiki-local/infrastructure/config/t2-dev-env-deciding-recording-the-final-appenvironment-api-summary.md` |
+| `9f05d1a613da06c7` | handfish | Planning t2-cmdexec-wait: deciding The reap-bound value and why it is fixed, not derived from `policy.timeout` | `wiki-local/backend/common/reliability/t2-cmdexec-wait-deciding-the-reap-bound-value-and-why-it-is-fixed-not.md` |
+| `8e03f7520152a155` | seagrass | Planning t178-emit-with-payload: deciding Grammar surface for `emit`/`publish` | `wiki-local/backend/common/api-design/t178-emit-with-payload-deciding-grammar-surface-for-emit-publish.md` |
+| `dd481d0ccec0139c` | seagrass | Planning t178-emit-with-payload: deciding Duplicate mapped field names | `wiki-local/backend/common/api-design/t178-emit-with-payload-deciding-duplicate-mapped-field-names.md` |
+| `36c365e42c22749d` | seagrass | Planning t178-emit-with-payload: deciding Runtime payload construction | `wiki-local/backend/common/api-design/t178-emit-with-payload-deciding-runtime-payload-construction.md` |
+| `dd9a1de6d841daf4` | seagrass | Planning t178-emit-with-payload: deciding `spec` compatibility | `wiki-local/backend/common/api-design/t178-emit-with-payload-deciding-spec-compatibility.md` |
+| `b7da7c25be38b089` | seagrass | Planning t178-emit-with-payload: deciding RFC-0002 `StepLine` word-cap drift | `wiki-local/backend/common/api-design/t178-emit-with-payload-deciding-rfc-0002-stepline-word-cap-drift.md` |
+| `d2ffe8bb9a03075d` | seagrass | Planning t178-emit-with-payload: deciding RFC-0049 authoring shape | `wiki-local/backend/common/api-design/t178-emit-with-payload-deciding-rfc-0049-authoring-shape.md` |
+| `c46b93213729f22d` | seagrass | Planning t178-emit-with-payload: deciding RFC_ROUTES registration | `wiki-local/backend/common/api-design/t178-emit-with-payload-deciding-rfc-routes-registration.md` |
+| `97e35ec0c3f11450` | handfish | Planning t4-fe-layout: deciding Fix for issue #29 suspect 1 (`.channel-view__side` grows with content) | `wiki-local/frontend/design/t4-fe-layout-deciding-fix-for-issue-29-suspect-1-channel-view-side-gro.md` |
+| `0cd3fbeb251a807f` | handfish | Planning t4-fe-layout: deciding Fix for issue #29 suspect 2 (`.thread-panel__list` grows instead of scrolling) | `wiki-local/frontend/design/t4-fe-layout-deciding-fix-for-issue-29-suspect-2-thread-panel-list-gro.md` |
+| `32d68342d573a02b` | handfish | Planning t4-fe-layout: deciding Bound for issue #27 (`.new-task-modal__project-list` grows with project count) | `wiki-local/frontend/design/t4-fe-layout-deciding-bound-for-issue-27-new-task-modal-project-list-g.md` |
+| `7df0d15a106696c6` | handfish | Planning t4-fe-layout: deciding Bound for issue #27 (roster pushed off-screen), scoped so the standalone `RosterPanel` stays untouched | `wiki-local/frontend/design/t4-fe-layout-deciding-bound-for-issue-27-roster-pushed-off-screen-scop.md` |
+| `b5e8294d3ee94b9c` | handfish | Planning t4-fe-layout: deciding Whether `.new-task-modal`'s whole-modal `overflow-y: auto` (new-task-modal.css:10-18) stays | `wiki-local/frontend/design/t4-fe-layout-deciding-whether-new-task-modal-s-whole-modal-overflow-y.md` |
+| `a35af19defb7a81a` | handfish | Planning t4-fe-layout: deciding Whether any TSX change is needed | `wiki-local/frontend/design/t4-fe-layout-deciding-whether-any-tsx-change-is-needed.md` |
+| `7f0ce70b8c79f8d5` | handfish | Planning t4-fe-layout: deciding Baseline command standardized for gate-A / CI parity | `wiki-local/frontend/design/t4-fe-layout-deciding-baseline-command-standardized-for-gate-a-ci-pari.md` |
+| `5aad2d91e92d5e4e` | handfish | Planning t4-fe-layout: deciding Where/when R6 (`npm run build` stays green) is verified as its own gate, separate from vitest | `wiki-local/frontend/design/t4-fe-layout-deciding-where-when-r6-npm-run-build-stays-green-is-verif.md` |
+| `bc42469f7b56e958` | handfish | Planning t5-agent-toolwrite: deciding PiHarness / OpencodeHarness behaviour | `wiki-local/infrastructure/agent-orchestration/t5-agent-toolwrite-deciding-piharness-opencodeharness-behaviour.md` |
