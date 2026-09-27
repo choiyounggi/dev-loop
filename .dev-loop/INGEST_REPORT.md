@@ -133,3 +133,17 @@ appended log.md entries (union merge).
 - Advisory (cross-link gap): qa parity gate ↔ backend-common-api-design-agent-tool-granularity
   linked both ways, with one sentence placing the parity table as the release-time reading of
   that page's design-time capability map.
+
+## CI agent gate, second run (36330523418) — blocker applied, quote advisory stands
+
+- Blocker: the frontend page stated "the development standard is an additive WebMCP tool per
+  action" as unconditional fact under confidence: verified. Applied: the trigger, the frontend
+  domain description and load-when line, and the INDEX.md frontend row now condition on "this
+  wiki's development standard (owner decision, log.md 2026-09-28, a policy rather than a sourced
+  fact)". Routing width is unchanged; the sentence is a policy the wiki declares, not a claim about
+  the world.
+- Advisory (§6 quote unverifiable from CI): the gate's fetch truncates before §6.3.2 and curl is
+  blocked in its sandbox; it records the quote as unverifiable, not refuted. Ground-truth grep is in
+  the PR comment; the two sources lines name the section.
+- Advisory (duplication with test-level-choice's extract-and-wire edge row): linked both ways and
+  named in step 1 as the general rule applied to two entry points.

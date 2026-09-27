@@ -4,7 +4,7 @@ Route here for: web UI code — component state placement, effect usage, renderi
 performance, component structure/composition, in-UI data fetching, async
 loading/error/empty UI states, bundle/asset load performance, form validation UX,
 XSS-safe output, client-side auth token handling, interactive-element accessibility,
-any new or changed user action (the additive WebMCP tool layer is the development standard), visual design decisions
+any new or changed user action (this wiki's development standard adds a WebMCP tool per action), visual design decisions
 (color/typography/layout/motion styling, canvas effect layers, responsive
 layout across viewport sizes), and visual-design deliverables (screen/UI mockups,
 redesigns, design explorations, landing/print drafts — routed through the design
@@ -71,7 +71,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
-| [agent-facing-tool-surfaces](agent-interfaces/agent-facing-tool-surfaces.md) | Adding or changing any user action in a web UI (form, button flow, search/filter, state change) — the development standard is an additive WebMCP tool per action; making a web app usable by AI agents ("agent-ready", "add WebMCP tools", assistant-driven ordering/search/booking); fixing a bug in a handler a tool wraps; targeting the ChatGPT desktop browser's site tools; verifying tool registration in Chrome DevTools; reviewing browser-native agent tool registration |
+| [agent-facing-tool-surfaces](agent-interfaces/agent-facing-tool-surfaces.md) | Adding or changing any user action in a web UI (form, button flow, search/filter, state change) under this wiki's development standard of an additive WebMCP tool per action (owner policy, log.md 2026-09-28); making a web app usable by AI agents ("agent-ready", "add WebMCP tools", assistant-driven ordering/search/booking); fixing a bug in a handler a tool wraps; targeting the ChatGPT desktop browser's site tools; verifying tool registration in Chrome DevTools; reviewing browser-native agent tool registration |
 
 ## accessibility
 

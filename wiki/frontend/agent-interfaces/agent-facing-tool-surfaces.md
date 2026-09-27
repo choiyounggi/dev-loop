@@ -22,10 +22,11 @@ related: [security-agent-exposure-in-session-tool-exposure, frontend-accessibili
 ## When this applies
 
 Adding or changing any user action in a web UI (form, button flow,
-search/filter, state change) — the development standard is an additive WebMCP
-tool per action; asked to make a web app usable by AI agents ("agent-ready",
-"add WebMCP tools"); fixing a bug in a handler a tool wraps; reviewing code
-that registers browser-native agent tools.
+search/filter, state change) in a project under this wiki's development
+standard — an additive WebMCP tool per action (owner decision, log.md
+2026-09-28, a policy rather than a sourced fact); asked to make a web app
+usable by AI agents ("agent-ready", "add WebMCP tools"); fixing a bug in a
+handler a tool wraps; reviewing code that registers browser-native agent tools.
 
 ## Do this
 

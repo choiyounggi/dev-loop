@@ -9,7 +9,7 @@ sources:
   - https://developer.chrome.com/docs/devtools/application/webmcp
   - https://developer.chrome.com/docs/ai/webmcp/declarative-api
 last_verified: 2026-09-28
-related: [frontend-agent-interfaces-agent-facing-tool-surfaces, qa-process-agent-tool-parity-gate, testing-strategy-cross-layer-effect-tests, testing-strategy-failing-test-first, testing-strategy-differential-testing]
+related: [frontend-agent-interfaces-agent-facing-tool-surfaces, qa-process-agent-tool-parity-gate, testing-strategy-test-level-choice, testing-strategy-cross-layer-effect-tests, testing-strategy-failing-test-first, testing-strategy-differential-testing]
 ---
 
 # Testing a UI Action That Is Also a Registered Agent Tool
@@ -26,9 +26,11 @@ handler a tool wraps; deciding whether the tool needs its own test suite.
    the UI's event handler call the same named function
    ([frontend-agent-interfaces-agent-facing-tool-surfaces] step 3), so the
    behavior tests — normal case, error case, boundary case — target that
-   function, not either entry point. When the tool and the UI call different
-   functions, the fix is to extract the shared function first; a second test
-   suite for the tool is the symptom of two code paths.
+   function, not either entry point — the extract-and-wire rule of
+   [testing-strategy-test-level-choice], applied to two entry points. When the
+   tool and the UI call different functions, the fix is to extract the shared
+   function first; a second test suite for the tool is the symptom of two code
+   paths.
 
 2. Add exactly two entry-point tests per imperative tool:
 
