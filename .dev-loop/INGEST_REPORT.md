@@ -1,105 +1,231 @@
-# Knowledge flush — 3 insight(s): 1 new page, 2 project-specific plan-gap drops
+# Knowledge flush — 15 insight(s) + 100 plan-gap rows
+
+Flush run id `20260927-220639-49006` (inherited from the auto-flush hook that spawned this session; step-0 acquire returned `already-owned`). Claimed queue ids: 15 session-harvested insights (`307f10608d65a6d0`, `d2e47909427e02ad`, `37109c771a9ba93c`, `5d59a844073147a7`, `ff60eb0e0691203e`, `98e0d29a7383f8e5`, `324d4632fef36d4a`, `33561bcd6e9d2418`, `8f424e7311ef0f10`, `216a416d59e66e68`, `b2b3b3de331806dd`, `e9e18afa8ee063ee`, `81730ed319bd149b`, `3813f53604b45aff`, `04140085265a247c`) plus the 100 rows of `plan-gaps.jsonl` (all `sessionId: plan-gaps`, harvested 2026-09-21 → 2026-09-23).
+
+Outcome: **8 new pages, 5 amended pages, 6 domain indexes updated, 1 new category (`debugging/network`)**; 14 of 15 session candidates ingested (8 new, 6 merged), 1 folded as an edge row; 100 plan-gap rows dropped as project-specific (listed under Local-layer candidates). Lint after the edits: `node scripts/wiki-structure-checks.js wiki` → **359 pages, 13 indexes, 0 findings** (CI invocation); `wiki-lint-prohibitions.js` → 79 directives, 0 violations. Largest touched bodies: `portable-shell-scripts` 120 (frontmatter-only change), `checkable-claims-in-an-adopted-plan` 118, `tests-that-cannot-fail` 117 (frontmatter-only change) — all ≤ 120.
+
+Method: four research/dedup agents (read-only against the checkout, scratch under the gitignored `.claude/tmp/`) fetched the sources and ran reproductions; the coordinator then **re-ran every local reproduction cited below itself** (gitignore, jq, shell redirection under four shells, `/bin/true`, hooks doc grep, `merge-file --union`, EPIPE in Python, vitest 2.1.9, the handle-forced race in Node, the fake-server ordering in Rust) and confirmed all 20 cited URLs return HTTP 200 (`curl -sL -o /dev/null -w '%{http_code}'`). One agent wrote 9 scratch files into `wiki/` by mistake (a failed `cd`), removed them itself, and the coordinator confirmed `git status --porcelain` empty before any edit.
 
 ## Verified best-practice
 
-### 1. `2b99ac7bc23f307f` — custom-property alias tokens read from script under jsdom → **verified**
+**1. `307f10608d65a6d0` — re-including a path under an ignored directory needs `dir/*`, not `dir/`** (→ `confidence: verified`, new page)
+- https://git-scm.com/docs/gitignore — "It is not possible to re-include a file if a parent directory of that file is excluded. Git doesn't list excluded directories for performance reasons, so any patterns on contained files have no effect, no matter where they are defined."
+- https://git-scm.com/docs/git-check-ignore — exit 0 = ignored (prints `file:line:pattern` with `-v`), exit 1 = not ignored.
+- Reproduced (git 2.50.1): `.crew/` + `!.crew/artifacts` → `check-ignore -v .crew/artifacts/f.txt` printed `.gitignore:1:.crew/`, rc 0; `.crew/*` + `!.crew/artifacts` → no output, rc 1. Matches the candidate exactly.
 
-Claim: `getComputedStyle(el).getPropertyValue('--a')` for `--a: var(--b)` returns the
-substituted value in a browser but the literal `var(--b)` under jsdom; the string is
-non-empty so an empty-value fallback never fires, and a canvas consumer silently
-ignores it.
+**2. `33561bcd6e9d2418` — word-level `merge-file --union` and lost separators** (→ `verified`, new page; **candidate's mechanism corrected**)
+- https://git-scm.com/docs/git-merge-file — `--union` "resolve[s] conflicts favouring our (or their or both) side of the lines".
+- Reproduced: `--union` on a one-line conflict wrote both versions joined by `\n`, also when no input ended in a newline — **`--union` never concatenates without a separator**. Splitting words to lines, `--union`, then `tr -d '\n'` produced `theplanisreadyforreviewandapproved`; `paste -sd' '` on the same output produced the correct sentence. The glued text (`planning)the`, `2026-09-172026-09-06`) comes from the rejoin step, not from git; the page says so. The directive (check the join, resolve list/date fields by their semantics) stands.
+- Field evidence: dev-loop 2026-09-21 consolidation, 4 of 6 word merges glued (`word-merges.log`), repaired by hand.
 
-- **Reproduced** (2026-09-21, jsdom 30.1.0, scratch project, since removed). Printed output of
-  `getPropertyValue` on `:root` with
-  `--b:#ff0000; --a:var(--b); --c:var(--a); --u:var(--missing); --x:var(--y); --y:var(--x)`:
-  `--b "#ff0000"`, `--a "var(--b)"`, `--c "var(--a)"`, `--u "var(--missing)"`,
-  `--x "var(--y)"`, undeclared `--none ""`. This matches the candidate's own evidence
-  (`--color-go: var(--color-accent)` read back as `var(--color-accent)` in a Vitest jsdom env).
-- https://www.w3.org/TR/css-variables-1/ — §2 computed value of `--*`: "specified value with
-  variables substituted, or the guaranteed-invalid value"; §2.2 that value "serializes as the
-  empty string"; §2.3 every property in a cycle is invalid at computed-value time. This is the
-  browser column of the page's table (derived from the spec, not separately measured in a browser).
-- https://html.spec.whatwg.org/multipage/canvas.html — `fillStyle`: "Invalid values are
-  ignored" (extracted from the fetched spec text), which is why the failure is silent.
-- https://github.com/jsdom/jsdom/issues/1895 — "Implement CSS custom properties", state OPEN
-  (read via `gh issue view`): jsdom's support is partial.
+**3. `b2b3b3de331806dd` — UserPromptSubmit hooks read `prompt`, not `user_prompt`** (→ `verified`, new page)
+- `curl -sL https://code.claude.com/docs/en/hooks.md` line 1353: "UserPromptSubmit hooks receive the `prompt` field containing the text the user submitted"; line 1362 example `"prompt": "Write a function to calculate the factorial of a number"`.
+- `grep -n user_prompt …/plugins/plugin-dev/skills/hook-development/scripts/test-hook.sh` → line 79 `"user_prompt": "Test user prompt"` in the `UserPromptSubmit)` case — the sample is wrong, exactly as the candidate said. Page generalised to "field names come from the reference, not a sample; run one positive control in a live session".
 
-One sentence in my first draft (that each simulated DOM implements a different subset) had no
-source; it was replaced with a statement limited to what was measured (jsdom only).
+**4. `e9e18afa8ee063ee` — silencing a failed write needs `{ cmd > f; } 2>/dev/null`** (→ `verified`, new page; **added finding**)
+- https://www.gnu.org/software/bash/manual/bash.html#Redirections — "Redirections are processed in the order they appear, from left to right"; POSIX XCU 2.7 "order of evaluation is from beginning to end".
+- Reproduced with a `chmod 555` directory under `/bin/bash` 3.2.57, Homebrew bash 5.3.15, `/bin/sh`, zsh 5.9: unwrapped form leaks `Permission denied` in all four; braced form silent in all four; **reordered form (`cmd 2>/dev/null > f`) is silent in bash/sh but still leaks in zsh** — so the page recommends the braced form as the only portable one. Braced form exits 1 and terminates a `set -e` script unless `|| true` follows (reproduced).
 
-### 2. `27f30a2498bd57d3` — resolve `expected_page_id` via a frontmatter-id map → **not ingested (project-specific)**
+**5. `81730ed319bd149b` — a non-ASCII character in a jq regex is written `’` with one backslash** (→ `verified`, new page; **candidate's explanation completed**)
+- https://jqlang.org/manual/ — jq uses Oniguruma, "Perl NG" flavor; https://www.shellcheck.net/wiki/SC1112 — "This is a Unicode quote. Delete and retype it (or ignore/doublequote for literal)."
+- Reproduced (jq-1.7.1-apple): `test("’")` → true; `test("\\u2019")` → false; `test("\\x{2019}")` → true (Oniguruma's own escape, which the candidate did not mention); `"\\u2019" | explode` → 6 literal characters. Agent also found SC1112 fires only for a single-quoted jq program containing the literal quote, not a double-quoted one; recorded as an edge row.
 
-The directive names dev-loop's own id scheme (`<domain>-<category>-<slug>`, `wiki/**/*.md`,
-`index.md`) and one eval-case field. No external verification was attempted because it is not
-bundled-wiki material; see Local-layer candidates.
+**6. `d2e47909427e02ad` — stale-socket guard in a Socket.IO `disconnect` handler** (→ merged as `verified` material into `backend-common-realtime-websocket-sse-lifecycle`)
+- https://socket.io/docs/v4/server-options/ — `pingInterval` 25000, `pingTimeout` 20000, "if the client doesn't respond with a pong within `pingTimeout` ms, the connection is considered closed"; https://socket.io/docs/v4/how-it-works/ — PING every `pingInterval`, PONG within `pingTimeout`. The ≈45 s window is confirmed; the connection-state-recovery docs do not describe the stale-socket race.
+- Reproduced by the verification agent (Node 26.7.0, real `socket.io` sockets): client B rejoins as `p1`, client A's transport is terminated → with the guard `markDisconnected` called 0 times; without it, called once, evicting the connected replacement.
 
-### 3. `d6771df1f2a91b34` — default `eval` recall counts only positive cases → **not ingested (project-specific)**
+**7. `37109c771a9ba93c` — reconnect snapshot must replay events in the live order** (→ `field-tested`, folded as one edge row into the same realtime page, pointing at `frontend-state-derived-state` for the client-side fix)
+- No primary source states the ordering rule; https://socket.io/docs/v4/connection-state-recovery says only that missed events "will be received now". The verification agent reproduced the symptom in jsdom (state-first → 2 elements; live order → 44) and argued, correctly, that the robust fix is the client deriving mount-time reads from current props, which `frontend-state-derived-state` already documents. Kept as a server-side edge row with the client-side pointer rather than a new page.
 
-The directive specifies one function's signature (`evaluate(cfg, cases, k)`), one output format
-string and this repo's case counts (15 / 35+15). The general kernel (recall = hits over cases
-that have a relevant item) is the textbook definition and adds no routable situation; see
-Local-layer candidates.
+**8. `216a416d59e66e68` — forcing EPIPE deterministically needs two writes after the peer's close** (→ `verified`, new page, new `debugging/network` category)
+- https://datatracker.ietf.org/doc/html/rfc9293 — "If the connection does not exist (CLOSED), then a reset is sent in response to any incoming segment except another reset"; https://man7.org/linux/man-pages/man2/write.2.html and https://man7.org/linux/man-pages/man2/send.2.html — EPIPE + SIGPIPE, "the write return value is seen only if the program catches, blocks or ignores this signal".
+- Reproduced (Python 3.14.6, macOS, SIGPIPE ignored): one write after close → 0/20 failures; five writes 50 ms apart → 20/20 failures, first failure at write #2 with `EPIPE` every time; **peer closing with unread data → first write fails 20/20** (recorded as an edge row; reproduced-only, the RFC does not state the write index).
+
+**9. `ff60eb0e0691203e` — a completion handle as the forcing point for a background-reset race** (→ merged as `verified` into `testing-flaky-diagnosing-flaky-tests`)
+- https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html — "It is guaranteed that the destructor of the spawned task has finished before task completion is observed via `JoinHandle` `await`."
+- Reproduced (Node 26.7.0): no forcing 0/200 failures; handle awaited between setup write and read 200/200 failures; handle awaited before the write 0/200. The agent's Rust/tokio run gave 0/250, 150/150, 600/600.
+
+**10. `8f424e7311ef0f10` — fake server forwards to the test channel before writing any reply** (→ `verified`, new page)
+- https://docs.rs/tokio/latest/tokio/sync/mpsc/struct.Receiver.html — `recv` returns `None` once "all senders have been dropped"; https://doc.rust-lang.org/std/io/enum.ErrorKind.html — `BrokenPipe`.
+- Reproduced (Rust 1.98, tokio, client `SO_LINGER(0)` → RST): reply-then-forward lost 60/60 with 60/60 server-task panics (`BrokenPipe` errno 32); forward-then-reply 0/60 lost, 0 panics.
+
+**11. `324d4632fef36d4a` — "A and B agree" asserted by calling the same helper twice is a rubber stamp** (→ `verified`, new page)
+- https://pitest.org/quickstart/basic_concepts/ — "'Survived' means the mutation was not detected by the covering test"; https://github.com/kenjudy/pdca-agentic-coding-framework/issues/181 — an independent record of the same anti-pattern (`expect(cliOutput).toBe(applyBlock('', entries))`) and its oracle rule ("is that source independent of the code under test?").
+- Field evidence (originating session, not re-run): mutating `role_cli_cwd(None, ..)` left 10 tests green; after the fixture recorded `pwd -P` the same mutation went red.
+
+**12. `98e0d29a7383f8e5` — literal binaries in an adopted plan must be checked on the target machine** (→ merged as `verified` into `infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan`; **candidate's check corrected**)
+- Reproduced (macOS 26.1): `ls -l /bin/true /bin/false` → both "No such file or directory"; `/usr/bin/true`, `/usr/bin/false` present. **`command -v true` and `type true` resolve to the zsh builtin**, so the candidate's own suggested check (`command -v`) cannot detect an absent absolute path — the page says to check the literal path with `ls -l`/`test -x`.
+
+**13. `5d59a844073147a7` — enumerate every producer of the symptom value before instrumenting; stop condition on the symptom alone** (→ merged as `field-tested` into `debugging-concurrency-intermittent-failures`)
+- No external source states the rule; the closest wiki material (`hypothesis-testing` "instrument every boundary") covers multi-component failures, not multi-producer symptom values. Field evidence: `grep -n 'RunOutcomeDto::Failed' controller.rs` → 5 hits (2 assignments, 1 independent producer `handle.await.unwrap_or(Failed)`, 1 unreachable, 1 consumer); with all producers instrumented and the stop condition on the panic text alone the failure reproduced on the first run (3/21).
+
+**14. `3813f53604b45aff` — re-run a gate ledger's CHECK in the executor's cwd and tool version** (→ merged into `qa-process-completion-claims`; the vitest fact `verified`, the process rule `field-tested`)
+- Reproduced (vitest 2.1.9, Node 26.7.0): `npx vitest run` prints `Tests  1 passed (1)` with **two spaces** (a single-spaced grep never matches a genuine pass); `npx vitest run -t nomatch` prints `Tests  1 skipped (1)` and **exits 0**. https://vitest.dev/guide/reporters fetched for the reporter format.
+- Field evidence: dev-loop task t2-browser-lifecycle reviews r1/r2 — worker assumed the wording, coordinator re-ran from the wrong cwd; both wrong in opposite directions.
+
+**15. `04140085265a247c` — cite the reproducible artifact instead of an empirical number in agent-facing instructions** (→ merged as `verified` into `checkable-claims-in-an-adopted-plan`)
+- Primary source is in-repo: `git show 906b2e7` — "Replace the Semantic candidate check paragraph's stale parenthetical (the coordinator's ad-hoc 22-query survey, "0.69-0.82") with a reference to the 50-case reproducible calibration set (tests/fixtures/wiki-retrieval-calibration.json, run with wiki-index.py eval --report), which found no separable score floor. No numeric range is embedded, so a future re-calibration cannot make the skill text wrong again."
 
 ## Existing-layer check
 
-Routed candidate 1 via `INDEX.md` → `wiki/frontend/index.md` (owning artifact: the UI helper),
-and checked `wiki/testing/index.md` as the second domain. Whole-wiki grep: `jsdom` / `happy-dom`
-→ 0 files; `getPropertyValue|custom propert|var(--` → 1 file (anti-slop-visual-design, directive 4:
-declare tokens once and reference `var(--token)` — authoring tokens, not reading them from
-script; no overlap, no conflict). `wiki_search` top-5 for the trigger sentence:
-frontend-security-xss-safe-rendering (×2), frontend-design-anti-slop-visual-design,
-testing-e2e-e2e-stability, backend-common-change-impact-compiler-as-call-site-inventory — none
-describes the same situation. Result: **new page**
-`wiki/frontend/design/custom-property-values-read-from-script.md`, no merge target.
+Routed via `INDEX.md` → domain `index.md` → every page whose "load when" overlapped; keyword sweeps over the whole `wiki/` tree for each candidate's terms; `wiki_search` (k=5) on every trigger by the verification agents.
 
-Related links added both ways: frontend-design-anti-slop-visual-design (token declaration),
-frontend-design-html-in-canvas (canvas consumers), testing-mocking-what-to-mock (the Instead-of
-row about mocking `getComputedStyle`). `wiki/frontend/index.md` gained the design row; `log.md`
-gained the ingest entry.
+Pages read: infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, infrastructure-agent-orchestration-ours-resolution-on-a-mixed-content-conflict, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, platforms-processes-tool-diagnostics-without-a-failing-exit-code, platforms-tools-harness-mediated-tool-results, platforms-shells-escapes-in-shell-string-literals, platforms-tools-jq-dot-rebinding-in-predicates, platforms-environment-unicode-text-matching, backend-common-realtime-websocket-sse-lifecycle, frontend-data-fetching-race-conditions, frontend-state-effects-usage, frontend-data-fetching-query-state-vs-fetch-state, frontend-state-derived-state, testing-flaky-diagnosing-flaky-tests, testing-async-async-testing, debugging-concurrency-intermittent-failures, testing-quality-proving-a-critical-section-is-lock-protected, testing-quality-sequential-dispatch-assumption-under-concurrency, testing-mocking-what-to-mock, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, testing-strategy-signal-delivery-to-a-process-under-test, testing-quality-tests-that-cannot-fail, testing-quality-source-text-wiring-assertions, testing-quality-path-resolver-fixtures-with-coincident-cwd, testing-quality-surviving-mutant-equivalence-triage, testing-quality-mutation-harness-file-custody, testing-quality-value-preserving-refactor-assertions, testing-quality-behavior-not-implementation, testing-quality-default-values-under-test, infrastructure-agent-orchestration-worker-reported-plan-contradiction, qa-process-completion-claims, testing-quality-checks-that-cannot-pass, testing-strategy-real-cli-spot-check-for-new-execution-paths, testing-data-harness-vs-run-path-fixtures, testing-quality-harness-reverse-controls, platforms-tools-bsd-vs-gnu-cli, debugging-methodology-reproduce-first, debugging-methodology-isolate-by-bisection, debugging-methodology-hypothesis-testing, debugging-methodology-probe-path-vs-operation-path, debugging-methodology-silent-registration-failure-in-a-finder-launched-app, debugging-methodology-verify-the-fix, debugging-signals-stack-traces, debugging-signals-reading-error-messages, debugging-signals-logs-and-correlation, debugging-performance-profile-before-optimizing, debugging-performance-attributing-a-benchmark-speedup, qa-process-acceptance-criteria, qa-process-release-gates, qa-process-regression-scope, qa-process-severity-and-priority, qa-process-post-release-verification, qa-process-scope-purity-checks, qa-process-defect-class-resweep-after-review, qa-process-evaluating-review-feedback, qa-process-adversarial-change-review, qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-spec-document-gates, qa-document-verification-rationale-prose-after-a-config-value-change, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-gate-evidence-exit-code-class, infrastructure-agent-orchestration-verify-command-in-a-worker-brief, backend-common-llm-binding-instructions-for-agents, testing-quality-gate-parsing-vs-command-execution, testing-mocking-captured-call-arguments
 
-For candidates 2–3, `wiki_search` on the recall trigger returned
-testing-quality-stale-artifact-baselines, databases-indexing-trigram-index-short-patterns,
-qa-process-completion-claims, testing-quality-generated-sql-property-assertions,
-databases-indexing-index-write-cost — no page on retrieval-eval scoring; the plan's own
-grounding page testing-quality-harness-reverse-controls covers harness discrimination, not
-denominators.
+| Insight | Overlap found | Outcome |
+|---------|---------------|---------|
+| 1 gitignore | `worktree-isolated-workers` and `checkable-claims` use `check-ignore` for other purposes (where to put byproduct ignores; verifying a deliverable is not ignored); no page states the re-inclusion rule | **New page**, linked both ways to both |
+| 2 union merge | `ours-resolution-on-a-mixed-content-conflict` (whole-file `--ours` on counts) and `semantic-conflicts-after-parallel-merge` (conflict-free but broken) are adjacent mechanisms | **New page**, linked both ways to both |
+| 3 hook fields | `harness-mediated-tool-results` / `tool-diagnostics-without-a-failing-exit-code` cover hook *output*, not hook *input* schema | **New page**, linked both ways |
+| 4 redirection | `tool-diagnostics-without-a-failing-exit-code` cites the same left-to-right rule for *capturing* stderr; different trigger (silencing a write) and that page is at 96 body lines — "one case per page" | **New page** in `platforms/shells`, linked both ways; the close call is recorded here for the reviewer |
+| 5 jq unicode | `jq-dot-rebinding-in-predicates` (different jq pitfall), `escapes-in-shell-string-literals` (shell-level escaping), `unicode-text-matching` (grep/regex normalisation) — none covers jq's two-stage decode | **New page**, linked both ways to all three |
+| 6 stale socket | `websocket-sse-lifecycle` has dead-peer detection and reconnect rows but no identity-binding row | **Merged** (1 Do row, 1 edge row, 2 sources, reproduction) |
+| 7 snapshot order | `frontend-state-derived-state` already owns the root cause on the client (mount-time reads) | **Folded** as 1 edge row on the realtime page with a pointer; no new page |
+| 8 EPIPE | No page anywhere covers TCP write/EPIPE semantics; `debugging` has no transport category | **New page + new category** `debugging/network` |
+| 9 handle forcing | `diagnosing-flaky-tests` row "sleep racing background work → wait on the condition" and `async-testing` "expose a completion handle" are adjacent; neither uses one handle at two points as the red/green pair | **Merged** (1 table row, 1 edge row, 1 source, 2 evidence lines) |
+| 10 fake server | `what-to-mock` covers fake authoring generally (timestamp row) but not forward-vs-reply ordering | **New page**, linked both ways to `what-to-mock`, `diagnosing-flaky-tests`, `tests-that-cannot-fail`, and the EPIPE page |
+| 11 shared helper | `tests-that-cannot-fail` (117 lines, no room), `path-resolver-fixtures-with-coincident-cwd` (fallback = cwd), `harness-vs-run-path-fixtures` (two *independent* synthesizers) — adjacent, none the same defect | **New page**, linked both ways to five pages |
+| 12 literal binaries | `checkable-claims-in-an-adopted-plan` is framed around numeric/symbol claims; no item for literal paths; `checks-that-cannot-pass` owns the gate-side ambiguity | **Merged** (item 8, 1 finding row, 1 edge row, 2 sources); linked to `checks-that-cannot-pass`, `env-var-off-switches` |
+| 13 producers | `intermittent-failures` has amplification and a logging-shifts-timing edge; `hypothesis-testing` is about multi-component boundaries | **Merged** (step 4 inserted, steps renumbered, 1 edge row, 1 evidence line); linked to `hypothesis-testing` |
+| 14 ledger re-run | `gate-evidence-exit-code-class` is exit 126/127; `session-completion-gates` item 7 is hook design; `verify-command-in-a-worker-brief` is brief authoring; `completion-claims` has "Tests pass → fresh run" but nothing on cwd/version parity for a ledger | **Merged** into `completion-claims` (1 claim row, 1 edge row, 2 sources); linked to `gate-evidence-exit-code-class` |
+| 15 empirical number | `checkable-claims` covers *derivable* numbers; `quantitative-claims-in-a-published-document` is external docs; `rationale-prose-after-a-config-value-change` is prose after a value edit | **Merged** into `checkable-claims` (item 9, 1 finding row, 1 source); linked to `rationale-prose…` and `binding-instructions-for-agents` |
 
-Pages read: frontend-design-anti-slop-visual-design, frontend-design-html-in-canvas, testing-mocking-what-to-mock, testing-quality-harness-reverse-controls
+Conflicts flagged: none — no existing directive is contradicted. Two candidate explanations were corrected on the page (2: `--union` is not the failure point; 12: `command -v` cannot detect the absence) and one completed (5: `\x{2019}`).
 
-Checks run in the checkout: `node scripts/wiki-lint-prohibitions.js` → `directives: 75,
-compliant: 75, violations: 0` (count unchanged, matches the bats pin); new page body = 77 lines;
-banned-qualifier grep on the new page → 0 hits; `bats tests/wiki-lint-prohibitions.bats
-tests/wiki-structure-checks.bats tests/wiki-lint-score.bats` → 35 ok, 0 not ok.
+Related links added both ways (24 reciprocal edits): `worktree-isolated-workers`, `ours-resolution…`, `semantic-conflicts…`, `harness-mediated-tool-results`, `tool-diagnostics…`, `escapes-in-shell-string-literals`, `portable-shell-scripts`, `jq-dot-rebinding…`, `unicode-text-matching`, `frontend-state-derived-state`, `tests-that-cannot-fail`, `behavior-not-implementation`, `captured-call-arguments`, `path-resolver-fixtures…`, `harness-vs-run-path-fixtures`, `what-to-mock`, `checks-that-cannot-pass`, `env-var-off-switches`, `rationale-prose…`, `binding-instructions-for-agents`, `gate-evidence-exit-code-class`, `hypothesis-testing`, `reproduce-first` (`async-testing` already linked `diagnosing-flaky-tests`).
 
 ## Open-PR check
 
-Listed 18 open `knowledge/*` heads (#179, #180, #181, #182, #183, #185, #186, #187, #188, #189,
-#190, #191, #205, #207, #208, #209, #210, #212). Fetched each and searched
-`git diff origin/main origin/<head> -- wiki/`:
+`gh pr list --repo choiyounggi/dev-loop --state open --json number,headRefName --search "head:knowledge/"` → `[]`, and `gh pr list --state open --limit 50` → `[]`. **No open `knowledge/*` heads exist** (the 19-PR backlog was consolidated on 2026-09-21), so there is nothing to fold into or drop against.
 
-- `jsdom|getPropertyValue|happy-dom` → 0 matches in all 18 heads. Candidate 1: **new**.
-- `recall@|negative cases|denominator|frontmatter id|hyphenated id` → two unrelated
-  "denominator" hits (#185 benchmark-relative grade, #182 vendor benchmark claims), neither about
-  retrieval-eval scoring or id resolution. Candidates 2–3: no overlap; **drop** as
-  project-specific (not as pending duplicates).
+| Candidate | Overlapping open head | Verdict |
+|-----------|----------------------|---------|
+| 1–15 (all) | none | **new** (ingested as above; 7 as a fold onto the merged wiki page, not onto a PR) |
+| 100 plan-gap rows | none | **drop** — project-specific (below), not pending-duplicate |
 
 ## Routing decision
 
-| Candidate | Decision |
-|-----------|----------|
-| `2b99ac7bc23f307f` | **new page** → `frontend/design/custom-property-values-read-from-script` (id `frontend-design-custom-property-values-read-from-script`). Existing category `design` fits: it already owns token declaration and canvas effect layers; the artifact changed is the UI helper, so frontend owns it over testing. No new category. |
-| `27f30a2498bd57d3` | excluded — project-specific (layer test) |
-| `d6771df1f2a91b34` | excluded — project-specific (layer test) |
+| Insight | Target | New category? |
+|---------|--------|---------------|
+| 1 | `platforms/tools/gitignore-directory-reinclusion.md` (**new**) | No — `tools` already holds git/jq/CLI pages |
+| 2 | `infrastructure/agent-orchestration/word-level-union-merge-reassembly.md` (**new**) | No — sits beside the two other parallel-merge pages |
+| 3 | `platforms/tools/hook-input-fields-from-the-reference.md` (**new**) | No — beside `harness-mediated-tool-results`, `plugin-mcp-server-registration` |
+| 4 | `platforms/shells/redirection-order-for-a-silenced-write.md` (**new**) | No |
+| 5 | `platforms/tools/unicode-escape-in-a-jq-regex.md` (**new**) | No — beside `jq-dot-rebinding-in-predicates` |
+| 6, 7 | `backend/common/realtime/websocket-sse-lifecycle.md` (**merge**) | No |
+| 8 | `debugging/network/epipe-write-ordering.md` (**new**) | **Yes — `debugging/network`.** `methodology`, `signals`, `performance`, `concurrency` none own transport-level failure reproduction; `signals` is about reading errors, not forcing them. One page today; the category name matches the domain's noun convention |
+| 9 | `testing/flaky/diagnosing-flaky-tests.md` (**merge**) | No |
+| 10 | `testing/mocking/fake-server-forward-before-reply.md` (**new**) | No |
+| 11 | `testing/quality/cross-component-invariant-via-shared-helper.md` (**new**) | No |
+| 12, 15 | `infrastructure/agent-orchestration/checkable-claims-in-an-adopted-plan.md` (**merge**, now 118 body lines) | No |
+| 13 | `debugging/concurrency/intermittent-failures.md` (**merge**) | No |
+| 14 | `qa/process/completion-claims.md` (**merge**) | No |
+
+Plumbing: `wiki/platforms/index.md` +4 rows; `wiki/infrastructure/index.md` +1 row, 1 extended "load when"; `wiki/debugging/index.md` +1 section/row; `wiki/testing/index.md` +2 rows, 1 extended line; `wiki/backend/index.md` and `wiki/qa/index.md` 1 extended line each; `log.md` +1 `ingest` entry. `INDEX.md` unchanged (all ten domains already seeded; the `debugging` route line already covers "reproducing").
 
 ## Local-layer candidates
 
-Both belong to the `dev-loop` project (run wiki-ingest inside that project; it has no
-`wiki-local/` yet, and the decisions are already recorded in
-`plans/t2-eval-calibration/design.md` D3/D4 and implemented in commit da64d40):
+All 100 `plan-gaps.jsonl` rows are wiki-plan Phase B decisions of the form "Planning tN: deciding X (no owning wiki page)" whose directives name one repository's own CSS tokens, files, handlers, timers, or docs (`--color-go`, `GET /healthz` handler placement, `DISCONNECT_GRACE_MS`, `closeBrowser()` semantics, README/HANDOFF sections, `LeadBehavior` builder shape, …). Each is a design record for that repo, not a reusable trigger; the previous flushes (#188, #213) retired the same class the same way. Retired as `drop: project-specific plan-gap`. Targets below use the closest bundled category; run `wiki-ingest` inside the named project to land any of them.
 
-- `27f30a2498bd57d3` → `wiki-local/testing/quality/eval-case-page-id-resolution.md` — resolve
-  `expected_page_id` through a map built from every page's frontmatter `id:` line; categories
-  such as `query-optimization` contain hyphens, so the id string cannot be split into a path.
-- `d6771df1f2a91b34` → `wiki-local/testing/quality/eval-recall-over-positive-cases.md` — the
-  default `eval` recall counts a case only when `expected_page_id` is truthy; negatives stay out
-  of `hits`/`total` and the output line format is unchanged.
+| Queue id | Project | Decision | Local target |
+|----------|---------|----------|--------------|
+| `4dd0ac40512d1365` | mechameleon-web-swordtail | Planning t1-foundation: deciding `--color-go` vs. a distinct "mint waiting" hue | `wiki-local/frontend/design/t1-foundation-deciding-color-go-vs-a-distinct-mint.md` |
+| `d739d8943c72d94e` | mechameleon-web-swordtail | Planning t1-foundation: deciding Fonts | `wiki-local/frontend/design/t1-foundation-deciding-fonts.md` |
+| `2c2c002898c729db` | mechameleon-web-swordtail | Planning t1-foundation: deciding Promote `.mc-error`/`.mc-form`/`.mc-input` scope | `wiki-local/frontend/design/t1-foundation-deciding-promote-mc-error-mc-form-mc.md` |
+| `7bf8793133dd74ad` | mechameleon-web-swordtail | Planning t1-foundation: deciding New shared primitive classes (panel/status-pill/code-pill) | `wiki-local/frontend/design/t1-foundation-deciding-new-shared-primitive-classes-panel-status.md` |
+| `4cc309927154b41f` | mechameleon-web-swordtail | Planning t1-foundation: deciding Alpha-variant API for `canvasToken()` (added in response to plan-reviewer rou | `wiki-local/frontend/design/t1-foundation-deciding-alpha-variant-api-for-canvastoken-added.md` |
+| `23d4eeafdf39ece4` | mechameleon-web-swordtail | Planning t1-foundation: deciding `--color-keycap`'s value, and the violet join-code pill's own token (fixed in | `wiki-local/frontend/design/t1-foundation-deciding-color-keycap-s-value-and-the.md` |
+| `e976609a25bbd673` | mechameleon-web-swordtail | Planning t1-foundation: deciding fx.css stub creation and its `@import` position in style.css (added in respon | `wiki-local/frontend/design/t1-foundation-deciding-fx-css-stub-creation-and-its.md` |
+| `70f6e93e54e6a1ca` | mechameleon-web-swordtail | Planning t4-seek-result: deciding "found = light-blue glow, survived = red glow" (design_spec's hedged phrase) | `wiki-local/frontend/design/t4-seek-result-deciding-found-light-blue-glow-survived.md` |
+| `4f7701ec23cd7639` | mechameleon-web-swordtail | Planning t4-seek-result: deciding Design_spec's "optional row of humanoid silhouette icons for hiders remainin | `wiki-local/infrastructure/agent-orchestration/t4-seek-result-deciding-design-spec-s-optional-row.md` |
+| `5799b6af03521676` | mechameleon-web-swordtail | Planning t4-seek-result: deciding Lockout chip "red rounded-square keycap" | `wiki-local/frontend/design/t4-seek-result-deciding-lockout-chip-red-rounded-square.md` |
+| `ae4ccb9c1ef5b93c` | mechameleon-web-swordtail | Planning t4-seek-result: deciding Cross-cutting guarantee: no existing `mc-*` class name removed/renamed, no e | `wiki-local/testing/quality/t4-seek-result-deciding-cross-cutting-guarantee-no-existing.md` |
+| `d19374b5ea60c8c4` | mechameleon-web-swordtail | Planning t3-hide: deciding Keycap strip visual | `wiki-local/frontend/design/t3-hide-deciding-keycap-strip-visual.md` |
+| `1b09867a1c89493e` | mechameleon-web-swordtail | Planning t3-hide: deciding Wait-screen hourglass DOM wiring — an explicit REPARENT, and its order (revised — s | `wiki-local/frontend/design/t3-hide-deciding-wait-screen-hourglass-dom-wiring-an.md` |
+| `f76783b87346d3b7` | mechameleon-web-swordtail | Planning t3-hide: deciding Wait-screen urgency + fill wiring | `wiki-local/infrastructure/agent-orchestration/t3-hide-deciding-wait-screen-urgency-fill-wiring.md` |
+| `a2a73771aecdeddd` | mechameleon-web-swordtail | Planning t3-hide: deciding Wait-screen default hourglass/numeral color (mint, not lime) | `wiki-local/frontend/design/t3-hide-deciding-wait-screen-default-hourglass-numeral-color.md` |
+| `f9d8e8036eae0db4` | mechameleon-web-swordtail | Planning t3-hide: deciding Wait-screen timer-wrapper positioning reset | `wiki-local/backend/common/api-design/t3-hide-deciding-wait-screen-timer-wrapper-positioning-reset.md` |
+| `ebee6d3b3d62b23b` | mechameleon-web-swordtail | Planning t3-hide: deciding `mc-wait-msg` orphan-class rule | `wiki-local/infrastructure/agent-orchestration/t3-hide-deciding-mc-wait-msg-orphan-class-rule.md` |
+| `4210e94d7af0ceb1` | mechameleon-web-swordtail | Planning t3-hide: deciding Cursor for the eyedropper hint / the remaining 19 pre-existing inline `.style.*` wr | `wiki-local/frontend/design/t3-hide-deciding-cursor-for-the-eyedropper-hint-the.md` |
+| `e75055c04a49315f` | mechameleon-web-swordtail | Planning t3-hide: deciding `client/src/hide/paint.ts` stays untouched | `wiki-local/infrastructure/agent-orchestration/t3-hide-deciding-client-src-hide-paint-ts-stays.md` |
+| `a9cae22be5081f84` | mechameleon-web-swordtail | Planning t3-hide: deciding Numeral-beneath-hourglass and caption-beneath-numeral stacking, both screens | `wiki-local/frontend/design/t3-hide-deciding-numeral-beneath-hourglass-and-caption-beneath.md` |
+| `ef738239c2d1d6cf` | mechameleon-web-swordtail | Planning t3-hide: deciding Nudge levels (danger/warn/info/safe data-level contract) | `wiki-local/infrastructure/agent-orchestration/t3-hide-deciding-nudge-levels-danger-warn-info-safe.md` |
+| `2c8f18347aedb5eb` | mechameleon-web-swordtail | Planning t3-hide: deciding Leave button stays clear of the countdown digits (post-reorder) | `wiki-local/infrastructure/agent-orchestration/t3-hide-deciding-leave-button-stays-clear-of-the.md` |
+| `912b81c2e0ed900a` | mechameleon-web-swordtail | Planning t3-hide: deciding Additive-only compliance (enforcement, not a new mechanism) | `wiki-local/infrastructure/agent-orchestration/t3-hide-deciding-additive-only-compliance-enforcement-not-a.md` |
+| `6aba13848114c177` | mechameleon-web-swordtail | Planning t2-lobby: deciding Room-card background, text colour, and legibility | `wiki-local/frontend/design/t2-lobby-deciding-room-card-background-text-colour-and.md` |
+| `67cd84be8d715cb6` | mechameleon-web-swordtail | Planning t2-lobby: deciding Join-code pill (`.mc-code`) | `wiki-local/frontend/design/t2-lobby-deciding-join-code-pill-mc-code.md` |
+| `696ca720b35442ba` | mechameleon-web-swordtail | Planning t2-lobby: deciding Start CTA (room screen) | `wiki-local/infrastructure/agent-orchestration/t2-lobby-deciding-start-cta-room-screen.md` |
+| `c72a4bc393f8ba56` | mechameleon-web-swordtail | Planning t2-lobby: deciding Visibility toggle restyle — base button, hover, active, selected-state color (roun | `wiki-local/frontend/design/t2-lobby-deciding-visibility-toggle-restyle-base-button-hover.md` |
+| `3e26532f845ea5d8` | mechameleon-web-swordtail | Planning t2-lobby: deciding Title outline, scoped to the lobby | `wiki-local/frontend/design/t2-lobby-deciding-title-outline-scoped-to-the-lobby.md` |
+| `9a3ce10067c2f44e` | mechameleon-web-swordtail | Planning t2-lobby: deciding Capture-preview inline-style migration | `wiki-local/infrastructure/agent-orchestration/t2-lobby-deciding-capture-preview-inline-style-migration.md` |
+| `4e240ace61de8461` | mechameleon-web-swordtail | Planning t2-lobby: deciding Aggregate hygiene rule (R10) — covering decision | `wiki-local/infrastructure/agent-orchestration/t2-lobby-deciding-aggregate-hygiene-rule-r10-covering-decision.md` |
+| `cc52e6cdc547bdae` | mechameleon-web-swordtail | Planning t2-lobby: deciding Explicit no-change confirmations (home-screen chrome, password row, player chips,  | `wiki-local/frontend/design/t2-lobby-deciding-explicit-no-change-confirmations-home-screen.md` |
+| `5b9712c030498f11` | mechameleon-web-swordtail | Planning t2-lobby: deciding Exact new test cases (round 3 fix — pins the brief's "unit tests added: >=1 normal | `wiki-local/testing/quality/t2-lobby-deciding-exact-new-test-cases-round-3.md` |
+| `1f47d8bce6928c50` | groundwork-anemone | Planning t2: deciding One-line output contract for the 3 SessionStart hooks | `wiki-local/platforms/processes/t2-deciding-one-line-output-contract-for-the-3.md` |
+| `8dc6bbecf740b479` | groundwork-anemone | Planning t2: deciding Where the habit budget/rule-cap/split-threshold check lives, and its own cadence | `wiki-local/infrastructure/agent-orchestration/t2-deciding-where-the-habit-budget-rule-cap-split.md` |
+| `b4b95343be646312` | groundwork-anemone | Planning t2: deciding Detail persistence so "which files moved" / "why the habit file is over, and what to do  | `wiki-local/infrastructure/agent-orchestration/t2-deciding-detail-persistence-so-which-files-moved-why.md` |
+| `19d6ab93a033a042` | groundwork-anemone | Planning t2: deciding Config keys/defaults for the relocated habit check | `wiki-local/platforms/processes/t2-deciding-config-keys-defaults-for-the-relocated-habit.md` |
+| `7bf2c6a30b1c572f` | groundwork-anemone | Planning t2: deciding hooks/tutor-due-check.sh scope | `wiki-local/platforms/processes/t2-deciding-hooks-tutor-due-check-sh-scope.md` |
+| `4da9e89147704a04` | groundwork-anemone | Planning t1: deciding UserPromptSubmit output envelope | `wiki-local/platforms/processes/t1-deciding-userpromptsubmit-output-envelope.md` |
+| `63a57968ed77cff1` | groundwork-anemone | Planning t1: deciding Per-session injection-cap state (concurrency-safe) | `wiki-local/platforms/processes/t1-deciding-per-session-injection-cap-state-concurrency-safe.md` |
+| `10e01b32767d3ce8` | groundwork-anemone | Planning t1: deciding Cap config key and precedence | `wiki-local/platforms/processes/t1-deciding-cap-config-key-and-precedence.md` |
+| `95091f594b1079a8` | groundwork-anemone | Planning t1: deciding Retiring the Stop-hook nudge (R9) | `wiki-local/platforms/processes/t1-deciding-retiring-the-stop-hook-nudge-r9.md` |
+| `9142d592501ee77d` | groundwork-anemone | Planning t1: deciding Retiring the Stop-hook nudge (R9) | `wiki-local/platforms/processes/t1-deciding-retiring-the-stop-hook-nudge-r9.md` |
+| `b4101904db069d0c` | mechameleon-web-swordtail | Planning t6-motion-fallback: deciding Optional mc- spinner | `wiki-local/frontend/design/t6-motion-fallback-deciding-optional-mc-spinner.md` |
+| `ebe931fcc01c7115` | mechameleon-web-swordtail | Planning t6-motion-fallback: deciding Where the transition class is applied | `wiki-local/frontend/design/t6-motion-fallback-deciding-where-the-transition-class-is.md` |
+| `ee8895f42fe2dd08` | mechameleon-web-swordtail | Planning t6-motion-fallback: deciding Bubbled animationend guard | `wiki-local/frontend/design/t6-motion-fallback-deciding-bubbled-animationend-guard.md` |
+| `43df3b518ec54d4c` | groundwork-anemone | Planning t2: deciding Where the habit budget/rule-cap/split-threshold check lives, and its own cadence | `wiki-local/infrastructure/agent-orchestration/t2-deciding-where-the-habit-budget-rule-cap-split.md` |
+| `bbf08e411e1b2052` | groundwork-anemone | Planning t3: deciding Error/boundary-case fixture strategy | `wiki-local/testing/quality/t3-deciding-error-boundary-case-fixture-strategy.md` |
+| `ea7b43132ded216e` | mechameleon-web-swordtail | Planning t6-motion-fallback: deciding Where the fade class is applied | `wiki-local/frontend/design/t6-motion-fallback-deciding-where-the-fade-class-is.md` |
+| `63038ef396e95d61` | mechameleon-web-swordtail | Planning t6-motion-fallback: deciding Bubbled animationend guard (root fade) | `wiki-local/frontend/design/t6-motion-fallback-deciding-bubbled-animationend-guard-root-fade.md` |
+| `d0023073df98e7d3` | mechameleon-web-swordtail | Planning t6-motion-fallback: deciding Leak prevention for the 13 existing, byte-unchanged test call sites | `wiki-local/testing/quality/t6-motion-fallback-deciding-leak-prevention-for-the-13.md` |
+| `253d93e62f61cc74` | mechameleon-web-swordtail | Planning t6-motion-fallback: deciding `.mc-phase-wipe`'s z-index relative to the HUD | `wiki-local/frontend/design/t6-motion-fallback-deciding-mc-phase-wipe-s-z.md` |
+| `ad24d746a5f10980` | linkly-crew-unicornfish | Planning t3-fe-modal-errors: deciding Existing-mode error display (R5) | `wiki-local/infrastructure/agent-orchestration/t3-fe-modal-errors-deciding-existing-mode-error-display.md` |
+| `eac6bef94f34d193` | linkly-crew-unicornfish | Planning t4-test-m5-flaky: deciding Handling of the out-of-scope flake found during this session's own spike ( | `wiki-local/testing/quality/t4-test-m5-flaky-deciding-handling-of-the-out.md` |
+| `bf2c83b6f1f55feb` | linkly-crew-unicornfish | Planning t5-be-automemory: deciding Shape of the new builder knob on `ClaudeCodeHarness` | `wiki-local/backend/common/api-design/t5-be-automemory-deciding-shape-of-the-new-builder.md` |
+| `a040d8adb11f70c1` | linkly-crew-unicornfish | Planning t5-be-automemory: deciding What happens if the primary mechanism's A/B fails (canary still echoes in  | `wiki-local/infrastructure/agent-orchestration/t5-be-automemory-deciding-what-happens-if-the-primary.md` |
+| `495ba60fed392b1d` | linkly-crew-unicornfish | Planning t5-be-automemory: deciding New doc's name and structure | `wiki-local/infrastructure/agent-orchestration/t5-be-automemory-deciding-new-doc-s-name-and.md` |
+| `cf03695b7e759a1a` | linkly-crew-unicornfish | Planning t4-test-m5-flaky: deciding Scope boundary re-affirmation for Task 03 | `wiki-local/testing/quality/t4-test-m5-flaky-deciding-scope-boundary-re-affirmation.md` |
+| `441b72897e43a432` | linkly-crew-unicornfish | Planning t2-be-artifacts-ignore: deciding Sharing the toplevel-confirmation logic | `wiki-local/backend/common/api-design/t2-be-artifacts-ignore-deciding-sharing-the-toplevel-confirmation.md` |
+| `e2077cd00cdd858e` | linkly-crew-unicornfish | Planning t2-be-artifacts-ignore: deciding Exact error message text for the ignored case | `wiki-local/backend/common/api-design/t2-be-artifacts-ignore-deciding-exact-error-message-text.md` |
+| `7689fdcc0bc9fa76` | linkly-crew-unicornfish | Planning t2-be-artifacts-ignore: deciding Distinguishing `git check-ignore`'s three exit outcomes | `wiki-local/backend/common/api-design/t2-be-artifacts-ignore-deciding-distinguishing-git-check-ignore.md` |
+| `49b4b8b20585750d` | linkly-crew-unicornfish | Planning t2-be-artifacts-ignore: deciding Where the new code lives | `wiki-local/infrastructure/agent-orchestration/t2-be-artifacts-ignore-deciding-where-the-new-code.md` |
+| `1a72e45fb26acbbf` | linkly-crew-unicornfish | Planning t2-be-artifacts-ignore: deciding `docs/DESIGN.md` §4.2 precondition sentence -- placement and content | `wiki-local/infrastructure/agent-orchestration/t2-be-artifacts-ignore-deciding-docs-design-md-4.md` |
+| `0d524e6efcebb819` | mechameleon-web-swordtail | Planning t1-crash-guard: deciding Where `GET /healthz`'s handler lives | `wiki-local/infrastructure/agent-orchestration/t1-crash-guard-deciding-where-get-healthz-s-handler.md` |
+| `ef11ac42f6c5c9a3` | mechameleon-web-swordtail | Planning t1-crash-guard: deciding README section placement | `wiki-local/infrastructure/agent-orchestration/t1-crash-guard-deciding-readme-section-placement.md` |
+| `462df2c25b8cddd6` | mechameleon-web-swordtail | Planning t1-crash-guard: deciding `server/package.json` `"start"` script | `wiki-local/infrastructure/agent-orchestration/t1-crash-guard-deciding-server-package-json-start-script.md` |
+| `9c79f279e086c362` | linkly-crew-unicornfish | Planning t1-flaky-18: deciding HANDOFF.md documentation update (two-part, because the brief's named location a | `wiki-local/infrastructure/agent-orchestration/t1-flaky-18-deciding-handoff-md-documentation-update-two.md` |
+| `481c16d330eb8d85` | linkly-crew-unicornfish | Planning t1-flaky-18: deciding Clippy/build regression check | `wiki-local/testing/quality/t1-flaky-18-deciding-clippy-build-regression-check.md` |
+| `bd785297693da39b` | mechameleon-web-swordtail | Planning t3-reconnect: deciding `DISCONNECT_GRACE_MS` placement/value | `wiki-local/backend/common/api-design/t3-reconnect-deciding-disconnect-grace-ms-placement-value.md` |
+| `0c28aaa7b8909abb` | mechameleon-web-swordtail | Planning t3-reconnect: deciding `room:rejoin` request/ack shape | `wiki-local/backend/common/api-design/t3-reconnect-deciding-room-rejoin-request-ack-shape.md` |
+| `d3549c0435e27324` | mechameleon-web-swordtail | Planning t3-reconnect: deciding Where the per-player grace timer lives | `wiki-local/backend/common/api-design/t3-reconnect-deciding-where-the-per-player-grace-timer.md` |
+| `40507f65c53fb779` | mechameleon-web-swordtail | Planning t3-reconnect: deciding `rejoin(playerId): Result<{code:string}>` semantics | `wiki-local/backend/common/api-design/t3-reconnect-deciding-rejoin-playerid-result-code-string-semantics.md` |
+| `9eeb0c1a00480225` | mechameleon-web-swordtail | Planning t3-reconnect: deciding Reusing the seek-stickmen payload builder | `wiki-local/backend/common/api-design/t3-reconnect-deciding-reusing-the-seek-stickmen-payload-builder.md` |
+| `048c43b53a90e50f` | mechameleon-web-swordtail | Planning t3-reconnect: deciding Client identity storage | `wiki-local/backend/common/api-design/t3-reconnect-deciding-client-identity-storage.md` |
+| `abbca8850bdce5fb` | mechameleon-web-swordtail | Planning t3-reconnect: deciding `rejoinRoom(ctx)` playerId assignment timing | `wiki-local/backend/common/api-design/t3-reconnect-deciding-rejoinroom-ctx-playerid-assignment-timing.md` |
+| `c8c9948c0033f333` | mechameleon-web-swordtail | Planning t3-reconnect: deciding Bootstrap's `connect` handler | `wiki-local/backend/common/api-design/t3-reconnect-deciding-bootstrap-s-connect-handler.md` |
+| `49ee87549fe36a92` | mechameleon-web-swordtail | Planning t3-reconnect: deciding Home-screen notice rendering | `wiki-local/backend/common/api-design/t3-reconnect-deciding-home-screen-notice-rendering.md` |
+| `60298a1b16647c63` | mechameleon-web-swordtail | Planning t3-reconnect: deciding Identity clear points (closing the brief's open "when room:state is no longer  | `wiki-local/backend/common/api-design/t3-reconnect-deciding-identity-clear-points-closing-the-brief.md` |
+| `19d5df7b952b4c21` | mechameleon-web-swordtail | Planning t3-reconnect: deciding `PlayerPublic.connected` field | `wiki-local/backend/common/api-design/t3-reconnect-deciding-playerpublic-connected-field.md` |
+| `caddd4175d7c3b83` | mechameleon-web-swordtail | Planning t3-reconnect: deciding Where the per-player grace timer lives, and what clears it (re-plan round 2, w | `wiki-local/testing/quality/t3-reconnect-deciding-where-the-per-player-grace-timer.md` |
+| `09efcda7019b6ebe` | mechameleon-web-swordtail | Planning t3-reconnect: deciding `rejoinRoom(ctx)` playerId assignment timing | `wiki-local/backend/common/api-design/t3-reconnect-deciding-rejoinroom-ctx-playerid-assignment-timing.md` |
+| `288638ebd86b0f91` | mechameleon-web-swordtail | Planning t2-browser-lifecycle: deciding Identity guard on cache resets | `wiki-local/backend/common/api-design/t2-browser-lifecycle-deciding-identity-guard-on-cache-resets.md` |
+| `d36f25bedc13c9d0` | mechameleon-web-swordtail | Planning t2-browser-lifecycle: deciding `closeBrowser()` semantics | `wiki-local/backend/common/api-design/t2-browser-lifecycle-deciding-closebrowser-semantics.md` |
+| `c99ae3e38097b3cd` | mechameleon-web-swordtail | Planning t2-browser-lifecycle: deciding Test-only accessor for `getBrowser()` | `wiki-local/testing/quality/t2-browser-lifecycle-deciding-test-only-accessor-for-getbrowser.md` |
+| `8efee67b5d3a20ff` | mechameleon-web-swordtail | Planning t2-browser-lifecycle: deciding Fake `Browser` test shape | `wiki-local/testing/quality/t2-browser-lifecycle-deciding-fake-browser-test-shape.md` |
+| `862b0ff56709ef84` | mechameleon-web-swordtail | Planning t2-browser-lifecycle: deciding Scope of `_resetBrowserStateForTests()` | `wiki-local/testing/quality/t2-browser-lifecycle-deciding-scope-of-resetbrowserstatefortests.md` |
+| `9025c18dca30cbda` | linkly-crew-unicornfish | Planning t1-flaky-m5: deciding R4's stop-and-report contingency — what to do if D1's diagnostic locates the tr | `wiki-local/testing/quality/t1-flaky-m5-deciding-r4-s-stop-and-report.md` |
+| `e9bdb5bd42b07eec` | linkly-crew-unicornfish | Planning t1-flaky-m5: deciding Fix class once D9 confirms the cause sits inside the two in-scope files | `wiki-local/testing/quality/t1-flaky-m5-deciding-fix-class-once-d9-confirms.md` |
+| `85359d7fb7f3b6cb` | linkly-crew-unicornfish | Planning t1-flaky-m5: deciding What to do about the distinct, already-confirmed line-176 `events.last()` order | `wiki-local/testing/quality/t1-flaky-m5-deciding-what-to-do-about-the.md` |
+| `fe07a304e499a7d8` | linkly-crew-unicornfish | Planning t2-browser-exec: deciding `expect` grammar | `wiki-local/backend/common/api-design/t2-browser-exec-deciding-expect-grammar.md` |
+| `101779646c62d3c0` | linkly-crew-unicornfish | Planning t2-browser-exec: deciding Where each `BrowserOutcome` variant is recorded in `DodVerdict` (complete f | `wiki-local/backend/common/api-design/t2-browser-exec-deciding-where-each-browseroutcome-variant-is.md` |
+| `a4e25d0b1abbb988` | linkly-crew-unicornfish | Planning t2-browser-exec: deciding What `flow` means now | `wiki-local/backend/common/api-design/t2-browser-exec-deciding-what-flow-means-now.md` |
+| `3ae64a5fe2b33d85` | linkly-crew-unicornfish | Planning t2-browser-exec: deciding Argv shape and pass/fail convention for the (not-yet-existing) browser CLI  | `wiki-local/backend/common/api-design/t2-browser-exec-deciding-argv-shape-and-pass-fail.md` |
+| `335eb96e3f330d5d` | linkly-crew-unicornfish | Planning t2-browser-exec: deciding Sharing `cmd_exec`'s `ProcessGroupGuard` vs. duplicating it | `wiki-local/backend/common/api-design/t2-browser-exec-deciding-sharing-cmd-exec-s-processgroupguard.md` |
+| `a05191cf9a92234f` | linkly-crew-unicornfish | Planning t2-browser-exec: deciding `BrowserPolicy` default timeout | `wiki-local/backend/common/api-design/t2-browser-exec-deciding-browserpolicy-default-timeout.md` |
+| `4516d05b25c35acd` | linkly-crew-unicornfish | Planning t2-browser-exec: deciding Verifying zero new crate dependencies (covers analysis.md Rule R8) | `wiki-local/backend/common/api-design/t2-browser-exec-deciding-verifying-zero-new-crate-dependencies.md` |
+| `35ed37a370308528` | linkly-crew-unicornfish | Planning t1-flaky-m5: deciding R4's stop-and-report contingency — what to do if D1's diagnostic locates the tr | `wiki-local/testing/quality/t1-flaky-m5-deciding-r4-s-stop-and-report.md` |
+| `3d68964d8cf752f8` | linkly-crew-unicornfish | Planning t1-flaky-m5: deciding Fix class once D9 confirms the cause sits inside the two in-scope files, for wh | `wiki-local/testing/quality/t1-flaky-m5-deciding-fix-class-once-d9-confirms.md` |
+| `21f49fe1eb59088c` | linkly-crew-unicornfish | Planning t1-flaky-m5: deciding R4's stop-and-report contingency — corrected in re-plan round 2: D9's test and  | `wiki-local/testing/quality/t1-flaky-m5-deciding-r4-s-stop-and-report.md` |
+| `c0a4143038a6f5ab` | linkly-crew-unicornfish | Planning t1-flaky-m5: deciding Fix class once D9 confirms the TRACED-BACK cause sits inside one of the three i | `wiki-local/testing/quality/t1-flaky-m5-deciding-fix-class-once-d9-confirms.md` |
+| `71365b194277a718` | linkly-crew-unicornfish | Planning t3-browser-wiring: deciding Shape of the `LeadBehavior` builder | `wiki-local/backend/common/api-design/t3-browser-wiring-deciding-shape-of-the-leadbehavior-builder.md` |
