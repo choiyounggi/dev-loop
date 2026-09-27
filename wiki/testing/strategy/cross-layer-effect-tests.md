@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://github.com/EveryInc/compound-engineering-plugin
 last_verified: 2026-08-22
-related: [testing-strategy-test-level-choice, testing-mocking-what-to-mock, testing-quality-write-path-assertions, testing-quality-minimum-case-set]
+related: [testing-strategy-test-level-choice, testing-mocking-what-to-mock, testing-quality-write-path-assertions, testing-quality-minimum-case-set, testing-strategy-agent-tool-shared-handler-tests]
 ---
 
 # Testing a Change Whose Execution Reaches Other Layers
