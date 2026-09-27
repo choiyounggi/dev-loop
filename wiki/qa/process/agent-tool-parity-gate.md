@@ -10,7 +10,7 @@ sources:
   - https://learn.chatgpt.com/docs/webmcp
   - https://webmachinelearning.github.io/webmcp/
 last_verified: 2026-09-28
-related: [frontend-agent-interfaces-agent-facing-tool-surfaces, security-agent-exposure-in-session-tool-exposure, testing-strategy-agent-tool-shared-handler-tests, qa-process-release-gates, qa-process-regression-scope]
+related: [frontend-agent-interfaces-agent-facing-tool-surfaces, security-agent-exposure-in-session-tool-exposure, testing-strategy-agent-tool-shared-handler-tests, qa-process-release-gates, qa-process-regression-scope, backend-common-api-design-agent-tool-granularity]
 ---
 
 # Release Gate for a Web UI's Agent Tool Surface (WebMCP Parity)
@@ -30,7 +30,9 @@ as registered tools; reviewing a QA plan that covers the human UI only.
    no tool is a gate failure unless the action is on the documented exclusion
    list (an action with no agent use case, recorded with its reason). The
    human UI is the primary surface and stays fully working — the gate checks
-   that the tool layer keeps up with it, not the reverse.
+   that the tool layer keeps up with it, not the reverse. The table is the
+   release-time reading of the capability map that
+   [backend-common-api-design-agent-tool-granularity] builds at design time.
 
 2. Verify each tool in Chrome DevTools → Application → WebMCP, with the page
    loaded the way a user would load it:

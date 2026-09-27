@@ -41,8 +41,9 @@ session, and permissions. Also when reviewing such a design.
 | Mutates user state (cart, profile, settings) | Keep the human in the submit path: declarative forms omit `toolautosubmit`; imperative `execute` shows an in-page confirmation UI before applying the change |
 | Spends money or is irreversible (order, payment, delete) | Register it with `annotations: { consequentialHint: true }` AND require an explicit human confirmation the agent cannot perform — a click on a control the tool result only points to, never triggers |
 
-   The hints are signals, not gates: the CG draft (2026-09-26) defines
-   `consequentialHint` as a signal "to the client or agent" so they "can
+   The hints are signals, not gates: the CG draft (2026-09-26, §6 Security
+   considerations, mitigation for "Misrepresentation of Intent") describes
+   `consequentialHint` as "a signal to the client or agent" so that "they can
    selectively enforce mandatory user confirmation prompts" (Chrome's docs:
    "agents and browsers"), and ChatGPT's site-tools runtime documents a
    safety review per invocation plus its own confirmation policy for
@@ -88,6 +89,6 @@ session, and permissions. Also when reviewing such a design.
 ## Sources
 
 - https://developer.chrome.com/docs/ai/webmcp/secure-tools — prompt-injection stance, `exposedTo` trust guidance, `readOnlyHint`/`untrustedContentHint`; still mentions a `requestUserInteraction()` absent from the current draft (page dated 2026-09-01)
-- https://webmachinelearning.github.io/webmcp/ — CG draft dated 2026-09-26; `ToolAnnotations` = `readOnlyHint`, `untrustedContentHint`, `consequentialHint`, `debugging`; no standardized user-confirmation primitive
+- https://webmachinelearning.github.io/webmcp/ — CG draft dated 2026-09-26; `ToolAnnotations` = `readOnlyHint`, `untrustedContentHint`, `consequentialHint`, `debugging`; §6 Security considerations → "Misrepresentation of Intent" mitigation: "acts as a signal to the client or agent … they can selectively enforce mandatory user confirmation prompts"; no standardized user-confirmation primitive
 - https://developer.chrome.com/docs/ai/webmcp/imperative-api — `consequentialHint` "allows agents and browsers to enforce mandatory user confirmation prompts before executing high-stakes tools" (page dated 2026-09-21)
 - https://learn.chatgpt.com/docs/webmcp — "Each tool invocation receives a safety review before it runs"; confirmation policy for purchases, deletions, permission changes; `readOnlyHint: true` in its read-only example, with the warning that a read-only claim is not proof

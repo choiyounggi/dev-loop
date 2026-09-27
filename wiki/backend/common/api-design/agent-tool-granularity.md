@@ -8,7 +8,7 @@ sources:
   - https://github.com/EveryInc/compound-engineering-plugin
   - https://www.anthropic.com/engineering/building-effective-agents
 last_verified: 2026-08-22
-related: [frontend-agent-interfaces-agent-facing-tool-surfaces, backend-common-llm-binding-instructions-for-agents]
+related: [frontend-agent-interfaces-agent-facing-tool-surfaces, backend-common-llm-binding-instructions-for-agents, qa-process-agent-tool-parity-gate]
 ---
 
 # Choosing the Tool Surface an In-App LLM Agent Calls

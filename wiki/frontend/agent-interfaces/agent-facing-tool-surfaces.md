@@ -93,8 +93,8 @@ that registers browser-native agent tools.
    pane shows the return value, or an error when parameters or return values
    violate the declared schema. For an agent-driven check, the Model Context
    Tool Inspector extension sends natural-language prompts to a Gemini model
-   against the live page; **Invoked Tools** then logs each agent call with
-   status, input and output.
+   against the live page; **Invoked Tools**, the pane's log of agent↔page
+   interactions, shows each call's status, input and output.
 
 ## Edge cases
 
@@ -122,6 +122,6 @@ that registers browser-native agent tools.
 - https://developer.chrome.com/docs/ai/webmcp/declarative-api — `toolname`/`tooldescription`/`toolautosubmit`/`toolparamdescription`, label→schema derivation, `:tool-form-active`/`:tool-submit-active`, `SubmitEvent.agentInvoked` + `respondWith()` for the page's own response
 - https://developer.chrome.com/docs/ai/webmcp/secure-tools — recommended character limits ("subject to change"): 500/tool description, 150/parameter description, 30/tool name and parameter name, 1.5K/tool output
 - https://webmachinelearning.github.io/webmcp/ — Draft Community Group Report status (Web Machine Learning CG)
-- https://chromestatus.com/feature/5117755740913664 — official milestone tracker: origin trial desktop first 149, last 156
+- https://chromestatus.com/feature/5117755740913664 — official milestone tracker: origin-trial stage desktop and Android 149–156, Firefox/Safari "No signal" (the HTML page is a JS shell; read `https://chromestatus.com/api/v0/features/5117755740913664`, stripping the `)]}'` prefix)
 - https://developer.chrome.com/docs/devtools/application/webmcp — DevTools Application → WebMCP pane: Available Tools; Invoked Tools as the log of agent↔page interactions; Run tool with manual parameters; schema-violation errors in the output pane (page dated 2026-05-12)
 - https://learn.chatgpt.com/docs/webmcp — "Site tools are ChatGPT's implementation of the proposed WebMCP standard"; `document.modelContext` only, declarative API and iframe registrations unsupported, per-invocation safety review, `readOnlyHint: true` in its read-only example ("A tool's name or claim that it only reads data isn't proof of what it does"), user toggle under Settings → Browser → Permissions

@@ -115,3 +115,21 @@ appended log.md entries (union merge).
   row now names `allow="tools"` + `exposedTo` + `getTools({ fromOrigins })`; origin trial and
   local flag separated; `SubmitEvent.agentInvoked` / `respondWith()` added to the declarative
   test directive.
+
+## CI agent gate (run 36329841491) — blocker refuted, advisories applied
+
+- Blocker claimed the CG draft has no "client or agent … selectively enforce" language. Ground
+  truth (`curl -sL https://webmachinelearning.github.io/webmcp/`, 504,537 bytes, tags stripped,
+  2026-09-28): the phrase occurs once, in §6 Security considerations under the mitigation for
+  "Misrepresentation of Intent": "A boolean consequentialHint annotation acts as a signal to the
+  client or agent that the tool performs a consequential action … This way they can selectively
+  enforce mandatory user confirmation prompts before executing high-stakes tools". The gate's
+  fetch read a truncated page. The page now names the section beside the quote.
+- Advisory (chromestatus unverifiable from CI): confirmed via the JSON API — stage 150
+  desktop/Android 149–156; Firefox and Safari "No signal". The source line now records the API
+  path.
+- Advisory (Run tool vs Invoked Tools): Do 8 no longer implies manual runs are excluded from the
+  log; it states only what the DevTools page states.
+- Advisory (cross-link gap): qa parity gate ↔ backend-common-api-design-agent-tool-granularity
+  linked both ways, with one sentence placing the parity table as the release-time reading of
+  that page's design-time capability map.
