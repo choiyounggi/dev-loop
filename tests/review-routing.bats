@@ -32,11 +32,11 @@ step7_table_rows() {
   ' "$1" | wc -l | tr -d ' '
 }
 
-# --- normal: AGENTS.md carries step 7 with a 6-row decision table -----------
+# --- normal: AGENTS.md carries step 7 with a 7-row decision table -----------
 
-@test "AGENTS.md: step 7 exists in the routing protocol with a 6-row table" {
+@test "AGENTS.md: step 7 exists in the routing protocol with a 7-row table" {
   [ "$(step7_line_count "$AGENTS")" -eq 1 ]
-  [ "$(step7_table_rows "$AGENTS")" -eq 6 ]
+  [ "$(step7_table_rows "$AGENTS")" -eq 7 ]
 }
 
 # --- normal: INDEX.md preamble names both inputs and cites AGENTS.md --------

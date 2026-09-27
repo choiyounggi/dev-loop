@@ -15,6 +15,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [acceptance-criteria](process/acceptance-criteria.md) | Writing or reviewing a feature ticket/user story before development starts; "done" is disputed at QA time; a delivered feature technically works but misses the intent |
 | [release-gates](process/release-gates.md) | Deciding whether a build/release is ready to ship; defining or reviewing the checklist that makes that decision |
+| [agent-tool-parity-gate](process/agent-tool-parity-gate.md) | QA-ing or gating a release of a web app whose standard is a WebMCP tool per user action; deciding whether a feature, fix, or release is done when UI actions must also be callable as tools; reviewing a QA plan that covers the human UI only; running the DevTools Application → WebMCP checks as a release gate |
 | [regression-scope](process/regression-scope.md) | Choosing what to re-test for a release/change when full regression is too expensive; reviewing someone else's proposed regression scope |
 | [severity-and-priority](process/severity-and-priority.md) | Triaging a bug — deciding how bad it is and when it gets fixed; a triage stalled on a severity debate |
 | [post-release-verification](process/post-release-verification.md) | A release just deployed to production; defining what "released safely" means; an incident revealed a release was broken for hours before anyone noticed |

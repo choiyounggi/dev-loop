@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://sre.google/sre-book/release-engineering/
 last_verified: 2026-07-10
-related: [qa-process-regression-scope, qa-exploratory-exploratory-sessions, backend-common-integrations-externally-owned-defaults]
+related: [qa-process-regression-scope, qa-exploratory-exploratory-sessions, backend-common-integrations-externally-owned-defaults, qa-process-agent-tool-parity-gate]
 ---
 
 # Deciding Whether a Build Is Ready to Ship
