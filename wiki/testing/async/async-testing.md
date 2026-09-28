@@ -62,6 +62,7 @@ un-awaited promises; or an async test intermittently interferes with the next te
 | Runner reports an unhandled rejection after the suite passes | A promise was created without `await`/`return` — find it and await it; do not silence the warning |
 | Assertions run inside a `.then`/callback the test never awaits | Add `expect.assertions(n)` / `expect.hasAssertions()` so the test fails when the callback is skipped, then restructure to await-then-assert |
 | A stream-fed test hangs after consuming the first record, with the later records never delivered | The records arrived in one chunk: a readable concatenates buffered writes, and a line-oriented consumer walks every delimiter in that chunk synchronously, discarding the lines no reader is waiting for. Write one record per turn (table row above) and re-run |
+| Teardown deletes a directory or closes a socket that spawned runtime tasks (tokio and similar) still use, from a `Drop`/destructor or a cleanup call placed after the assertions | Abort *and await* every task handle before the delete, on the single path every outcome takes — `abort()` returns before the task stops, and a failing assertion skips a trailing cleanup → [testing-async-teardown-after-aborted-tasks] |
 | The consumer is rebuilt per prompt (a new interface inside a retry loop) | Construct it once per interaction and reuse it — a second instance attached to the same stream competes for the same buffered data, so records land in whichever instance reads first |
 
 ## Instead of

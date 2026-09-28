@@ -101,6 +101,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [async-testing](async/async-testing.md) | Testing async code — promises, timers, retries, debounce, event-driven flows; the runner warns about assertions after completion or un-awaited promises; an async test intermittently interferes with the next test; deciding between fake timers and condition waits |
+| [teardown-after-aborted-tasks](async/teardown-after-aborted-tasks.md) | A test or shutdown path spawned tasks on an async runtime (tokio or similar) and is about to delete or close what they use (temp dir, socket, a spawned server's spool) through a `Drop` guard or a cleanup call after the assertions; leftover test directories concentrate in failing runs; deciding the order of `abort()`, awaiting the `JoinHandle`, and the delete, and where `Drop` still belongs |
 
 ## e2e
 
