@@ -8,7 +8,7 @@ sources:
   - https://github.com/zhaoxuya520/reverse-skill/blob/main/skills/ops/scope-contract.md
   - https://github.com/zhaoxuya520/reverse-skill/blob/main/RULES.md
 last_verified: 2026-08-24
-related: [security-agent-exposure-in-session-tool-exposure, infrastructure-agent-orchestration-autonomous-decision-rulings]
+related: [security-agent-exposure-in-session-tool-exposure, infrastructure-agent-orchestration-autonomous-decision-rulings, security-agent-exposure-capability-flag-across-adapters]
 ---
 
 # Gating a Dangerous Agent Capability on Persisted Authorization
@@ -48,6 +48,7 @@ specific target and must be established before the agent acts.
 | Case | Then |
 |------|------|
 | Read-only reconnaissance (passive lookups, public data) | Allowed before a grant; gate only the active/mutating actions in step 2 |
+| The gate is a flag in a config struct shared by several backends/adapters and only some of them read it | An adapter that never reads the flag runs unconfined while the caller believes it gated — census the readers, refuse the flag in non-enforcing adapters, pass each adapter's native lock-down switch ([security-agent-exposure-capability-flag-across-adapters]) |
 | Authorization covers one target but the agent discovers an adjacent one | The new target is out of scope until its own grant is written — discovery does not extend authorization |
 
 ## Instead of

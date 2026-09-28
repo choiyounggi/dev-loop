@@ -1,149 +1,147 @@
-# Knowledge ingest — WebMCP as the development standard: 2 pages re-verified, 2 new pages, routing widened
+# Knowledge flush — 2 insight(s) (+12 plan-gap rows retired as local-layer)
 
-Trigger: a Korean WebMCP explainer video (2026-09) pasted for evaluation. Its own content
-(declarative vs imperative API, shared page logic, token savings vs browser agents) was already
-covered by the two pages ingested 2026-08-18; adoption advocacy and proposal history were again
-left out. Verifying the video's claims against primary sources found the wiki a month behind its
-sources; the owner then decided (2026-09-28) that the additive WebMCP tool layer is the
-development standard for web UI work, QA, and bug fixes, which changes routing.
+Run id `20260928-191816-52426` (inherited from the auto-flush parent). Claimed 14 rows: 2 general
+candidates from sessions `56be2ab9…` (linkly t175) and `e5d33b40…` (linkly-crew t7), and 12
+`plan-gaps` rows tagged `t175-find-by-lookup-key`.
 
 ## Verified best-practice
 
-### 1. `consequentialHint` / `debugging` annotations, ChatGPT site-tools constraints, DevTools pane → **verified**
+### 1. Threading a new parameter through a call chain that crosses an executor (hash `157f9966ef1bfebb`)
 
-- https://webmachinelearning.github.io/webmcp/ — Draft Community Group Report dated 2026-09-26;
-  IDL `partial interface Document { readonly attribute ModelContext modelContext }` (Document
-  only); `dictionary ToolAnnotations { readOnlyHint, untrustedContentHint, consequentialHint,
-  debugging }`; no user-confirmation primitive defined. (fetched 2026-09-28)
-- https://developer.chrome.com/docs/ai/webmcp/imperative-api — page dated 2026-09-21;
-  `document.modelContext.registerTool({ name, description, inputSchema, execute, annotations },
-  { signal, exposedTo })`; `consequentialHint` "allows agents and browsers to enforce mandatory
-  user confirmation prompts before executing high-stakes tools"; `debugging` Chrome 156+; no
-  `requestUserInteraction` mention (the security page's old note on it was removed).
-- https://developer.chrome.com/docs/devtools/application/webmcp — page dated 2026-05-12; the
-  WebMCP pane is in the Application panel; Available Tools (name, description, invocation count),
-  Invoked Tools (status, input, output), Run tool with manual parameters, schema-mismatch errors
-  in the output pane.
-- https://learn.chatgpt.com/docs/webmcp — "Site tools are ChatGPT's implementation of the
-  proposed WebMCP standard"; feature-detects `document.modelContext.registerTool`; declarative
-  API and iframe registrations unsupported; "Each tool invocation receives a safety review before
-  it runs"; GPT-5.6 Sol / GPT-6 Sol only, Luna disabled; desktop app; not in Enterprise/Edu;
-  surfaces: built-in browser, ChatGPT Work, Codex; user toggle under Settings → Browser →
-  Permissions. (help.openai.com's site-tools article was dropped as a source: it returns 403 to
-  fetchers, so its claims could not be verified.)
-- https://developer.chrome.com/docs/ai/webmcp/secure-tools — page dated 2026-09-01; budgets
-  30 / 500 / 150 / 1.5K. Contains no auth-state guidance, so the parity gate's both-auth-states
-  row is derived from security-agent-exposure-in-session-tool-exposure (PII via read tools,
-  server-side authz unchanged), not from this page.
-- https://developer.chrome.com/docs/ai/webmcp — page dated 2026-08-07; origin trial from Chrome
-  149; Model Context Tool Inspector extension; prompts go to `gemini-3-flash-preview`.
+**Claim.** When a new argument is threaded through Python helpers and one hop is a
+`ThreadPoolExecutor.submit()`, enumerate every function on the path with a scope scan (names
+referenced but not bound as parameter/local/module) before running tests, and read "the parallel
+block produced no results" as a possible exception stored on a future rather than a logic error.
 
-### 2. WebMCP-as-standard routing (owner decision) → **policy, not a sourced claim**
+**Sources checked.**
+- https://docs.python.org/3/library/concurrent.futures.html — `Future.result()`: "If the call raised an
+  exception, this method will raise the same exception"; `Future.exception()` returns the stored
+  exception or `None`; `Executor.map()`: the exception "will be raised when its value is retrieved from
+  the iterator". Nothing surfaces at `submit()` time.
+- https://docs.python.org/3/library/symtable.html — `Function.get_parameters()`, `Function.get_locals()`,
+  `Symbol.is_referenced()`, `Symbol.is_free()`, `SymbolTable.get_children()` — the primitives the scan uses.
 
-The widened triggers (any new or changed user action in a web UI) and the parity gate's
-"every action has a tool unless on the exclusion list" are the owner's development standard,
-stated as such in log.md. Every mechanical directive inside those pages is sourced as above.
-The standard keeps the existing "human UI primary, tool layer additive" directive unchanged.
+**How verified.** Reproduction 2026-09-28 (CPython 3.14.4, macOS) in `.claude/tmp/flush-repro/`
+(deleted after capture): a worker helper referencing an unbound `keys` under a
+`ThreadPoolExecutor(max_workers=4)` whose caller appends `result()` only when `exception()` is `None`
+printed `results: []` with exit code 0 and no traceback; calling `result()` on one future raised
+`NameError: name 'keys' is not defined`. The symtable scan printed exactly one line naming the broken
+helper on the original file (known-bad) and zero lines on the fixed copy (known-good), which then
+returned three results.
+
+**Confidence:** verified.
+
+### 2. A capability-restriction flag in a shared config that only some adapters enforce (hash `2b935d298d7e036e`)
+
+**Claim.** When a restriction flag (`tool_use`, write confinement) lives in a config struct shared
+by several adapters and only one implements it: census which adapters read it, make every
+non-enforcing adapter refuse the flag with an explicit error before spawning, gate the flag at the
+caller on adapter id, pass each adapter's native lock-down switch unconditionally, and test the
+true arm per adapter.
+
+**Sources checked.**
+- https://cwe.mitre.org/data/definitions/636.html — CWE-636 "Not Failing Securely ('Failing Open')":
+  falling "back to a state that is less secure … such as using the most permissive access control
+  restrictions"; "causes administrators to have a false sense of security".
+- https://cheatsheetseries.owasp.org/cheatsheets/Secure_Product_Design_Cheat_Sheet.html — Least
+  Privilege, Fail Securely, Secure by Default, Defense-in-Depth (quoted in the page).
+- https://github.com/badlogic/pi-mono/issues/555 — the closed request that added `--no-tools` to pi;
+  confirmed on the installed CLI 2026-09-28: `pi --help` line 31 `--no-tools, -nt  Disable all tools by
+  default (built-in and extension)`; the package CHANGELOG (fetched via `gh api`) records "`--no-tools`
+  now disables all tools by default rather than only built-ins" (#2835, #3452).
+
+**How verified.** Directive matched against CWE-636 and the OWASP principles (fail closed, least
+privilege, secure defaults); the adapter-native switch the directive names was confirmed on the
+installed binary and in the upstream changelog; the field incident (crew-run `role_harness_cfg` set
+`tool_use` for all harnesses, `pi.rs` ignored it, RED test showed pi spawned with `tool_use=true`) is
+recorded as the field evidence row.
+
+**Confidence:** verified.
 
 ## Existing-layer check
 
-Pages read: frontend-agent-interfaces-agent-facing-tool-surfaces, security-agent-exposure-in-session-tool-exposure, qa-process-release-gates, testing-strategy-differential-testing, testing-strategy-cross-layer-effect-tests, testing-strategy-failing-test-first
+Pages read: backend-python-concurrency-gil-and-concurrency-model, testing-quality-sequential-dispatch-assumption-under-concurrency, debugging-signals-stack-traces, debugging-concurrency-intermittent-failures, backend-common-change-impact-call-site-enumeration, backend-common-errors-async-failure-handling, backend-common-errors-exception-handling, testing-mocking-captured-call-arguments, security-authn-retiring-a-replaced-auth-gate, security-agent-exposure-authorization-scope-persistence, testing-quality-default-values-under-test, backend-common-integrations-consumer-required-fields, backend-common-api-design-unenforced-declarations
 
-Whole-wiki grep `webmcp|modelContext|toolname|agent-friendly|answer engine` → 7 files (the two
-WebMCP pages, their two domain indexes, INDEX.md, log.md, platforms/tools/plugin-mcp-server-
-registration which matches only on a modelcontextprotocol URL). skills/, hooks/, agents/,
-templates/, AGENTS.md → 0 mentions. qa/testing/debugging indexes → no WebMCP routing line (the
-one qa hit is the model-coupled-guidance-aging-detector page, unrelated). `wiki_search` was
-unavailable (dev-loop-wiki MCP server failed to connect this session); the category pages were
-read directly per the skill's fallback.
+Also read: `INDEX.md`, `wiki/debugging/index.md`, `wiki/security/index.md`, `wiki/backend/index.md`,
+`wiki/backend/python/index.md`, the agent-orchestration section of `wiki/infrastructure/index.md`.
 
-Merge targets: both existing WebMCP pages were **revised in place** (same trigger, same
-directive, newer sources) — no new page for that material. The two new pages have new triggers
-(a release gate; a test strategy) that no existing qa/testing page covers: release-gates is the
-generic checklist page and is linked, not extended; differential-testing / cross-layer-effect-
-tests / failing-test-first are referenced from the testing page's edge cases.
+`wiki_search` top-5 for candidate 1: testing-quality-sequential-dispatch-assumption-under-concurrency
+(0.751), backend-python-concurrency-gil-and-concurrency-model (0.748),
+backend-common-errors-async-failure-handling (0.738), backend-java-kotlin-coroutines-dispatchers-and-blocking
+(×2, 0.738/0.735). For candidate 2: infrastructure-deploy-rollout-and-rollback (0.748),
+platforms-filesystems-paths-case-and-line-endings (0.726), testing-mocking-captured-call-arguments (0.723),
+infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge (0.722),
+platforms-toolchains-compiler-sysroot-on-macos (0.721). Repo-wide grep for the candidates' keywords
+(`ThreadPoolExecutor|NameError|as_completed|future.result`; `capability flag|least.privilege|deny.by.default|silently ignor|adapter`)
+ran with a positive control (`asyncio` → 3 files) and every hit was opened.
 
-Related links added both ways: qa-process-release-gates ↔ qa-process-agent-tool-parity-gate;
-testing-strategy-cross-layer-effect-tests ↔ testing-strategy-agent-tool-shared-handler-tests;
-frontend agent-facing-tool-surfaces and security in-session-tool-exposure ↔ both new pages.
+**Overlaps and verdicts.**
+- Candidate 1 — no page has the trigger. `backend-common-change-impact-call-site-enumeration` enumerates
+  *callers* of a changed callee; this case is the *intermediate* hop that is a caller of nothing new, so
+  it is adjacent, not a duplicate. `backend-common-errors-async-failure-handling` has the edge row
+  "Future stored but never consumed"; the new case (a collection loop that records only OK futures) is
+  a sibling shape — added as a new edge row there pointing at the new page, not merged, because the
+  new page's directive (the pre-test scope scan) is a change-impact step that page does not own.
+  `testing-quality-sequential-dispatch-assumption-under-concurrency` covers exact-count assertions
+  under a parallelized loop — linked as related. No conflicting directive found.
+- Candidate 2 — no page has the trigger. `backend-common-api-design-unenforced-declarations` is the
+  nearest principle (recognized-but-unenforced declaration → accept-and-warn); the new page sharpens it
+  for a security restriction shared across adapters (refuse, not warn) and is linked both ways with an
+  edge row. `security-agent-exposure-authorization-scope-persistence` (force flag must not bypass the
+  gate) and `security-authn-retiring-a-replaced-auth-gate` (deny default) are adjacent principles, not
+  duplicates. `testing-mocking-captured-call-arguments` owns the "assert the spawn carries the
+  confinement argument" test shape — linked one-way from the new page only, because open PR #223
+  rewrites that file.
+
+**Created:** `wiki/backend/common/change-impact/threading-a-parameter-through-executor-hops.md`,
+`wiki/security/agent-exposure/capability-flag-across-adapters.md`.
+**Amended (related link + one edge row each):** call-site-enumeration, async-failure-handling,
+authorization-scope-persistence, unenforced-declarations. **Index rows:** `wiki/backend/index.md`
+(change-impact), `wiki/security/index.md` (agent-exposure), `INDEX.md` security route line (the
+backend route line is left untouched because open PR #225 rewrites it; the domain index row carries the
+route). **Conflicts flagged:** none.
 
 ## Open-PR check
 
-`gh pr list --state open` (2026-09-28): one open PR, #223 (knowledge/choiyounggi-20260927-220735,
-15 insights). Its file list contains none of the four WebMCP-related pages; the only overlap is
-appended log.md entries (union merge).
+Open `knowledge/*` heads listed 2026-09-28 19:19 KST: #223 (`knowledge/choiyounggi-20260927-220735`),
+#225 (`…-20260928-082803`), #226 (`…-092831`), #227 (`…-103056`), #228 (`…-134840`),
+#229 (`…-145025`), #230 (`…-155239`). Each head fetched; `git diff origin/main origin/<head> -- wiki/`
+grepped for both candidates' keywords (positive control: `gitignore` in #223 → 13 hits) and each
+head's added/modified page list read.
+
+| Candidate | Overlapping open head | Verdict |
+|-----------|----------------------|---------|
+| 1 (`157f9966ef1bfebb`) executor-hop parameter threading | none — no open head adds or edits a page about executors, futures, or parameter threading | **new** |
+| 2 (`2b935d298d7e036e`) capability flag across adapters | none — #223 edits `security/agent-exposure/in-session-tool-exposure.md` and `testing/mocking/captured-call-arguments.md` (WebMCP tool surfaces), which is why those two files receive no back-link edit here | **new** |
+| 12 `plan-gaps` rows (t175-find-by-lookup-key) | #230 retired 8 t175 plan-gaps as local-layer; these 12 are a different hash set and were still `pending` | **drop** (local-layer, see below) |
 
 ## Routing decision
 
-- frontend/agent-interfaces/agent-facing-tool-surfaces — revised (owning artifact: the UI code).
-- security/agent-exposure/in-session-tool-exposure — revised (confirmation gating).
-- **qa/process/agent-tool-parity-gate** — new page in the existing `process` category beside
-  release-gates: it is a release-decision checklist for one surface, so it belongs where
-  release-gates and regression-scope live; no new category.
-- **testing/strategy/agent-tool-shared-handler-tests** — new page in the existing `strategy`
-  category beside test-level-choice / cross-layer-effect-tests: it decides what to test and at
-  which level for a two-entry-point action; no new category.
-- AGENTS.md routing step 7 — one row added (web UI user action → frontend agent-interfaces,
-  then the qa parity gate); tests/review-routing.bats pin 6 → 7 rows in the same commit.
-- INDEX.md frontend / qa / testing route lines and the three domain indexes updated; log.md
-  gained two ingest entries and two revise entries.
+| Insight | Layer | Target | Why this category |
+|---------|-------|--------|-------------------|
+| 1 | bundled wiki | `backend/common/change-impact/threading-a-parameter-through-executor-hops` | The directive is a pre-edit enumeration step for a parameter change (change-impact's remit, sibling of call-site-enumeration); the harvested `debugging` hint is served by the edge row and related link from `async-failure-handling`, the page an agent debugging "side effects silently never happen" already loads |
+| 2 | bundled wiki | `security/agent-exposure/capability-flag-across-adapters` | The flag confines an LLM agent harness's executable tools — the agent-exposure category's subject (in-session-tool-exposure, authorization-scope-persistence); no new category needed |
 
-## Verification
+No new category was created.
 
-- `node scripts/wiki-lint-prohibitions.js wiki` → directives 79, violations 0 (pin unchanged).
-- `node scripts/wiki-structure-checks.js wiki --layer bundled` → pages 353, findings 0.
-- bats: tests/wiki-*.bats + tests/review-routing.bats + tests/orchestrate-review-pass.bats →
-  273/273 ok (one earlier `Recall@5` flake re-ran green; baseline on an untouched HEAD worktree
-  measured the same 0.87).
-- Body lines: frontend 110, security 76, qa 70, testing 66 (limit 120).
+## Local-layer candidates
 
-## Independent review (before commit)
+All 12 `plan-gaps` rows belong to the linkly compiler repository (`seagrass`); each directive names
+`lower.py` line numbers, `RepositoryCall` nodes, `RFC-0052`, `RFC_ROUTES`, `LOOKUP_SUBJECT`, and
+`_resolve_lookup_key`, and would be wrong in any other codebase. Excluded from this PR; run
+`wiki-ingest` inside that project.
 
-- General reviewer (feature-dev:code-reviewer, fresh context): FAIL → 2 major + 4 minor, all
-  applied: `consequentialHint` scope aligned with the security page's class table; gate edge row
-  for a vanished runtime (human-UI release not blocked); logout added to the AbortSignal edge
-  row and the Registration test; step 2/3 of the testing page conditioned on imperative vs
-  declarative; AGENTS.md step-7 row admits the exclusion list; qa index clause matched to the
-  page trigger.
-- Adversarial fact-checker (fresh context, every source re-fetched): 8/8 targeted claims
-  confirmed; FAIL on 2 unsupported sentences + 8 imprecisions, all applied: dropped the
-  `navigator.modelContext` history (no cited source has it); Run tool no longer claimed to write
-  Invoked Tools (that log is agent↔page); `consequentialHint` quote re-attributed (draft: "client
-  or agent"; Chrome: "agents and browsers"); secure-tools' stale `requestUserInteraction()`
-  mention recorded; `readOnlyHint` "requested" → "in its read-only example"; budgets labelled
-  as Chrome's recommendations applied as limits, parameter names included; cross-origin edge
-  row now names `allow="tools"` + `exposedTo` + `getTools({ fromOrigins })`; origin trial and
-  local flag separated; `SubmitEvent.agentInvoked` / `respondWith()` added to the declarative
-  test directive.
-
-## CI agent gate (run 36329841491) — blocker refuted, advisories applied
-
-- Blocker claimed the CG draft has no "client or agent … selectively enforce" language. Ground
-  truth (`curl -sL https://webmachinelearning.github.io/webmcp/`, 504,537 bytes, tags stripped,
-  2026-09-28): the phrase occurs once, in §6 Security considerations under the mitigation for
-  "Misrepresentation of Intent": "A boolean consequentialHint annotation acts as a signal to the
-  client or agent that the tool performs a consequential action … This way they can selectively
-  enforce mandatory user confirmation prompts before executing high-stakes tools". The gate's
-  fetch read a truncated page. The page now names the section beside the quote.
-- Advisory (chromestatus unverifiable from CI): confirmed via the JSON API — stage 150
-  desktop/Android 149–156; Firefox and Safari "No signal". The source line now records the API
-  path.
-- Advisory (Run tool vs Invoked Tools): Do 8 no longer implies manual runs are excluded from the
-  log; it states only what the DevTools page states.
-- Advisory (cross-link gap): qa parity gate ↔ backend-common-api-design-agent-tool-granularity
-  linked both ways, with one sentence placing the parity table as the release-time reading of
-  that page's design-time capability map.
-
-## CI agent gate, second run (36330523418) — blocker applied, quote advisory stands
-
-- Blocker: the frontend page stated "the development standard is an additive WebMCP tool per
-  action" as unconditional fact under confidence: verified. Applied: the trigger, the frontend
-  domain description and load-when line, and the INDEX.md frontend row now condition on "this
-  wiki's development standard (owner decision, log.md 2026-09-28, a policy rather than a sourced
-  fact)". Routing width is unchanged; the sentence is a policy the wiki declares, not a claim about
-  the world.
-- Advisory (§6 quote unverifiable from CI): the gate's fetch truncates before §6.3.2 and curl is
-  blocked in its sandbox; it records the quote as unverifiable, not refuted. Ground-truth grep is in
-  the PR comment; the two sources lines name the section.
-- Advisory (duplication with test-level-choice's extract-and-wire edge row): linked both ways and
-  named in step 1 as the general rule applied to two entry points.
+| Hash | Decision | wiki-local target (project: linkly / seagrass) |
+|------|----------|-----------------------------------------------|
+| `3d731255ec8e39e0` | Grammar surface for `by <ref>` on read/update/delete | `wiki-local/backend/compiler/by-ref-trailing-clause-grammar.md` |
+| `d5c058373a04ea49` | Static ref-category split + order-blind admission rule | `wiki-local/backend/compiler/lookup-ref-category-admission.md` |
+| `fc8c4977a204266d` | Derived/Password refusal wording for a `binding.field` lookup key | `wiki-local/backend/compiler/lookup-key-derived-password-refusal.md` |
+| `e4ea213f6d9df04f` | Runtime key derivation | `wiki-local/backend/runtime/lookup-key-derivation.md` |
+| `be4216dd01e49bae` | Runtime key derivation + trace/collector attrs (re-plan) | same target as `e4ea213f6d9df04f` (revision of the same decision) |
+| `c207e65da923f1a0` | Persisting a `set` under the lookup key | `wiki-local/backend/runtime/persist-set-under-lookup-key.md` |
+| `672134c2e2a71817` | `update`/`delete … by <ref>` execute key | `wiki-local/backend/runtime/update-delete-by-lookup-key.md` |
+| `f5ba6ac93a2aedca` | Seed-key rule for `input.<field>` first reads | `wiki-local/backend/runtime/seed-key-rule-input-field.md` |
+| `caf95ea8520a2931` | Seed-key rule + missing-field handling (re-plan) | same target as `f5ba6ac93a2aedca` (revision of the same decision) |
+| `4bf5070e2b5086fd` | Bare-ref and bound-ref seeding scope (documented limitation) | `wiki-local/backend/runtime/bound-ref-seeding-scope.md` |
+| `d4fa24759b67ba37` | RFC-0052 authoring shape and Updates chain | `wiki-local/qa/rfc-process/rfc-0052-updates-chain.md` |
+| `4d689bc1190fc357` | Registries + docs: RFC_ROUTES, generated references, enforcement matrix | `wiki-local/qa/registries/rfc-registry-and-generated-reference-gates.md` |
