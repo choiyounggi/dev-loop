@@ -1,149 +1,51 @@
-# Knowledge ingest — WebMCP as the development standard: 2 pages re-verified, 2 new pages, routing widened
+# Knowledge flush — 1 insight (9 claimed rows: 1 ingested, 8 plan-gap rows retired as local-layer / pending-duplicate)
 
-Trigger: a Korean WebMCP explainer video (2026-09) pasted for evaluation. Its own content
-(declarative vs imperative API, shared page logic, token savings vs browser agents) was already
-covered by the two pages ingested 2026-08-18; adoption advocacy and proposal history were again
-left out. Verifying the video's claims against primary sources found the wiki a month behind its
-sources; the owner then decided (2026-09-28) that the additive WebMCP tool layer is the
-development standard for web UI work, QA, and bug fixes, which changes routing.
+Run id `20260928-155151-10929` (inherited from the auto-flush parent via `DEV_LOOP_FLUSH_RUN_ID`; `flush-lock.sh acquire` answered `already-owned`). Claimed ids: `dd2b3e11fff92997` (session row, repo t7-run-gitflow, ingested) plus 8 `plan-gaps.jsonl` rows listed under Local-layer candidates.
 
 ## Verified best-practice
 
-### 1. `consequentialHint` / `debugging` annotations, ChatGPT site-tools constraints, DevTools pane → **verified**
+**Claim (row `dd2b3e11fff92997`):** a heredoc body that must expand a shell variable while quoting commands in markdown backtick spans keeps the delimiter quoted (`<<'EOF'`) and substitutes a placeholder afterwards with a tool that treats the replacement as data (python `replace` reading the value from an env var, or GNU `envsubst '$VAR'` with an explicit variable list), or backslash-escapes every backtick under an unquoted delimiter. Mechanism: with an unquoted delimiter the body is expanded like a double-quoted string, so every `` `…` `` span runs as a command in the current cwd/env and its stdout replaces the span; the exit status is `cat`'s, so only stderr and the written file show it.
 
-- https://webmachinelearning.github.io/webmcp/ — Draft Community Group Report dated 2026-09-26;
-  IDL `partial interface Document { readonly attribute ModelContext modelContext }` (Document
-  only); `dictionary ToolAnnotations { readOnlyHint, untrustedContentHint, consequentialHint,
-  debugging }`; no user-confirmation primitive defined. (fetched 2026-09-28)
-- https://developer.chrome.com/docs/ai/webmcp/imperative-api — page dated 2026-09-21;
-  `document.modelContext.registerTool({ name, description, inputSchema, execute, annotations },
-  { signal, exposedTo })`; `consequentialHint` "allows agents and browsers to enforce mandatory
-  user confirmation prompts before executing high-stakes tools"; `debugging` Chrome 156+; no
-  `requestUserInteraction` mention (the security page's old note on it was removed).
-- https://developer.chrome.com/docs/devtools/application/webmcp — page dated 2026-05-12; the
-  WebMCP pane is in the Application panel; Available Tools (name, description, invocation count),
-  Invoked Tools (status, input, output), Run tool with manual parameters, schema-mismatch errors
-  in the output pane.
-- https://learn.chatgpt.com/docs/webmcp — "Site tools are ChatGPT's implementation of the
-  proposed WebMCP standard"; feature-detects `document.modelContext.registerTool`; declarative
-  API and iframe registrations unsupported; "Each tool invocation receives a safety review before
-  it runs"; GPT-5.6 Sol / GPT-6 Sol only, Luna disabled; desktop app; not in Enterprise/Edu;
-  surfaces: built-in browser, ChatGPT Work, Codex; user toggle under Settings → Browser →
-  Permissions. (help.openai.com's site-tools article was dropped as a source: it returns 403 to
-  fetchers, so its claims could not be verified.)
-- https://developer.chrome.com/docs/ai/webmcp/secure-tools — page dated 2026-09-01; budgets
-  30 / 500 / 150 / 1.5K. Contains no auth-state guidance, so the parity gate's both-auth-states
-  row is derived from security-agent-exposure-in-session-tool-exposure (PII via read tools,
-  server-side authz unchanged), not from this page.
-- https://developer.chrome.com/docs/ai/webmcp — page dated 2026-08-07; origin trial from Chrome
-  149; Model Context Tool Inspector extension; prompts go to `gemini-3-flash-preview`.
+Sources checked and how:
 
-### 2. WebMCP-as-standard routing (owner decision) → **policy, not a sourced claim**
+- https://www.gnu.org/software/bash/manual/html_node/Redirections.html §3.6.6 Here Documents (curled 2026-09-28, tags stripped with sed): "If any part of word is quoted … the lines in the here-document are not expanded. If word is unquoted … all lines of the here-document are subjected to parameter expansion, command substitution, and arithmetic expansion … and '\' must be used to quote the characters '\', '$', and '`'".
+- https://zsh.sourceforge.io/Doc/Release/Redirection.html `<<[-] word` (curled the same way): "If any character of word is quoted with single or double quotes or a '\', no interpretation is placed upon the characters of the document. Otherwise, parameter and command substitution occurs … and '\' must be used to quote the characters '\', '$', '`'".
+- https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html §2.7.4 Here-Document (curled): "If no part of word is quoted, all lines of the here-document shall be expanded for parameter expansion, command substitution, and arithmetic expansion."
+- Reproduction 2026-09-28 in a scratch git repo under the project's `.claude/tmp/` (removed afterwards), bash 5.3.15 and zsh 5.9 on macOS: `cat <<EOF > notes.md` with the prose `` `git branch crew/qa` then `frobnicate --all` `` → rc 0, stderr only `frobnicate: command not found`, file content `Next run  then .`, and `git branch --list` showed the new `crew/qa` branch (zsh: `crew/qa4` likewise). The three remedies — `<<'EOF'` + python placeholder replace from `$V`, `<<EOF` with `` \` ``, and `<<'EOF'` piped through `envsubst '$TASK'` — each wrote the prose intact with the variable expanded and created no branch. Also observed: `envsubst` turns `\$TASK` into `\t7` (backslash has no quoting meaning there), recorded as an edge case.
+- Field evidence from the session row: an unquoted notes heredoc printed `fatal: a branch named 'crew/qa' already exists` — the prose `git branch crew/qa` had run against the worktree's repo.
 
-The widened triggers (any new or changed user action in a web UI) and the parity gate's
-"every action has a tool unless on the exclusion list" are the owner's development standard,
-stated as such in log.md. Every mechanical directive inside those pages is sourced as above.
-The standard keeps the existing "human UI primary, tool layer additive" directive unchanged.
+Result: **confidence: verified** (three official manuals + reproduction). `applies_to: [bash, zsh, posix-sh]`.
 
 ## Existing-layer check
 
-Pages read: frontend-agent-interfaces-agent-facing-tool-surfaces, security-agent-exposure-in-session-tool-exposure, qa-process-release-gates, testing-strategy-differential-testing, testing-strategy-cross-layer-effect-tests, testing-strategy-failing-test-first
+Pages read: platforms-shells-escapes-in-shell-string-literals, platforms-shells-command-text-inspected-before-execution, platforms-shells-portable-shell-scripts, platforms-processes-non-interactive-cli-invocation, infrastructure-ci-cd-unparseable-workflow-file
 
-Whole-wiki grep `webmcp|modelContext|toolname|agent-friendly|answer engine` → 7 files (the two
-WebMCP pages, their two domain indexes, INDEX.md, log.md, platforms/tools/plugin-mcp-server-
-registration which matches only on a modelcontextprotocol URL). skills/, hooks/, agents/,
-templates/, AGENTS.md → 0 mentions. qa/testing/debugging indexes → no WebMCP routing line (the
-one qa hit is the model-coupled-guidance-aging-detector page, unrelated). `wiki_search` was
-unavailable (dev-loop-wiki MCP server failed to connect this session); the category pages were
-read directly per the skill's fallback.
-
-Merge targets: both existing WebMCP pages were **revised in place** (same trigger, same
-directive, newer sources) — no new page for that material. The two new pages have new triggers
-(a release gate; a test strategy) that no existing qa/testing page covers: release-gates is the
-generic checklist page and is linked, not extended; differential-testing / cross-layer-effect-
-tests / failing-test-first are referenced from the testing page's edge cases.
-
-Related links added both ways: qa-process-release-gates ↔ qa-process-agent-tool-parity-gate;
-testing-strategy-cross-layer-effect-tests ↔ testing-strategy-agent-tool-shared-handler-tests;
-frontend agent-facing-tool-surfaces and security in-session-tool-exposure ↔ both new pages.
+- `INDEX.md` → platforms (shell portability). `wiki/platforms/index.md` read in full; the `shells` category is the fit.
+- `grep -rli 'heredoc|here-doc|here document' wiki/` → 4 files: `command-text-inspected-before-execution` (a heredoc-built file does not exist at gate time), `non-interactive-cli-invocation` (feed stdin from a heredoc), `unparseable-workflow-file` (heredoc indentation in YAML `run:`), `worktree-isolated-workers` (unrelated). None describes body expansion.
+- `wiki_search` (k=5) on the trigger sentence: four hits on `escapes-in-shell-string-literals` (its double-quoted-backtick rows for `grep -F` patterns) and one on `unparseable-workflow-file`. `escapes-in-shell-string-literals` "When this applies" is a regex/pattern **string literal**; `portable-shell-scripts` has the one-line edge row "Message text must contain a command example → single-quote or write to a file". Neither covers a heredoc body (a different quoting mechanism — the delimiter, not the quotes), the variable-plus-backtick conflict, the placeholder/`envsubst`/escape choice, or auditing an executed span. → **new page**, one case: `heredoc-body-expansion-with-backtick-prose`. No conflict: the new page defers the single-line-argument case back to `escapes-in-shell-string-literals` in an edge row.
+- `related:` on the new page → escapes-in-shell-string-literals, portable-shell-scripts, command-text-inspected-before-execution. Reciprocal link added on `command-text-inspected-before-execution` (no open PR touches it). Reciprocal links on `escapes-in-shell-string-literals` and `portable-shell-scripts` are **deferred**: open PR #223 rewrites both pages' `related:` lines, so a second edit of the same line would conflict on whichever merges second; add them after #223 lands.
+- `INDEX.md` platforms row left unchanged for the same reason (open PR #227 rewrites that row); its existing "shell portability" wording already routes shell writes to the platforms index, where the new row carries the specific trigger.
+- Lint on the edited checkout: `node scripts/wiki-lint-prohibitions.js wiki` → `directives: 79, violations: 0` (baseline on untouched main was also 79 / 0, so `tests/wiki-lint-prohibitions.bats` needs no count bump); `node scripts/wiki-structure-checks.js wiki` → `pages: 354, indexes: 13, findings: 0` (baseline 353 / 0); `bats tests/wiki-lint-prohibitions.bats tests/wiki-structure-checks.bats tests/wiki-index.bats tests/wiki-index-freshness.bats tests/wiki-agent-gate.bats tests/wiki-contradiction.bats` → `1..131`, 131 ok, 0 not ok. New page body: 72 lines.
 
 ## Open-PR check
 
-`gh pr list --state open` (2026-09-28): one open PR, #223 (knowledge/choiyounggi-20260927-220735,
-15 insights). Its file list contains none of the four WebMCP-related pages; the only overlap is
-appended log.md entries (union merge).
+`gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` → #223 (`knowledge/choiyounggi-20260927-220735`), #225 (`…-082803`), #226 (`…-092831`), #227 (`…-103056`), #228 (`…-134840`), #229 (`…-145025`). Each head fetched; `git diff origin/main origin/<head> -- wiki/` grepped for `heredoc|here-doc|here document|command substitution|backtick` → 0 added lines in every head. #223 adds `shells/redirection-order-for-a-silenced-write` (stderr/stdout ordering of a silenced write — a different situation).
+
+Verdict per candidate: `dd2b3e11fff92997` → **new**. The 8 plan-gap rows → **drop**: six of them (`f8274e8a574a39af`, `f541156192eeee35`, `4bac29ffc7930e3c`, `72355943be4f08f4`, `1958e49958fa5319`, `cae239f03ddab2cd`) are byte-identical re-harvests of rows PR #229's report already retired as local-layer, and the remaining two (`da8b9f803d9aa21a`, `cadd2dc7b02ea111`) are two more harvests of the same `interp.eval_value` decision #229 retired under `ff968018e51af793`. Nothing new; retired again so they stop re-crossing the auto-flush threshold.
 
 ## Routing decision
 
-- frontend/agent-interfaces/agent-facing-tool-surfaces — revised (owning artifact: the UI code).
-- security/agent-exposure/in-session-tool-exposure — revised (confirmation gating).
-- **qa/process/agent-tool-parity-gate** — new page in the existing `process` category beside
-  release-gates: it is a release-decision checklist for one surface, so it belongs where
-  release-gates and regression-scope live; no new category.
-- **testing/strategy/agent-tool-shared-handler-tests** — new page in the existing `strategy`
-  category beside test-level-choice / cross-layer-effect-tests: it decides what to test and at
-  which level for a two-entry-point action; no new category.
-- AGENTS.md routing step 7 — one row added (web UI user action → frontend agent-interfaces,
-  then the qa parity gate); tests/review-routing.bats pin 6 → 7 rows in the same commit.
-- INDEX.md frontend / qa / testing route lines and the three domain indexes updated; log.md
-  gained two ingest entries and two revise entries.
+- `dd2b3e11fff92997` → `wiki/platforms/shells/heredoc-body-expansion-with-backtick-prose.md` (id `platforms-shells-heredoc-body-expansion-with-backtick-prose`), existing category `shells` — it is the shell-quoting family the category already holds (string-literal escapes, gate-inspected command text); no new category.
+- Plumbing: `wiki/platforms/index.md` (+1 row after `escapes-in-shell-string-literals`), `log.md` (ingest entry), `wiki/platforms/shells/command-text-inspected-before-execution.md` (reciprocal `related:`).
 
-## Verification
+## Local-layer candidates
 
-- `node scripts/wiki-lint-prohibitions.js wiki` → directives 79, violations 0 (pin unchanged).
-- `node scripts/wiki-structure-checks.js wiki --layer bundled` → pages 353, findings 0.
-- bats: tests/wiki-*.bats + tests/review-routing.bats + tests/orchestrate-review-pass.bats →
-  273/273 ok (one earlier `Recall@5` flake re-ran green; baseline on an untouched HEAD worktree
-  measured the same 0.87).
-- Body lines: frontend 110, security 76, qa 70, testing 66 (limit 120).
+All 8 `plan-gaps.jsonl` rows are wiki-plan "no owning wiki page" design records for seagrass (linkly), task t172-money-set-and-guards; each directive names that repository's own functions, RFC numbers and pinned test lines and would be wrong in another codebase. Target `wiki-local/backend/python/<slug>.md` in that repo — run `wiki-ingest` inside the project if any is wanted there:
 
-## Independent review (before commit)
-
-- General reviewer (feature-dev:code-reviewer, fresh context): FAIL → 2 major + 4 minor, all
-  applied: `consequentialHint` scope aligned with the security page's class table; gate edge row
-  for a vanished runtime (human-UI release not blocked); logout added to the AbortSignal edge
-  row and the Registration test; step 2/3 of the testing page conditioned on imperative vs
-  declarative; AGENTS.md step-7 row admits the exclusion list; qa index clause matched to the
-  page trigger.
-- Adversarial fact-checker (fresh context, every source re-fetched): 8/8 targeted claims
-  confirmed; FAIL on 2 unsupported sentences + 8 imprecisions, all applied: dropped the
-  `navigator.modelContext` history (no cited source has it); Run tool no longer claimed to write
-  Invoked Tools (that log is agent↔page); `consequentialHint` quote re-attributed (draft: "client
-  or agent"; Chrome: "agents and browsers"); secure-tools' stale `requestUserInteraction()`
-  mention recorded; `readOnlyHint` "requested" → "in its read-only example"; budgets labelled
-  as Chrome's recommendations applied as limits, parameter names included; cross-origin edge
-  row now names `allow="tools"` + `exposedTo` + `getTools({ fromOrigins })`; origin trial and
-  local flag separated; `SubmitEvent.agentInvoked` / `respondWith()` added to the declarative
-  test directive.
-
-## CI agent gate (run 36329841491) — blocker refuted, advisories applied
-
-- Blocker claimed the CG draft has no "client or agent … selectively enforce" language. Ground
-  truth (`curl -sL https://webmachinelearning.github.io/webmcp/`, 504,537 bytes, tags stripped,
-  2026-09-28): the phrase occurs once, in §6 Security considerations under the mitigation for
-  "Misrepresentation of Intent": "A boolean consequentialHint annotation acts as a signal to the
-  client or agent that the tool performs a consequential action … This way they can selectively
-  enforce mandatory user confirmation prompts before executing high-stakes tools". The gate's
-  fetch read a truncated page. The page now names the section beside the quote.
-- Advisory (chromestatus unverifiable from CI): confirmed via the JSON API — stage 150
-  desktop/Android 149–156; Firefox and Safari "No signal". The source line now records the API
-  path.
-- Advisory (Run tool vs Invoked Tools): Do 8 no longer implies manual runs are excluded from the
-  log; it states only what the DevTools page states.
-- Advisory (cross-link gap): qa parity gate ↔ backend-common-api-design-agent-tool-granularity
-  linked both ways, with one sentence placing the parity table as the release-time reading of
-  that page's design-time capability map.
-
-## CI agent gate, second run (36330523418) — blocker applied, quote advisory stands
-
-- Blocker: the frontend page stated "the development standard is an additive WebMCP tool per
-  action" as unconditional fact under confidence: verified. Applied: the trigger, the frontend
-  domain description and load-when line, and the INDEX.md frontend row now condition on "this
-  wiki's development standard (owner decision, log.md 2026-09-28, a policy rather than a sourced
-  fact)". Routing width is unchanged; the sentence is a policy the wiki declares, not a claim about
-  the world.
-- Advisory (§6 quote unverifiable from CI): the gate's fetch truncates before §6.3.2 and curl is
-  blocked in its sandbox; it records the quote as unverifiable, not refuted. Ground-truth grep is in
-  the PR comment; the two sources lines name the section.
-- Advisory (duplication with test-level-choice's extract-and-wire edge row): linked both ways and
-  named in step 1 as the general rule applied to two entry points.
+- `f8274e8a574a39af` `_check_dimensions` message names RFC-0051 only when `"money"` participates → `money-mismatch-message-cites-rfc-0051`
+- `da8b9f803d9aa21a`, `cadd2dc7b02ea111` `interp.eval_value` `Ref` branch gains a Money dict case (shape dispatch) → `money-runtime-shape-dispatch`
+- `f541156192eeee35` `money.py` `sub`/`mul_int` pure, import-free, own ±INT64 check → `money-sub-mul-int-domain-check`
+- `4bac29ffc7930e3c` `_condition_holds` spec-only Money order comparison opened → `money-order-comparison-in-spec`
+- `72355943be4f08f4` RFC-0051 status Draft + Updates chain per RFC-0007 §2.2 → `wiki-local/qa/document-verification/rfc-0051-updates-chain`
+- `1958e49958fa5319` t177 declared-field rule reaches `_dimension_of` through the generic reference loop → `numeric-predicate-declared-field-rule`
+- `cae239f03ddab2cd` `RFC_ROUTES["0051"]`, generated grammar prose, README/CHANGELOG/ENFORCEMENT rows → `rfc-0051-registry-rows`
