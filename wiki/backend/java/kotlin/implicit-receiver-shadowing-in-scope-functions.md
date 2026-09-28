@@ -48,6 +48,7 @@ the fake's own exception on a line that "calls the helper".
 | Case | Then |
 |------|------|
 | The receiver member is `suspend` and the caller is not in a coroutine | The compiler reports the suspend-call error, which is the first visible symptom — read it as shadowing, not as a missing `runBlocking` |
+| The receiver member is `suspend` and the call sits inside `runTest`/`runBlocking` or another coroutine | It compiles cleanly and fails only at runtime with the fake's own stub error (`NotImplementedError`, `NoSuchElementException`) on the line that "calls the helper" — resolve the call before touching the fixture data |
 | Nested receivers (`a.apply { b.apply { trip() } }`) | The innermost receiver wins, then outer receivers, then top-level — the spec orders implicit receivers by priority before top-level callables |
 | An extension function shares a member's name | The member wins on an explicit receiver too; rename the extension |
 
@@ -63,3 +64,4 @@ the fake's own exception on a line that "calls the helper".
 - https://kotlinlang.org/spec/overload-resolution.html — "Call without an explicit receiver": for an identifier `f` the sets are analyzed in order: local callables, then "the overload candidate sets for each pair of implicit receivers … in order of the receiver priority", then "top-level non-extension functions named `f`"; the first non-empty set wins
 - https://kotlinlang.org/docs/scope-functions.html — `apply`/`run`/`with` expose the context object as `this`; `also`/`let` expose it as `it`
 - Field evidence 2026-09-27 (linkly-calendar Android, `TripViewModelTest`): three cases failed with the fake's `NoSuchElementException("no trip t1")` thrown from inside `apply {}`; the top-level `trip(id)` fixture had been shadowed by `FakeTripApi.trip(id)`. Renaming the helper to `tripFixture` made all 13 pass
+- Field evidence 2026-09-28 (the same Android app, `CalendarViewModelTest`, inside `runTest`): three cases failed with `kotlin.NotImplementedError: not used by CalendarViewModelTest` thrown by the fake's `suspend fun trip(...)` from inside `FakeX().apply { … }`; the top-level fixture `trip()` renamed to `makeTrip()` — 14/14 pass. Second independent hit of the same resolution rule; the `suspend` member compiled without complaint because the call site was already in a coroutine
