@@ -4,7 +4,8 @@ Route here for: app-side iOS/Android/cross-platform concerns — process lifecyc
 and state survival, offline storage and sync, network calls from the device,
 store releases/rollout/hotfix strategy, startup performance, deep-link/push
 entry routing, modal presentation (sheets/covers contending for one host),
-runtime permissions, and sensitive data stored on the device.
+runtime permissions, sensitive data stored on the device, and in-composition
+UI state identity (a Compose map marker driven by changing state).
 Server-side API patterns (idempotency storage, retry contracts, error bodies)
 stay in the backend domain (pages link there).
 
@@ -15,6 +16,12 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [process-death-and-state](lifecycle/process-death-and-state.md) | Building any screen with in-progress user state (forms, wizards, selections, media position) — choosing where each kind of state lives (saved-state vs local storage vs keychain/keystore); a bug report says "app lost my data when I switched apps"; designing deep-link/notification entry that must rebuild state on a cold process; writing a process-death test plan |
+
+## state
+
+| Page | Load when |
+|------|-----------|
+| [map-marker-state-from-changing-position](state/map-marker-state-from-changing-position.md) | A maps-compose `Marker` (Jetpack Compose on Google Maps) takes its position from state that changes after first composition — a draft pin following map taps, a tracked entity, a reloaded or reordered list of places; the marker stays at its first position, or one place shows another place's coordinates/info window after the list changes; choosing `rememberMarkerState` vs `rememberUpdatedMarkerState` vs `rememberSaveable(saver = MarkerState.Saver)`, and wrapping list markers in `key(item.id)` |
 
 ## offline
 
