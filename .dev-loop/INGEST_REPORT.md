@@ -1,149 +1,125 @@
-# Knowledge ingest — WebMCP as the development standard: 2 pages re-verified, 2 new pages, routing widened
+# Knowledge flush — 1 insight (1 new page; 7 plan-gap rows retired as local-layer candidates)
 
-Trigger: a Korean WebMCP explainer video (2026-09) pasted for evaluation. Its own content
-(declarative vs imperative API, shared page logic, token savings vs browser agents) was already
-covered by the two pages ingested 2026-08-18; adoption advocacy and proposal history were again
-left out. Verifying the video's claims against primary sources found the wiki a month behind its
-sources; the owner then decided (2026-09-28) that the additive WebMCP tool layer is the
-development standard for web UI work, QA, and bug fixes, which changes routing.
+Run id `20260928-103002-67743` (auto-flush child; lock inherited via `DEV_LOOP_FLUSH_RUN_ID`).
+Claimed 8 queue rows: `27c34a17ce1d6612` (bun native addon) and 7 `plan-gaps` rows for the
+`dace` Android repo (`30c9b935faa64ba8`, `639657eea8ef0550`, `2b1e21589c1987ea`,
+`a81012fb435b7e21`, `79f42a83701cab51`, `86a1fcda7460b479`, `3deebdb303656afe`).
 
 ## Verified best-practice
 
-### 1. `consequentialHint` / `debugging` annotations, ChatGPT site-tools constraints, DevTools pane → **verified**
+### 1. A native addon has no `.node` binary after `bun install` — `confidence: verified`
 
-- https://webmachinelearning.github.io/webmcp/ — Draft Community Group Report dated 2026-09-26;
-  IDL `partial interface Document { readonly attribute ModelContext modelContext }` (Document
-  only); `dictionary ToolAnnotations { readOnlyHint, untrustedContentHint, consequentialHint,
-  debugging }`; no user-confirmation primitive defined. (fetched 2026-09-28)
-- https://developer.chrome.com/docs/ai/webmcp/imperative-api — page dated 2026-09-21;
-  `document.modelContext.registerTool({ name, description, inputSchema, execute, annotations },
-  { signal, exposedTo })`; `consequentialHint` "allows agents and browsers to enforce mandatory
-  user confirmation prompts before executing high-stakes tools"; `debugging` Chrome 156+; no
-  `requestUserInteraction` mention (the security page's old note on it was removed).
-- https://developer.chrome.com/docs/devtools/application/webmcp — page dated 2026-05-12; the
-  WebMCP pane is in the Application panel; Available Tools (name, description, invocation count),
-  Invoked Tools (status, input, output), Run tool with manual parameters, schema-mismatch errors
-  in the output pane.
-- https://learn.chatgpt.com/docs/webmcp — "Site tools are ChatGPT's implementation of the
-  proposed WebMCP standard"; feature-detects `document.modelContext.registerTool`; declarative
-  API and iframe registrations unsupported; "Each tool invocation receives a safety review before
-  it runs"; GPT-5.6 Sol / GPT-6 Sol only, Luna disabled; desktop app; not in Enterprise/Edu;
-  surfaces: built-in browser, ChatGPT Work, Codex; user toggle under Settings → Browser →
-  Permissions. (help.openai.com's site-tools article was dropped as a source: it returns 403 to
-  fetchers, so its claims could not be verified.)
-- https://developer.chrome.com/docs/ai/webmcp/secure-tools — page dated 2026-09-01; budgets
-  30 / 500 / 150 / 1.5K. Contains no auth-state guidance, so the parity gate's both-auth-states
-  row is derived from security-agent-exposure-in-session-tool-exposure (PII via read tools,
-  server-side authz unchanged), not from this page.
-- https://developer.chrome.com/docs/ai/webmcp — page dated 2026-08-07; origin trial from Chrome
-  149; Model Context Tool Inspector extension; prompts go to `gemini-3-flash-preview`.
+**Harvested claim (row `27c34a17ce1d6612`):** a `bun install -g` CLI dies with "Could not
+locate the bindings file" because bun skips lifecycle scripts for packages not in
+`trustedDependencies`; remedy: run `prebuild-install` / `node-gyp rebuild` by hand or
+reinstall with `--trust`.
 
-### 2. WebMCP-as-standard routing (owner decision) → **policy, not a sourced claim**
+**Verification changed the claim.** The stated cause is refuted for the harvested case and
+the page states the corrected mechanism:
 
-The widened triggers (any new or changed user action in a web UI) and the parity gate's
-"every action has a tool unless on the exclusion list" are the owner's development standard,
-stated as such in log.md. Every mechanical directive inside those pages is sourced as above.
-The standard keeps the existing "human UI primary, tool layer additive" directive unchanged.
+- `bun pm default-trusted` (bun 1.3.11, run in `~/.bun/install/global`) lists 367 packages and
+  **includes `better-sqlite3` (line 117) and `sqlite3`**; the upstream
+  `src/install/default-trusted-dependencies.txt` confirms both. `bun pm untrusted` in that
+  install root lists tree-sitter-* and node-llama-cpp as blocked but **not better-sqlite3**.
+  So bun ran its script; it was the `prebuild-install || node-gyp rebuild --release` chain
+  (better-sqlite3's own `package.json` install script) that produced no binary.
+- Reproduction (scratch project under the seagrass `.claude/tmp/`, deleted afterwards):
+  a trusted `file:` dep whose install script exits 1 → `bun install` exits 1 with
+  `error: install script from "failing-dep" exited with 1`, leaves `build/Release/obj`,
+  writes no lockfile (`bun pm untrusted` → `error: Lockfile not found`). An unlisted dep →
+  exit 0 with `Blocked 1 postinstall. Run \`bun pm untrusted\` for details.`; `bun pm trust
+  blocked-dep` ran the script and wrote `trustedDependencies`. The "only obj dirs, no .node"
+  state in the harvested evidence matches the *failed* branch, not the *blocked* branch.
+- Official docs checked (context7 `/oven-sh/bun` + WebFetch): https://bun.com/docs/pm/lifecycle
+  (default-secure allowlist; default list applies to npm sources only; `--ignore-scripts`),
+  https://bun.com/docs/pm/cli/pm (`untrusted` / `trust` / `default-trusted` / `ls --trusted`;
+  a set `trustedDependencies` **replaces** the default list),
+  https://bun.com/docs/guides/install/trusted (same replace-not-extend note),
+  https://github.com/nodejs/node-gyp#installation (Xcode CLT + supported Python; `--python`,
+  `npm_config_python`, `PYTHON`; `rebuild` = clean+configure+build).
+- Field half kept as evidence in the page's Sources: the qmd MCP server (global bun install,
+  better-sqlite3 12.8.0, launcher `#!/bin/sh` → Node 26.7) had no prebuilt for that ABI;
+  `node-gyp rebuild --release --python=<3.11>` produced `better_sqlite3.node` and the server
+  connected (originating session transcript `d5eb45d9…`, `claude mcp list` output).
+- Not substantiated and therefore left out: the harvested `--trust` remedy for a
+  default-listed package (it would re-run the same failing compile and, by writing
+  `trustedDependencies`, drop the rest of the default allowlist — recorded as an *Instead of*
+  row).
+
+### 2–8. Seven `plan-gaps` rows (t6b-calendar-trip-integration, repo `dace`) — not ingested
+
+Each directive names the dace repository's own types and files (`CalendarBarItem`,
+`CalendarWeekSegmentLayout`, `CalendarViewModel`/`TripApi`, `MonthGridPanel`,
+`CalendarWeekRow`, `PendingInAppRouteBox`, `AppContainer`, `MainTabScaffold`, `TripTabRoot`)
+and would be wrong in any other codebase. Layer test (wiki-ingest step 3) → local layer; see
+`## Local-layer candidates`. Their general residue is already covered:
+`mobile/navigation/deep-links-and-entry-points` (pending-route ownership, cited by the rows
+themselves) and `testing/mocking/what-to-mock`.
 
 ## Existing-layer check
 
-Pages read: frontend-agent-interfaces-agent-facing-tool-surfaces, security-agent-exposure-in-session-tool-exposure, qa-process-release-gates, testing-strategy-differential-testing, testing-strategy-cross-layer-effect-tests, testing-strategy-failing-test-first
+Pages read: platforms-toolchains-version-management, platforms-toolchains-compiler-sysroot-on-macos, platforms-environment-path-resolution, security-dependencies-supply-chain, platforms-tools-plugin-mcp-server-registration, qa-deliverables-documented-behavior-of-a-third-party-tool
 
-Whole-wiki grep `webmcp|modelContext|toolname|agent-friendly|answer engine` → 7 files (the two
-WebMCP pages, their two domain indexes, INDEX.md, log.md, platforms/tools/plugin-mcp-server-
-registration which matches only on a modelcontextprotocol URL). skills/, hooks/, agents/,
-templates/, AGENTS.md → 0 mentions. qa/testing/debugging indexes → no WebMCP routing line (the
-one qa hit is the model-coupled-guidance-aging-detector page, unrelated). `wiki_search` was
-unavailable (dev-loop-wiki MCP server failed to connect this session); the category pages were
-read directly per the skill's fallback.
-
-Merge targets: both existing WebMCP pages were **revised in place** (same trigger, same
-directive, newer sources) — no new page for that material. The two new pages have new triggers
-(a release gate; a test strategy) that no existing qa/testing page covers: release-gates is the
-generic checklist page and is linked, not extended; differential-testing / cross-layer-effect-
-tests / failing-test-first are referenced from the testing page's edge cases.
-
-Related links added both ways: qa-process-release-gates ↔ qa-process-agent-tool-parity-gate;
-testing-strategy-cross-layer-effect-tests ↔ testing-strategy-agent-tool-shared-handler-tests;
-frontend agent-facing-tool-surfaces and security in-session-tool-exposure ↔ both new pages.
+- Routing via `INDEX.md` → `wiki/platforms/index.md` (toolchains; also read shells/tools rows),
+  `wiki/infrastructure/index.md`, `wiki/backend/node/index.md`, `wiki/debugging/index.md`.
+- Repo-wide grep for `bun|native addon|node-gyp|prebuild-install|lifecycle script|postinstall|trustedDependencies|bindings file`
+  across `wiki/` (no truncation): 3 files — `frontend/design/design-canvas-workflow.md` (bun as
+  a prerequisite only), `security/dependencies/supply-chain.md` (one directive: review
+  install scripts, allowlist them — same *principle*, no diagnostic/remedy), `qa/deliverables/
+  documented-behavior-of-a-third-party-tool.md` (`npm ls -g` lookup only). No page covers the
+  blocked-vs-failed distinction, `bun pm untrusted/trust`, or the ABI/runtime rebuild.
+- `wiki_search` (k=5) on the trigger sentence: qa-deliverables-documented-behavior-of-a-third-party-tool (0.75),
+  infrastructure-containers-image-builds ×4 (0.72–0.75) — none describes this situation, so
+  **created new**: `wiki/platforms/toolchains/native-addon-binary-missing-after-bun-install.md`
+  (id `platforms-toolchains-native-addon-binary-missing-after-bun-install`, 90 lines total).
+- Conflicts: none. `security-dependencies-supply-chain` says "disable install scripts by
+  default and allowlist"; the new page is the downstream diagnostic when that allowlist (or a
+  failed script) leaves a native addon without its binary — complementary, linked both ways.
+- Related links added both ways: platforms-toolchains-version-management,
+  platforms-toolchains-compiler-sysroot-on-macos (node-gyp compile on macOS),
+  platforms-environment-path-resolution (which `node` the launcher resolves),
+  security-dependencies-supply-chain, platforms-tools-plugin-mcp-server-registration (MCP
+  server dying at connect).
+- Plumbing: `wiki/platforms/index.md` toolchains row; `INDEX.md` platforms route line
+  extended (no open PR rewrites that row — checked #223/#225/#226 diffs on `INDEX.md`);
+  `log.md` ingest entry.
+- Lint: `node scripts/wiki-lint-prohibitions.js` — no finding on the new page; no banned
+  qualifiers in directive sentences.
 
 ## Open-PR check
 
-`gh pr list --state open` (2026-09-28): one open PR, #223 (knowledge/choiyounggi-20260927-220735,
-15 insights). Its file list contains none of the four WebMCP-related pages; the only overlap is
-appended log.md entries (union merge).
+Open `knowledge/*` heads (`gh pr list --state open --search "head:knowledge/"`):
+#226 `knowledge/choiyounggi-20260928-092831`, #225 `knowledge/choiyounggi-20260928-082803`,
+#223 `knowledge/choiyounggi-20260927-220735`. Each fetched and diffed against `origin/main`
+under `wiki/` with the overlap grep above:
+
+| Candidate | #226 | #225 | #223 | Verdict |
+|-----------|------|------|------|---------|
+| `27c34a17ce1d6612` bun native addon | 0 hits | 1 hit (`postinstall` in an unrelated Kotlin/Gradle page) | 1 hit (unrelated `bun` mention) | **new** |
+| 7 dace plan-gap rows | — | — | — | not general; local-layer (see below), no wiki edit here |
+
+#223 touches `wiki/platforms/index.md` (shells and tools rows) and `INDEX.md`; my edits are in
+the toolchains table and the platforms route line, which none of the three PRs rewrite.
 
 ## Routing decision
 
-- frontend/agent-interfaces/agent-facing-tool-surfaces — revised (owning artifact: the UI code).
-- security/agent-exposure/in-session-tool-exposure — revised (confirmation gating).
-- **qa/process/agent-tool-parity-gate** — new page in the existing `process` category beside
-  release-gates: it is a release-decision checklist for one surface, so it belongs where
-  release-gates and regression-scope live; no new category.
-- **testing/strategy/agent-tool-shared-handler-tests** — new page in the existing `strategy`
-  category beside test-level-choice / cross-layer-effect-tests: it decides what to test and at
-  which level for a two-entry-point action; no new category.
-- AGENTS.md routing step 7 — one row added (web UI user action → frontend agent-interfaces,
-  then the qa parity gate); tests/review-routing.bats pin 6 → 7 rows in the same commit.
-- INDEX.md frontend / qa / testing route lines and the three domain indexes updated; log.md
-  gained two ingest entries and two revise entries.
+| Insight | Target | Why this category |
+|---------|--------|-------------------|
+| bun native addon without `.node` | `platforms/toolchains/native-addon-binary-missing-after-bun-install` (new page) | The fault sits between a package manager's script policy and a compiler toolchain (node-gyp, Python, Xcode CLT, runtime ABI) — the toolchains category already holds `compiler-sysroot-on-macos`, `version-management`, `environment-resync-removes-undeclared-packages`. Not `backend/node` (no application code) and not `security/dependencies` (that page owns the policy, not the diagnosis). No new category. |
 
-## Verification
+## Local-layer candidates
 
-- `node scripts/wiki-lint-prohibitions.js wiki` → directives 79, violations 0 (pin unchanged).
-- `node scripts/wiki-structure-checks.js wiki --layer bundled` → pages 353, findings 0.
-- bats: tests/wiki-*.bats + tests/review-routing.bats + tests/orchestrate-review-pass.bats →
-  273/273 ok (one earlier `Recall@5` flake re-ran green; baseline on an untouched HEAD worktree
-  measured the same 0.87).
-- Body lines: frontend 110, security 76, qa 70, testing 66 (limit 120).
+Project `dace` (`/Users/choeyeong-gi/Desktop/workspace/linkly-calendar/dace`, task
+t6b-calendar-trip-integration) — run `wiki-ingest` inside that project:
 
-## Independent review (before commit)
+| Row | Target |
+|-----|--------|
+| `30c9b935faa64ba8` CalendarBarItem sealed union + id prefixes | `wiki-local/mobile/presentation/calendar-bar-item-union.md` |
+| `639657eea8ef0550` shared greedy lane layout over mixed bar items | `wiki-local/mobile/presentation/calendar-week-lane-layout.md` |
+| `2b1e21589c1987ea` asymmetric error isolation for parallel events/trips fetch | `wiki-local/mobile/networking/calendar-parallel-fetch-error-isolation.md` |
+| `a81012fb435b7e21` trip bar color/icon parity with iOS | `wiki-local/mobile/presentation/calendar-trip-bar-rendering.md` |
+| `79f42a83701cab51` trip-bar tap routing (`onTripTap`, isCenter-only) | `wiki-local/mobile/navigation/calendar-trip-bar-tap-routing.md` |
+| `86a1fcda7460b479` PendingInAppRouteBox owned by AppContainer | `wiki-local/mobile/navigation/pending-in-app-route-ownership.md` |
+| `3deebdb303656afe` 5th tab index/icon + TripTabRoot stub consumption | `wiki-local/mobile/navigation/trip-tab-and-pending-route-consumption.md` |
 
-- General reviewer (feature-dev:code-reviewer, fresh context): FAIL → 2 major + 4 minor, all
-  applied: `consequentialHint` scope aligned with the security page's class table; gate edge row
-  for a vanished runtime (human-UI release not blocked); logout added to the AbortSignal edge
-  row and the Registration test; step 2/3 of the testing page conditioned on imperative vs
-  declarative; AGENTS.md step-7 row admits the exclusion list; qa index clause matched to the
-  page trigger.
-- Adversarial fact-checker (fresh context, every source re-fetched): 8/8 targeted claims
-  confirmed; FAIL on 2 unsupported sentences + 8 imprecisions, all applied: dropped the
-  `navigator.modelContext` history (no cited source has it); Run tool no longer claimed to write
-  Invoked Tools (that log is agent↔page); `consequentialHint` quote re-attributed (draft: "client
-  or agent"; Chrome: "agents and browsers"); secure-tools' stale `requestUserInteraction()`
-  mention recorded; `readOnlyHint` "requested" → "in its read-only example"; budgets labelled
-  as Chrome's recommendations applied as limits, parameter names included; cross-origin edge
-  row now names `allow="tools"` + `exposedTo` + `getTools({ fromOrigins })`; origin trial and
-  local flag separated; `SubmitEvent.agentInvoked` / `respondWith()` added to the declarative
-  test directive.
-
-## CI agent gate (run 36329841491) — blocker refuted, advisories applied
-
-- Blocker claimed the CG draft has no "client or agent … selectively enforce" language. Ground
-  truth (`curl -sL https://webmachinelearning.github.io/webmcp/`, 504,537 bytes, tags stripped,
-  2026-09-28): the phrase occurs once, in §6 Security considerations under the mitigation for
-  "Misrepresentation of Intent": "A boolean consequentialHint annotation acts as a signal to the
-  client or agent that the tool performs a consequential action … This way they can selectively
-  enforce mandatory user confirmation prompts before executing high-stakes tools". The gate's
-  fetch read a truncated page. The page now names the section beside the quote.
-- Advisory (chromestatus unverifiable from CI): confirmed via the JSON API — stage 150
-  desktop/Android 149–156; Firefox and Safari "No signal". The source line now records the API
-  path.
-- Advisory (Run tool vs Invoked Tools): Do 8 no longer implies manual runs are excluded from the
-  log; it states only what the DevTools page states.
-- Advisory (cross-link gap): qa parity gate ↔ backend-common-api-design-agent-tool-granularity
-  linked both ways, with one sentence placing the parity table as the release-time reading of
-  that page's design-time capability map.
-
-## CI agent gate, second run (36330523418) — blocker applied, quote advisory stands
-
-- Blocker: the frontend page stated "the development standard is an additive WebMCP tool per
-  action" as unconditional fact under confidence: verified. Applied: the trigger, the frontend
-  domain description and load-when line, and the INDEX.md frontend row now condition on "this
-  wiki's development standard (owner decision, log.md 2026-09-28, a policy rather than a sourced
-  fact)". Routing width is unchanged; the sentence is a policy the wiki declares, not a claim about
-  the world.
-- Advisory (§6 quote unverifiable from CI): the gate's fetch truncates before §6.3.2 and curl is
-  blocked in its sandbox; it records the quote as unverifiable, not refuted. Ground-truth grep is in
-  the PR comment; the two sources lines name the section.
-- Advisory (duplication with test-level-choice's extract-and-wire edge row): linked both ways and
-  named in step 1 as the general rule applied to two entry points.
+All 8 claimed rows are retired in the queue by this run (1 ingested, 7 local-layer).
