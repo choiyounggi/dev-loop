@@ -1,149 +1,127 @@
-# Knowledge ingest — WebMCP as the development standard: 2 pages re-verified, 2 new pages, routing widened
+# knowledge(design): product-surface vs brand-surface rules, UI hardening against real content, anti-slop craft-floor rows
 
-Trigger: a Korean WebMCP explainer video (2026-09) pasted for evaluation. Its own content
-(declarative vs imperative API, shared page logic, token savings vs browser agents) was already
-covered by the two pages ingested 2026-08-18; adoption advocacy and proposal history were again
-left out. Verifying the video's claims against primary sources found the wiki a month behind its
-sources; the owner then decided (2026-09-28) that the additive WebMCP tool layer is the
-development standard for web UI work, QA, and bug fixes, which changes routing.
+Source: the Impeccable design skill (github.com/pbakaus/impeccable), read at commit
+114ea1d3838fca73b253af45f873b9c4f5f213c8 (2026-09-29). Origin: the user asked whether
+hgko-dev.tistory.com/551 (an Impeccable install guide) should steer design work. The
+guide itself is stale (`/teach-impeccable`, `.impeccable.md` and the `dist/claude-code`
+path no longer exist) and carries no design knowledge; the skill's reference files do.
+This PR ingests the three areas where the wiki and the hallmark skill had no coverage.
 
 ## Verified best-practice
 
-### 1. `consequentialHint` / `debugging` annotations, ChatGPT site-tools constraints, DevTools pane → **verified**
+1. **Product (Operate) surfaces invert the brand-surface rules.** New page
+   `frontend-design-product-ui-vs-brand-surface`: Persuade / Operate / Read /
+   Experience modes chosen from the requested surface; on Operate surfaces one tuned
+   sans, fixed rem scale (1.125–1.2), Restrained color floor with a second neutral,
+   full state vocabulary, skeleton loading, structural responsiveness, 150–250 ms
+   state motion and no page-load sequence, standard affordances permitted, overlays
+   escape overflow ancestors, modal only for interruption or protected focus.
+   Verified by reading `skill/reference/operate.md` and `skill/SKILL.src.md` at the
+   pinned SHA; cross-checked against the Anthropic frontend-design post the anti-slop
+   page already cites. `confidence: unverified` — the sources are a third-party skill
+   file and a blog post, and no production use of this wiki's own is described; the
+   page says what upgrades it.
+2. **UI hardening against real content.** New page
+   `frontend-design-ui-hardening-against-real-content`: extreme-input test set,
+   translation-expansion budget by source length, truncate / clamp / wrap with
+   `min-width: 0`, logical properties + RTL glyph flip, `Intl` formatting and
+   `Intl.PluralRules`, interrupted-gesture handling (`touch-action`, `pointerId`
+   pinning, cancel paths), error copy with recovery, pending-state submit guard,
+   virtualization. Verified live: W3C article-text-size (IBM table ≤10 chars
+   200–300% … >70 chars 130%; Korean 0.8×), W3C Pointer Events (`pointercancel`
+   MUST fire on stream suppression; capture implicitly released), MDN logical
+   properties, `Intl` / `Intl.PluralRules`, `overflow-wrap` (only `anywhere`
+   counts toward min-content), `hyphens`, `-webkit-line-clamp`, `touch-action`
+   (pointercancel on browser gesture take-over), `title` accessibility concerns,
+   WCAG SC 1.4.4 — all HTTP 200. `confidence: verified`.
+3. **Craft-floor rows for brand surfaces.** `frontend-design-anti-slop-visual-design`
+   +2 directive rows (theme browser-default surfaces from the palette; shadows carry
+   offset + soft blur), +2 edge cases (route task UIs and hostile content to the new
+   pages), +6 Instead-of rows (eyebrow, decorative section numbers, geometric
+   occlusion mask, mono as costume, glyph icons, image hover animation). Verified by
+   reading `skill/reference/craft-floor.md` at the pinned SHA. Body 85 → 96 lines.
 
-- https://webmachinelearning.github.io/webmcp/ — Draft Community Group Report dated 2026-09-26;
-  IDL `partial interface Document { readonly attribute ModelContext modelContext }` (Document
-  only); `dictionary ToolAnnotations { readOnlyHint, untrustedContentHint, consequentialHint,
-  debugging }`; no user-confirmation primitive defined. (fetched 2026-09-28)
-- https://developer.chrome.com/docs/ai/webmcp/imperative-api — page dated 2026-09-21;
-  `document.modelContext.registerTool({ name, description, inputSchema, execute, annotations },
-  { signal, exposedTo })`; `consequentialHint` "allows agents and browsers to enforce mandatory
-  user confirmation prompts before executing high-stakes tools"; `debugging` Chrome 156+; no
-  `requestUserInteraction` mention (the security page's old note on it was removed).
-- https://developer.chrome.com/docs/devtools/application/webmcp — page dated 2026-05-12; the
-  WebMCP pane is in the Application panel; Available Tools (name, description, invocation count),
-  Invoked Tools (status, input, output), Run tool with manual parameters, schema-mismatch errors
-  in the output pane.
-- https://learn.chatgpt.com/docs/webmcp — "Site tools are ChatGPT's implementation of the
-  proposed WebMCP standard"; feature-detects `document.modelContext.registerTool`; declarative
-  API and iframe registrations unsupported; "Each tool invocation receives a safety review before
-  it runs"; GPT-5.6 Sol / GPT-6 Sol only, Luna disabled; desktop app; not in Enterprise/Edu;
-  surfaces: built-in browser, ChatGPT Work, Codex; user toggle under Settings → Browser →
-  Permissions. (help.openai.com's site-tools article was dropped as a source: it returns 403 to
-  fetchers, so its claims could not be verified.)
-- https://developer.chrome.com/docs/ai/webmcp/secure-tools — page dated 2026-09-01; budgets
-  30 / 500 / 150 / 1.5K. Contains no auth-state guidance, so the parity gate's both-auth-states
-  row is derived from security-agent-exposure-in-session-tool-exposure (PII via read tools,
-  server-side authz unchanged), not from this page.
-- https://developer.chrome.com/docs/ai/webmcp — page dated 2026-08-07; origin trial from Chrome
-  149; Model Context Tool Inspector extension; prompts go to `gemini-3-flash-preview`.
-
-### 2. WebMCP-as-standard routing (owner decision) → **policy, not a sourced claim**
-
-The widened triggers (any new or changed user action in a web UI) and the parity gate's
-"every action has a tool unless on the exclusion list" are the owner's development standard,
-stated as such in log.md. Every mechanical directive inside those pages is sourced as above.
-The standard keeps the existing "human UI primary, tool layer additive" directive unchanged.
+Gap evidence: `grep -rli dashboard wiki/frontend` → 0 files; hallmark v1.1.0 has 3
+"product UI" mentions and 0 `pointercancel` / RTL rules; the wiki's only Impeccable
+citation was README-level (log.md 2026-08-21) because the skill's paths churn — every
+new citation here is a commit-pinned permalink.
 
 ## Existing-layer check
 
-Pages read: frontend-agent-interfaces-agent-facing-tool-surfaces, security-agent-exposure-in-session-tool-exposure, qa-process-release-gates, testing-strategy-differential-testing, testing-strategy-cross-layer-effect-tests, testing-strategy-failing-test-first
+Pages read: frontend-design-anti-slop-visual-design, frontend-design-responsive-layout, frontend-data-fetching-async-ui-states, frontend-design-design-canvas-workflow, frontend-accessibility-interactive-elements
 
-Whole-wiki grep `webmcp|modelContext|toolname|agent-friendly|answer engine` → 7 files (the two
-WebMCP pages, their two domain indexes, INDEX.md, log.md, platforms/tools/plugin-mcp-server-
-registration which matches only on a modelcontextprotocol URL). skills/, hooks/, agents/,
-templates/, AGENTS.md → 0 mentions. qa/testing/debugging indexes → no WebMCP routing line (the
-one qa hit is the model-coupled-guidance-aging-detector page, unrelated). `wiki_search` was
-unavailable (dev-loop-wiki MCP server failed to connect this session); the category pages were
-read directly per the skill's fallback.
-
-Merge targets: both existing WebMCP pages were **revised in place** (same trigger, same
-directive, newer sources) — no new page for that material. The two new pages have new triggers
-(a release gate; a test strategy) that no existing qa/testing page covers: release-gates is the
-generic checklist page and is linked, not extended; differential-testing / cross-layer-effect-
-tests / failing-test-first are referenced from the testing page's edge cases.
-
-Related links added both ways: qa-process-release-gates ↔ qa-process-agent-tool-parity-gate;
-testing-strategy-cross-layer-effect-tests ↔ testing-strategy-agent-tool-shared-handler-tests;
-frontend agent-facing-tool-surfaces and security in-session-tool-exposure ↔ both new pages.
+- `wiki_search` (dev-loop-wiki MCP) was down this session (CONNECTION_CLOSED); dedupe
+  was done by reading the design category index and grepping the frontend domain for
+  each candidate's trigger terms (`dashboard`, `product UI`, `::selection`,
+  `pointercancel`, `inline-start`, `RTL`, `i18n`, `empty state`, `skeleton`).
+- anti-slop-visual-design: same trigger for the craft-floor rows → merged as rows.
+  Its motion row ("spend the motion budget on one page-load") conflicts with the
+  Operate rule; resolved as a condition-dependent edge-case row that routes task UIs
+  to the new page, not as an overwrite.
+- responsive-layout: already owns overflow / `min-width: 0` / CJK wrapping / iOS
+  16px; the hardening page links to it for those rows instead of repeating them.
+- data-fetching/async-ui-states: owns empty / loading / error states; the hardening
+  page's edge case defers to it. Back-links added on both.
+- No local layer (`wiki-local/`) exists in this repo.
 
 ## Open-PR check
 
-`gh pr list --state open` (2026-09-28): one open PR, #223 (knowledge/choiyounggi-20260927-220735,
-15 insights). Its file list contains none of the four WebMCP-related pages; the only overlap is
-appended log.md entries (union merge).
+Open PRs #223, #225–#231 (listed 2026-09-29 with `gh pr list --state open`) are
+knowledge-flush batches touching backend, infrastructure, testing, mobile and
+platforms pages; none touch `wiki/frontend/design`, `wiki/frontend/index.md` or the
+three source files. Two concurrent local sessions (dev-loop-doliolid-70, -f8) had
+queued the identical ingest; both confirmed zero writes and stood down before this
+branch was edited.
 
 ## Routing decision
 
-- frontend/agent-interfaces/agent-facing-tool-surfaces — revised (owning artifact: the UI code).
-- security/agent-exposure/in-session-tool-exposure — revised (confirmation gating).
-- **qa/process/agent-tool-parity-gate** — new page in the existing `process` category beside
-  release-gates: it is a release-decision checklist for one surface, so it belongs where
-  release-gates and regression-scope live; no new category.
-- **testing/strategy/agent-tool-shared-handler-tests** — new page in the existing `strategy`
-  category beside test-level-choice / cross-layer-effect-tests: it decides what to test and at
-  which level for a two-entry-point action; no new category.
-- AGENTS.md routing step 7 — one row added (web UI user action → frontend agent-interfaces,
-  then the qa parity gate); tests/review-routing.bats pin 6 → 7 rows in the same commit.
-- INDEX.md frontend / qa / testing route lines and the three domain indexes updated; log.md
-  gained two ingest entries and two revise entries.
+- Layer: bundled `wiki/` (general knowledge, no repo-specific files named).
+- Domain: frontend. Category: design — both new pages are design-time decisions
+  about how a surface is styled and verified; the hardening page was considered for
+  `forms` and `accessibility` and rejected because its trigger is content shape and
+  locale, not a form lifecycle or an assistive-technology contract.
+- Page ids: `frontend-design-product-ui-vs-brand-surface`,
+  `frontend-design-ui-hardening-against-real-content`.
 
 ## Verification
 
-- `node scripts/wiki-lint-prohibitions.js wiki` → directives 79, violations 0 (pin unchanged).
-- `node scripts/wiki-structure-checks.js wiki --layer bundled` → pages 353, findings 0.
-- bats: tests/wiki-*.bats + tests/review-routing.bats + tests/orchestrate-review-pass.bats →
-  273/273 ok (one earlier `Recall@5` flake re-ran green; baseline on an untouched HEAD worktree
-  measured the same 0.87).
-- Body lines: frontend 110, security 76, qa 70, testing 66 (limit 120).
+- `node scripts/wiki-lint-prohibitions.js` → directives 79 / compliant 79 /
+  violations 0 (unchanged from the pre-edit baseline; rows written positively, so
+  `tests/wiki-lint-prohibitions.bats:25` keeps its pin).
+- `PATH=/opt/homebrew/bin:$PATH bats tests/wiki-structure-checks.bats tests/wiki-index.bats tests/wiki-lint-prohibitions.bats tests/wiki-contradiction.bats tests/wiki-index-freshness.bats tests/wiki-lint-score.bats tests/wiki-agent-gate.bats` → `1..136`, 136 ok, 0 not ok.
+- Inline `[page-id]` links and `related:` ids in the three touched pages all resolve
+  (grep `^id:` per id).
+- No banned qualifiers (`usually`, `consider`, `might`, `generally`, `as appropriate`,
+  `often`, `should`) in the two new pages.
 
 ## Independent review (before commit)
 
-- General reviewer (feature-dev:code-reviewer, fresh context): FAIL → 2 major + 4 minor, all
-  applied: `consequentialHint` scope aligned with the security page's class table; gate edge row
-  for a vanished runtime (human-UI release not blocked); logout added to the AbortSignal edge
-  row and the Registration test; step 2/3 of the testing page conditioned on imperative vs
-  declarative; AGENTS.md step-7 row admits the exclusion list; qa index clause matched to the
-  page trigger.
-- Adversarial fact-checker (fresh context, every source re-fetched): 8/8 targeted claims
-  confirmed; FAIL on 2 unsupported sentences + 8 imprecisions, all applied: dropped the
-  `navigator.modelContext` history (no cited source has it); Run tool no longer claimed to write
-  Invoked Tools (that log is agent↔page); `consequentialHint` quote re-attributed (draft: "client
-  or agent"; Chrome: "agents and browsers"); secure-tools' stale `requestUserInteraction()`
-  mention recorded; `readOnlyHint` "requested" → "in its read-only example"; budgets labelled
-  as Chrome's recommendations applied as limits, parameter names included; cross-origin edge
-  row now names `allow="tools"` + `exposedTo` + `getTools({ fromOrigins })`; origin trial and
-  local flag separated; `SubmitEvent.agentInvoked` / `respondWith()` added to the declarative
-  test directive.
+Two fresh-context reviewers (`feature-dev:code-reviewer`, one general brief and one
+adversarial brief; read-only, no Bash) on the 7-file diff. Findings applied:
 
-## CI agent gate (run 36329841491) — blocker refuted, advisories applied
+- anti-slop: a source bullet had been appended after the last table on a page that
+  keeps its sources in frontmatter → removed; the task-UI edge case named a
+  "fluid-type" row this page does not have and missed the default-font-rejection and
+  extreme-contrast rows → rewritten to name the exact rows and widened to Read /
+  Experience surfaces (a docs site previously had no route to the Read guidance).
+- responsive-layout: the `clamp()` row stated fluid type unconditionally → scoped to
+  brand/content surfaces with the app-UI alternative and a `related:` link.
+- product-ui-vs-brand-surface: `field-tested` over-claimed (no production context
+  described) → `unverified` with the upgrade condition in the page; trigger lines
+  now list mode choice, Read/Experience surfaces, overlay clipping, modal-first
+  (index/trigger drift); 65–75ch attributed to operate.md in the source line.
+- ui-hardening: `min-width: 0` rationale was wrong for `overflow-wrap: anywhere`
+  (only `break-word` leaves min-content unchanged) → corrected with the MDN quote;
+  `title` tooltip replaced by hover+focus tooltip (MDN accessibility concerns);
+  `touch-action: none` added to the drag row (MDN: browser fires `pointercancel`
+  when it takes a gesture); iOS 16px row now defers to responsive-layout instead of
+  restating an unsourced mechanism; WCAG 1.4.4 source added; IBM 51–70 row
+  anomaly noted as published.
+- Not applied: "ui-hardening bundles four topics" (both reviewers rated it below
+  their confidence bar; the page's one case is "data is present but hostile" and it
+  routes empty/loading/error out to async-ui-states).
 
-- Blocker claimed the CG draft has no "client or agent … selectively enforce" language. Ground
-  truth (`curl -sL https://webmachinelearning.github.io/webmcp/`, 504,537 bytes, tags stripped,
-  2026-09-28): the phrase occurs once, in §6 Security considerations under the mitigation for
-  "Misrepresentation of Intent": "A boolean consequentialHint annotation acts as a signal to the
-  client or agent that the tool performs a consequential action … This way they can selectively
-  enforce mandatory user confirmation prompts before executing high-stakes tools". The gate's
-  fetch read a truncated page. The page now names the section beside the quote.
-- Advisory (chromestatus unverifiable from CI): confirmed via the JSON API — stage 150
-  desktop/Android 149–156; Firefox and Safari "No signal". The source line now records the API
-  path.
-- Advisory (Run tool vs Invoked Tools): Do 8 no longer implies manual runs are excluded from the
-  log; it states only what the DevTools page states.
-- Advisory (cross-link gap): qa parity gate ↔ backend-common-api-design-agent-tool-granularity
-  linked both ways, with one sentence placing the parity table as the release-time reading of
-  that page's design-time capability map.
+After the fixes: the same seven bats wiki suites re-run → `1..136`, 136 ok, 0 not ok;
+prohibitions still directives 79 / violations 0; all inline links resolve.
 
-## CI agent gate, second run (36330523418) — blocker applied, quote advisory stands
-
-- Blocker: the frontend page stated "the development standard is an additive WebMCP tool per
-  action" as unconditional fact under confidence: verified. Applied: the trigger, the frontend
-  domain description and load-when line, and the INDEX.md frontend row now condition on "this
-  wiki's development standard (owner decision, log.md 2026-09-28, a policy rather than a sourced
-  fact)". Routing width is unchanged; the sentence is a policy the wiki declares, not a claim about
-  the world.
-- Advisory (§6 quote unverifiable from CI): the gate's fetch truncates before §6.3.2 and curl is
-  blocked in its sandbox; it records the quote as unverifiable, not refuted. Ground-truth grep is in
-  the PR comment; the two sources lines name the section.
-- Advisory (duplication with test-level-choice's extract-and-wire edge row): linked both ways and
-  named in step 1 as the general rule applied to two entry points.
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

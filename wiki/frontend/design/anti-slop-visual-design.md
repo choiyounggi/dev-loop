@@ -8,8 +8,9 @@ sources:
   - "hallmark skill v1.1.0 (anti-AI-slop design skill; distills Anthropic's frontend-design skill, the Claude cookbook on frontend aesthetics, and the 2026 tactile-rebellion consensus)"
   - "https://claude.com/blog/improving-frontend-design-through-skills — Anthropic Engineering, 2025-11-12 (distributional-convergence mechanism, font avoid-list + taxonomy, extreme-contrast thresholds, domain-derived aesthetic direction, second-order convergence warning; Korean translation: velog.io/@xxziiko)"
   - "https://github.com/pbakaus/impeccable — README (gray-text-on-colored-background and bounce/elastic-easing anti-patterns; command list unstable across versions, cited for README-level rules only)"
-last_verified: 2026-08-21
-related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements, frontend-design-responsive-layout, frontend-design-design-canvas-workflow, frontend-design-lightness-steps-on-dark-surfaces, frontend-design-custom-property-values-read-from-script]
+  - "https://github.com/pbakaus/impeccable/blob/114ea1d3838fca73b253af45f873b9c4f5f213c8/skill/reference/craft-floor.md — Impeccable skill 4.x craft floor, pinned to a commit (browser-surface theming, offset+blur shadows vs halo and hard-offset, eyebrow ban, section numbers, geometric occlusion mask, mono-as-costume, glyph icons, image-hover)"
+last_verified: 2026-09-29
+related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements, frontend-design-responsive-layout, frontend-design-design-canvas-workflow, frontend-design-lightness-steps-on-dark-surfaces, frontend-design-custom-property-values-read-from-script, frontend-design-product-ui-vs-brand-surface, frontend-design-ui-hardening-against-real-content]
 ---
 
 # Making Web UI Look Designed, Not Generated
@@ -69,6 +70,8 @@ Typography, layout, motion, states:
 | Animate `transform`/`opacity` only, with named easing tokens | Support `prefers-reduced-motion`; cut motion before adding it — spend the whole motion budget on one orchestrated page-load with staggered reveals (`animation-delay`), then content is just there; scattered per-element micro-interactions read as noise. Ease/cubic-bezier tokens only — bounce/elastic easing reads as dated |
 | Ship all 8 states per interactive element | default · hover · focus-visible · active · disabled · loading · error · success — see [frontend-accessibility-interactive-elements] for the focus rules; the focus ring appears instantly, ≥3:1 contrast |
 | Prefer silent success and optimistic update + Undo | Toasts are for failures and non-visible async effects; confirmation modals are for irreversible actions only. Tooltip delay: hover ~800ms, focus 0ms |
+| Theme the browser's own surfaces from the palette | `::selection`, `caret-color`, `scrollbar-color`, the `:focus-visible` ring, `text-underline-offset` / `text-decoration-thickness`, and `font-variant-numeric: tabular-nums` in data all ship as browser defaults that belong to no design system; setting them from the tokens is the cheapest signal that the page was built rather than assembled, and the one an unsteered generation skips most reliably (brand surfaces only — a product surface keeps standard scrollbars, see [frontend-design-product-ui-vs-brand-surface]) |
+| Shadows carry an offset and a soft blur | A zero-offset colored halo is decoration; a zero-blur hard offset (`4px 4px 0`) is a neobrutalist costume that only a world which chose that aesthetic earns |
 
 ## Edge cases
 
@@ -80,6 +83,8 @@ Typography, layout, motion, states:
 | The base design passes and an effect layer is wanted | Canvas/shader effects go on top of a passing base, not instead of one — see [frontend-design-html-in-canvas] |
 | Writing reusable design guidance (a prompt, skill, or wiki page) rather than styling directly | Pitch it at the "right altitude": name the design axes and their decision logic (pairing categories, contrast thresholds), never exact hex/pixel values (over-constrains) and never "make it look good" (assumes context the model lacks) |
 | Narrow viewports (verify 320/375/414/768px) | Root `overflow-x: clip` on both `html` and `body`; clickable text stays on one line (shorten the label, then `white-space: nowrap`, then drop the item); image-bearing grid tracks use `minmax(0, 1fr)` |
+| The surface is a task UI (dashboard, admin, settings, editor, data table) or a Read / Experience surface (docs, guides, changelog, portfolio, gallery), not a landing or marketing page | Route to [frontend-design-product-ui-vs-brand-surface]: it scopes this page's font-pairing, default-font-rejection, extreme-contrast and page-load-motion rows to Persuade surfaces and replaces them for the others |
+| The screen will show user-generated or translated content, or a custom drag control | The visual rules above assume friendly data; run [frontend-design-ui-hardening-against-real-content] before shipping |
 
 ## Instead of
 
@@ -96,3 +101,9 @@ Typography, layout, motion, states:
 | `loading="lazy"` on the hero (LCP) image or video | `fetchpriority="high"` on the LCP element; lazy-load only below the fold | Lazy LCP roughly doubles p75 paint time |
 | An uppercase eyebrow label (`01 / FEATURES`) on every section | Zero eyebrows by default; only for genuinely ordinal content, 1–2 per page, stacked above the heading in the same column | Decorative numbering erases the hierarchy it claims to create |
 | Straight quotes, `--`, `...`, "Jane Doe", "Acme" | Curly quotes, `—`, `…`, plausible domain-specific names | Unproofread details mark generated copy |
+| A kicker or eyebrow label above a heading | Delete the label and let the heading carry its own weight | The heading already names the section; the label is the one scaffold no brief earns back |
+| Section numbers (`01 / 02 / 03`) as decoration | Number sections only when the sequence itself is information the reader needs | Decorative ordinals promise a structure the content does not have |
+| A circle, polygon or radial-gradient cutout approximating a photo subject's edge | Derive an alpha matte from the image or produce a real cut-out asset | The geometric approximation reads worse than omitting the effect |
+| Monospace for everything "technical" | Mono only for code, data and measurement; the body face for prose about technology | Mono as a costume signals the theme was chosen by category, not by content |
+| Emoji or Unicode glyphs standing in for an icon set | One icon library, or authored SVG, in one consistent stroke and weight | Glyph icons vary in weight and color per platform and read as a placeholder |
+| A hover animation on an image (scale, tilt, brightness), directly or via its parent | Put the feedback on the container that is actually the action target (border, background, shadow) | An image is not the control; animating it invents an affordance |
