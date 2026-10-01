@@ -45,6 +45,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [deep-links-and-entry-points](navigation/deep-links-and-entry-points.md) | Implementing deep links / universal links / app links or push-notification tap routing; links open the browser (or a disambiguation chooser) instead of the app; deep-linked screens crash or strand users on cold start; back navigation from a deep-linked screen exits the app |
+| [test-files-in-expo-router-app-directory](navigation/test-files-in-expo-router-app-directory.md) | Deciding where Jest tests for Expo Router routes/layouts live or configuring `testMatch`; a diff adds `app/__tests__/` or `app/**/*.test.tsx`; a production bundle contains `testing-library`/`jest.mock`, or a test file shows up as a route |
 
 ## presentation
 
