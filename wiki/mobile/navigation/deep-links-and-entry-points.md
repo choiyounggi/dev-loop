@@ -11,7 +11,7 @@ sources:
   - https://developer.apple.com/documentation/xcode/supporting-associated-domains
   - https://developer.apple.com/documentation/xcode/allowing-apps-and-websites-to-link-to-your-content
 last_verified: 2026-07-10
-related: [mobile-lifecycle-process-death-and-state]
+related: [mobile-lifecycle-process-death-and-state, mobile-navigation-test-files-in-expo-router-app-directory]
 ---
 
 # Deep Links, Push Taps, and Multi-Entry-Point Routing
