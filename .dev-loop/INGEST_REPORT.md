@@ -1,127 +1,67 @@
-# knowledge(design): product-surface vs brand-surface rules, UI hardening against real content, anti-slop craft-floor rows
+# Knowledge flush — 1 insight (+26 plan-gap rows retired as local-layer)
 
-Source: the Impeccable design skill (github.com/pbakaus/impeccable), read at commit
-114ea1d3838fca73b253af45f873b9c4f5f213c8 (2026-09-29). Origin: the user asked whether
-hgko-dev.tistory.com/551 (an Impeccable install guide) should steer design work. The
-guide itself is stale (`/teach-impeccable`, `.impeccable.md` and the `dist/claude-code`
-path no longer exist) and carries no design knowledge; the skill's reference files do.
-This PR ingests the three areas where the wiki and the hallmark skill had no coverage.
+Run id `20261003-220928-9795` (auto-flush; lock inherited from `hooks/auto-flush.sh`). 27 rows claimed: 1 harvested `★ Insight` (`a427206df3949b03`), 26 `plan-gaps.jsonl` rows.
 
 ## Verified best-practice
 
-1. **Product (Operate) surfaces invert the brand-surface rules.** New page
-   `frontend-design-product-ui-vs-brand-surface`: Persuade / Operate / Read /
-   Experience modes chosen from the requested surface; on Operate surfaces one tuned
-   sans, fixed rem scale (1.125–1.2), Restrained color floor with a second neutral,
-   full state vocabulary, skeleton loading, structural responsiveness, 150–250 ms
-   state motion and no page-load sequence, standard affordances permitted, overlays
-   escape overflow ancestors, modal only for interruption or protected focus.
-   Verified by reading `skill/reference/operate.md` and `skill/SKILL.src.md` at the
-   pinned SHA; cross-checked against the Anthropic frontend-design post the anti-slop
-   page already cites. `confidence: unverified` — the sources are a third-party skill
-   file and a blog post, and no production use of this wiki's own is described; the
-   page says what upgrades it.
-2. **UI hardening against real content.** New page
-   `frontend-design-ui-hardening-against-real-content`: extreme-input test set,
-   translation-expansion budget by source length, truncate / clamp / wrap with
-   `min-width: 0`, logical properties + RTL glyph flip, `Intl` formatting and
-   `Intl.PluralRules`, interrupted-gesture handling (`touch-action`, `pointerId`
-   pinning, cancel paths), error copy with recovery, pending-state submit guard,
-   virtualization. Verified live: W3C article-text-size (IBM table ≤10 chars
-   200–300% … >70 chars 130%; Korean 0.8×), W3C Pointer Events (`pointercancel`
-   MUST fire on stream suppression; capture implicitly released), MDN logical
-   properties, `Intl` / `Intl.PluralRules`, `overflow-wrap` (only `anywhere`
-   counts toward min-content), `hyphens`, `-webkit-line-clamp`, `touch-action`
-   (pointercancel on browser gesture take-over), `title` accessibility concerns,
-   WCAG SC 1.4.4 — all HTTP 200. `confidence: verified`.
-3. **Craft-floor rows for brand surfaces.** `frontend-design-anti-slop-visual-design`
-   +2 directive rows (theme browser-default surfaces from the palette; shadows carry
-   offset + soft blur), +2 edge cases (route task UIs and hostile content to the new
-   pages), +6 Instead-of rows (eyebrow, decorative section numbers, geometric
-   occlusion mask, mono as costume, glyph icons, image hover animation). Verified by
-   reading `skill/reference/craft-floor.md` at the pinned SHA. Body 85 → 96 lines.
+**a427206df3949b03 — quote a glob meant for the program; an empty enumeration is unverified until a known-present file appears.**
 
-Gap evidence: `grep -rli dashboard wiki/frontend` → 0 files; hallmark v1.1.0 has 3
-"product UI" mentions and 0 `pointercancel` / RTL rules; the wiki's only Impeccable
-citation was README-level (log.md 2026-08-21) because the skill's paths churn — every
-new citation here is a commit-pinned permalink.
+Claim: an unquoted `--include=*.py` run through zsh is not executed (`no matches found`), and inside a pipeline the result is an empty list that reads as "nothing missing". Quote the pattern; require a positive control before trusting an empty enumeration.
+
+Sources checked:
+- https://zsh.sourceforge.io/Doc/Release/Options.html — `NOMATCH` (`<C> <Z>`, on in zsh emulation): "If a pattern for filename generation has no matches, print an error, instead of leaving it unchanged in the argument list." `NULL_GLOB` deletes the pattern instead and overrides `NOMATCH`.
+- https://www.gnu.org/software/bash/manual/html_node/Filename-Expansion.html — bash leaves an unmatched word unchanged unless `nullglob` (word removed) or `failglob` (error, command not executed) is set.
+- https://www.gnu.org/software/grep/manual/grep.html — `--include=glob` / `--exclude=glob`: grep does its own wildcard matching on each file's base name while recursing (so the pattern must reach grep literally).
+
+Reproduction (2026-10-03, macOS, zsh 5.9, bash 5.3.15), in a scratch dir holding `sub/a.py`:
+- zsh unquoted: `zsh:1: no matches found: --include=*.py`, rc 1 — also with a `b.py` in the cwd (the shell matches the whole word, prefix included).
+- zsh quoted and bash unquoted: `./sub/a.py`, rc 0.
+- zsh `… | sort > out.txt`: rc 0, `out.txt` 0 lines (the silent-empty failure from the original session).
+- zsh function: the skipped command is followed by the next line, function returns 0; `$(…)` yields an empty string.
+- bash `failglob`: `no match: --include=*.py`, rest of the `bash -c` line skipped; bash `nullglob`: flag deleted, `sub/b.txt` listed too.
+- A file named `--include=x.py` in the cwd: both shells substitute it, list nothing, exit 0.
+
+One claim in the original candidate was corrected: "when the unquoted glob matches nothing in the cwd" — in practice it essentially never matches (the `--include=` prefix is part of the word), so zsh fails every time.
+
+Confidence: **verified** (official zsh/bash/grep docs + local reproduction of every table row).
 
 ## Existing-layer check
 
-Pages read: frontend-design-anti-slop-visual-design, frontend-design-responsive-layout, frontend-data-fetching-async-ui-states, frontend-design-design-canvas-workflow, frontend-accessibility-interactive-elements
+`wiki_search` top-5 for the trigger: infrastructure-ci-cd-changed-files-only-gates (x3 chunks), testing-quality-checks-that-cannot-pass (x2 chunks). Neither covers unmatched-glob behavior: changed-files-only-gates is about splitting an unquoted `$FILES` list; checks-that-cannot-pass is about a gate never observed passing against a known-good input (adjacent to step 3 of the new page, linked).
 
-- `wiki_search` (dev-loop-wiki MCP) was down this session (CONNECTION_CLOSED); dedupe
-  was done by reading the design category index and grepping the frontend domain for
-  each candidate's trigger terms (`dashboard`, `product UI`, `::selection`,
-  `pointercancel`, `inline-start`, `RTL`, `i18n`, `empty state`, `skeleton`).
-- anti-slop-visual-design: same trigger for the craft-floor rows → merged as rows.
-  Its motion row ("spend the motion budget on one page-load") conflicts with the
-  Operate rule; resolved as a condition-dependent edge-case row that routes task UIs
-  to the new page, not as an overwrite.
-- responsive-layout: already owns overflow / `min-width: 0` / CJK wrapping / iOS
-  16px; the hardening page links to it for those rows instead of repeating them.
-- data-fetching/async-ui-states: owns empty / loading / error states; the hardening
-  page's edge case defers to it. Back-links added on both.
-- No local layer (`wiki-local/`) exists in this repo.
+`grep -rli 'no matches found|nomatch|unquoted glob|--include' wiki` on main: one unrelated hit (security/authn/retiring-a-replaced-auth-gate.md). The zsh-vs-bash table in portable-shell-scripts covers word splitting, `=word`, and array indexing, not `NOMATCH`.
+
+Merge-before-create: the natural merge target, platforms-shells-portable-shell-scripts, is at exactly 120 body lines (measured with awk), so a row there would break the ≤120 limit. escapes-in-shell-string-literals is about backslash escapes inside quoted patterns, a different trigger. → **new page**.
+
+Pages read: platforms-shells-portable-shell-scripts, platforms-shells-escapes-in-shell-string-literals, backend-common-change-impact-call-site-enumeration, testing-quality-checks-that-cannot-pass, infrastructure-ci-cd-changed-files-only-gates
+
+Conflicts: none. Related links: new page links to all five. Back-link added on infrastructure-ci-cd-changed-files-only-gates. Back-links on portable-shell-scripts, escapes-in-shell-string-literals, checks-that-cannot-pass (rewritten by #223) and call-site-enumeration (rewritten by #231) **deferred** to avoid merge conflicts on those `related:` lines.
+
+Lint: `node scripts/wiki-structure-checks.js ~/.dev-loop/repo/wiki --layer bundled` → `pages: 356, indexes: 13, findings: 0`, rc 0. `node scripts/wiki-lint-prohibitions.js` → 3 violations, all pre-existing outside `wiki/` (plans/…, skills/graph-setup/…), none on the new page. New page body: 63 lines.
 
 ## Open-PR check
 
-Open PRs #223, #225–#231 (listed 2026-09-29 with `gh pr list --state open`) are
-knowledge-flush batches touching backend, infrastructure, testing, mobile and
-platforms pages; none touch `wiki/frontend/design`, `wiki/frontend/index.md` or the
-three source files. Two concurrent local sessions (dev-loop-doliolid-70, -f8) had
-queued the identical ingest; both confirmed zero writes and stood down before this
-branch was edited.
+Open `knowledge/*` heads diffed against main (`git diff origin/main...origin/<head> -- wiki/ INDEX.md`): #223, #225, #226, #227, #228, #229, #230, #231, #233, #234.
+
+- Grep of every head's wiki diff for `no matches found|NOMATCH|nullglob|--include=`: one hit, in #223 — a vitest `-t nomatch` filter, unrelated.
+- Shell-category PRs: #223 (redirection-order-for-a-silenced-write), #230 (heredoc-body-expansion-with-backtick-prose), #233 (line-by-line-read-loops) — different triggers.
+- Index placement: #233 inserts after line 18 and #230 after line 19 of `wiki/platforms/index.md`, #223 after line 23; this PR inserts after the `unset-versus-empty-parameters` row (line 21) so no hunk touches theirs. `log.md` appends conflict as in every flush.
+
+Verdict for a427206df3949b03: **new**.
 
 ## Routing decision
 
-- Layer: bundled `wiki/` (general knowledge, no repo-specific files named).
-- Domain: frontend. Category: design — both new pages are design-time decisions
-  about how a surface is styled and verified; the hardening page was considered for
-  `forms` and `accessibility` and rejected because its trigger is content shape and
-  locale, not a form lifecycle or an assistive-technology contract.
-- Page ids: `frontend-design-product-ui-vs-brand-surface`,
-  `frontend-design-ui-hardening-against-real-content`.
+- a427206df3949b03 → `platforms/shells`, new page `wiki/platforms/shells/unmatched-glob-in-a-command-argument.md` (id `platforms-shells-unmatched-glob-in-a-command-argument`). Shell expansion behavior is the cause; the candidate's `domain: debugging` hint was overridden because the fix is a shell-quoting rule, and the debugging angle (empty enumeration) is carried by step 3 and the checks-that-cannot-pass link. No new category.
 
-## Verification
+## Local-layer candidates
 
-- `node scripts/wiki-lint-prohibitions.js` → directives 79 / compliant 79 /
-  violations 0 (unchanged from the pre-edit baseline; rows written positively, so
-  `tests/wiki-lint-prohibitions.bats:25` keeps its pin).
-- `PATH=/opt/homebrew/bin:$PATH bats tests/wiki-structure-checks.bats tests/wiki-index.bats tests/wiki-lint-prohibitions.bats tests/wiki-contradiction.bats tests/wiki-index-freshness.bats tests/wiki-lint-score.bats tests/wiki-agent-gate.bats` → `1..136`, 136 ok, 0 not ok.
-- Inline `[page-id]` links and `related:` ids in the three touched pages all resolve
-  (grep `^id:` per id).
-- No banned qualifiers (`usually`, `consider`, `might`, `generally`, `as appropriate`,
-  `often`, `should`) in the two new pages.
+All 26 `plan-gaps.jsonl` rows are wiki-plan Phase B decisions naming linkly's own files (`impl/lnpl/*.py`, `docs/*.md`, RFC-0052, `.orchestration/*`, `examples/deploy/*`). Excluded from this PR and retired; run wiki-ingest inside that project if any is worth keeping.
 
-## Independent review (before commit)
-
-Two fresh-context reviewers (`feature-dev:code-reviewer`, one general brief and one
-adversarial brief; read-only, no Bash) on the 7-file diff. Findings applied:
-
-- anti-slop: a source bullet had been appended after the last table on a page that
-  keeps its sources in frontmatter → removed; the task-UI edge case named a
-  "fluid-type" row this page does not have and missed the default-font-rejection and
-  extreme-contrast rows → rewritten to name the exact rows and widened to Read /
-  Experience surfaces (a docs site previously had no route to the Read guidance).
-- responsive-layout: the `clamp()` row stated fluid type unconditionally → scoped to
-  brand/content surfaces with the app-UI alternative and a `related:` link.
-- product-ui-vs-brand-surface: `field-tested` over-claimed (no production context
-  described) → `unverified` with the upgrade condition in the page; trigger lines
-  now list mode choice, Read/Experience surfaces, overlay clipping, modal-first
-  (index/trigger drift); 65–75ch attributed to operate.md in the source line.
-- ui-hardening: `min-width: 0` rationale was wrong for `overflow-wrap: anywhere`
-  (only `break-word` leaves min-content unchanged) → corrected with the MDN quote;
-  `title` tooltip replaced by hover+focus tooltip (MDN accessibility concerns);
-  `touch-action: none` added to the drag row (MDN: browser fires `pointercancel`
-  when it takes a gesture); iOS 16px row now defers to responsive-layout instead of
-  restating an unsourced mechanism; WCAG 1.4.4 source added; IBM 51–70 row
-  anomaly noted as published.
-- Not applied: "ui-hardening bundles four topics" (both reviewers rated it below
-  their confidence bar; the page's one case is "data is present but hostile" and it
-  routes empty/loading/error out to async-ui-states).
-
-After the fixes: the same seven bats wiki suites re-run → `1..136`, 136 ok, 0 not ok;
-prohibitions still directives 79 / violations 0; all inline links resolve.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+| Rows | Task | Target | Project |
+|------|------|--------|---------|
+| 9ea52047c7bafed9, 3928ccce3c53eb4a, 5991206585add27b, be69ab1edb95dfdd | t197 doc follow-through, read-miss raise site, RFC-0052 section 4 text (two rows) | wiki-local/backend/persistence/read-miss-without-seeding.md | linkly |
+| 3cf28a54959fc278, b616a55432340048, b38f2fd77dcc7da6, 4380ecedaf5bbf88, e4d9a8942e01a214 | t198 diagnostic codes, guard-scoped binding check, test module, README counts | wiki-local/backend/diagnostics/guard-scoped-binding-escape.md | linkly |
+| 288f108aeeb38a4d, 49979f4c79df2ac8, bdd5affbc97acee9 | t183 `_touch` docstring, TCK list, decomposition | wiki-local/backend/persistence/fake-driver-row-count.md | linkly |
+| 43e1d5e9eed7e9a9, a6d580c96574df05, 041b6a094d03d3ee, b6e268c1a75961c8, 976e2cef3792e62b, fef6f4b3411a68b5 | t190 GHCR image name, RELEASING / deploy README / CI-GATES docs, changelog, blackboard | wiki-local/infrastructure/release/container-image-job.md | linkly |
+| bd277c8bd3a44e1a, 2da8bcb1de354b02, 3595ddece91643f1, 2478b86b1926cae8, 0f85f9561a5c0b41 | t187a docs sync, blackboard, deploy tests, secret-leak scope, suite gate | wiki-local/infrastructure/deploy/serving-env-variables.md | linkly |
+| cc0ee395c0b29f60, eb1f4b4be43f641e, c57db25512ad8340 | t204 textual-order tracking, IR shape, interp runtime path | wiki-local/backend/compiler/derived-field-assignment.md | linkly |
