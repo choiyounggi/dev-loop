@@ -10,7 +10,7 @@ sources:
   - https://json-schema.org/draft/2020-12/json-schema-core
   - https://pitest.org/quickstart/basic_concepts/
 last_verified: 2026-08-04
-related: [testing-quality-spec-artifact-checks, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, qa-document-verification-spec-document-gates]
+related: [testing-quality-spec-artifact-checks, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, qa-document-verification-spec-document-gates, testing-quality-key-order-in-serialized-goldens]
 ---
 
 # Adding a Case to a Format Whose Only Gate Mutates a Golden Example
