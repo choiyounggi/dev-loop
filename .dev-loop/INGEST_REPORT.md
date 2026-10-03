@@ -1,127 +1,68 @@
-# knowledge(design): product-surface vs brand-surface rules, UI hardening against real content, anti-slop craft-floor rows
-
-Source: the Impeccable design skill (github.com/pbakaus/impeccable), read at commit
-114ea1d3838fca73b253af45f873b9c4f5f213c8 (2026-09-29). Origin: the user asked whether
-hgko-dev.tistory.com/551 (an Impeccable install guide) should steer design work. The
-guide itself is stale (`/teach-impeccable`, `.impeccable.md` and the `dist/claude-code`
-path no longer exist) and carries no design knowledge; the skill's reference files do.
-This PR ingests the three areas where the wiki and the hallmark skill had no coverage.
+# Knowledge flush — 1 insight (1 new page, 4 back-links, 7 plan-gaps retired as local-layer)
 
 ## Verified best-practice
 
-1. **Product (Operate) surfaces invert the brand-surface rules.** New page
-   `frontend-design-product-ui-vs-brand-surface`: Persuade / Operate / Read /
-   Experience modes chosen from the requested surface; on Operate surfaces one tuned
-   sans, fixed rem scale (1.125–1.2), Restrained color floor with a second neutral,
-   full state vocabulary, skeleton loading, structural responsiveness, 150–250 ms
-   state motion and no page-load sequence, standard affordances permitted, overlays
-   escape overflow ancestors, modal only for interruption or protected focus.
-   Verified by reading `skill/reference/operate.md` and `skill/SKILL.src.md` at the
-   pinned SHA; cross-checked against the Anthropic frontend-design post the anti-slop
-   page already cites. `confidence: unverified` — the sources are a third-party skill
-   file and a blog post, and no production use of this wiki's own is described; the
-   page says what upgrades it.
-2. **UI hardening against real content.** New page
-   `frontend-design-ui-hardening-against-real-content`: extreme-input test set,
-   translation-expansion budget by source length, truncate / clamp / wrap with
-   `min-width: 0`, logical properties + RTL glyph flip, `Intl` formatting and
-   `Intl.PluralRules`, interrupted-gesture handling (`touch-action`, `pointerId`
-   pinning, cancel paths), error copy with recovery, pending-state submit guard,
-   virtualization. Verified live: W3C article-text-size (IBM table ≤10 chars
-   200–300% … >70 chars 130%; Korean 0.8×), W3C Pointer Events (`pointercancel`
-   MUST fire on stream suppression; capture implicitly released), MDN logical
-   properties, `Intl` / `Intl.PluralRules`, `overflow-wrap` (only `anywhere`
-   counts toward min-content), `hyphens`, `-webkit-line-clamp`, `touch-action`
-   (pointercancel on browser gesture take-over), `title` accessibility concerns,
-   WCAG SC 1.4.4 — all HTTP 200. `confidence: verified`.
-3. **Craft-floor rows for brand surfaces.** `frontend-design-anti-slop-visual-design`
-   +2 directive rows (theme browser-default surfaces from the palette; shadows carry
-   offset + soft blur), +2 edge cases (route task UIs and hostile content to the new
-   pages), +6 Instead-of rows (eyebrow, decorative section numbers, geometric
-   occlusion mask, mono as costume, glyph icons, image hover animation). Verified by
-   reading `skill/reference/craft-floor.md` at the pinned SHA. Body 85 → 96 lines.
+**Insight `e752ed422e090759`** — when rebuilding a dict that serializes into a committed golden file (JSON/OpenAPI), assign keys in the order the old literal used, then regenerate and byte-compare every golden, not only the ones a test pins.
 
-Gap evidence: `grep -rli dashboard wiki/frontend` → 0 files; hallmark v1.1.0 has 3
-"product UI" mentions and 0 `pointercancel` / RTL rules; the wiki's only Impeccable
-citation was README-level (log.md 2026-08-21) because the skill's paths churn — every
-new citation here is a commit-pinned permalink.
+Sources checked (each quote extracted from the fetched page on 2026-10-04):
+
+- https://docs.python.org/3/library/stdtypes.html#mapping-types-dict — "Dictionaries compare equal if and only if they have the same (key, value) pairs (regardless of ordering)"; "Dictionaries preserve insertion order"; "Changed in version 3.7: Dictionary order is guaranteed to be insertion order".
+- https://docs.python.org/3/library/json.html — "This module's encoders and decoders preserve input and output order by default"; `sort_keys` "is useful for regression tests to ensure that JSON serializations can be compared on a day-to-day basis".
+- https://www.rfc-editor.org/rfc/rfc8259#section-4 — "An object is an unordered collection"; §9 says parsers differ on whether they expose member order.
+- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify — properties are visited "using the same algorithm as Object.keys()".
+
+Reproduction (Python 3 + Node, 2026-10-04): the same keys assigned with `additionalProperties` before `required` gave `old == new` True, `json.dumps` bytes equal **False**, and bytes equal True with `sort_keys=True`. Node gave `JSON.stringify` bytes equal false. `JSON.stringify({b:1,"2":1,a:1,"1":1})` printed `{"1":1,"2":1,"b":1,"a":1}`, which backs the integer-like-key edge row.
+
+Confidence: **verified**.
+
+Review round (fresh-context adversarial reviewer, verdict CHANGES, no blockers): I re-checked each finding before applying it.
+- First-insertion position under reassign and `{**a, **b}` merge: reproduced, edge row added.
+- `asdict` field order: reproduced, edge row added.
+- `OrderedDict` equality is order-sensitive: quoted from collections docs, source added.
+- JS array-index rule: the ECMAScript 10.1.11.1 OrdinaryOwnPropertyKeys text was extracted from https://tc39.es/ecma262/. `"4294967295"` / `"01"` / `"-1"` / `"1.5"` keeping insertion order was reproduced in Node. Item 1 and the edge row were rewritten to match.
+- The equal-parsed-objects row now names formatting as a second cause.
+- `git status --porcelain` was added to catch a new untracked golden.
+- RFC §9 and `json.JSONEncoder` anchors were split into their own sources.
+- The trigger was widened to match the index row's sorted-keys clause.
+- The reviewer's PyYAML-sorts-by-default claim could **not** be verified here (PyYAML not installed, no doc fetched). The YAML/TOML row therefore says to read the writer's docs and byte-compare, and states no default.
+
+After the fixes: body 73 lines, structure checks 0 findings, prohibition lint 0 violations.
 
 ## Existing-layer check
 
-Pages read: frontend-design-anti-slop-visual-design, frontend-design-responsive-layout, frontend-data-fetching-async-ui-states, frontend-design-design-canvas-workflow, frontend-accessibility-interactive-elements
+Pages read: testing-quality-value-preserving-refactor-assertions, testing-quality-schema-additions-under-a-golden-gate, qa-document-verification-generated-reference-drift-gates, testing-quality-stale-artifact-baselines, testing-quality-behavior-not-implementation
 
-- `wiki_search` (dev-loop-wiki MCP) was down this session (CONNECTION_CLOSED); dedupe
-  was done by reading the design category index and grepping the frontend domain for
-  each candidate's trigger terms (`dashboard`, `product UI`, `::selection`,
-  `pointercancel`, `inline-start`, `RTL`, `i18n`, `empty state`, `skeleton`).
-- anti-slop-visual-design: same trigger for the craft-floor rows → merged as rows.
-  Its motion row ("spend the motion budget on one page-load") conflicts with the
-  Operate rule; resolved as a condition-dependent edge-case row that routes task UIs
-  to the new page, not as an overwrite.
-- responsive-layout: already owns overflow / `min-width: 0` / CJK wrapping / iOS
-  16px; the hardening page links to it for those rows instead of repeating them.
-- data-fetching/async-ui-states: owns empty / loading / error states; the hardening
-  page's edge case defers to it. Back-links added on both.
-- No local layer (`wiki-local/`) exists in this repo.
+- `wiki_search` top-5 for the trigger: `backend-python-language-dict-subclass-attribute-loss-on-copy` (4 chunks) and `backend-python-language-mutable-state-traps`. Neither covers this situation: one is about attribute loss when copying a dict subclass, the other about module-global state.
+- `generated-reference-drift-gates` has one edge row on *unstable* ordering: "churn on every run (timestamps, dict ordering)". This insight is different. The order here is deterministic, but a refactor changed it. The page also covers byte-comparing all outputs vs. only pinned ones. No conflict.
+- `value-preserving-refactor-assertions` covers a literal→config refactor whose rendered output stays byte-identical. Adjacent, but its directive is about choosing a sentinel assertion, not about serialization order. No conflict.
+- `behavior-not-implementation` (snapshot section) and `schema-additions-under-a-golden-gate` / `stale-artifact-baselines` are adjacent golden-file pages. No overlap.
+- Decision: **new page** `testing-quality-key-order-in-serialized-goldens`. Back-links added on value-preserving-refactor-assertions, schema-additions-under-a-golden-gate, stale-artifact-baselines, generated-reference-drift-gates. The behavior-not-implementation back-link is **deferred**, because open PR #223 rewrites that file.
+- Lint: `node scripts/wiki-structure-checks.js wiki/` → `pages: 356, indexes: 13, findings: 0` (355 on origin/main + 1 new). `node scripts/wiki-lint-prohibitions.js wiki/` → `violations: 0`.
 
 ## Open-PR check
 
-Open PRs #223, #225–#231 (listed 2026-09-29 with `gh pr list --state open`) are
-knowledge-flush batches touching backend, infrastructure, testing, mobile and
-platforms pages; none touch `wiki/frontend/design`, `wiki/frontend/index.md` or the
-three source files. Two concurrent local sessions (dev-loop-doliolid-70, -f8) had
-queued the identical ingest; both confirmed zero writes and stood down before this
-branch was edited.
+Open `knowledge/*` heads listed: #235 (20261003-220951), #234 (20261002-160836), #233 (20261001-150222), #231 (20260928-191901), #230 (20260928-155239), #229 (20260928-145025), #228 (20260928-134840), #227 (20260928-103056), #226 (20260928-092831), #225 (20260928-082803), #223 (20260927-220735).
+
+Each head's `git diff origin/main origin/<head> -- wiki/` added lines were grepped for `golden|insertion order|sort_keys|key order|json.dumps|byte-identical|byte-compare`. Only #225 and #223 matched, one line each, and both matches are `related:` lists that mention `testing-quality-schema-additions-under-a-golden-gate`. Neither adds content about key order or golden regeneration.
+
+Verdict for `e752ed422e090759`: **new**.
+
+The 7 plan-gap rows are project-specific (see Local-layer candidates), so no open-PR check applies to them.
 
 ## Routing decision
 
-- Layer: bundled `wiki/` (general knowledge, no repo-specific files named).
-- Domain: frontend. Category: design — both new pages are design-time decisions
-  about how a surface is styled and verified; the hardening page was considered for
-  `forms` and `accessibility` and rejected because its trigger is content shape and
-  locale, not a form lifecycle or an assistive-technology contract.
-- Page ids: `frontend-design-product-ui-vs-brand-surface`,
-  `frontend-design-ui-hardening-against-real-content`.
+- `e752ed422e090759` → `wiki/testing/quality/key-order-in-serialized-goldens.md` (domain testing, category quality — the category that already holds the golden/snapshot assertion pages). No new category. The row is added to the `quality` table in `wiki/testing/index.md`, and a `log.md` entry is appended.
 
-## Verification
+## Local-layer candidates
 
-- `node scripts/wiki-lint-prohibitions.js` → directives 79 / compliant 79 /
-  violations 0 (unchanged from the pre-edit baseline; rows written positively, so
-  `tests/wiki-lint-prohibitions.bats:25` keeps its pin).
-- `PATH=/opt/homebrew/bin:$PATH bats tests/wiki-structure-checks.bats tests/wiki-index.bats tests/wiki-lint-prohibitions.bats tests/wiki-contradiction.bats tests/wiki-index-freshness.bats tests/wiki-lint-score.bats tests/wiki-agent-gate.bats` → `1..136`, 136 ok, 0 not ok.
-- Inline `[page-id]` links and `related:` ids in the three touched pages all resolve
-  (grep `^id:` per id).
-- No banned qualifiers (`usually`, `consider`, `might`, `generally`, `as appropriate`,
-  `often`, `should`) in the two new pages.
+All 7 rows come from `plan-gaps.jsonl` and are linkly planning decisions (t201, t205). Each names linkly's own files and conventions, so it would be wrong in another codebase. They are excluded from this PR and retired. To keep any of them, run wiki-ingest inside that project.
 
-## Independent review (before commit)
-
-Two fresh-context reviewers (`feature-dev:code-reviewer`, one general brief and one
-adversarial brief; read-only, no Bash) on the 7-file diff. Findings applied:
-
-- anti-slop: a source bullet had been appended after the last table on a page that
-  keeps its sources in frontmatter → removed; the task-UI edge case named a
-  "fluid-type" row this page does not have and missed the default-font-rejection and
-  extreme-contrast rows → rewritten to name the exact rows and widened to Read /
-  Experience surfaces (a docs site previously had no route to the Read guidance).
-- responsive-layout: the `clamp()` row stated fluid type unconditionally → scoped to
-  brand/content surfaces with the app-UI alternative and a `related:` link.
-- product-ui-vs-brand-surface: `field-tested` over-claimed (no production context
-  described) → `unverified` with the upgrade condition in the page; trigger lines
-  now list mode choice, Read/Experience surfaces, overlay clipping, modal-first
-  (index/trigger drift); 65–75ch attributed to operate.md in the source line.
-- ui-hardening: `min-width: 0` rationale was wrong for `overflow-wrap: anywhere`
-  (only `break-word` leaves min-content unchanged) → corrected with the MDN quote;
-  `title` tooltip replaced by hover+focus tooltip (MDN accessibility concerns);
-  `touch-action: none` added to the drag row (MDN: browser fires `pointercancel`
-  when it takes a gesture); iOS 16px row now defers to responsive-layout instead of
-  restating an unsourced mechanism; WCAG 1.4.4 source added; IBM 51–70 row
-  anomaly noted as published.
-- Not applied: "ui-hardening bundles four topics" (both reviewers rated it below
-  their confidence bar; the page's one case is "data is present but hostile" and it
-  routes empty/loading/error out to async-ui-states).
-
-After the fixes: the same seven bats wiki suites re-run → `1..136`, 136 ok, 0 not ok;
-prohibitions still directives 79 / violations 0; all inline links resolve.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+| Hash | Decision | Target |
+|------|----------|--------|
+| 1dbdd7273430a837 | t201 `policy retry` effect on a write-conflict | linkly-vendace `wiki-local/backend/reliability/retry-on-write-conflict.md` |
+| 97b558dfdc04da2d | t201 `openapi.py` 409 description + 6 example goldens | linkly-vendace `wiki-local/backend/api-design/openapi-409-description.md` |
+| 4d49fc2224f86910 | t201 deterministic two-run interleaving test via `_OnceStolenDriver` | linkly-vendace `wiki-local/testing/strategy/once-stolen-driver-interleaving.md` |
+| 28ae85b20be137ec | t205 `doctor.sh` digest-mismatch check | linkly-vendace `wiki-local/platforms/tools/doctor-digest-mismatch.md` |
+| d198c2fbe1b3a24d | t205 MCP launcher startup stderr line | linkly-vendace `wiki-local/platforms/tools/mcp-launcher-stderr-line.md` |
+| 6a7226ec3bf50dc0 | t205 `docs/RELEASING.md` post-release dev-version paragraph | linkly-vendace `wiki-local/infrastructure/release/post-release-dev-version.md` |
+| fa92bb280ede406b | t205 `cli-surface.md` capabilities doc update | linkly-vendace `wiki-local/platforms/tools/cli-surface-capabilities-doc.md` |

@@ -10,7 +10,7 @@ sources:
   - https://stryker-mutator.io/docs/mutation-testing-elements/equivalent-mutants/
   - https://pitest.org/quickstart/basic_concepts/
 last_verified: 2026-08-06
-related: [testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-behavior-not-implementation, testing-quality-minimum-case-set, testing-quality-unasserted-return-fields, testing-quality-checks-that-cannot-pass, backend-common-change-impact-call-site-enumeration]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-behavior-not-implementation, testing-quality-minimum-case-set, testing-quality-unasserted-return-fields, testing-quality-checks-that-cannot-pass, backend-common-change-impact-call-site-enumeration, testing-quality-key-order-in-serialized-goldens]
 ---
 
 # Regression Tests for a Value-Preserving Refactor
