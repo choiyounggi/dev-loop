@@ -1,127 +1,47 @@
-# knowledge(design): product-surface vs brand-surface rules, UI hardening against real content, anti-slop craft-floor rows
-
-Source: the Impeccable design skill (github.com/pbakaus/impeccable), read at commit
-114ea1d3838fca73b253af45f873b9c4f5f213c8 (2026-09-29). Origin: the user asked whether
-hgko-dev.tistory.com/551 (an Impeccable install guide) should steer design work. The
-guide itself is stale (`/teach-impeccable`, `.impeccable.md` and the `dist/claude-code`
-path no longer exist) and carries no design knowledge; the skill's reference files do.
-This PR ingests the three areas where the wiki and the hallmark skill had no coverage.
+# Knowledge flush — 1 insight (1 page amended, 14 plan-gaps retired as local-layer)
 
 ## Verified best-practice
 
-1. **Product (Operate) surfaces invert the brand-surface rules.** New page
-   `frontend-design-product-ui-vs-brand-surface`: Persuade / Operate / Read /
-   Experience modes chosen from the requested surface; on Operate surfaces one tuned
-   sans, fixed rem scale (1.125–1.2), Restrained color floor with a second neutral,
-   full state vocabulary, skeleton loading, structural responsiveness, 150–250 ms
-   state motion and no page-load sequence, standard affordances permitted, overlays
-   escape overflow ancestors, modal only for interruption or protected focus.
-   Verified by reading `skill/reference/operate.md` and `skill/SKILL.src.md` at the
-   pinned SHA; cross-checked against the Anthropic frontend-design post the anti-slop
-   page already cites. `confidence: unverified` — the sources are a third-party skill
-   file and a blog post, and no production use of this wiki's own is described; the
-   page says what upgrades it.
-2. **UI hardening against real content.** New page
-   `frontend-design-ui-hardening-against-real-content`: extreme-input test set,
-   translation-expansion budget by source length, truncate / clamp / wrap with
-   `min-width: 0`, logical properties + RTL glyph flip, `Intl` formatting and
-   `Intl.PluralRules`, interrupted-gesture handling (`touch-action`, `pointerId`
-   pinning, cancel paths), error copy with recovery, pending-state submit guard,
-   virtualization. Verified live: W3C article-text-size (IBM table ≤10 chars
-   200–300% … >70 chars 130%; Korean 0.8×), W3C Pointer Events (`pointercancel`
-   MUST fire on stream suppression; capture implicitly released), MDN logical
-   properties, `Intl` / `Intl.PluralRules`, `overflow-wrap` (only `anywhere`
-   counts toward min-content), `hyphens`, `-webkit-line-clamp`, `touch-action`
-   (pointercancel on browser gesture take-over), `title` accessibility concerns,
-   WCAG SC 1.4.4 — all HTTP 200. `confidence: verified`.
-3. **Craft-floor rows for brand surfaces.** `frontend-design-anti-slop-visual-design`
-   +2 directive rows (theme browser-default surfaces from the palette; shadows carry
-   offset + soft blur), +2 edge cases (route task UIs and hostile content to the new
-   pages), +6 Instead-of rows (eyebrow, decorative section numbers, geometric
-   occlusion mask, mono as costume, glyph icons, image hover animation). Verified by
-   reading `skill/reference/craft-floor.md` at the pinned SHA. Body 85 → 96 lines.
+**Insight 4012a55145c1a945 — fallible final assembly runs before commit.**
+Claim: when a response or report value is computed at the end of a run from a function that can raise (an average over an empty set, a conversion, a lookup), evaluate it inside the transaction before commit and turn its error into an ordinary operation failure that rolls back; after commit, only reshape values already computed.
 
-Gap evidence: `grep -rli dashboard wiki/frontend` → 0 files; hallmark v1.1.0 has 3
-"product UI" mentions and 0 `pointercancel` / RTL rules; the wiki's only Impeccable
-citation was README-level (log.md 2026-08-21) because the skill's paths churn — every
-new citation here is a commit-pinned permalink.
+Sources checked:
+- https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/support/TransactionSynchronization.html — `beforeCommit`: "exceptions will get propagated to the commit caller and cause a rollback of the transaction"; `afterCommit`: "The transaction will have been committed already", a `RuntimeException` "will be propagated to the caller".
+- https://docs.djangoproject.com/en/5.2/topics/db/transactions/ — `atomic`: "If there is an exception, the changes are rolled back"; `on_commit`: "Your callbacks are executed after a successful commit, so a failure in a callback will not cause the transaction to roll back."
+- https://www.postgresql.org/docs/current/sql-commit.html — "All changes made by the transaction become visible to others and are guaranteed to be durable if a crash occurs."
+
+How verified: fetched all three pages and quoted the sentences above. Field reproduction from the originating session: a workflow interpreter's response-term evaluation was moved before `repo.commit()`; the regression test went red when the error catch was removed and green with it, and asserted the rolled-back row.
+
+Confidence: **verified**.
 
 ## Existing-layer check
 
-Pages read: frontend-design-anti-slop-visual-design, frontend-design-responsive-layout, frontend-data-fetching-async-ui-states, frontend-design-design-canvas-workflow, frontend-accessibility-interactive-elements
+Pages read: backend-common-orm-transaction-boundaries, testing-quality-store-assertions-after-a-rolled-back-run, backend-common-errors-async-failure-handling
 
-- `wiki_search` (dev-loop-wiki MCP) was down this session (CONNECTION_CLOSED); dedupe
-  was done by reading the design category index and grepping the frontend domain for
-  each candidate's trigger terms (`dashboard`, `product UI`, `::selection`,
-  `pointercancel`, `inline-start`, `RTL`, `i18n`, `empty state`, `skeleton`).
-- anti-slop-visual-design: same trigger for the craft-floor rows → merged as rows.
-  Its motion row ("spend the motion budget on one page-load") conflicts with the
-  Operate rule; resolved as a condition-dependent edge-case row that routes task UIs
-  to the new page, not as an overwrite.
-- responsive-layout: already owns overflow / `min-width: 0` / CJK wrapping / iOS
-  16px; the hardening page links to it for those rows instead of repeating them.
-- data-fetching/async-ui-states: owns empty / loading / error states; the hardening
-  page's edge case defers to it. Back-links added on both.
-- No local layer (`wiki-local/`) exists in this repo.
+- `wiki_search` top-5 for the trigger sentence: frontend-data-fetching-query-state-vs-fetch-state, backend-common-integrations-estimate-derived-thresholds, backend-node-boundaries-runtime-validation, backend-common-llm-completion-response-validation, testing-quality-store-assertions-after-a-rolled-back-run. None describes the same situation.
+- Closest owner: backend-common-orm-transaction-boundaries. Its "what goes inside the boundary" table already says "slow computation: compute before; only write inside" and "the controller stays outside (serialization is not DB work)". It did not cover computation that can **fail** and must therefore sit before commit. Same topic, new edge → **merged**, no new page.
+- Added: one row in the Do-this table, one Edge-cases row, one Instead-of row, a trigger sentence in "When this applies", three sources plus a field-evidence line, `last_verified` 2026-10-04.
+- Review: one fresh-context adversarial reviewer (feature-dev:code-reviewer) re-fetched the sources and approved; its one finding (no precedence between the existing "slow computation: compute before" row and the new row) is applied as a final sentence on the new row.
+- Conflicts: none. The new row agrees with "keep only DB work inside": the fallible step goes before commit, not between commit and response.
+- Related links: added testing-quality-store-assertions-after-a-rolled-back-run to the page's `related:`. That page already links back to backend-common-orm-transaction-boundaries.
+- Plumbing: wiki/backend/index.md load-when line extended; log.md ingest line appended. `node scripts/wiki-lint-prohibitions.js wiki/` → violations: 0.
 
 ## Open-PR check
 
-Open PRs #223, #225–#231 (listed 2026-09-29 with `gh pr list --state open`) are
-knowledge-flush batches touching backend, infrastructure, testing, mobile and
-platforms pages; none touch `wiki/frontend/design`, `wiki/frontend/index.md` or the
-three source files. Two concurrent local sessions (dev-loop-doliolid-70, -f8) had
-queued the identical ingest; both confirmed zero writes and stood down before this
-branch was edited.
+Open `knowledge/*` heads listed: #223, #225, #226, #227, #228, #229, #230, #231, #233, #234, #235, #236, #237.
+
+For each one, ran `git diff origin/main...origin/<head> -- wiki/` and grepped added lines for commit/rollback/transaction. None of them touches wiki/backend/common/orm/transaction-boundaries.md. The only matches were unrelated: #234 is about sharing one connection across request transactions, #231 only adds a `related:` link on async-failure-handling, #225 is about optimistic UI patches, and the rest are git/heredoc prose.
+
+Verdict for 4012a55145c1a945: **new**.
+Verdict for the 14 plan-gap rows: none overlap an open PR; they are retired as local-layer (below).
 
 ## Routing decision
 
-- Layer: bundled `wiki/` (general knowledge, no repo-specific files named).
-- Domain: frontend. Category: design — both new pages are design-time decisions
-  about how a surface is styled and verified; the hardening page was considered for
-  `forms` and `accessibility` and rejected because its trigger is content shape and
-  locale, not a form lifecycle or an assistive-technology contract.
-- Page ids: `frontend-design-product-ui-vs-brand-surface`,
-  `frontend-design-ui-hardening-against-real-content`.
+- 4012a55145c1a945 → backend / common/orm / backend-common-orm-transaction-boundaries (merged into existing page). Reason: the directive is about where a step sits relative to the transaction boundary, which this page owns. No new category needed.
 
-## Verification
+## Local-layer candidates
 
-- `node scripts/wiki-lint-prohibitions.js` → directives 79 / compliant 79 /
-  violations 0 (unchanged from the pre-edit baseline; rows written positively, so
-  `tests/wiki-lint-prohibitions.bats:25` keeps its pin).
-- `PATH=/opt/homebrew/bin:$PATH bats tests/wiki-structure-checks.bats tests/wiki-index.bats tests/wiki-lint-prohibitions.bats tests/wiki-contradiction.bats tests/wiki-index-freshness.bats tests/wiki-lint-score.bats tests/wiki-agent-gate.bats` → `1..136`, 136 ok, 0 not ok.
-- Inline `[page-id]` links and `related:` ids in the three touched pages all resolve
-  (grep `^id:` per id).
-- No banned qualifiers (`usually`, `consider`, `might`, `generally`, `as appropriate`,
-  `often`, `should`) in the two new pages.
+14 plan-gap rows from linkly orchestration run qa1002. Each names linkly's own files, RFCs, or decisions (`impl/lnpl/lower.py`, `interp.py`, `RFC-0061`/`RFC-0062`, `RFC_ROUTES`, `VERB_LEXICON`). They are excluded from this PR and retired from the queue. Target if ever wanted: `wiki-local/backend/<category>/<slug>.md` in the linkly repo. Run wiki-ingest inside that project.
 
-## Independent review (before commit)
-
-Two fresh-context reviewers (`feature-dev:code-reviewer`, one general brief and one
-adversarial brief; read-only, no Bash) on the 7-file diff. Findings applied:
-
-- anti-slop: a source bullet had been appended after the last table on a page that
-  keeps its sources in frontmatter → removed; the task-UI edge case named a
-  "fluid-type" row this page does not have and missed the default-font-rejection and
-  extreme-contrast rows → rewritten to name the exact rows and widened to Read /
-  Experience surfaces (a docs site previously had no route to the Read guidance).
-- responsive-layout: the `clamp()` row stated fluid type unconditionally → scoped to
-  brand/content surfaces with the app-UI alternative and a `related:` link.
-- product-ui-vs-brand-surface: `field-tested` over-claimed (no production context
-  described) → `unverified` with the upgrade condition in the page; trigger lines
-  now list mode choice, Read/Experience surfaces, overlay clipping, modal-first
-  (index/trigger drift); 65–75ch attributed to operate.md in the source line.
-- ui-hardening: `min-width: 0` rationale was wrong for `overflow-wrap: anywhere`
-  (only `break-word` leaves min-content unchanged) → corrected with the MDN quote;
-  `title` tooltip replaced by hover+focus tooltip (MDN accessibility concerns);
-  `touch-action: none` added to the drag row (MDN: browser fires `pointercancel`
-  when it takes a gesture); iOS 16px row now defers to responsive-layout instead of
-  restating an unsourced mechanism; WCAG 1.4.4 source added; IBM 51–70 row
-  anomaly noted as published.
-- Not applied: "ui-hardening bundles four topics" (both reviewers rated it below
-  their confidence bar; the page's one case is "data is present but hostile" and it
-  routes empty/loading/error out to async-ui-states).
-
-After the fixes: the same seven bats wiki suites re-run → `1..136`, 136 ok, 0 not ok;
-prohibitions still directives 79 / violations 0; all inline links resolve.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+- t210 (9): c4d0c28b0fdf9504, fdfc99325ca6b354, b09d09db744c2d54, 23d5ef43080132f9, fcc5792205767081, 22e6c899fa7e772c, d87a8a4bda0cb8a3, 1d7e8d070878d875, e1e40e6b4f3faaf0
+- t211b (5): 545228fe7f18d075, 81220620185427cd, cf8385f12b32b61f, cda72e4bf1eed6ca, 5625140924325116
