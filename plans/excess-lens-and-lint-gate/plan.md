@@ -15,7 +15,7 @@ Stack: POSIX sh / bash scripts, Markdown skills and agents, bats-core under Home
 | D8 | configure verify text | test / build / lint / typecheck / QA in 3 places | [no-wiki] |
 | D9 | r1 copy | edit base, run gen-agent-tier-variants.sh, `--check` exits 0 | [no-wiki] |
 ## Size verdict
-size: medium
+size: medium (9 tasks after the task-04 sweep repair; every task within the step-4 bounds)
 ## Task order
 | Task | Depends on | Parallel-ok |
 |------|------------|-------------|
@@ -23,6 +23,8 @@ size: medium
 | 02-gate-a-emits-lint-surveyed | 01 | |
 | 03-wiki-plan-lint-prose | 02 | |
 | 04-configure-verify-lint | — | parallel-ok with 01-03 |
+| 04b-verify-wording-readmes | 04 | |
+| 04c-verify-wording-loop-and-example | 04b | |
 | 05-excess-lens-skill | — | parallel-ok with 01-04 |
 | 06-excess-lens-report-template | 05 | |
 | 07-excess-lens-agent | 06 | |
