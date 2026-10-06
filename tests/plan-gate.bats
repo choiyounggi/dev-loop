@@ -690,3 +690,16 @@ crlf_copy() { # <src-dir> <name> -> prints the CRLF copy dir
   run sh "$PG" check lint-surveyed "$d"
   [ "$status" -eq 4 ]
 }
+
+@test "CRLF: a stray mid-line CR in the Baseline bullet never reaches the emitted CHECK line" {
+  d="${BATS_TEST_TMPDIR}/crlf-midline"
+  mkdir -p "$d"
+  cp "$FIX/passing"/*.md "$d/"
+  sed 's/^- Baseline: true -> /- Baseline: true\r -> /' "$FIX/passing/analysis.md" > "$d/analysis.md"
+  [[ "$(cat "$d/analysis.md")" == *$'true\r ->'* ]]
+  run sh "$PG" emit A "$d" "$WORK/plan-A-midline.md"
+  [ "$status" -eq 0 ]
+  content="$(cat "$WORK/plan-A-midline.md")"
+  [[ "$content" == *"CHECK: true && echo GATE_OK"* ]]
+  [[ "$content" != *$'\r'* ]]
+}

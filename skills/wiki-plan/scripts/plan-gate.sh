@@ -37,7 +37,7 @@ fail4() { echo fail; echo "plan-gate: $1" >&2; exit 4; }
 # line and the next "## " line (or EOF). Nested "### " subsections stay in.
 extract_l2() {
   awk -v hdr="$2" '
-    { sub(/\r$/, "") }
+    { gsub(/\r/, "") }
     $0 == hdr { flag=1; next }
     flag && /^## / { exit }
     flag { print }
@@ -48,7 +48,7 @@ extract_l2() {
 # line and the next heading of any level (or EOF).
 extract_l3() {
   awk -v hdr="$2" '
-    { sub(/\r$/, "") }
+    { gsub(/\r/, "") }
     $0 == hdr { flag=1; next }
     flag && /^#+ / { exit }
     flag { print }
