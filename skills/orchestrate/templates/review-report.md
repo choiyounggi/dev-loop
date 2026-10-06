@@ -15,6 +15,7 @@ one unless you say otherwise.
 | 3. Execution-environment reality | `clean — <what was checked>` or `findings: F1, F2` or `not run — <why>` |
 | 4. Multi-object write ordering | `clean — <what was checked>` or `findings: F1, F2` or `not run — <why>` |
 | 5. AC traceability | `clean — <what was checked>` or `findings: F1, F2` or `not run — <why>` |
+| 6. Excess | `clean — <what was checked>` or `findings: F1, F2` or `not run — <why>` |
 
 ## AC traceability
 
@@ -29,6 +30,9 @@ skipped-tier marker; leave this table empty.
 
 Each finding must state a concrete failure scenario. If it cannot, it belongs
 in **Non-blocking** below, not here.
+
+For a lens 6 (Excess) finding, the failure scenario is the search command,
+its hit count, and "no brief or plan line needs it".
 
 ### F1
 

@@ -62,9 +62,9 @@ If any are missing, ask for them rather than guessing.
 
 | Tier | Lenses |
 |---|---|
-| R0 | lenses 1 and 3; write not run — R0 profile in rows 2, 4, 5 |
-| R1 | lenses 1-4; write not run — R1 profile in row 5 |
-| R2 or R3 | lenses 1-5; R3 also applies the adversarial-change-review techniques under lens 5 |
+| R0 | lenses 1, 3 and 6; write not run — R0 profile in rows 2, 4, 5 |
+| R1 | lenses 1-4 and 6; write not run — R1 profile in row 5 |
+| R2 or R3 | lenses 1-6; R3 also applies the adversarial-change-review techniques under lens 5 |
 
 3. Apply these fixed lenses (restated from SKILL.md Phase 4):
 
@@ -81,6 +81,21 @@ If any are missing, ask for them rather than guessing.
    `| DoD item | gate id | test case |` with one row per `<definition_of_done>`
    item of the brief; any row with an empty gate or test cell is a Findings
    item.
+6. **Excess** — for each element the diff adds (a file, function or method,
+   class/interface/type, parameter, config key/flag/env var, dependency), name
+   the brief or plan line it serves: the Objective, a `<definition_of_done>`
+   item, a D-number, or a later task's Inputs — an element a later task
+   consumes is that task's seam, so it has no caller yet by design. An element
+   the plan's decision table names is never an Excess finding — a dispute with
+   the plan belongs to lens 1. When no line serves it AND a search shows one
+   of (a) zero call sites outside its own tests, (b) a re-implementation of an
+   existing repo helper or a standard-library/language function — name that
+   function and where it lives, (c) two or more call sites that all pass the
+   same value for the new parameter, config key, or option, (d) a new
+   interface, abstract type, or factory with exactly one implementation — it
+   is a Findings item whose failure scenario is that search command, its hit
+   count, and "no brief or plan line needs it". A complexity judgment with no
+   such search evidence goes under Non-blocking.
 
 4. No file modification in the worktree, under any circumstance — findings
    route back to the responsible session as rework, never a direct edit by

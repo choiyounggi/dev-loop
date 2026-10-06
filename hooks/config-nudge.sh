@@ -42,7 +42,7 @@ read -r -d '' MSG <<'EOF'
 
 dev-loop works with zero config, but you'll get more out of it by mapping its
 capability roles to your real tools. Notably:
-  • `verify`    → your project's actual test / build command (used in the loop's run step)
+  • `verify`    → your project's actual test / build / lint / typecheck command (used in the loop's run step)
   • `knowledge` → your domain/team wiki or knowledge MCP (external facts — the bundled best-practice wiki needs no setup)
   • also: `explore` (code search), `tacit` (incidents), `design` (Figma)
 

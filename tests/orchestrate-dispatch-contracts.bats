@@ -381,7 +381,7 @@ brief_dependencies_region() {
   [[ "$section" == *"claude-fable-5-1"* ]]
   [[ "$section" == *"worker effort (DEV_LOOP_WORKER_EFFORT) | medium | medium | high | high"* ]]
   [[ "$section" == *"scripts/gen-agent-tier-variants.sh"* ]]
-  [[ "$section" == *"1 and 3 only"* ]]
+  [[ "$section" == *"| review lenses | 1, 3 and 6 only | 1-4 and 6 | 1-6 | 1-6 plus the adversarial-change-review techniques recorded under lens 5 |"* ]]
 }
 
 @test "negative control: a Phase 2 copy without the profile table fails the tier-profile check" {
@@ -410,7 +410,9 @@ brief_dependencies_region() {
 @test "Phase 4 selects the lens set by tier and escalates an R0 second round" {
   section="$(normalize_ws "$(phase4_section "$SKILL")")"
   [[ "$section" == *"Lens set by tier"* ]]
-  [[ "$section" == *"lenses 1 and 3 only"* ]]
+  [[ "$section" == *"lenses 1, 3 and 6 only"* ]]
+  [[ "$section" == *"when R1, lenses 1-4 and 6;"* ]]
+  [[ "$section" == *"when R2 or R3, lenses 1-6."* ]]
   [[ "$section" == *"not run — R0 profile"* ]]
   [[ "$section" == *"instead of dispatching a second rework"* ]]
 }
@@ -611,4 +613,16 @@ brief_dependencies_region() {
 @test "boundary: an empty profile section fails the per-role row count" {
   rows="$(printf '' | grep -E '^\| (analysis|design|QA|final review) agent' || true)"
   [ -z "$rows" ]
+}
+
+@test "negative control: a Phase 4 copy with the old R1 lens set fails the R1 check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-old-r1.md"
+  sed 's/lenses 1-4 and 6/lenses 1-4/' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(phase4_section "$fixture")")"
+  [[ "$section" != *"when R1, lenses 1-4 and 6;"* ]]
+}
+
+@test "Preflight's role list names verify as the test/build/lint/typecheck/QA command" {
+  text="$(normalize_ws "$(cat "$SKILL")")"
+  [[ "$text" == *'`verify` (test/build/lint/typecheck/QA command)'* ]]
 }
