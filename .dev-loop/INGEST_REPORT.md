@@ -1,125 +1,71 @@
 # Knowledge flush — 3 insight(s)
 
-macOS awk aborting on split multibyte text, a lint gate for agent-written Tailwind UI, and proving a function unchanged with an AST comparison. **1 page amended, 2 new pages, 4 back-links. 0 dropped, 0 local-layer.**
+Claimed 27 queue rows (run id `20261007-004436-74724`): 3 `★ Insight` candidates and 24 `plan-gap` rows. Result: 2 new pages (insights 1 and 2 share one page), 2 back-links, 3 index/log rows; 24 plan-gaps retired as local-layer.
 
 ## Verified best-practice
 
-### 1. macOS awk: `match()`/`substr()` over Korean text aborts → `LC_ALL=C awk` (queue `d7bc69bc97da5266`)
+**Insight 1 — Next.js 16 built CSS lives in `.next/static/chunks/`, not `.next/static/css/`** (row `ef8cd55ff96a447d`)
+- Claim: under Next 16 the default `next build` uses Turbopack and writes CSS chunks beside JS chunks; a webpack-era glob `.next/static/css/*.css` matches nothing, so a verify command built on it can never pass (zsh aborts with `no matches found`).
+- Sources: https://nextjs.org/blog/next-16 (Behavior Changes table: "Turbopack is now the default bundler for all apps; opt out with `next build --webpack`"; build banner `▲ Next.js 16 (Turbopack)`).
+- Reproduction 2026-10-07, next@16.3.8, minimal App Router app with one CSS import, in a project-local scratch dir (deleted afterwards):
+  - Default build: banner `▲ Next.js 16.3.8 (Turbopack)`; `find .next/static -name '*.css'` → `.next/static/chunks/1bb-rre_qc00j.css`; `ls -d .next/static/css` → No such file or directory.
+  - Known-bad/contrast arm: `next build --webpack` → banner `▲ Next.js 16.3.8 (webpack)`, CSS at `.next/static/css/095cf7daa880d79a.css` — so the path is bundler-dependent and `find` covers both.
+  - zsh `grep -l x .next/static/css/*.css` with no CSS there → `zsh:1: no matches found`, rc 1; `/bin/bash` → `grep: ...: No such file or directory`, rc 2.
+- The exact chunk path is not stated in the Next docs; it rests on the reproduction. Confidence: **verified** (official default-bundler statement + reproducible two-arm check).
 
-- **Claim (corrected):** macOS `/usr/bin/awk` (`awk version 20200816`) counts `length`/`RSTART`/`substr` in **bytes**, but POSIX says characters. So `substr(s, RSTART-1, 1)` can return half a character. A regex test on that fragment then aborts under a UTF-8 locale with `towc: multibyte conversion failure` (exit 2). Running the awk under `LC_ALL=C` makes every step byte-based and the abort goes away.
-- **Correction to the queued candidate:** the candidate said awk "mixes a byte-based RSTART with character-based substr()". Measured: both are byte-based. The abort comes from the **regex step** decoding a split fragment. A `match()`+`substr()` with no regex test on the fragment did not abort.
-- **Sources checked:**
-  - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html: `length`, `match` and `substr` are defined "in characters"; `LC_CTYPE` decides how bytes become characters.
-  - https://developer.apple.com/forums/thread/705559: the same `towc` error from macOS `/usr/bin/awk`; the poster reports GNU awk works.
-- **How verified (local, 2026-10-06, macOS 26.1, `LANG=en_US.UTF-8`):**
-  - `printf '한\n' | awk '{print length($0)}'` → `3` in both locales.
-  - `printf '한R1\n' | awk '{match($0,/R[0-9]+/); p=substr($0,RSTART-1,1); if (p ~ /[A-Za-z]/) print "x"}'` → `towc: multibyte conversion failure`, rc=2. With `LC_ALL=C` → rc=0.
-  - The real `_cited_rule_ids` awk from dev-loop `skills/wiki-plan/scripts/plan-gate.sh` (PR #242), run without `LC_ALL=C` on `검증 R1–R3 한글`: aborted, rc=2. With `LC_ALL=C`: printed `1 2 3 3 4 5 5`, rc=0.
-- **Not verified:** the candidate's claim that Ubuntu's mawk does not fail. gawk and mawk were not installed here, so the page says this is untested.
-- **Confidence:** verified (POSIX spec plus a local reproduction).
+**Insight 2 — pin the tsconfig that `next build` writes** (row `0e927a3537586109`)
+- Claim: Next 16 treats `jsx: react-jsx` as mandatory and appends `.next/types/**/*.ts` and `.next/dev/types/**/*.ts` to `include`, re-serializing the file; a hand-written `jsx: preserve` config is rewritten on every build; pinning the build's own output makes later builds no-ops.
+- Sources: https://nextjs.org/docs/app/api-reference/config/typescript (v16.3.8: `next dev`/`next build` "add a `tsconfig.json` file with the recommended config options"; `next-env.d.ts` regenerated, belongs in `.gitignore`, must be in `include`); https://nextjs.org/blog/next-16 ("`next dev` and `next build` now use separate output directories" — why `.next/dev/types` appears); create-next-app v16.3.8 `templates/app/ts/tsconfig.json` and `templates/app-tw/ts/tsconfig.json` fetched with curl — both ship `"jsx": "react-jsx"` and the two `.next/**/types` include globs.
+- Reproduction: first build printed "The following mandatory changes were made to your tsconfig.json: … jsx was set to react-jsx (next.js uses the React automatic runtime)" and "include was updated to add '.next/dev/types/**/*.ts'"; sha256 after build 1 and build 2 identical (`243562f4…e233`).
+- Source code: next v16.3.8 `packages/next/src/lib/typescript/writeConfigurationDefaults.ts` (curl) — `jsx` always `value: 'react-jsx'`; `esModuleInterop`/`resolveJsonModule` omitted under `module: preserve` (TS ≥5.4); `isolatedModules` omitted under `verbatimModuleSyntax: true`; include globs from `getTypeDefinitionGlobPatterns(distDir)`. https://nextjs.org/docs/app/api-reference/config/next-config-js/distDir for the `<distDir>` edge row.
+- CI guard checked in a scratch repo: `git diff --exit-code` on an untracked file → rc 0 (so the page pairs it with `git ls-files --error-unmatch`, rc 1 when untracked); tracked + modified → rc 1.
+- Confidence: **verified**.
 
-### 2. Lint gate for agent-written UI in a Tailwind design system (queue `df76e2cefa92769b`)
-
-- **Claim:** turn prose design-system rules into `@shadcn/lint` rules, make lint-clean a done criterion, and loop the agent on diagnostics until the count is 0. On a legacy codebase, start at `warn` with a `--max-warnings` cap, or use ESLint bulk suppressions, and gate on "no new violations".
-- **Sources checked:**
-  - https://github.com/shadcn-ui/lint (README via `gh api`): Tailwind v4, ESLint/Oxlint, React/Svelte/Vue, the six-rule table, the per-model run table (8/8, 42–117 → 0), "10% to 48% less".
-  - https://github.com/shadcn-ui/lint/blob/main/docs/evals.md: methodology, 150+ runs, the rules-only control. Labelled on the page as a **vendor eval**.
-  - https://github.com/shadcn-ui/lint/blob/main/docs/adoption.md: warn, then `--max-warnings`, then bulk suppressions.
-  - https://eslint.org/docs/latest/use/suppressions and https://eslint.org/blog/2025/04/eslint-v9.24.0-released/: bulk suppressions arrived in v9.24.0.
-  - `packages/lint/package.json`: v0.2.0, peer `eslint >=9.30.0`, `node >=20.19`.
-- **Confidence:** verified for the tool's documented behaviour and the adoption path. The effect sizes are vendor-measured and labelled as such.
-
-### 3. Prove "function X unchanged" with an AST segment comparison, not a grep over removed diff lines (queue `ee42f6a325200abf`)
-
-- **Claim:** a grep for `^-.*X(` in the diff fails on correct work when a call to X is re-indented. Comparing `ast.get_source_segment` of X at base and in the working tree is exact, and the gate must also be run on a deliberately changed copy.
-- **Sources checked:**
-  - https://docs.python.org/3/library/ast.html#ast.get_source_segment: signature, returns `None` without position info, added in 3.8.
-  - https://git-scm.com/docs/git-show: the `<rev>:<path>` blob form. Checked in the local `git show --help`: "Shows the contents of the file … as they were current in the 10th last commit".
-- **How verified (local, Python 3.14.6, scratch git repo):**
-  - Wrapping `helper(a)` in `if a:` made the grep gate print `1`.
-  - The page's own snippet, extracted from the markdown and run as is, printed `changed: []` (rc=0) on that change and `changed: ['helper']` (rc=1) after one literal inside `helper` was changed.
-  - Decorator edge case checked: `get_source_segment` on a decorated `FunctionDef` returns text starting at `def`.
-- **Confidence:** verified.
-
-### Review (two fresh-context reviewers: one general, one adversarial; both returned FAIL, every finding fixed and re-checked)
-
-- **Vendor numbers.** The run table is 8/8 for four models and 6/8 for GPT 5.6 Sol, and now says so. The "Instead of" row now reports the control runs per model: Sonnet and Opus also reached zero from rules alone; Haiku missed one task; savings were about 10%, 31% and 48%. The quoted diagnostic is now verbatim from the README.
-- **Gaps in the ESLint bulk-suppressions advice, now fixed:**
-  - A fixed suppressed violation makes ESLint exit non-zero until `--prune-suppressions`, which is checked against the ESLint docs. A row was added.
-  - `--suppress-rule` replaced `--suppress-all`, which hides unrelated lint debt.
-  - Bulk suppressions are ESLint-only.
-- **Oxlint** lints only script blocks in Vue/Svelte, per the README Frameworks table. A row was added.
-- **Lint-clean does not approve the design.** New tokens and variants need review, per evals.md and the red-team escapes. A row was added.
-- **awk:**
-  - The awk row now warns that under `LC_ALL=C` a non-ASCII literal in a bracket expression becomes a set of single bytes. Reproduced: `printf '가\n' | LC_ALL=C awk '$0 ~ /[–—]/'` matches, and the grouped `(–|—)` does not.
-  - The "Linux CI" framing was removed; it had no evidence.
-  - The bytes claim now has its own reproduction: RSTART=4, and `substr($0,1,1)` is byte `0xED`.
-  - `last_verified` was bumped.
-- **Gate snippet:**
-  - A misspelled name passed vacuously (`None == None`). It now exits with `not found at base: [...]`.
-  - `HEAD:./{path}` replaced `HEAD:{path}`, so the path resolves from the cwd.
-  - Re-run on the page's extracted snippet: good → rc=0, typo → rc=1, subdirectory → rc=0, bad → rc=1.
-  - The hunk-range "Instead of" row is corrected: base-coordinate `-U0` intersection is sound, and the row now says when it is not.
-- **Separately, not in this PR:** the code comment at `skills/wiki-plan/scripts/plan-gate.sh:246` says macOS awk "mixes byte RSTART with character substr()". The measurement shows both are byte-based; the abort comes from regex-decoding a split fragment. The `LC_ALL=C` fix there is still correct; only the comment's mechanism is off.
+**Insight 3 — per-project hook policy lost when the shell sits in a nested repo** (row `1f8019e5875d72e3`)
+- Claim: a hook that finds its project config by walking from the shell directory up to `git rev-parse --show-toplevel` stops at a nested clone's root, so the stricter global rule decides; keep the persistent shell at the project root and address the nested repo with `git -C` / one-command subshells.
+- Sources: https://code.claude.com/docs/en/hooks (common input field `cwd`: "Current working directory when the hook is invoked"; "`cwd` follows Claude … the new directory after Claude runs `cd`"; `${CLAUDE_PROJECT_DIR}` is "the project root where the session started"); https://git-scm.com/docs/git-rev-parse (`--show-toplevel`: "Show the (by default, absolute) path of the top-level directory of the working tree", read from the local `git rev-parse --help`).
+- Hook source read: guardrails 1.2.2 `hooks/bash-guard.sh` `find_repo_cfg` — starts at `$PWD`, bounds the walk at `git rev-parse --show-toplevel`, falls back to `~/.claude/groundwork/guardrails.json`.
+- Reproduction 2026-10-07: from `outer/.claude/tmp/inner/sub` (inner `git init`) `--show-toplevel` → `…/outer/.claude/tmp/inner`; from `outer/.claude/tmp` → `…/outer`; a linked worktree at `outer/.claude/tmp/wt` → `…/outer/.claude/tmp/wt`.
+- https://code.claude.com/docs/en/tools-reference (Bash tool): a `cd` carries over only inside the project or an additional working directory; outside it resets with `Shell cwd was reset to <dir>`; `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` makes every Bash command start in the project directory — added as Do-this step 2.
+- The escalation itself is the queued field report (allowed at worktree root, escalated `rm_rf` from a nested clone's subdir). Confidence: **verified** (mechanism in docs + source + reproduction).
 
 ## Existing-layer check
 
-Pages read: platforms-environment-unicode-text-matching, testing-quality-checks-that-cannot-pass, testing-quality-guard-shape-vs-consequence, testing-quality-source-text-wiring-assertions, frontend-design-custom-property-values-read-from-script
+Routed via `INDEX.md` → `wiki/platforms/index.md` (toolchains, tools) and `wiki/frontend/index.md` (no build-output/framework-tooling category; bundle-and-assets is about bundle size). `wiki_search` (k=5) per candidate trigger:
+- Insight 1 top-5: backend-common-change-impact-compiler-as-call-site-inventory (×2 chunks), testing-quality-value-preserving-refactor-assertions, debugging-signals-stack-traces, platforms-tools-version-keyed-artifact-cache — none about framework build output paths.
+- Insight 2 top-5: security-secrets-secrets-in-code, platforms-tools-deny-rules-under-bypassed-permissions, testing-data-testcontainers-python-community-namespace, backend-common-change-impact-compiler-as-call-site-inventory, qa-process-scope-purity-checks — none about a build rewriting a tracked config.
+- Insight 3 top-5: platforms-tools-harness-mediated-tool-results, qa-process-scope-purity-checks (×2), platforms-filesystems-paths-case-and-line-endings, backend-common-llm-project-local-layer-over-shared-guidance — none about hook config discovery vs the shell directory.
+- Repo grep: `turbopack|next.js|nextjs|tsconfig` hits only compiler-as-call-site-inventory, backend/index, secrets-in-code (unrelated mentions); `show-toplevel|nested clone|guardrails` hits agent-orchestration pages about brief writing and run state, not config discovery.
 
-- **Scanned by grep for overlap terms** (not read in full): platforms-shells-portable-shell-scripts, platforms-tools-bsd-vs-gnu-cli (has no awk content), frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, infrastructure-ci-cd-write-time-limit-guards, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan. Also the domain indexes for platforms, frontend and testing.
-- **`wiki_search` top hits (k=5):**
-  - #1: unicode-text-matching (trigger + LC_ALL=C edge case), portable-shell-scripts, unset-versus-empty-parameters, option-like-argument-values.
-  - #2: agent-facing-tool-surfaces, startup-time, component-composition, client-vs-server-state. None about design-system enforcement.
-  - #3: checks-that-cannot-pass (×4 chunks), evaluating-review-feedback.
-- **#1 → merged** into `platforms-environment-unicode-text-matching`: +1 edge-case row, +1 instead-of row, trigger sentence extended, +2 frontmatter sources, +2 Sources entries. That page already owns "a non-ASCII pattern must hold under `LC_ALL=C`". This is the same locale/byte topic with a different tool (awk) and a different failure (abort rather than silent mismatch). No conflict with its existing directive.
-- **#2 → new page** `frontend-design-design-system-lint-gate-for-agents`.
-  - anti-slop-visual-design states the rule in prose ("only `var(--token)`"), and write-time-limit-guards covers the baseline mechanism generically. Neither covers a design-system linter as an agent done-gate.
-  - Back-links added from anti-slop-visual-design and product-ui-vs-brand-surface.
-- **#3 → new page** `testing-quality-unchanged-function-gates`.
-  - checks-that-cannot-pass covers gates that cannot fail on an unwritten target. guard-shape-vs-consequence covers repo-wide shape guards. source-text-wiring-assertions covers regex-on-source call-presence tests.
-  - None covers "prove a named function untouched by a diff". The new trigger and directive (AST segment comparison) are distinct.
-  - Back-links added from guard-shape-vs-consequence and harness-reverse-controls.
-- **Deferred back-links**, because an open PR rewrites the same `related:` line and an edit here would conflict:
-  - checks-that-cannot-pass (#223)
-  - source-text-wiring-assertions (#241)
-  - changed-files-only-gates (#235)
-  - The new pages link to them forward, and the back-links can follow once those PRs land.
-- **Lint:** `node scripts/wiki-lint-prohibitions.js wiki` gives `violations: 0`, rc=0. `node scripts/wiki-structure-checks.js wiki` gives `pages: 357, indexes: 13, findings: 0`, rc=0. Every `related:` id in the new and changed pages resolves to an existing page.
+Pages read: platforms-toolchains-regeneration-silently-drops-hand-edited-state, platforms-tools-deny-rules-under-bypassed-permissions, testing-quality-checks-that-cannot-pass, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-worktree-isolated-workers
+
+Adversarial review (fresh-context `feature-dev:code-reviewer`, no shell, re-fetched every cited doc) before commit — findings and what changed:
+- Unsupported: `distDir` row, the mandatory-option list, "not configurable", `git diff --exit-code` guard, `.gitignore` "untracks", cd-reset row, submodule row → each now cites source code / docs / a scratch-repo check, or is reworded (`git rm --cached`; submodule marked not reproduced).
+- Wrong in a common case: page 2 said a non-root toplevel means the policy was never loaded — false for a worktree/clone of the same project with a tracked policy file. Scoped the trigger and step 4 to a nested repo without the file; edge row rewritten.
+- Wording: hook start directory is "the shell directory the previous call left behind"; `CLAUDE_PROJECT_DIR` quoted from the docs.
+- All quoted phrases were confirmed faithful; format (frontmatter, positive form, ≤120 lines) passed.
+
+Outcome: no duplicate, no conflicting directive → 2 new pages.
+- Created `platforms-toolchains-nextjs-16-build-output-and-tsconfig-rewrite` (insights 1+2: same tool, same "what does `next build` write" trigger family; two "When this applies" bullets).
+- Created `platforms-tools-hook-config-lookup-from-shell-cwd` (insight 3).
+- Back-links added: regeneration-silently-drops-hand-edited-state → nextjs page; deny-rules-under-bypassed-permissions → hook-config page.
+- Back-links deferred (forward `related:` only) because an open PR rewrites that file's `related:` line: checks-that-cannot-pass (#223), command-text-inspected-before-execution (#230), harness-mediated-tool-results (#223), worktree-isolated-workers (#223), flag-availability-at-the-execution-site (#244), portable-shell-scripts (#223).
+- Lint: `node scripts/wiki-structure-checks.js wiki/` → `pages: 361, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki/` → `violations: 0`. Known-bad arm: same structure check on a scratch copy with a fabricated related id → rc 3, `bad-related: … resolves to no page`.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`: #241, #239, #238, #237, #236, #235, #234, #233, #231, #230, #229, #228, #227, #226, #225, #223.
+Listed 20 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253, #254) and diffed each against `origin/main` under `wiki/` for `turbopack|next.js|nextjs|tsconfig|show-toplevel|nested clone|nested git|guardrails|hook.*(config|cwd)|starting directory`. Hits: #254 (session-completion-gates row mentions `cwd` + tmux session name — worker identification, not config discovery), #244 (tsconfig `paths` alias vs Node `exports` — module resolution), #233 (TypeScript 6 `types` default — not Next build rewrites). Adjacent but distinct: #235 adds `unmatched-glob-in-a-command-argument` (zsh NOMATCH on a glob the program matches itself — the new page only cites the symptom and does not restate that guidance; not linked because the id is not on main yet) and #223 adds `hook-input-fields-from-the-reference` (hook stdin field names, not config discovery).
 
-Each head's `wiki/` diff against main was searched for the candidate terms:
-- #1: `towc|multibyte|LC_ALL=C|substr|RSTART`
-- #2: `shadcn|design.system|tailwind|eslint|bulk suppress|raw color`
-- #3: `get_source_segment|not touched|unchanged function|re-indent|removed line`
-
-| Candidate | Hits in open PRs | Verdict |
-|-----------|------------------|---------|
-| #1 awk towc | #241: 8 hits, all the word "substrings" in its YAML substring-test page. Unrelated. | **new** |
-| #2 design-system lint gate | #231, #228: one hit each. An OWASP quote and an ESLint custom-rule tutorial URL. Unrelated. | **new** |
-| #3 unchanged-function gate | none | **new** |
-
-Line-level conflicts were avoided where possible:
-- #223 rewrites the `related:` line of unicode-text-matching.md, so this PR leaves that line alone. Its new frontmatter source lines are inserted two lines away from it.
-- Index rows were inserted after their nearest sibling row, not at the table end where #225, #241 and #226 append.
-- `log.md` appends at the end, as every flush does.
+Verdicts: insight 1 → **new**; insight 2 → **new**; insight 3 → **new**.
 
 ## Routing decision
 
-| Insight | Layer | Target |
-|---------|-------|--------|
-| #1 macOS awk towc | general | `platforms/environment/unicode-text-matching.md` (amended): edge-case row + instead-of row. Index load-when line extended |
-| #2 design-system lint gate | general | `frontend/design/design-system-lint-gate-for-agents.md` (new). Row placed after anti-slop-visual-design in `wiki/frontend/index.md` |
-| #3 unchanged-function gate | general | `testing/quality/unchanged-function-gates.md` (new). Row placed after checks-that-cannot-pass in `wiki/testing/index.md` |
-
-No new category was needed: each insight fits an existing category.
-
-Layer test:
-- #1 names dev-loop's `plan-gate.sh` only as field evidence. The directive holds for any macOS awk script.
-- #3 came from a linkly plan. The directive names no linkly code, and the field-evidence line was reworded to "an orchestration plan's task gate".
+- Insights 1+2 → `platforms/toolchains/nextjs-16-build-output-and-tsconfig-rewrite.md`. platforms/toolchains already holds "generator rewrites a tracked file" and "version-dependent tool behavior" pages; frontend's categories cover UI code, not what a framework build writes to disk. No new category.
+- Insight 3 → `platforms/tools/hook-config-lookup-from-shell-cwd.md`. The queued domain hint was infrastructure/agent-orchestration, but the mechanism applies to any Claude Code session under a cwd-scoped hook, orchestrated or not; platforms/tools already holds the harness/hook pages (deny-rules-under-bypassed-permissions, harness-mediated-tool-results). No new category.
 
 ## Local-layer candidates
 
-none
+All 24 `plan-gap` rows are per-task design decisions that name one repository's own files, modules and conventions — excluded from this PR. Run wiki-ingest inside that project if any should persist:
+- linkly, task t189 (14 rows: `f68a1de9cb55da66`, `ca6074ccf20b52ce`, `30ef5a67fdc20ae6`, `ff2818c4c12a9039`, `b1330715aaa59008`, `797cbdc6cd089be0`, `5c402b4b5f5ef523`, `b26bda08f4c7bf18`, `2145b5849260e272`, `9a6fec94ecc06f9d`, `0b04e848c404d49a`, `2e1b7c241919e43e`, `7fcdf73748dac079`, `d5bea8aa3c9701a5` — deploy_gen module layout, `--set` option channel, capability→service mapping, YAML escaping, DNS-1035 names, goldens) → `wiki-local/infrastructure/deploy/compose-and-k8s-generators.md` — run wiki-ingest inside that project.
+- linkly, task t192 (8 rows: `2c338f7472d6cca6`, `2138692f31f68a45`, `ce4b609e9fc14a83`, `d92d4cd64d7e65dd`, `e8f481402bb4b4fb`, `6700e0327e928b26`, `2252032edcc09dab`, `9df8879ea515ed17` — secret-file trailing newline, SecretProvider SPI, opener diagnostics, bookkeeping) → `wiki-local/security/secrets/secret-provider-spi.md` — run wiki-ingest inside that project.
+- Next.js 16 invitation scaffold project, task t1 (2 rows: `61e0efcc16733efe`, `1d79a3953022f952` — Tailwind v4 `@theme inline` token mapping, dev-only preview route; the row does not name the repository) → `wiki-local/frontend/design/tailwind-v4-token-mapping.md` — run wiki-ingest inside that project.
