@@ -22,7 +22,7 @@ setup() {
   cd "$REPO_ROOT" || return 1
   run node "$CHECKER" wiki
   [ "$status" -eq 0 ]
-  [[ "$output" == *"directives: 79"* ]]
+  [[ "$output" == *"directives: 80"* ]]
   [[ "$output" == *"violations: 0"* ]]
 }
 
