@@ -15,7 +15,10 @@ Stack: POSIX sh / bash scripts, Markdown skills and agents, bats-core under Home
 | D8 | configure verify text | test / build / lint / typecheck / QA in 3 places | [no-wiki] |
 | D9 | r1 copy | edit base, run gen-agent-tier-variants.sh, `--check` exits 0 | [no-wiki] |
 ## Size verdict
-size: medium (9 tasks after the task-04 sweep repair; every task within the step-4 bounds)
+size: large (9 tasks after the task-04 sweep repair, > 8; every task within the step-4 bounds)
+Pre-dispatch split, two independent pieces:
+- piece A (lint gate) — files: skills/wiki-plan/scripts/plan-gate.sh, templates/plan-gates.md, templates/analysis.md, skills/wiki-plan/SKILL.md, skills/configure/SKILL.md, references/tool-profile.md, README.md, README.ko.md, skills/loop-implement/SKILL.md, examples/tools.example.json, tests/plan-gate.bats, tests/fixtures/plan-gate/passing/analysis.md, tests/wiki-plan-lint-gate.bats, tests/verify-role-lint.bats; outputs: gate-A id lint-surveyed
+- piece B (excess lens) — files: skills/orchestrate/SKILL.md, skills/orchestrate/templates/review-report.md, agents/task-reviewer.md, agents/task-reviewer-r1.md, tests/orchestrate-review-pass.bats, tests/orchestrate-dispatch-contracts.bats; outputs: review lens 6 Excess
 ## Task order
 | Task | Depends on | Parallel-ok |
 |------|------------|-------------|
