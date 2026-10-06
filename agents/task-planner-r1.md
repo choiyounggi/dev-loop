@@ -75,7 +75,12 @@ carrying that `gate-A rc` and do no design work.
 ## Two-stage handshake (full mode)
 
 1. Run Phase B from the task-analyst's `analysis.md` and write `design.md`
-   with its `## Review` section left empty. Do NOT call plan-reviewer and do NOT
+   with its `## Review` section left empty. Then run
+   `sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check requirements-covered <plan dir>`
+   and fix `design.md` until it prints `ok` — every Rule must be named by a
+   Decision row before the reviewer sees it. A failure saying Rule rows have
+   no leading `R<n>` id is an `analysis.md` defect: do not edit `analysis.md`;
+   name it on the `contradiction:` line. Do NOT call plan-reviewer and do NOT
    emit gate-B — you are not allowed to run the review of your own design
    (`Agent` is absent from your tools on purpose: the author of a design must
    not own the loop that judges it).
@@ -92,7 +97,8 @@ carrying that `gate-A rc` and do no design work.
    SendMessage. On `VERDICT: FAIL` it forwards the blocking findings the same
    way: fix `design.md` (a finding against `analysis.md` goes to the
    task-analyst first; when the coordinator says `analysis.md` changed,
-   re-check `design.md` against it), reply with a fresh STOP REPORT, and
+   re-check `design.md` against it), re-run the step-1 requirements-covered
+   check, reply with a fresh STOP REPORT, and
    wait again (bounded at 3 reviewer calls, as wiki-plan says). On
    `VERDICT: PASS`: emit and run gate-B, run Phase C, write the flat worker
    plan `{ORCH_DIR}/plans/<task>.md` (header, `## Decisions` with Wiki basis,

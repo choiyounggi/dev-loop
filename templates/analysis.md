@@ -13,7 +13,9 @@ below is a content defect (exit 3).
 Example-Mapping table: one row per rule, with a concrete Given/When/Then
 example. Leave "Open question" blank once resolved; while unresolved, mark
 it `OPEN: <question>` — the open-questions-resolved gate fails while any
-`OPEN:` token remains in this section.
+`OPEN:` token remains in this section. Start every Rule cell with its id
+(`R1: ...`, `R2: ...`): design.md's Decision rows and Phase C `covers:` lines
+cite these ids, and gate-B's requirements-covered fails a row without one.
 | Rule | Concrete example | Open question |
 |------|------------------|---------------|
 

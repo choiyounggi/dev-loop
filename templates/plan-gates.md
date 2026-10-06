@@ -53,6 +53,11 @@ either script were needed or made.
   EXPECT: ok
   EVIDENCE: pending
 
+- [ ] requirements-covered: every Rule id (R<n>) in analysis.md's `## Requirements` is named by at least one data row of design.md's `## Decisions` (ranges like R4-R6 count)
+  CHECK: sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check requirements-covered {PLAN_DIR}
+  EXPECT: ok
+  EVIDENCE: pending
+
 - [ ] reviewer-verdict: <plan-dir>/review-verdict.md records a `VERDICT: PASS` line
   CHECK: sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check reviewer-verdict {PLAN_DIR}
   EXPECT: ok

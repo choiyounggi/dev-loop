@@ -270,15 +270,15 @@ EOF
   grep -q 'CHECK: true && echo GATE_OK' "$WORK/plan-A-fixture.md"
 }
 
-@test "emit B: writes 4 gates, all CHECK/EXPECT/EVIDENCE lines present" {
+@test "emit B: writes 5 gates, all CHECK/EXPECT/EVIDENCE lines present" {
   run sh "$PG" emit B "$FIX/passing" "$WORK/plan-B-fixture.md"
   [ "$status" -eq 0 ]
-  ids="groundings-exist decision-rows-complete reviewer-verdict gaps-emitted"
+  ids="groundings-exist decision-rows-complete requirements-covered reviewer-verdict gaps-emitted"
   for id in $ids; do
     grep -q -- "- \[ \] ${id}:" "$WORK/plan-B-fixture.md"
   done
-  [ "$(grep -c '^  CHECK: ' "$WORK/plan-B-fixture.md")" -eq 4 ]
-  [ "$(grep -c '^  EXPECT: ' "$WORK/plan-B-fixture.md")" -eq 4 ]
+  [ "$(grep -c '^  CHECK: ' "$WORK/plan-B-fixture.md")" -eq 5 ]
+  [ "$(grep -c '^  EXPECT: ' "$WORK/plan-B-fixture.md")" -eq 5 ]
   ! grep -q '{PLAN_DIR}' "$WORK/plan-B-fixture.md"
 }
 
@@ -311,7 +311,7 @@ EOF
   printf '# Change Log\n\n' > "$WORK/log.md"
   CLAUDE_PLUGIN_ROOT="${BATS_TEST_DIRNAME}/.." DEV_LOOP_LOG_MD="$WORK/log.md" DEV_LOOP_QUEUE_DIR="$WORK/queue" run bash "$GC" --run "$WORK/plan-B-run.md"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"met=4 unmet=0"* ]]
+  [[ "$output" == *"met=5 unmet=0"* ]]
 }
 
 # ---------- groundings-exist: project-local layer (issue #194 A) ----------
@@ -425,4 +425,148 @@ EOF2
   [ "${lines[0]}" = "fail" ]
   [[ "$output" == *"not found under $WORK (project-local layer): wiki-local/alpha/cat/page.md"* ]]
   [[ "$output" != *"not found under $WIKI"* ]]
+}
+
+# ------------------------------------------------------ requirements-covered --
+
+# req_plan <dir> <rule-cell>... — analysis.md whose ## Requirements table has
+# one row per <rule-cell>; the caller writes design.md.
+req_plan() {
+  d="$1"; shift
+  mkdir -p "$d"
+  {
+    printf '## Requirements\n| Rule | Concrete example | Open question |\n|------|------------------|---------------|\n'
+    for r in "$@"; do printf '| %s | given x, then y | |\n' "$r"; done
+    printf '\n## Ground truth\n- Baseline: true -> rc=0, HEAD abc1234, git status clean\n'
+  } > "$d/analysis.md"
+}
+
+# req_design <dir> <row-text>... — design.md whose ## Decisions rows carry
+# <row-text> in the Testability cell.
+req_design() {
+  d="$1"; shift
+  {
+    printf '## Decisions\n| # | Decision | Choice | Wiki basis | Rejected alternative | Testability |\n|---|---|---|---|---|---|\n'
+    i=0
+    for t in "$@"; do i=$((i + 1)); printf '| D%s | d | c | [no-wiki] | r | %s |\n' "$i" "$t"; done
+  } > "$d/design.md"
+}
+
+@test "requirements-covered: every rule named by a Decision row -> ok" {
+  req_plan p "R1: login works" "R2. logout works"
+  req_design p "covers R1" "covers R2"
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok" ]
+}
+
+@test "requirements-covered: rules named by no Decision row -> fail exit 3 listing them" {
+  req_plan p "R1: a" "R2: b" "R3: c"
+  req_design p "covers R1"
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 3 ]
+  [ "${lines[0]}" = "fail" ]
+  [[ "$output" == *"Rule(s) named by no ## Decisions row: R2 R3"* ]]
+}
+
+@test "requirements-covered: ranges with -, en dash and .. expand; Korean text does not break awk" {
+  req_plan p "R1: 가" "R2: 나" "R3: 다" "R4: 라" "R5: 마" "R6: 바" "R7: 사"
+  req_design p "검증 R1–R3 한글" "R4-R5" "R6..R7 끝"
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok" ]
+}
+
+@test "requirements-covered: R<n> glued to a word (PR2, XR2) is not a citation" {
+  req_plan p "R1: a" "R2: b"
+  req_design p "covers R1, see PR2 and XR2"
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"no ## Decisions row: R2"* ]]
+}
+
+@test "requirements-covered: an id named only outside the Decisions table does not count" {
+  req_plan p "R1: a" "R2: b"
+  req_design p "covers R1"
+  printf '\n## Constraints\n- R2 is handled elsewhere\n' >> p/design.md
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"no ## Decisions row: R2"* ]]
+}
+
+@test "requirements-covered: a bold or backticked rule id is still read" {
+  req_plan p "**R1**: a" "\`R2\` b"
+  req_design p "R1 R2"
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 0 ]
+}
+
+@test "requirements-covered: a rule row with no leading R<n> id -> fail exit 3" {
+  req_plan p "R1: a" "login must work"
+  req_design p "R1"
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"1 ## Requirements row(s) have no leading R<n> id"* ]]
+}
+
+@test "requirements-covered: an empty Requirements table -> fail exit 3" {
+  req_plan p
+  req_design p "R1"
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"## Requirements has no rule rows"* ]]
+}
+
+@test "requirements-covered: design.md absent -> fail exit 4" {
+  req_plan p "R1: a"
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 4 ]
+  [ "${lines[0]}" = "fail" ]
+}
+
+@test "requirements-covered: ## Requirements heading absent -> fail exit 4" {
+  mkdir -p p
+  printf '# Analysis\n' > p/analysis.md
+  req_design p "R1"
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 4 ]
+}
+
+@test "prose wiring: requirements-covered is named by the gate-B ids line, the pre-review check and the analysis template" {
+  root="${BATS_TEST_DIRNAME}/.."
+  [[ "$(grep -n 'Gate ids:' "$root/skills/wiki-plan/SKILL.md" | grep groundings-exist)" == *"requirements-covered"* ]]
+  grep -q '^\*\*Pre-review check\*\*' "$root/skills/wiki-plan/SKILL.md"
+  grep -q 'Start every Rule cell with its id' "$root/templates/analysis.md"
+  grep -q 'check requirements-covered <plan dir>' "$root/agents/task-planner.md"
+}
+
+@test "prose wiring: orchestrate routes a missing-R<n> failure to the analyst and bounds the bounces" {
+  orch="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
+  grep -q 'check requirements-covered <plan dir>' "$orch"
+  grep -q 'failure to the same `task-analyst` first' "$orch"
+  grep -q '`fail` on the same task is escalated to the user' "$orch"
+}
+
+@test "requirements-covered: an id in a second table under ## Decisions does not count" {
+  req_plan p "R1: a" "R2: b"
+  req_design p "covers R1"
+  printf '\nAlternatives below.\n\n| Alt | Why rejected |\n|---|---|\n| R2 approach | too slow |\n' >> p/design.md
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"no ## Decisions row: R2"* ]]
+}
+
+@test "requirements-covered: a Rule cell naming several ids (R1/R2, R3, R4) needs each one covered" {
+  req_plan p "R1/R2: a" "R3, R4: b"
+  req_design p "covers R1, R3"
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"no ## Decisions row: R2 R4"* ]]
+}
+
+@test "requirements-covered: a range wider than 100 still names every number in it" {
+  req_plan p "R1: a" "R120: b"
+  req_design p "covers R1-R150"
+  run sh "$PG" check requirements-covered p
+  [ "$status" -eq 0 ]
 }
