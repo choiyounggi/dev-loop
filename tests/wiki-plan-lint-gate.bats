@@ -34,7 +34,7 @@ flat() { # <file>
   [[ "$text" == *'Lint gating in every task'* ]]
   [[ "$text" == *'&& echo LINT_OK'* ]]
   [[ "$text" == *'fs=(); for f in <only the Deliverables paths this tool lints>; do [ -f "$f" ] && fs+=("$f"); done'* ]]
-  [[ "$text" == *'echo "lint files (${#fs[@]}): ${fs[*]}"'* ]]
+  [[ "$text" == *'echo "lint files (${#fs[@]}): ${fs[*]-}"'* ]]
   [[ "$text" == *'lint skipped: no lintable Deliverables remain'* ]]
   [[ "$text" == *'<tool invocation that takes files> "${fs[@]}"'* ]]
   [[ "$text" == *'not gated — baseline rc=<n>'* ]]
@@ -75,4 +75,16 @@ flat() { # <file>
   sed 's/lint skipped: no lintable Deliverables remain//' "$SKILL" > "$stripped"
   text="$(flat "$stripped")"
   [[ "$text" != *'lint skipped: no lintable Deliverables remain'* ]]
+}
+
+@test "the red-baseline line reports an empty list under set -u on /bin/bash" {
+  line="$(grep -o '`- lint: fs=();[^`]*`' "$SKILL" | sed -e 's/^`- lint: //' -e 's/`$//')"
+  [ -n "$line" ]
+  line="${line//<only the Deliverables paths this tool lints>/missing.js}"
+  line="${line//<tool invocation that takes files>/true}"
+  cd "$BATS_TEST_TMPDIR"
+  run /bin/bash -c "set -u; $line"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"lint skipped: no lintable Deliverables remain"* ]]
+  [[ "$output" == *"LINT_OK"* ]]
 }

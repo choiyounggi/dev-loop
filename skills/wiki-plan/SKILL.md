@@ -310,7 +310,7 @@ Exit 0 before entering Phase C.
    | Ground truth bullet | Task Verify line |
    |---|---|
    | `Lint: <command> -> rc=0` | `- lint: <command> && echo LINT_OK` — `<command>` copied verbatim; success = `LINT_OK` printed |
-   | `Lint: <command> -> rc=<non-zero>`, the tool accepts file operands | `- lint: fs=(); for f in <only the Deliverables paths this tool lints>; do [ -f "$f" ] && fs+=("$f"); done; echo "lint files (${#fs[@]}): ${fs[*]}"; if [ ${#fs[@]} -eq 0 ]; then echo "lint skipped: no lintable Deliverables remain"; else <tool invocation that takes files> "${fs[@]}"; fi && echo LINT_OK` (bash) — the untouched tree already fails, so only this task's files are judged; deleted files and paths with spaces pass through safely, and an empty list is reported, not hidden |
+   | `Lint: <command> -> rc=<non-zero>`, the tool accepts file operands | `- lint: fs=(); for f in <only the Deliverables paths this tool lints>; do [ -f "$f" ] && fs+=("$f"); done; echo "lint files (${#fs[@]}): ${fs[*]-}"; if [ ${#fs[@]} -eq 0 ]; then echo "lint skipped: no lintable Deliverables remain"; else <tool invocation that takes files> "${fs[@]}"; fi && echo LINT_OK` (bash) — the untouched tree already fails, so only this task's files are judged; deleted files and paths with spaces pass through safely, and an empty list is reported, not hidden |
    | `Lint: <command> -> rc=<non-zero>`, the tool takes no file operands | `- lint: not gated — baseline rc=<n>, <command> takes no file operands`; loop-implement step 0 records it as `ABANDON: <gate id> baseline rc=<n>, <command> takes no file operands` |
    | `Lint: none — checked: ...` | no lint line |
 
