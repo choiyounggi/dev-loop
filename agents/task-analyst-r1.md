@@ -86,7 +86,9 @@ a report line without a run behind it is a prediction, not evidence.
 ## Resumed rounds
 
 - **A plan-reviewer finding targets `analysis.md`.** Fix only what the finding
-  names, re-run gate-A, and reply with a fresh ANALYSIS REPORT.
+  names, re-run gate-A, and reply with a fresh ANALYSIS REPORT. The same
+  applies when the coordinator forwards a `requirements-covered` failure
+  saying Rule rows have no leading `R<n>` id: number those rows.
 - **A worker's gap report faults the analysis (rounds 1-2).** Patch only the
   part of `analysis.md` the gap names, re-run gate-A, and reply with a fresh
   ANALYSIS REPORT.

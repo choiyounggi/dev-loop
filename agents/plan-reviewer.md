@@ -25,7 +25,9 @@ missing, ask for them rather than guessing.
 
 1. **Requirements coverage** — every Rule in analysis.md's `## Requirements`
    table is covered by at least one Decision row. An uncovered Rule is
-   blocking.
+   blocking. The `requirements-covered` gate already checked that each Rule
+   id is named by some row; a named id is not coverage by itself — judge
+   whether that row's Choice actually decides what the Rule needs.
 2. **Grounding exists** — every `Wiki basis` cited in the Decisions table is a
    real file. Grep it under the wiki root yourself (Bash) — do not take the
    citation on faith. A citation that does not resolve to a real file is

@@ -879,7 +879,15 @@ reasoning-effort flags) that `worker-start` cannot express.
 
    **Two-stage handshake (full mode).** The agent stops after writing
    `design.md` and replies with its stop report (plan dir, gate-A rc, decision
-   and no-wiki counts, expected size, contradiction line). You then run the
+   and no-wiki counts, expected size, contradiction line). Before this and
+   every later reviewer call, run
+   `sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check requirements-covered <plan dir>`.
+   On `fail`, forward its stderr with SendMessage: a "no leading R<n> id"
+   failure to the same `task-analyst` first (wait for its ANALYSIS REPORT and
+   re-run gate-A), any other failure to the same task-planner; then wait for a
+   fresh stop report. These bounces are not reviewer calls, but a third
+   `fail` on the same task is escalated to the user, like a third reviewer
+   FAIL. You then run the
    `plan-reviewer` agent yourself (Agent tool) on `analysis.md` + `design.md`,
    record its full output under `design.md`'s `## Review`, and on
    `VERDICT: PASS` write just that line into `<plan dir>/review-verdict.md`;

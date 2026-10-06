@@ -74,7 +74,8 @@ and fill it in. Its section headers are parsed by `plan-gate.sh` — keep them
 exactly as the template has them.
 
 **A1. Requirements + acceptance examples** (Example Mapping: Rule / Concrete
-example / Open question). While a question is unresolved, mark it literally
+example / Open question). Start every Rule cell with its id — `R1: ...`,
+`R2: ...` — because Phase B Decision rows and Phase C `covers:` lines cite it. While a question is unresolved, mark it literally
 `OPEN: <question>` in the Open question cell — the gate fails while any `OPEN:`
 token remains, so leaving a question unresolved is what blocks entry to Phase B
 (Definition of Ready), not a missing checkbox.
@@ -145,13 +146,19 @@ Example, for a login feature:
 
 | # | Decision | Choice | Wiki basis | Rejected alternative | Testability |
 |---|----------|--------|------------|----------------------|-------------|
-| D1 | PK type for users | UUIDv7, app-generated | `wiki/databases/schema-design/primary-key-choice.md` | Auto-increment int — leaks row count, harder to shard | any insert path missing an explicit id |
-| D2 | Auth mechanism | Session cookie, not token | `wiki/security/authn/session-vs-token.md` | JWT — needless revocation complexity for this scale | session-fixation / logout test |
-| D3 | Re-signup after delete | Soft-delete + partial unique index | `wiki/databases/schema-design/soft-delete.md`, `wiki/databases/schema-design/partial-and-expression-indexes.md` | Hard delete — loses audit trail | re-signup integration test |
+| D1 | PK type for users | UUIDv7, app-generated | `wiki/databases/schema-design/primary-key-choice.md` | Auto-increment int — leaks row count, harder to shard | any insert path missing an explicit id; covers R1 |
+| D2 | Auth mechanism | Session cookie, not token | `wiki/security/authn/session-vs-token.md` | JWT — needless revocation complexity for this scale | session-fixation / logout test; covers R2 |
+| D3 | Re-signup after delete | Soft-delete + partial unique index | `wiki/databases/schema-design/soft-delete.md`, `wiki/databases/schema-design/partial-and-expression-indexes.md` | Hard delete — loses audit trail | re-signup integration test; covers R3 |
 
 `Testability` names the test/gate that would catch this decision being wrong —
 never leave it blank; a row missing any of the six cells fails
 `decision-rows-complete`.
+
+Every row also names the analysis.md Rule ids it covers — `covers R1, R3`, or a
+range like `R4-R6` — in any cell, usually `Testability`. A Rule named by no row
+was the most frequent blocking plan-reviewer finding, so `requirements-covered`
+checks it mechanically: every `R<n>` in `## Requirements` must appear in some
+`## Decisions` data row.
 
 **Semantic candidate check** — after the routing sweep, run the bundled-wiki
 vector index as a fail-open second path: once for the task as a whole (a
@@ -189,6 +196,12 @@ never feed `decision-rows-complete`. Only after this check finds no
 matching page does the decision's `Wiki basis` cell take the literal
 `[no-wiki]`.
 
+**Pre-review check** — before every `plan-reviewer` call, run
+`sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check requirements-covered plans/<feature>`.
+`fail` lists the uncovered Rules on stderr: fix `design.md` until it prints `ok`
+instead of spending a reviewer round on them. This check is not a reviewer call
+and does not count toward the 3-call bound.
+
 **Independent review** — call the `plan-reviewer` subagent (Agent tool) with:
 the `analysis.md` path (including its `## Research` section), the `design.md`
 path, the requester's original goal text, and the wiki root
@@ -205,7 +218,7 @@ requester, not a forced PASS.
 sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh emit B plans/<feature> .dev-loop/gates/plan-B-<feature>.md
 sh ${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh --run .dev-loop/gates/plan-B-<feature>.md
 ```
-Gate ids: `groundings-exist`, `decision-rows-complete`, `reviewer-verdict`, `gaps-emitted`.
+Gate ids: `groundings-exist`, `decision-rows-complete`, `requirements-covered`, `reviewer-verdict`, `gaps-emitted`.
 Exit 0 before entering Phase C.
 
 ## Phase C — Decompose (produces `plans/<feature>/plan.md` + `tasks/NN-*.md`)
