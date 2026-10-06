@@ -290,3 +290,36 @@ lens_order() {
   grep -v '^| 6\. Excess |' "$TEMPLATE" > "$stripped"
   [ "$(grep -c 'clean —' "$stripped")" -eq 5 ]
 }
+
+# --- task-reviewer agent lens 6 (plans/excess-lens-and-lint-gate task 07) ---
+
+agent_flat() { # <file>
+  tr '\n' ' ' < "$1" | tr -s ' '
+}
+
+@test "task-reviewer carries lens 6 and names it for every tier" {
+  agent="${BATS_TEST_DIRNAME}/../agents/task-reviewer.md"
+  text="$(agent_flat "$agent")"
+  [[ "$text" == *'6. **Excess**'* ]]
+  [[ "$text" == *'zero call sites outside its own tests'* ]]
+  [[ "$text" == *'| R0 | lenses 1, 3 and 6; write not run — R0 profile in rows 2, 4, 5 |'* ]]
+  [[ "$text" == *'| R1 | lenses 1-4 and 6; write not run — R1 profile in row 5 |'* ]]
+  [[ "$text" == *'| R2 or R3 | lenses 1-6; R3 also applies the adversarial-change-review techniques under lens 5 |'* ]]
+}
+
+@test "the generated task-reviewer-r1 copy carries lens 6 too" {
+  text="$(agent_flat "${BATS_TEST_DIRNAME}/../agents/task-reviewer-r1.md")"
+  [[ "$text" == *'6. **Excess**'* ]]
+  [[ "$text" == *'| R1 | lenses 1-4 and 6; write not run — R1 profile in row 5 |'* ]]
+}
+
+@test "boundary: the agent body has exactly one lens 6 line" {
+  [ "$(grep -c '^6\. \*\*Excess\*\*' "${BATS_TEST_DIRNAME}/../agents/task-reviewer.md")" -eq 1 ]
+}
+
+@test "negative control: an agent copy with the old R1 row fails the R1 check" {
+  old="${BATS_TEST_TMPDIR}/task-reviewer-old-r1.md"
+  sed 's/| R1 | lenses 1-4 and 6;/| R1 | lenses 1-4;/' "${BATS_TEST_DIRNAME}/../agents/task-reviewer.md" > "$old"
+  text="$(agent_flat "$old")"
+  [[ "$text" != *'| R1 | lenses 1-4 and 6; write not run — R1 profile in row 5 |'* ]]
+}
