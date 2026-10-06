@@ -54,7 +54,7 @@ when it exists) also needs no config; it is not the `knowledge` role.
    // ~/.claude/dev-loop/tools.json
    {
      "knowledge": { "kind": "mcp", "ref": "<your-wiki-mcp>", "how": "search -> read", "when": "domain facts, policy, code values" },
-     "verify":    { "kind": "cli", "ref": "<your test/build command>", "how": "run only; report failures verbatim", "when": "step 5 — running tests" }
+     "verify":    { "kind": "cli", "ref": "<your test/build/lint/typecheck command>", "how": "run only; report failures verbatim", "when": "step 5 — running tests" }
    }
    ```
    Include only the roles being set; unset roles inherit `default`. For `verify`,

@@ -96,3 +96,22 @@ setup() {
     run bash "$old" --summary
   [[ "$output" != *'lint / typecheck / QA checks'* ]]
 }
+
+# --- config-nudge and the configure JSON example (task 10) ---
+
+@test "config-nudge describes verify as the test / build / lint / typecheck command" {
+  content="$(cat "${BATS_TEST_DIRNAME}/../hooks/config-nudge.sh")"
+  [[ "$content" == *'your project'"'"'s actual test / build / lint / typecheck command'* ]]
+}
+
+@test "configure's JSON example ref names lint and typecheck" {
+  content="$(cat "$CONFIGURE")"
+  [[ "$content" == *'"ref": "<your test/build/lint/typecheck command>"'* ]]
+}
+
+@test "negative control: a config-nudge copy with the old text fails the nudge check" {
+  old="${BATS_TEST_TMPDIR}/config-nudge-old.sh"
+  sed 's#test / build / lint / typecheck command#test / build command#' "${BATS_TEST_DIRNAME}/../hooks/config-nudge.sh" > "$old"
+  content="$(cat "$old")"
+  [[ "$content" != *'actual test / build / lint / typecheck command'* ]]
+}
