@@ -16,7 +16,7 @@ sources:
   - https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Cascading_variables/Using_custom_properties
   - https://tailwindcss.com/docs/theme
 last_verified: 2026-10-06
-related: [frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, frontend-design-design-canvas-workflow, frontend-design-custom-property-values-read-from-script, infrastructure-ci-cd-changed-files-only-gates, infrastructure-ci-cd-write-time-limit-guards, testing-quality-checks-that-cannot-pass]
+related: [frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, frontend-design-design-canvas-workflow, frontend-design-custom-property-values-read-from-script, infrastructure-ci-cd-changed-files-only-gates, infrastructure-ci-cd-write-time-limit-guards, testing-quality-checks-that-cannot-pass, frontend-design-slop-detector-gate]
 ---
 
 # A Lint Gate for Agent-Written UI in a Tailwind Design System
@@ -94,7 +94,7 @@ shared components.
 | Vue or Svelte linted with Oxlint | Oxlint reads script blocks only, so template classes go unchecked; use the ESLint plugin for these frameworks |
 | The agent passes lint by adding a variant or a theme token | Review the new variant/token as a design change: lint-clean does not approve the design. The vendor's red-team table lists "Minting a new theme token" and "Raw CSS class in `globals.css`" as escaping the rules |
 | The stack is neither Tailwind v4 nor plain CSS (CSS-in-JS, another utility framework) | Keep the same pattern with that stack's linter: a token-only rule whose message names the allowed token and the file that defines it |
-| Lint is clean and screens are consistent, yet the UI still reads generic | The gate enforces consistency, not taste: a default theme passed through it stays a default theme. Revisit the token values with [frontend-design-anti-slop-visual-design] or [frontend-design-product-ui-vs-brand-surface] |
+| Lint is clean and screens are consistent, yet the UI still reads generic | The gate enforces consistency, not taste: a default theme passed through it stays a default theme. Revisit the token values with [frontend-design-anti-slop-visual-design] or [frontend-design-product-ui-vs-brand-surface]; to catch the specific tells mechanically rather than by re-reading prose, run [frontend-design-slop-detector-gate] |
 | A token is read from script for canvas or charts | The lint gate does not see it; follow [frontend-design-custom-property-values-read-from-script] |
 
 ## Instead of
