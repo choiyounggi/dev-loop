@@ -37,6 +37,11 @@ either script were needed or made.
   EXPECT: ok
   EVIDENCE: pending
 
+- [ ] lint-surveyed: analysis.md's `## Ground truth` records every lint/typecheck command as `- Lint: <command> -> rc=<n>` (or one `- Lint: none — checked: <command>` line)
+  CHECK: sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check lint-surveyed {PLAN_DIR}
+  EXPECT: ok
+  EVIDENCE: pending
+
 - [ ] research-evidenced: analysis.md's `## Research` has at least one query/source row or an explicit no-useful-results line
   CHECK: sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check research-evidenced {PLAN_DIR}
   EXPECT: ok

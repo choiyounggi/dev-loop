@@ -254,17 +254,17 @@ EOF
 
 # ---------------------------------------------------------------- emit -----
 
-@test "emit A: writes 5 gates, all CHECK/EXPECT/EVIDENCE lines present" {
+@test "emit A: writes 6 gates, all CHECK/EXPECT/EVIDENCE lines present" {
   run sh "$PG" emit A "$FIX/passing" "$WORK/plan-A-fixture.md"
   [ "$status" -eq 0 ]
   [ -f "$WORK/plan-A-fixture.md" ]
-  ids="baseline-tests-ran affected-files-evidenced open-questions-resolved constraints-surveyed research-evidenced"
+  ids="baseline-tests-ran affected-files-evidenced open-questions-resolved constraints-surveyed lint-surveyed research-evidenced"
   for id in $ids; do
     grep -q -- "- \[ \] ${id}:" "$WORK/plan-A-fixture.md"
   done
-  [ "$(grep -c '^  CHECK: ' "$WORK/plan-A-fixture.md")" -eq 5 ]
-  [ "$(grep -c '^  EXPECT: ' "$WORK/plan-A-fixture.md")" -eq 5 ]
-  [ "$(grep -c '^  EVIDENCE: pending' "$WORK/plan-A-fixture.md")" -eq 5 ]
+  [ "$(grep -c '^  CHECK: ' "$WORK/plan-A-fixture.md")" -eq 6 ]
+  [ "$(grep -c '^  EXPECT: ' "$WORK/plan-A-fixture.md")" -eq 6 ]
+  [ "$(grep -c '^  EVIDENCE: pending' "$WORK/plan-A-fixture.md")" -eq 6 ]
   ! grep -q '{PLAN_DIR}' "$WORK/plan-A-fixture.md"
   ! grep -q '{BASELINE_CMD}' "$WORK/plan-A-fixture.md"
   grep -q 'CHECK: true && echo GATE_OK' "$WORK/plan-A-fixture.md"
@@ -296,14 +296,14 @@ EOF
   sh "$PG" emit A "$FIX/passing" "$WORK/plan-A-parse.md"
   run bash "$GC" --status "$WORK/plan-A-parse.md"
   [[ "$output" != *PARSE* ]]
-  [[ "$output" == *"unmet=5"* ]] || [[ "$output" == *"met=5"* ]]
+  [[ "$output" == *"unmet=6"* ]] || [[ "$output" == *"met=6"* ]]
 }
 
 @test "emitted ledger --run reaches MET for every gate-A id when the plan-dir is well formed" {
   sh "$PG" emit A "$FIX/passing" "$WORK/plan-A-run.md"
   CLAUDE_PLUGIN_ROOT="${BATS_TEST_DIRNAME}/.." run bash "$GC" --run "$WORK/plan-A-run.md"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"met=5 unmet=0"* ]]
+  [[ "$output" == *"met=6 unmet=0"* ]]
 }
 
 @test "emitted ledger --run reaches MET for every gate-B id when the plan-dir is well formed" {
@@ -623,4 +623,28 @@ lint_variant() { # <name> <sed expression> -> prints the variant plan dir
   run sh "$PG" check lint-surveyed "${BATS_TEST_TMPDIR}/lint-empty"
   [ "$status" -eq 4 ]
   [[ "$output" == *"analysis.md not found"* ]]
+}
+
+# --- gate-A ledger carries lint-surveyed ---
+
+@test "emit A: the ledger runs plan-gate.sh check lint-surveyed" {
+  sh "$PG" emit A "$FIX/passing" "$WORK/plan-A-lint.md"
+  content="$(cat "$WORK/plan-A-lint.md")"
+  [[ "$content" == *"- [ ] lint-surveyed:"* ]]
+  [[ "$content" == *"plan-gate.sh check lint-surveyed "* ]]
+}
+
+@test "negative control: a plan-gates.md copy without the lint-surveyed block names no lint-surveyed gate" {
+  stripped="${BATS_TEST_TMPDIR}/plan-gates-no-lint.md"
+  awk '/^- \[ \] lint-surveyed:/{skip=1} skip && /^  EVIDENCE:/{skip=0; next} !skip' \
+    "${BATS_TEST_DIRNAME}/../templates/plan-gates.md" > "$stripped"
+  run grep -c 'lint-surveyed' "$stripped"
+  [ "$output" = "0" ]
+}
+
+@test "templates/analysis.md shows the Lint bullet and its none-checked form" {
+  tpl="${BATS_TEST_DIRNAME}/../templates/analysis.md"
+  content="$(cat "$tpl")"
+  [[ "$content" == *"- Lint: <lint or typecheck command> -> rc=<n>"* ]]
+  [[ "$content" == *"- Lint: none — checked: <command that confirmed it>"* ]]
 }
