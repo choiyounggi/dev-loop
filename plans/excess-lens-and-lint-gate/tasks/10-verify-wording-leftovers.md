@@ -14,7 +14,7 @@ Review-fix (general-review notes 1-2): hooks/config-nudge.sh and the configure J
 - skills/configure/SKILL.md
 - tests/verify-role-lint.bats
 ## Verify
-- PATH=/opt/homebrew/bin:$PATH bats tests/verify-role-lint.bats tests/config-nudge.bats tests/scripts.bats — success = no `not ok` line
+- PATH=/opt/homebrew/bin:$PATH bats tests/verify-role-lint.bats tests/scripts.bats tests/graph-hooks.bats — success = no `not ok` line
 - lint: node scripts/wiki-lint-prohibitions.js wiki && echo LINT_OK — success = LINT_OK printed
 - lint: bash scripts/gen-agent-tier-variants.sh --check && echo LINT_OK — success = LINT_OK printed
 - covers: R6
