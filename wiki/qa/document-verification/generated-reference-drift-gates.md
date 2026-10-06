@@ -16,6 +16,7 @@ related:
     qa-deliverables-generated-artifacts-as-deliverable-source,
     backend-common-api-design-unenforced-declarations,
     testing-quality-tests-that-cannot-fail,
+    platforms-tools-per-call-subagent-effort,
   ]
 ---
 
