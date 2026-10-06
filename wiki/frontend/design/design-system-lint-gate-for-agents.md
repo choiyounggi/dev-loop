@@ -2,7 +2,7 @@
 id: frontend-design-design-system-lint-gate-for-agents
 domain: frontend
 category: design
-applies_to: [tailwind, react, vue, svelte, eslint]
+applies_to: [tailwind, react, vue, svelte, eslint, css]
 confidence: verified
 sources:
   - https://github.com/shadcn-ui/lint
@@ -10,16 +10,22 @@ sources:
   - https://github.com/shadcn-ui/lint/blob/main/docs/adoption.md
   - https://eslint.org/docs/latest/use/suppressions
   - https://eslint.org/blog/2025/04/eslint-v9.24.0-released/
+  - https://github.com/shadcn-ui/lint/blob/main/docs/how-it-works.md
+  - https://stylelint.io/user-guide/rules/color-no-hex/
+  - https://github.com/AndyOGo/stylelint-declaration-strict-value
+  - https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Cascading_variables/Using_custom_properties
+  - https://tailwindcss.com/docs/theme
 last_verified: 2026-10-06
-related: [frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, infrastructure-ci-cd-changed-files-only-gates, infrastructure-ci-cd-write-time-limit-guards, testing-quality-checks-that-cannot-pass]
+related: [frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, frontend-design-design-canvas-workflow, frontend-design-custom-property-values-read-from-script, infrastructure-ci-cd-changed-files-only-gates, infrastructure-ci-cd-write-time-limit-guards, testing-quality-checks-that-cannot-pass]
 ---
 
 # A Lint Gate for Agent-Written UI in a Tailwind Design System
 
 ## When this applies
 
-An LLM agent writes or edits UI in a project that already has a Tailwind design
-system (theme tokens plus shared components such as `Button`, `Card`), and the
+An LLM agent writes or edits UI in a project that already has a design system —
+Tailwind theme tokens plus shared components such as `Button`, `Card`, or plain
+CSS custom properties — and the
 rules ("use tokens", "don't restyle components") exist only as prose in
 `AGENTS.md`, a wiki, or a prompt. New screens drift from the system page by page,
 or reviews keep finding raw colors, `p-[13px]`, and `className` overrides on
@@ -30,7 +36,15 @@ shared components.
 1. **Turn the prose rules into lint rules the agent must pass before "done".**
    For Tailwind v4 with React, Vue, or Svelte, `@shadcn/lint` provides them as an
    ESLint or Oxlint plugin. You do not need shadcn/ui to use it. Peer
-   requirements in v0.2.0: `eslint >=9.30.0`, Node `>=20.19`.
+   requirements in v0.2.0: `eslint >=9.30.0`, Node `>=20.19`. Pick the linter
+   by styling stack:
+
+| Stack | Linter |
+|-------|--------|
+| Tailwind v4 classes in React | `@shadcn/lint` on ESLint or Oxlint |
+| Tailwind v4 classes in Vue/Svelte | `@shadcn/lint` on ESLint (Oxlint skips templates, see Edge cases) |
+| Plain CSS, CSS modules, `.vue`/`.svelte` `<style>` blocks | stylelint: core `color-no-hex` and `color-named`, plus `scale-unlimited/declaration-strict-value` on `/color$/`, `font-size`, `border-radius` and spacing properties with per-property `ignoreValues` — `currentColor`, `inherit`, `transparent` on colors; `0`, `auto`, `none` on spacing; `0`, `50%`, `100%` on radius. The plugin flags every literal keyword and number by default, so without these lists the gate never reaches zero |
+| Both in one repo | Run both; each reads files the other cannot |
 
 | Rule | Catches |
 |------|---------|
@@ -40,6 +54,9 @@ shared components.
 | `no-inline-styles` | `style=` props and `<style>` elements |
 | `no-unknown-classes` | Classes Tailwind cannot generate, such as `rounded-huge` |
 | `require-static-classes` | Classes the linter cannot read, such as `` `bg-${color}` `` |
+
+   Set `settings.shadcn.note` to the project's design source (`DESIGN.md` or the
+   token file path); it is appended to every diagnostic.
 
 2. **Feed the diagnostics back to the agent and loop until the count is 0.** Each
    diagnostic names the violating class, says why it is not allowed, and points
@@ -57,6 +74,14 @@ shared components.
    it.** It must report on `<Button className="bg-[#FF6B35]">` and stay quiet on
    `<Button variant="brand">` ([testing-quality-checks-that-cannot-pass]).
 
+5. **After lint is clean, run a theme-swap check.** Temporarily set the accent
+   to a color absent from the design (pure magenta), screenshot every touched
+   screen, restore it. A region still showing the old accent is a hardcoded value
+   the linter could not trace (plain CSS, SVG `fill`, images, parent selectors).
+   Swap the variable the compiled utility reads: under `@theme inline`
+   (shadcn/ui's layout) `bg-primary` compiles to `var(--primary)`, so swap
+   `--primary`, not `--color-primary`.
+
 ## Edge cases
 
 | Case | Then |
@@ -65,10 +90,12 @@ shared components.
 | An agent fixes a suppressed legacy violation | ESLint then exits non-zero for the unused suppression. Have the agent run `eslint --prune-suppressions` and commit the smaller file, or run the loop with `--pass-on-unpruned-suppressions` and prune in a separate step |
 | Suppressions apply only to errors | Use the `--max-warnings` cap for rules still at `warn`; move a rule to `error` once it is clean |
 | Dynamic class strings (`` `bg-${tone}` ``) are common | Enable `require-static-classes` first. The other rules cannot check a class they cannot read |
-| `.vue` / `.svelte` `<style>` blocks | The plugin does not read them; use a CSS linter there |
+| `.vue` / `.svelte` `<style>` blocks | The plugin does not read them; run the stylelint row of step 1 on them |
 | Vue or Svelte linted with Oxlint | Oxlint reads script blocks only, so template classes go unchecked; use the ESLint plugin for these frameworks |
 | The agent passes lint by adding a variant or a theme token | Review the new variant/token as a design change: lint-clean does not approve the design. The vendor's red-team table lists "Minting a new theme token" and "Raw CSS class in `globals.css`" as escaping the rules |
-| The stack is not Tailwind v4 | This plugin does not apply. Keep the same pattern (a token-only lint rule whose message names the allowed token) with a linter for that stack |
+| The stack is neither Tailwind v4 nor plain CSS (CSS-in-JS, another utility framework) | Keep the same pattern with that stack's linter: a token-only rule whose message names the allowed token and the file that defines it |
+| Lint is clean and screens are consistent, yet the UI still reads generic | The gate enforces consistency, not taste: a default theme passed through it stays a default theme. Revisit the token values with [frontend-design-anti-slop-visual-design] or [frontend-design-product-ui-vs-brand-surface] |
+| A token is read from script for canvas or charts | The lint gate does not see it; follow [frontend-design-custom-property-values-read-from-script] |
 
 ## Instead of
 
@@ -86,4 +113,9 @@ shared components.
 - https://github.com/shadcn-ui/lint/blob/main/docs/adoption.md — start at `warn`, cap with `--max-warnings`, or use ESLint bulk suppressions ("They apply to errors, not warnings")
 - https://eslint.org/docs/latest/use/suppressions — "While the rule will be enforced for new code, the existing violations will not be reported"; `--suppress-all` covers "all the rules that are enabled as error", `--suppress-rule` targets named rules; a fixed suppressed violation makes ESLint exit non-zero ("There are suppressions left that do not occur anymore") until `--prune-suppressions` runs or `--pass-on-unpruned-suppressions` is passed; commit `eslint-suppressions.json`
 - https://eslint.org/blog/2025/04/eslint-v9.24.0-released/ — bulk suppressions introduced in v9.24.0
+- https://github.com/shadcn-ui/lint/blob/main/docs/how-it-works.md — "A clean lint result does not mean every styling path was checked": parent selectors, imported class values, plain CSS and locally rebuilt components are not traced (the gap step 5 covers)
+- https://stylelint.io/user-guide/rules/color-no-hex/ — core rule disallowing hex colors; `color-named` is also core
+- https://github.com/AndyOGo/stylelint-declaration-strict-value — `scale-unlimited/declaration-strict-value`: variables or functions only for the named properties; by default it also flags keywords (`inherit`, `none`) and numbers (`0`, `100%`), hence the per-property `ignoreValues`
+- https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Cascading_variables/Using_custom_properties — a custom property defined once reaches every `var()` reference, the mechanism step 5 relies on
+- https://tailwindcss.com/docs/theme — with `@theme inline` "the utility class will use the theme variable value instead of referencing the actual theme variable", which decides the variable step 5 swaps
 - Package metadata checked 2026-10-06 (`packages/lint/package.json`): `@shadcn/lint` 0.2.0, peer `eslint >=9.30.0`, `@typescript-eslint/parser >=8.40.0`, engines `node >=20.19`

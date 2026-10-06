@@ -48,7 +48,7 @@ Operate-mode rules (rows are ordered general → specific):
 | Restrained color is the floor | Accent goes on primary actions, current selection and state indicators only; give sidebars, toolbars and panels a second neutral a step cooler or warmer than the content surface; inactive states get muted, never full-saturation, color |
 | Standardize a state vocabulary once | hover, focus, active, disabled, selected, loading, error, warning, success, info — one token set, reused on every screen |
 | Ship every component state | default, hover, focus, active, disabled, loading, error; loading is a skeleton in place of the content, not a spinner in the middle of it; an empty state teaches the interface ([frontend-data-fetching-async-ui-states]) |
-| Consistent affordances across screens | Same button shape, same form-control vocabulary, same icon style; when the save button looks different on two screens, one of them is wrong |
+| Consistent affordances across screens | Same button shape, same form-control vocabulary, same icon style; when the save button looks different on two screens, one of them is wrong; enforce with `no-restyle` in [frontend-design-design-system-lint-gate-for-agents] |
 | Responsive behavior is structural | Collapse the sidebar, switch the table to a responsive form, change column counts at breakpoints — layout adapts, type stays fixed |
 | Motion conveys state, 150–250 ms | State change, feedback, loading, reveal; the surface loads straight into the task with no page-load choreography |
 | Standard patterns are permitted here | System fonts, top bar + side nav, breadcrumbs, tabs, command palettes, dense tables — density and sameness screen to screen are virtues on a task surface |

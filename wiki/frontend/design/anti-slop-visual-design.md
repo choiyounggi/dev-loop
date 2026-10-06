@@ -41,7 +41,8 @@ Work in this order — structure decisions precede visual ones:
 4. Declare every color and font as a CSS custom property once, then reference
    only `var(--token)`. A value that does not exist as a token gets added to the
    token block first — inline hex/oklch mid-file is how a 3-color system becomes
-   an 8-color freestyle.
+   an 8-color freestyle. Enforce this step with the lint gate in
+   [frontend-design-design-system-lint-gate-for-agents] rather than by re-reading it.
 5. Audit the result against the tells table below. One tell is a problem; two in
    the same view is a confirmation.
 
