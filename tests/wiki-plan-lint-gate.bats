@@ -33,9 +33,10 @@ flat() { # <file>
   text="$(flat "$SKILL")"
   [[ "$text" == *'Lint gating in every task'* ]]
   [[ "$text" == *'&& echo LINT_OK'* ]]
-  [[ "$text" == *'xargs -0 -r'* ]]
-  [[ "$text" == *'[ -f "$f" ] && printf '"'"'%s\0'"'"' "$f"'* ]]
-  [[ "$text" == *'only the Deliverables paths this tool lints'* ]]
+  [[ "$text" == *'fs=(); for f in <only the Deliverables paths this tool lints>; do [ -f "$f" ] && fs+=("$f"); done'* ]]
+  [[ "$text" == *'echo "lint files (${#fs[@]}): ${fs[*]}"'* ]]
+  [[ "$text" == *'lint skipped: no lintable Deliverables remain'* ]]
+  [[ "$text" == *'<tool invocation that takes files> "${fs[@]}"'* ]]
   [[ "$text" == *'not gated — baseline rc=<n>'* ]]
   [[ "$text" == *'never adds a warning-promotion flag'* ]]
 }
@@ -69,9 +70,9 @@ flat() { # <file>
   [[ "$text" == *'A `lint: not gated` Verify line becomes an `ABANDON:` line with its stated reason.'* ]]
 }
 
-@test "negative control: a wiki-plan copy without the NUL-separated xargs fails the red-baseline check" {
-  stripped="${BATS_TEST_TMPDIR}/skill-no-xargs0.md"
-  sed 's/xargs -0 -r/xargs/' "$SKILL" > "$stripped"
+@test "negative control: a wiki-plan copy without the skip line fails the red-baseline check" {
+  stripped="${BATS_TEST_TMPDIR}/skill-no-skip.md"
+  sed 's/lint skipped: no lintable Deliverables remain//' "$SKILL" > "$stripped"
   text="$(flat "$stripped")"
-  [[ "$text" != *'xargs -0 -r'* ]]
+  [[ "$text" != *'lint skipped: no lintable Deliverables remain'* ]]
 }
