@@ -17,7 +17,7 @@ Stack: POSIX sh / bash scripts, Markdown skills and agents, bats-core under Home
 | D11 | empty lint list | array + count line + explicit skip line | wiki/infrastructure/ci-cd/changed-files-only-gates.md |
 | D9 | r1 copy | edit base, run gen-agent-tier-variants.sh, `--check` exits 0 | [no-wiki] |
 ## Size verdict
-size: large (17 tasks after the task-04 sweep repairs and the review-fix tasks 08-12, > 8; every task within the step-4 bounds)
+size: large (19 tasks after the task-04 sweep repairs and the review-fix tasks 08-13b, > 8; every task within the step-4 bounds)
 Pre-dispatch split, two independent pieces:
 - piece A (lint gate) — files: skills/wiki-plan/scripts/plan-gate.sh, templates/plan-gates.md, templates/analysis.md, skills/wiki-plan/SKILL.md, skills/configure/SKILL.md, references/tool-profile.md, README.md, README.ko.md, skills/loop-implement/SKILL.md, examples/tools.example.json, scripts/resolve-tools.sh, tests/plan-gate.bats, tests/fixtures/plan-gate/passing/analysis.md, tests/wiki-plan-lint-gate.bats, tests/verify-role-lint.bats; outputs: gate-A id lint-surveyed
 - piece B (excess lens) — files: skills/orchestrate/SKILL.md, skills/orchestrate/templates/review-report.md, agents/task-reviewer.md, agents/task-reviewer-r1.md, tests/orchestrate-review-pass.bats, tests/orchestrate-dispatch-contracts.bats; outputs: review lens 6 Excess
@@ -41,3 +41,5 @@ Pre-dispatch split, two independent pieces:
 | 11a-plan-gate-crlf | 10 | |
 | 11b-emit-gaps-crlf | 11a | |
 | 12-red-baseline-empty-list | 10 | parallel-ok with 11a/11b |
+| 13a-every-cr-dropped | 11b | |
+| 13b-lint-line-nounset-safe | 12 | |
