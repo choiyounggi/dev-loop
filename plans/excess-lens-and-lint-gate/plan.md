@@ -15,7 +15,7 @@ Stack: POSIX sh / bash scripts, Markdown skills and agents, bats-core under Home
 | D8 | configure verify text | test / build / lint / typecheck / QA in 3 places | [no-wiki] |
 | D9 | r1 copy | edit base, run gen-agent-tier-variants.sh, `--check` exits 0 | [no-wiki] |
 ## Size verdict
-size: large (10 tasks after the task-04 sweep repairs, > 8; every task within the step-4 bounds)
+size: large (14 tasks after the task-04 sweep repairs and the review-fix tasks 08-10, > 8; every task within the step-4 bounds)
 Pre-dispatch split, two independent pieces:
 - piece A (lint gate) — files: skills/wiki-plan/scripts/plan-gate.sh, templates/plan-gates.md, templates/analysis.md, skills/wiki-plan/SKILL.md, skills/configure/SKILL.md, references/tool-profile.md, README.md, README.ko.md, skills/loop-implement/SKILL.md, examples/tools.example.json, scripts/resolve-tools.sh, tests/plan-gate.bats, tests/fixtures/plan-gate/passing/analysis.md, tests/wiki-plan-lint-gate.bats, tests/verify-role-lint.bats; outputs: gate-A id lint-surveyed
 - piece B (excess lens) — files: skills/orchestrate/SKILL.md, skills/orchestrate/templates/review-report.md, agents/task-reviewer.md, agents/task-reviewer-r1.md, tests/orchestrate-review-pass.bats, tests/orchestrate-dispatch-contracts.bats; outputs: review lens 6 Excess
@@ -32,3 +32,7 @@ Pre-dispatch split, two independent pieces:
 | 05-excess-lens-skill | — | parallel-ok with 01-04 |
 | 06-excess-lens-report-template | 05 | |
 | 07-excess-lens-agent | 06 | |
+| 08-lens6-seam-exemption | 07 | |
+| 09a-lint-none-needs-a-command | 07 | |
+| 09b-red-baseline-row-and-step0 | 09a | |
+| 10-verify-wording-leftovers | 09b | |
