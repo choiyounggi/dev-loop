@@ -56,3 +56,23 @@ setup() {
   content="$(cat "$old")"
   [[ "$content" != *'**test / build / lint / typecheck / QA** command'* ]]
 }
+
+# --- loop-implement role list and example profile (task 04c) ---
+
+@test "loop-implement's role list names verify as test / build / lint / typecheck / QA" {
+  text="$(tr '\n' ' ' < "${BATS_TEST_DIRNAME}/../skills/loop-implement/SKILL.md" | tr -s ' ')"
+  [[ "$text" == *'`verify` (the project'"'"'s test / build / lint / typecheck / QA command)'* ]]
+}
+
+@test "the example profile's verify how names lint and typecheck" {
+  run jq -r '.verify.how' "${BATS_TEST_DIRNAME}/../examples/tools.example.json"
+  [ "$status" -eq 0 ]
+  [ "$output" = "run the project's test/build/lint/typecheck/QA command; report failures verbatim" ]
+}
+
+@test "negative control: a loop-implement copy with the old role wording fails the role-list check" {
+  old="${BATS_TEST_TMPDIR}/loop-old.md"
+  sed 's#test / build / lint /#test / build / QA#' "${BATS_TEST_DIRNAME}/../skills/loop-implement/SKILL.md" > "$old"
+  text="$(tr '\n' ' ' < "$old" | tr -s ' ')"
+  [[ "$text" != *'test / build / lint / typecheck / QA command'* ]]
+}
