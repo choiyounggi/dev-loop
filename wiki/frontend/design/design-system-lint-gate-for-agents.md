@@ -14,9 +14,8 @@ sources:
   - https://stylelint.io/user-guide/rules/color-no-hex/
   - https://github.com/AndyOGo/stylelint-declaration-strict-value
   - https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Cascading_variables/Using_custom_properties
-  - https://tailwindcss.com/docs/theme
 last_verified: 2026-10-06
-related: [frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, frontend-design-design-canvas-workflow, frontend-design-custom-property-values-read-from-script, infrastructure-ci-cd-changed-files-only-gates, infrastructure-ci-cd-write-time-limit-guards, testing-quality-checks-that-cannot-pass, frontend-design-slop-detector-gate]
+related: [frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, frontend-design-design-canvas-workflow, frontend-design-custom-property-values-read-from-script, frontend-design-theme-swap-propagation-check, infrastructure-ci-cd-changed-files-only-gates, infrastructure-ci-cd-write-time-limit-guards, testing-quality-checks-that-cannot-pass, frontend-design-slop-detector-gate]
 ---
 
 # A Lint Gate for Agent-Written UI in a Tailwind Design System
@@ -74,13 +73,10 @@ shared components.
    it.** It must report on `<Button className="bg-[#FF6B35]">` and stay quiet on
    `<Button variant="brand">` ([testing-quality-checks-that-cannot-pass]).
 
-5. **After lint is clean, run a theme-swap check.** Temporarily set the accent
-   to a color absent from the design (pure magenta), screenshot every touched
-   screen, restore it. A region still showing the old accent is a hardcoded value
-   the linter could not trace (plain CSS, SVG `fill`, images, parent selectors).
-   Swap the variable the compiled utility reads: under `@theme inline`
-   (shadcn/ui's layout) `bg-primary` compiles to `var(--primary)`, so swap
-   `--primary`, not `--color-primary`.
+5. **After lint is clean, run a theme-swap check.** Run
+   [frontend-design-theme-swap-propagation-check] — it reads computed styles
+   before and after swapping the accent by value, and gives a pass/fail result
+   instead of a screenshot a coordinator cannot read.
 
 ## Edge cases
 
@@ -116,6 +112,5 @@ shared components.
 - https://github.com/shadcn-ui/lint/blob/main/docs/how-it-works.md — "A clean lint result does not mean every styling path was checked": parent selectors, imported class values, plain CSS and locally rebuilt components are not traced (the gap step 5 covers)
 - https://stylelint.io/user-guide/rules/color-no-hex/ — core rule disallowing hex colors; `color-named` is also core
 - https://github.com/AndyOGo/stylelint-declaration-strict-value — `scale-unlimited/declaration-strict-value`: variables or functions only for the named properties; by default it also flags keywords (`inherit`, `none`) and numbers (`0`, `100%`), hence the per-property `ignoreValues`
-- https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Cascading_variables/Using_custom_properties — a custom property defined once reaches every `var()` reference, the mechanism step 5 relies on
-- https://tailwindcss.com/docs/theme — with `@theme inline` "the utility class will use the theme variable value instead of referencing the actual theme variable", which decides the variable step 5 swaps
+- https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Cascading_variables/Using_custom_properties — a custom property defined once reaches every `var()` reference, the mechanism [frontend-design-theme-swap-propagation-check] relies on
 - Package metadata checked 2026-10-06 (`packages/lint/package.json`): `@shadcn/lint` 0.2.0, peer `eslint >=9.30.0`, `@typescript-eslint/parser >=8.40.0`, engines `node >=20.19`
