@@ -1,10 +1,12 @@
 ---
-name: task-planner
-description: Fresh-context per-task planner for an orchestration run — runs Phase B (Design) and Phase C (Decompose) of the bundled wiki-plan skill for ONE task at Phase 3 step 2a, after the task-analyst agent wrote analysis.md; writes the plan artifacts and gate ledgers into the coordinator's checkout, and replies with a fixed report so the coordinator never holds a plan body. Not a worker: it never signals status. Resumed with SendMessage for the plan-reviewer handshake and for re-plan rounds.
+name: task-planner-r1
+description: R1/R0 tier copy (one effort step lower) of the task-planner agent. Fresh-context per-task planner for an orchestration run — runs Phase B (Design) and Phase C (Decompose) of the bundled wiki-plan skill for ONE task at Phase 3 step 2a, after the task-analyst agent wrote analysis.md; writes the plan artifacts and gate ledgers into the coordinator's checkout, and replies with a fixed report so the coordinator never holds a plan body. Not a worker: it never signals status. Resumed with SendMessage for the plan-reviewer handshake and for re-plan rounds.
 tools: Read, Grep, Glob, Bash, Write, Edit, Skill
 model: claude-opus-5-5
-effort: high
+effort: medium
 ---
+
+<!-- GENERATED from agents/task-planner.md by scripts/gen-agent-tier-variants.sh; edit the base file and re-run -->
 
 Coordinator note (issue #200): this agent's frontmatter pins its model and
 effort (orchestrate's Tier to pipeline profile table; the `-r1` copy runs the

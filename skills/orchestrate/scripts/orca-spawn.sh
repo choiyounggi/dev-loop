@@ -13,9 +13,11 @@
 #   ORCA_BIN                     orca executable (default: orca)
 #   GROUNDWORK_ESCALATION_DIR    exported into the worker so an `ask` escalates
 #   GROUNDWORK_TASK_ID           worker task label
-#   DEV_LOOP_WORKER_MODEL        model the WORKER runs (e.g. claude-sonnet-5).
+#   DEV_LOOP_WORKER_MODEL        model the WORKER runs (e.g. claude-sonnet-5-5).
 #                                Unset = omit --model, so the worker inherits the
 #                                user's configured model (unchanged behavior).
+#   DEV_LOOP_WORKER_EFFORT       effort level the WORKER runs (low|medium|high|
+#                                xhigh|max), as CLAUDE_CODE_EFFORT_LEVEL. Unset = none.
 #   LO_READY_TIMEOUT             seconds to wait for TUI readiness (default 60)
 #   ORCA_SPAWN_DRYRUN=1          print the orca commands instead of running them
 #   ORCA_SPAWN_CREATE_JSON       canned `terminal create --json` (tests)
@@ -43,6 +45,15 @@ if [ -n "$model" ]; then
     *[!A-Za-z0-9._\[\]-]*) echo "orca-spawn: invalid model '$model'" >&2; exit 2 ;;
   esac
 fi
+# Worker effort, passed as CLAUDE_CODE_EFFORT_LEVEL rather than --effort: a
+# skill's `effort` frontmatter (loop-implement pins high) overrides --effort but
+# not the environment variable, which also reaches the worker's own subagents.
+# Unset = no variable, so the worker keeps the user's configured level.
+effort="${DEV_LOOP_WORKER_EFFORT:-}"
+case "$effort" in
+  ''|low|medium|high|xhigh|max) : ;;
+  *) echo "orca-spawn: invalid effort '$effort'" >&2; exit 2 ;;
+esac
 
 rt="${LO_READY_TIMEOUT:-60}"; [ "$rt" -ge 1 ] 2>/dev/null || rt=60
 timeout_ms=$(( rt * 1000 ))
@@ -58,7 +69,9 @@ if [ -n "${GROUNDWORK_ESCALATION_DIR:-}" ]; then
 fi
 model_arg=""
 [ -n "$model" ] && model_arg=" --model '$(esc_sq "$model")'"
-worker_cmd="${env_prefix}claude --permission-mode ${perm}${model_arg}"
+effort_env=""
+[ -n "$effort" ] && effort_env="CLAUDE_CODE_EFFORT_LEVEL=$effort "
+worker_cmd="${env_prefix}${effort_env}claude --permission-mode ${perm}${model_arg}"
 
 print_cmd() { printf 'orca'; for a in "$@"; do printf ' [%s]' "$a"; done; printf '\n'; }
 orca_run() {  # $1 = fatal flag (1 = return non-zero on failure); rest = orca args
