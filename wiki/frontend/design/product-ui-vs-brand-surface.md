@@ -9,7 +9,7 @@ sources:
   - "https://github.com/pbakaus/impeccable/blob/114ea1d3838fca73b253af45f873b9c4f5f213c8/skill/SKILL.src.md — the four visitor modes (Persuade / Operate / Read / Experience) and the rule that the mode comes from the requested surface, not the product"
   - "https://claude.com/blog/improving-frontend-design-through-skills — Anthropic Engineering, 2025-11-12; the brand-surface rules this page inverts for product surfaces"
 last_verified: 2026-09-29
-related: [frontend-design-anti-slop-visual-design, frontend-data-fetching-async-ui-states, frontend-accessibility-interactive-elements, frontend-design-responsive-layout]
+related: [frontend-design-anti-slop-visual-design, frontend-data-fetching-async-ui-states, frontend-accessibility-interactive-elements, frontend-design-responsive-layout, frontend-design-design-system-lint-gate-for-agents]
 ---
 
 # Styling a Product Surface Where the Design Serves a Task

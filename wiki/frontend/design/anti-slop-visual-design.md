@@ -10,7 +10,7 @@ sources:
   - "https://github.com/pbakaus/impeccable — README (gray-text-on-colored-background and bounce/elastic-easing anti-patterns; command list unstable across versions, cited for README-level rules only)"
   - "https://github.com/pbakaus/impeccable/blob/114ea1d3838fca73b253af45f873b9c4f5f213c8/skill/reference/craft-floor.md — Impeccable skill 4.x craft floor, pinned to a commit (browser-surface theming, offset+blur shadows vs halo and hard-offset, eyebrow ban, section numbers, geometric occlusion mask, mono-as-costume, glyph icons, image-hover)"
 last_verified: 2026-09-29
-related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements, frontend-design-responsive-layout, frontend-design-design-canvas-workflow, frontend-design-lightness-steps-on-dark-surfaces, frontend-design-custom-property-values-read-from-script, frontend-design-product-ui-vs-brand-surface, frontend-design-ui-hardening-against-real-content]
+related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements, frontend-design-responsive-layout, frontend-design-design-canvas-workflow, frontend-design-lightness-steps-on-dark-surfaces, frontend-design-custom-property-values-read-from-script, frontend-design-product-ui-vs-brand-surface, frontend-design-ui-hardening-against-real-content, frontend-design-design-system-lint-gate-for-agents]
 ---
 
 # Making Web UI Look Designed, Not Generated
