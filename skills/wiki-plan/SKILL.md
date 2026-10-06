@@ -310,7 +310,7 @@ Exit 0 before entering Phase C.
    | Ground truth bullet | Task Verify line |
    |---|---|
    | `Lint: <command> -> rc=0` | `- lint: <command> && echo LINT_OK` — `<command>` copied verbatim; success = `LINT_OK` printed |
-   | `Lint: <command> -> rc=<non-zero>`, the tool accepts file operands | `- lint: printf '%s\n' <this task's Deliverables paths> \| xargs -r <tool invocation that takes files> && echo LINT_OK` — the untouched tree already fails, so only this task's files are judged |
+   | `Lint: <command> -> rc=<non-zero>`, the tool accepts file operands | `- lint: for f in <only the Deliverables paths this tool lints>; do [ -f "$f" ] && printf '%s\0' "$f"; done \| xargs -0 -r <tool invocation that takes files> && echo LINT_OK` — the untouched tree already fails, so only this task's files are judged; deleted files and paths with spaces pass through safely |
    | `Lint: <command> -> rc=<non-zero>`, the tool takes no file operands | `- lint: not gated — baseline rc=<n>, <command> takes no file operands`; loop-implement step 0 records it as `ABANDON: <gate id> baseline rc=<n>, <command> takes no file operands` |
    | `Lint: none — checked: ...` | no lint line |
 

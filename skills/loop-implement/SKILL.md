@@ -103,6 +103,8 @@ starting the next, so a downstream task always builds on a verified upstream one
                         ledger file `.dev-loop/gates/<task-id>.md` (copy
                         `templates/gates.md`): each machine-checkable criterion
                         gets CHECK:/EXPECT:, manual ones EVIDENCE only.
+                        A `lint: not gated` Verify line becomes an `ABANDON:`
+                        line with its stated reason.
                         (See "Gates ledger" below.)                             [DoD/XP]
 1. Analyze + load refs— read THIS task's "Wiki pages (read these first, only
                         these)" — the pages `wiki-plan` navigated to — and load

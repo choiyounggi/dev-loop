@@ -33,7 +33,9 @@ flat() { # <file>
   text="$(flat "$SKILL")"
   [[ "$text" == *'Lint gating in every task'* ]]
   [[ "$text" == *'&& echo LINT_OK'* ]]
-  [[ "$text" == *'xargs -r'* ]]
+  [[ "$text" == *'xargs -0 -r'* ]]
+  [[ "$text" == *'[ -f "$f" ] && printf '"'"'%s\0'"'"' "$f"'* ]]
+  [[ "$text" == *'only the Deliverables paths this tool lints'* ]]
   [[ "$text" == *'not gated — baseline rc=<n>'* ]]
   [[ "$text" == *'never adds a warning-promotion flag'* ]]
 }
@@ -60,4 +62,16 @@ flat() { # <file>
   sed 's/lint-surveyed/x/g' "$SKILL" > "$renamed"
   ids="$(flat "$renamed" | grep -oE 'Gate ids: `baseline-tests-ran`[^.]*\.')"
   [[ "$ids" != *'`lint-surveyed`'* ]]
+}
+
+@test "loop-implement step 0 turns a not-gated lint line into an ABANDON line" {
+  text="$(flat "${BATS_TEST_DIRNAME}/../skills/loop-implement/SKILL.md")"
+  [[ "$text" == *'A `lint: not gated` Verify line becomes an `ABANDON:` line with its stated reason.'* ]]
+}
+
+@test "negative control: a wiki-plan copy without the NUL-separated xargs fails the red-baseline check" {
+  stripped="${BATS_TEST_TMPDIR}/skill-no-xargs0.md"
+  sed 's/xargs -0 -r/xargs/' "$SKILL" > "$stripped"
+  text="$(flat "$stripped")"
+  [[ "$text" != *'xargs -0 -r'* ]]
 }
