@@ -13,9 +13,11 @@ Stack: POSIX sh / bash scripts, Markdown skills and agents, bats-core under Home
 | D6 | Task Verify lint line per baseline | rc=0 full command + LINT_OK; red + file operands -> Deliverables via `xargs -r`; red + no operands -> not gated (ABANDON) | wiki/infrastructure/ci-cd/changed-files-only-gates.md |
 | D7 | Warnings | recorded command's exit status, verbatim; no promotion flag | wiki/platforms/processes/tool-diagnostics-without-a-failing-exit-code.md |
 | D8 | configure verify text | test / build / lint / typecheck / QA in 3 places | [no-wiki] |
+| D10 | CRLF plan files | readers drop a trailing CR | [no-wiki] |
+| D11 | empty lint list | array + count line + explicit skip line | wiki/infrastructure/ci-cd/changed-files-only-gates.md |
 | D9 | r1 copy | edit base, run gen-agent-tier-variants.sh, `--check` exits 0 | [no-wiki] |
 ## Size verdict
-size: large (14 tasks after the task-04 sweep repairs and the review-fix tasks 08-10, > 8; every task within the step-4 bounds)
+size: large (17 tasks after the task-04 sweep repairs and the review-fix tasks 08-12, > 8; every task within the step-4 bounds)
 Pre-dispatch split, two independent pieces:
 - piece A (lint gate) — files: skills/wiki-plan/scripts/plan-gate.sh, templates/plan-gates.md, templates/analysis.md, skills/wiki-plan/SKILL.md, skills/configure/SKILL.md, references/tool-profile.md, README.md, README.ko.md, skills/loop-implement/SKILL.md, examples/tools.example.json, scripts/resolve-tools.sh, tests/plan-gate.bats, tests/fixtures/plan-gate/passing/analysis.md, tests/wiki-plan-lint-gate.bats, tests/verify-role-lint.bats; outputs: gate-A id lint-surveyed
 - piece B (excess lens) — files: skills/orchestrate/SKILL.md, skills/orchestrate/templates/review-report.md, agents/task-reviewer.md, agents/task-reviewer-r1.md, tests/orchestrate-review-pass.bats, tests/orchestrate-dispatch-contracts.bats; outputs: review lens 6 Excess
@@ -36,3 +38,6 @@ Pre-dispatch split, two independent pieces:
 | 09a-lint-none-needs-a-command | 07 | |
 | 09b-red-baseline-row-and-step0 | 09a | |
 | 10-verify-wording-leftovers | 09b | |
+| 11a-plan-gate-crlf | 10 | |
+| 11b-emit-gaps-crlf | 11a | |
+| 12-red-baseline-empty-list | 10 | parallel-ok with 11a/11b |
