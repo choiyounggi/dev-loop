@@ -10,7 +10,7 @@ sources:
   - "https://github.com/pbakaus/impeccable — README (gray-text-on-colored-background and bounce/elastic-easing anti-patterns; command list unstable across versions, cited for README-level rules only)"
   - "https://github.com/pbakaus/impeccable/blob/114ea1d3838fca73b253af45f873b9c4f5f213c8/skill/reference/craft-floor.md — Impeccable skill 4.x craft floor, pinned to a commit (browser-surface theming, offset+blur shadows vs halo and hard-offset, eyebrow ban, section numbers, geometric occlusion mask, mono-as-costume, glyph icons, image-hover)"
 last_verified: 2026-09-29
-related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements, frontend-design-responsive-layout, frontend-design-design-canvas-workflow, frontend-design-lightness-steps-on-dark-surfaces, frontend-design-custom-property-values-read-from-script, frontend-design-product-ui-vs-brand-surface, frontend-design-ui-hardening-against-real-content]
+related: [frontend-design-html-in-canvas, frontend-accessibility-interactive-elements, frontend-design-responsive-layout, frontend-design-design-canvas-workflow, frontend-design-lightness-steps-on-dark-surfaces, frontend-design-custom-property-values-read-from-script, frontend-design-product-ui-vs-brand-surface, frontend-design-ui-hardening-against-real-content, frontend-design-design-system-lint-gate-for-agents]
 ---
 
 # Making Web UI Look Designed, Not Generated
@@ -41,7 +41,8 @@ Work in this order — structure decisions precede visual ones:
 4. Declare every color and font as a CSS custom property once, then reference
    only `var(--token)`. A value that does not exist as a token gets added to the
    token block first — inline hex/oklch mid-file is how a 3-color system becomes
-   an 8-color freestyle.
+   an 8-color freestyle. Enforce this step with the lint gate in
+   [frontend-design-design-system-lint-gate-for-agents] rather than by re-reading it.
 5. Audit the result against the tells table below. One tell is a problem; two in
    the same view is a confirmation.
 

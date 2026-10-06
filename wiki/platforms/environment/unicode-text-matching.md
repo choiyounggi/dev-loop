@@ -6,10 +6,12 @@ applies_to: [general]
 confidence: verified
 sources:
   - https://unicode.org/reports/tr15/
+  - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html
+  - https://developer.apple.com/forums/thread/705559
   - https://www.unicode.org/versions/Unicode16.0.0/core-spec/chapter-3/
   - https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/APFS_Guide/FAQ/FAQ.html
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/grep.html
-last_verified: 2026-09-03
+last_verified: 2026-10-06
 related: [platforms-environment-timezone-and-locale, platforms-filesystems-paths-case-and-line-endings, qa-document-verification-spec-document-gates, platforms-tools-bsd-vs-gnu-cli]
 ---
 
@@ -20,7 +22,9 @@ related: [platforms-environment-timezone-and-locale, platforms-filesystems-paths
 You are writing a grep/regex pattern that must match non-ASCII text (Korean,
 Japanese, accented Latin, emoji) in files, log lines, or file names; a pattern that
 looks correct returns zero hits on text you can see on screen; a search works on one
-machine and misses on another after the file crossed an OS, archive, or editor boundary.
+machine and misses on another after the file crossed an OS, archive, or editor boundary;
+an awk script that slices non-ASCII text with `match()`/`substr()` aborts on macOS
+with `towc: multibyte conversion failure`.
 
 ## Do this
 
@@ -49,6 +53,7 @@ len('아닌') NFC = 2 code points, NFD = 5     # jamo L+V+T decomposition
 | The pattern must survive both normalization forms | Match on a substring that contains no combining sequence (an ASCII token, an id, a number), or normalize the input through a filter before grep |
 | A pattern with a character class or quantifier over non-ASCII text | Test the exact pattern against a known-matching line first: BSD and GNU regex engines differ in multi-byte class handling, so a class that works on one userland can misfire on the other ([platforms-tools-bsd-vs-gnu-cli]) |
 | A quantifier follows a bare multibyte literal (`─{3,}`, `가+`) and the pattern may run under `LC_ALL=C`/POSIX (a minimal CI image, cron, `env -i`, a hook that pins the C locale) | Group the literal — `(─){3,}` — and run the pattern once under `LC_ALL=C` before accepting it: a byte-oriented locale binds the quantifier to the **last byte** of the UTF-8 sequence, so `─{3,}` matches one `─` followed by two stray `0x80` bytes and misses three `─`, while the grouped form matches in both locales |
+| An awk program cuts text with `substr()` at offsets from `match()`/`RSTART`/`length()` and then tests a piece with a regex (`~`, `match`, `sub`), the input may hold Korean/CJK/emoji, and the script runs on macOS `/usr/bin/awk` (`awk version 20200816`) | Run that awk as `LC_ALL=C awk '…'` and add one test whose input puts a multibyte character right next to the match target. That awk counts `length`/`RSTART`/`substr` in **bytes**, unlike POSIX's characters, so `substr(s, RSTART-1, 1)` can return half a character; its regex engine decodes under the UTF-8 locale and aborts on that fragment with `towc: multibyte conversion failure` (exit 2). Under `LC_ALL=C`, every step works on bytes, so the offsets stay consistent and ASCII-only patterns still match. A non-ASCII literal in the awk program changes meaning under C: inside a bracket expression it becomes a set of single bytes (`/[–—]/` matches `가`, because both contain byte `0x80`), so write it as a grouped alternation (`(–\|—)`) and include it in the Korean-text test |
 | Zero hits and the cause is unclear | Print the code points of both the pattern and the target line (`python3 -c "print([hex(ord(c)) for c in open(f).read()])"`) before concluding the text is missing — it separates "word absent" from "different code points" |
 | The text is user-supplied and used as a key or a dedup identifier | Normalize to NFC at the trust boundary on write, so later equality and search compare one form |
 | The search happens inside a database rather than a file | Normalization is applied by the writer, not the engine — same rule: normalize on write, search the stored form |
@@ -61,6 +66,7 @@ len('아닌') NFC = 2 code points, NFD = 5     # jamo L+V+T decomposition
 | Read a 0-hit grep as "the requirement is absent from the document" | Compare the code points of the pattern and the line before acting | 0 hits also means "different normalization form" or "different syllable" — an absence conclusion from that is a false negative |
 | Compare two file-name lists byte-for-byte across machines | Normalize both lists to NFC in code, then diff | Producers store different forms of the same name; APFS lookup hides this locally but a byte diff does not |
 | Accept a `X{n,}` pattern over a non-ASCII literal because it matches in your UTF-8 terminal | Group it as `(X){n,}` and test it under `LC_ALL=C` | The runner's locale decides what the quantifier binds to; a C-locale runner repeats the last byte instead of the character and reports no error |
+| Trust an awk `match()`+`substr()` script because its ASCII-only tests pass | Pin `LC_ALL=C` on that awk and add a Korean-text case that runs on macOS | The abort needs both a split multibyte character and macOS awk's UTF-8 regex decoding; ASCII fixtures cannot produce the split. It was reproduced only with macOS `/usr/bin/awk`; other awks were not tested |
 
 ## Sources
 
@@ -69,4 +75,8 @@ len('아닌') NFC = 2 code points, NFD = 5     # jamo L+V+T decomposition
 - https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/APFS_Guide/FAQ/FAQ.html — APFS preserves the file name's normalization and is normalization-insensitive via hashes of the normalized form; HFS+ stores the normalized form
 - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/grep.html — grep matches patterns against input lines by the specified regular-expression rules; no canonical-equivalence folding is specified
 - Local reproduction 2026-09-03 (macOS, BSD grep 2.6.0-FreeBSD and BSD sed): `printf '───\n' | LC_ALL=C grep -cE '─{3,}'` → 0, the same under `LC_ALL=en_US.UTF-8` → 1, and the grouped `(─){3,}` → 1 in both locales; `printf '\xe2\x94\x80\x80\x80\n' | LC_ALL=C grep -cE '─{3,}'` → 1 (one `─` plus two bare `0x80` bytes), which is the quantifier binding to the last byte. `sed -E 's/─{3,}/X/'` under C left `───` unchanged while `s/(─){3,}/X/` replaced it. GNU grep was not installed on the machine, so the GNU result is untested here — probe both userlands per [platforms-tools-bsd-vs-gnu-cli]
+- https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html — `length` returns "the length, in characters"; `match` returns "the position, in characters"; `substr` returns "the at most n-character substring"; `LC_CTYPE` decides how byte sequences become characters
+- https://developer.apple.com/forums/thread/705559 — `awk: towc: multibyte conversion failure` from macOS `/usr/bin/awk`; the poster reports that GNU awk from Homebrew does not fail
+- Local reproduction 2026-10-06 (macOS 26.1, `/usr/bin/awk` reports `awk version 20200816`, `LANG=en_US.UTF-8`): `printf '한\n' | awk '{print length($0)}'` → `3` in both UTF-8 and C (bytes); on `한R1`, `match($0,/R[0-9]+/)` sets `RSTART=4` and `substr($0,1,1)` returns the single byte `0xED` (bytes, in both locales); `printf '한R1\n' | awk '{match($0,/R[0-9]+/); p=substr($0,RSTART-1,1); if (p ~ /[A-Za-z]/) print "x"}'` → `awk: towc: multibyte conversion failure`, rc=2; the same with `LC_ALL=C` → rc=0. A `match()`+`substr()` with no regex test on the fragment did not abort, so the abort needs the regex step. Under `LC_ALL=C`, `printf '가\n' | awk '$0 ~ /[–—]/'` matched (byte `0x80` is shared) while `/(–|—)/` did not. gawk/mawk were not installed, so their behaviour is untested here
+- Field context 2026-10-06 (dev-loop PR #242, `skills/wiki-plan/scripts/plan-gate.sh` `_cited_rule_ids`): the rule-id scanner aborted on `검증 R1–R3 한글` under a UTF-8 locale; `LC_ALL=C awk` fixed it, and the bats Korean case was seen failing before the fix
 - Field context 2026-08-25 (dev-loop, review t1-detect-r1 finding F1): a `─{3,}` rule-line detector passed its first review because it was correct in the author's UTF-8 shell; run under a C locale it matched nothing and the script silently took its old code path; grouping to `(─){3,}` in both scripts fixed it
