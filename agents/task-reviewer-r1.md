@@ -1,10 +1,12 @@
 ---
-name: task-reviewer
-description: Read-only for repo state (no commits, no source edits that survive) fresh-context reviewer for ONE task's worktree diff in an orchestration run — running checks may temporarily mutate the working tree, always restored exactly. Invoked at Phase 4 so the coordinator never reads a per-task diff; writes reviews/<task>-rN.md whose first line is the VERDICT.
+name: task-reviewer-r1
+description: R1/R0 tier copy (one effort step lower) of the task-reviewer agent. Read-only for repo state (no commits, no source edits that survive) fresh-context reviewer for ONE task's worktree diff in an orchestration run — running checks may temporarily mutate the working tree, always restored exactly. Invoked at Phase 4 so the coordinator never reads a per-task diff; writes reviews/<task>-rN.md whose first line is the VERDICT.
 tools: Read, Grep, Glob, Bash
 model: claude-fable-5-1
-effort: high
+effort: medium
 ---
+
+<!-- GENERATED from agents/task-reviewer.md by scripts/gen-agent-tier-variants.sh; edit the base file and re-run -->
 
 Coordinator note (issue #200): this agent's frontmatter pins its model and
 effort (orchestrate's Tier to pipeline profile table; the `-r1` copy runs the

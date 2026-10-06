@@ -1,7 +1,9 @@
 #!/usr/bin/env bats
 # Issue #200: the two bundled review agents used to pin `model: fable` and
 # died on a model-scoped 429, which a mandatory auditor turned into a hard
-# stop. This file proves the pin is gone and that the 429-is-not-a-verdict
+# stop. The pins are back on purpose: each tier-graded agent now pins the model
+# and effort orchestrate's Tier to pipeline profile table names. This file
+# proves those pins, and that the 429-is-not-a-verdict
 # retry rule (re-run with the Agent tool's model override: opus, then sonnet)
 # is documented both where the auditor is invoked (loop-implement step 6.5)
 # and in each agent's own body.
@@ -17,6 +19,12 @@ setup() {
   AGENT2="${REPO_ROOT}/agents/test-quality-auditor.md"
   AGENT3="${REPO_ROOT}/agents/task-reviewer.md"
   AGENT4="${REPO_ROOT}/agents/task-planner.md"
+  AGENT5="${REPO_ROOT}/agents/task-analyst.md"
+}
+
+# frontmatter of an agent file: the lines between the first two '---'
+frontmatter() {
+  awk '/^---$/{n++; next} n==1' "$1"
 }
 
 # Extracts the "## Floor pre-gate + calling the auditor (step 6.5)" section:
@@ -25,11 +33,25 @@ step65_section() {
   awk '/^## Floor pre-gate/{p=1} p && /^## / && !/^## Floor pre-gate/{exit} p' "$1"
 }
 
-@test "review agents carry no model pin" {
-  for f in "$AGENT1" "$AGENT2" "$AGENT3" "$AGENT4"; do
-    run sh -c "head -10 '$f' | grep -q '^model:'"
-    [ "$status" -ne 0 ]
+@test "each tier-graded agent pins the profile table's model and R3/R2 effort" {
+  # name|model|effort — the base (R3/R2) column of the Tier to pipeline profile
+  for row in \
+    "task-analyst|claude-fable-5-1|xhigh" \
+    "task-planner|claude-opus-5-5|high" \
+    "test-quality-auditor|claude-fable-5-1|high" \
+    "task-reviewer|claude-fable-5-1|high" \
+    "integration-reviewer|claude-fable-5-1|max"; do
+    IFS='|' read -r name model effort <<< "$row"
+    fm="$(frontmatter "${REPO_ROOT}/agents/${name}.md")"
+    [[ "$fm" == *$'\n'"model: ${model}"$'\n'* ]]
+    [[ "$fm" == *$'\n'"effort: ${effort}"* ]]
   done
+}
+
+@test "plan-reviewer stays unpinned so R3's second call can override its model" {
+  fm="$(frontmatter "${REPO_ROOT}/agents/plan-reviewer.md")"
+  [ -n "$fm" ]
+  [[ "$fm" != *"model:"* ]]
 }
 
 @test "loop-implement step 6.5 documents the model-scoped 429 retry with the opus then sonnet override" {
@@ -39,8 +61,8 @@ step65_section() {
   [[ "$section" == *"opus"*"sonnet"* ]]
 }
 
-@test "all four agent bodies carry the Coordinator note about the 429 override" {
-  for f in "$AGENT1" "$AGENT2" "$AGENT3" "$AGENT4"; do
+@test "all five agent bodies carry the Coordinator note about the 429 override" {
+  for f in "$AGENT1" "$AGENT2" "$AGENT3" "$AGENT4" "$AGENT5"; do
     content="$(cat "$f" | tr '[:upper:]' '[:lower:]')"
     [[ "$content" == *"429"* ]]
     [[ "$content" == *"not a verdict"* ]]
@@ -75,16 +97,17 @@ step65_section() {
   [[ "$content" != *"429"* ]]
 }
 
-@test "boundary: a task-reviewer copy pinned to a model fails the no-pin check" {
-  pinned="${BATS_TEST_TMPDIR}/task-reviewer-pinned.md"
-  awk '/^name:/{print; print "model: fable"; next} {print}' "$AGENT3" > "$pinned"
-  run sh -c "head -10 '$pinned' | grep -q '^model:'"
-  [ "$status" -eq 0 ]
+@test "boundary: a plan-reviewer copy pinned to a model fails the unpinned check" {
+  pinned="${BATS_TEST_TMPDIR}/plan-reviewer-pinned.md"
+  awk '/^name:/{print; print "model: fable"; next} {print}' "${REPO_ROOT}/agents/plan-reviewer.md" > "$pinned"
+  fm="$(frontmatter "$pinned")"
+  [[ "$fm" == *"model:"* ]]
 }
 
-@test "boundary: a task-planner copy pinned to a model fails the no-pin check" {
-  pinned="${BATS_TEST_TMPDIR}/task-planner-pinned.md"
-  awk '/^name:/{print; print "model: fable"; next} {print}' "$AGENT4" > "$pinned"
-  run sh -c "head -10 '$pinned' | grep -q '^model:'"
-  [ "$status" -eq 0 ]
+@test "negative control: a task-analyst copy without its model pin fails the pin check" {
+  unpinned="${BATS_TEST_TMPDIR}/task-analyst-unpinned.md"
+  grep -v '^model:' "$AGENT5" > "$unpinned"
+  [ -s "$unpinned" ]
+  fm="$(frontmatter "$unpinned")"
+  [[ "$fm" != *$'\n'"model: claude-fable-5-1"$'\n'* ]]
 }

@@ -1,10 +1,12 @@
 ---
-name: test-quality-auditor
-description: Read-only for repo state (no commits, no source edits that survive) verifier that audits one task's diff and tests for quality — running the tests (step 4) DOES temporarily mutate the working tree, always restored exactly. Invoked between self-review and done so the session that wrote the code does not grade its own tests (self-grading guard). Returns a fixed VERDICT and REASONS.
+name: test-quality-auditor-r1
+description: R1/R0 tier copy (one effort step lower) of the test-quality-auditor agent. Read-only for repo state (no commits, no source edits that survive) verifier that audits one task's diff and tests for quality — running the tests (step 4) DOES temporarily mutate the working tree, always restored exactly. Invoked between self-review and done so the session that wrote the code does not grade its own tests (self-grading guard). Returns a fixed VERDICT and REASONS.
 tools: Read, Grep, Glob, Bash
 model: claude-fable-5-1
-effort: high
+effort: medium
 ---
+
+<!-- GENERATED from agents/test-quality-auditor.md by scripts/gen-agent-tier-variants.sh; edit the base file and re-run -->
 
 Coordinator note (issue #200): this agent's frontmatter pins its model and
 effort (orchestrate's Tier to pipeline profile table; the `-r1` copy runs the

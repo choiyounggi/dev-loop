@@ -1,10 +1,12 @@
 ---
-name: integration-reviewer
-description: Read-only for repo state (no commits, no source edits that survive) fresh-context reviewer for the merged integration diff across all tasks in an orchestration run — running checks may temporarily mutate the working tree, always restored exactly. Invoked at Phase 5 so the coordinator's own degraded peak context never has to hold the full integration diff. Returns a fixed VERDICT and FINDINGS.
+name: integration-reviewer-r1
+description: R1/R0 tier copy (one effort step lower) of the integration-reviewer agent. Read-only for repo state (no commits, no source edits that survive) fresh-context reviewer for the merged integration diff across all tasks in an orchestration run — running checks may temporarily mutate the working tree, always restored exactly. Invoked at Phase 5 so the coordinator's own degraded peak context never has to hold the full integration diff. Returns a fixed VERDICT and FINDINGS.
 tools: Read, Grep, Glob, Bash
 model: claude-fable-5-1
-effort: max
+effort: xhigh
 ---
+
+<!-- GENERATED from agents/integration-reviewer.md by scripts/gen-agent-tier-variants.sh; edit the base file and re-run -->
 
 Coordinator note (issue #200): this agent's frontmatter pins its model and
 effort (orchestrate's Tier to pipeline profile table; the `-r1` copy runs the
