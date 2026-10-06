@@ -6,7 +6,7 @@
 #   plan-gate.sh emit  <A|B> <plan-dir> <out-file>          write gates ledger from templates/plan-gates.md
 #
 # Gate ids (A): baseline-tests-ran affected-files-evidenced open-questions-resolved
-#               constraints-surveyed research-evidenced
+#               constraints-surveyed lint-surveyed research-evidenced
 # Gate ids (B): groundings-exist decision-rows-complete requirements-covered
 #               reviewer-verdict
 #   groundings-exist resolves wiki-local/... under the project root (see project_root_for)
@@ -115,6 +115,17 @@ check_constraints_surveyed() { # <plan-dir>
   has_heading "$file" "## Constraints" || fail4 "## Constraints section missing in $file"
   bullets=$(extract_l2 "$file" "## Constraints" | grep -c '^- ' || true)
   [ "$bullets" -ge 1 ] || fail3 "## Constraints has no bullets (use '- none — checked: <command>' if none apply)"
+  ok
+}
+
+check_lint_surveyed() { # <plan-dir>
+  file="$1/analysis.md"
+  [ -f "$file" ] || fail4 "analysis.md not found in $1"
+  has_heading "$file" "## Ground truth" || fail4 "## Ground truth section missing in $file"
+  lines=$(extract_l2 "$file" "## Ground truth" | grep '^- Lint: ' || true)
+  [ -n "$lines" ] || fail3 "no '- Lint: ' bullet under ## Ground truth (use '- Lint: none — checked: <command>' when the project has no lint or typecheck command)"
+  bad=$(printf '%s\n' "$lines" | grep -v -e '^- Lint: none — checked: .' -e '^- Lint: [^ ].* -> rc=[0-9][0-9]*$' || true)
+  [ -z "$bad" ] || fail3 "malformed Lint bullet(s): $(printf '%s' "$bad" | head -1)"
   ok
 }
 
@@ -324,6 +335,7 @@ do_check() {
     affected-files-evidenced) check_affected_files_evidenced "$plan_dir" ;;
     open-questions-resolved) check_open_questions_resolved "$plan_dir" ;;
     constraints-surveyed) check_constraints_surveyed "$plan_dir" ;;
+    lint-surveyed) check_lint_surveyed "$plan_dir" ;;
     research-evidenced) check_research_evidenced "$plan_dir" ;;
     groundings-exist) check_groundings_exist "$plan_dir" "$wiki_root" ;;
     decision-rows-complete) check_decision_rows_complete "$plan_dir" ;;

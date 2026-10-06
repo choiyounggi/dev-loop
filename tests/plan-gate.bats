@@ -570,3 +570,57 @@ req_design() {
   run sh "$PG" check requirements-covered p
   [ "$status" -eq 0 ]
 }
+
+# --- lint-surveyed ---
+# Variants are built from the passing fixture in $BATS_TEST_TMPDIR, so the
+# only difference from a passing analysis.md is the line under test.
+
+lint_variant() { # <name> <sed expression> -> prints the variant plan dir
+  d="${BATS_TEST_TMPDIR}/lint-$1"
+  mkdir -p "$d"
+  sed -e "$2" "$FIX/passing/analysis.md" > "$d/analysis.md"
+  printf '%s\n' "$d"
+}
+
+@test "check lint-surveyed: passing fixture -> ok" {
+  run sh "$PG" check lint-surveyed "$FIX/passing"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok" ]
+}
+
+@test "check lint-surveyed: an explicit 'none — checked:' bullet -> ok" {
+  d="$(lint_variant none 's/^- Lint: .*/- Lint: none — checked: grep -n lint package.json/')"
+  run sh "$PG" check lint-surveyed "$d"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ok" ]
+}
+
+@test "check lint-surveyed: no Lint bullet -> fail exit 3" {
+  d="$(lint_variant absent '/^- Lint: /d')"
+  run sh "$PG" check lint-surveyed "$d"
+  [ "$status" -eq 3 ]
+  [ "${lines[0]}" = "fail" ]
+  [[ "$output" == *"no '- Lint: ' bullet"* ]]
+}
+
+@test "check lint-surveyed: a Lint bullet with no rc -> fail exit 3" {
+  d="$(lint_variant norc 's/^- Lint: .*/- Lint: npm run lint/')"
+  run sh "$PG" check lint-surveyed "$d"
+  [ "$status" -eq 3 ]
+  [ "${lines[0]}" = "fail" ]
+  [[ "$output" == *"malformed Lint bullet"* ]]
+}
+
+@test "check lint-surveyed: no Ground truth heading -> fail exit 4" {
+  d="$(lint_variant noheading '/^## Ground truth$/d')"
+  run sh "$PG" check lint-surveyed "$d"
+  [ "$status" -eq 4 ]
+  [ "${lines[0]}" = "fail" ]
+}
+
+@test "check lint-surveyed: empty plan dir (no analysis.md) -> fail exit 4" {
+  mkdir -p "${BATS_TEST_TMPDIR}/lint-empty"
+  run sh "$PG" check lint-surveyed "${BATS_TEST_TMPDIR}/lint-empty"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"analysis.md not found"* ]]
+}
