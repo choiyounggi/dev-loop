@@ -6,7 +6,7 @@
 ## Inputs
 - Decisions that bind you: D8 (wording only; no schema or resolution-logic change)
 ## Steps
-1. Tests first in tests/verify-role-lint.bats: run `sh scripts/resolve-tools.sh --summary` with HOME set to an empty `$BATS_TEST_TMPDIR` dir and cwd an empty dir (no tools.json anywhere), assert the verify line contains `running tests / build / lint / typecheck / QA checks (step 5)`; negative control: a copy of resolve-tools.sh with the old text yields the old line.
+1. Tests first in tests/verify-role-lint.bats: run `sh scripts/resolve-tools.sh --summary` with LOOP_ORCH_CONFIG_HOME and LOOP_ORCH_CONFIG_PROJECT pointing at nonexistent files under `$BATS_TEST_TMPDIR` (the same isolation tests/resolve-tools.bats uses), assert the verify line contains `running tests / build / lint / typecheck / QA checks (step 5)`; negative control: a copy of resolve-tools.sh with the old text yields the old line.
 2. scripts/resolve-tools.sh DEFAULTS verify `when`: `running tests / build / QA checks (step 5)` -> `running tests / build / lint / typecheck / QA checks (step 5)`.
 ## Deliverables
 - scripts/resolve-tools.sh
