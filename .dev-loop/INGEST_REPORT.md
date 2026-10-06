@@ -1,125 +1,113 @@
-# Knowledge flush — 3 insight(s)
+# Knowledge flush — 2 insight(s)
 
-macOS awk aborting on split multibyte text, a lint gate for agent-written Tailwind UI, and proving a function unchanged with an AST comparison. **1 page amended, 2 new pages, 4 back-links. 0 dropped, 0 local-layer.**
+Run `20261006-223928-57385` (auto-flush). Claimed 19 queue rows: 2 insights were verified and merged into 2 existing pages, and 17 plan-gap rows were dropped as project-specific (listed under Local-layer candidates). No new pages.
 
 ## Verified best-practice
 
-### 1. macOS awk: `match()`/`substr()` over Korean text aborts → `LC_ALL=C awk` (queue `d7bc69bc97da5266`)
+### 1. Two mutants that change a Python file's size by the same amount reuse each other's bytecode; a fresh `PYTHONPYCACHEPREFIX` per run fixes it (row `c9bfb85cd7820c7e`)
 
-- **Claim (corrected):** macOS `/usr/bin/awk` (`awk version 20200816`) counts `length`/`RSTART`/`substr` in **bytes**, but POSIX says characters. So `substr(s, RSTART-1, 1)` can return half a character. A regex test on that fragment then aborts under a UTF-8 locale with `towc: multibyte conversion failure` (exit 2). Running the awk under `LC_ALL=C` makes every step byte-based and the abort goes away.
-- **Correction to the queued candidate:** the candidate said awk "mixes a byte-based RSTART with character-based substr()". Measured: both are byte-based. The abort comes from the **regex step** decoding a split fragment. A `match()`+`substr()` with no regex test on the fragment did not abort.
+- **Claim:** a harness that rewrites a `.py` file and imports it in a fresh subprocess each time can load the previous mutant's `.pyc`. This happens when two different mutations land in the same second and have the same size as each other, even if that size differs from the original's. Remedy: give each run its own new `PYTHONPYCACHEPREFIX` directory.
 - **Sources checked:**
-  - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html: `length`, `match` and `substr` are defined "in characters"; `LC_CTYPE` decides how bytes become characters.
-  - https://developer.apple.com/forums/thread/705559: the same `towc` error from macOS `/usr/bin/awk`; the poster reports GNU awk works.
-- **How verified (local, 2026-10-06, macOS 26.1, `LANG=en_US.UTF-8`):**
-  - `printf '한\n' | awk '{print length($0)}'` → `3` in both locales.
-  - `printf '한R1\n' | awk '{match($0,/R[0-9]+/); p=substr($0,RSTART-1,1); if (p ~ /[A-Za-z]/) print "x"}'` → `towc: multibyte conversion failure`, rc=2. With `LC_ALL=C` → rc=0.
-  - The real `_cited_rule_ids` awk from dev-loop `skills/wiki-plan/scripts/plan-gate.sh` (PR #242), run without `LC_ALL=C` on `검증 R1–R3 한글`: aborted, rc=2. With `LC_ALL=C`: printed `1 2 3 3 4 5 5`, rc=0.
-- **Not verified:** the candidate's claim that Ubuntu's mawk does not fail. gawk and mawk were not installed here, so the page says this is untested.
-- **Confidence:** verified (POSIX spec plus a local reproduction).
-
-### 2. Lint gate for agent-written UI in a Tailwind design system (queue `df76e2cefa92769b`)
-
-- **Claim:** turn prose design-system rules into `@shadcn/lint` rules, make lint-clean a done criterion, and loop the agent on diagnostics until the count is 0. On a legacy codebase, start at `warn` with a `--max-warnings` cap, or use ESLint bulk suppressions, and gate on "no new violations".
-- **Sources checked:**
-  - https://github.com/shadcn-ui/lint (README via `gh api`): Tailwind v4, ESLint/Oxlint, React/Svelte/Vue, the six-rule table, the per-model run table (8/8, 42–117 → 0), "10% to 48% less".
-  - https://github.com/shadcn-ui/lint/blob/main/docs/evals.md: methodology, 150+ runs, the rules-only control. Labelled on the page as a **vendor eval**.
-  - https://github.com/shadcn-ui/lint/blob/main/docs/adoption.md: warn, then `--max-warnings`, then bulk suppressions.
-  - https://eslint.org/docs/latest/use/suppressions and https://eslint.org/blog/2025/04/eslint-v9.24.0-released/: bulk suppressions arrived in v9.24.0.
-  - `packages/lint/package.json`: v0.2.0, peer `eslint >=9.30.0`, `node >=20.19`.
-- **Confidence:** verified for the tool's documented behaviour and the adoption path. The effect sizes are vendor-measured and labelled as such.
-
-### 3. Prove "function X unchanged" with an AST segment comparison, not a grep over removed diff lines (queue `ee42f6a325200abf`)
-
-- **Claim:** a grep for `^-.*X(` in the diff fails on correct work when a call to X is re-indented. Comparing `ast.get_source_segment` of X at base and in the working tree is exact, and the gate must also be run on a deliberately changed copy.
-- **Sources checked:**
-  - https://docs.python.org/3/library/ast.html#ast.get_source_segment: signature, returns `None` without position info, added in 3.8.
-  - https://git-scm.com/docs/git-show: the `<rev>:<path>` blob form. Checked in the local `git show --help`: "Shows the contents of the file … as they were current in the 10th last commit".
-- **How verified (local, Python 3.14.6, scratch git repo):**
-  - Wrapping `helper(a)` in `if a:` made the grep gate print `1`.
-  - The page's own snippet, extracted from the markdown and run as is, printed `changed: []` (rc=0) on that change and `changed: ['helper']` (rc=1) after one literal inside `helper` was changed.
-  - Decorator edge case checked: `get_source_segment` on a decorated `FunctionDef` returns text starting at `def`.
+  - https://docs.python.org/3/using/cmdline.html — `PYTHONPYCACHEPREFIX`: "If this is set, Python will write .pyc files in a mirror directory tree at this path, instead of in `__pycache__` directories within the source tree"; "Added in version 3.8". I fetched the live page and grepped it on 2026-10-06.
+  - https://docs.python.org/3/library/sys.html#sys.pycache_prefix — "write bytecode-cache .pyc files to (and read them from) a parallel directory tree … Any `__pycache__` directories in the source code tree will be ignored". I fetched the live page on 2026-10-06.
+  - https://docs.python.org/3/reference/import.html — already cited on the page: validation compares the stored mtime and size.
+- **How verified:** reproduced on Python 3.14.6 / macOS in a scratch dir under `~/.dev-loop/scratch/`, deleted afterwards.
+  - Known-bad: `X = "orig"`, then mutant A `X = "aa"`, then mutant B `X = "zz"`, both pinned to the same mtime. With the default cache, B printed `aa` (stale).
+  - Known-good: B under a fresh prefix printed `zz`, even though the in-tree `__pycache__` still held A.
+  - Reused prefix: mutant C `X = "yy"` under the same prefix printed `zz` (stale again). Under a new prefix it printed `yy`.
 - **Confidence:** verified.
 
-### Review (two fresh-context reviewers: one general, one adversarial; both returned FAIL, every finding fixed and re-checked)
+### 2. A completion gate that identifies the worker by tmux session name also matches processes that are not the worker (row `10454e0809cda9c3`)
 
-- **Vendor numbers.** The run table is 8/8 for four models and 6/8 for GPT 5.6 Sol, and now says so. The "Instead of" row now reports the control runs per model: Sonnet and Opus also reached zero from rules alone; Haiku missed one task; savings were about 10%, 31% and 48%. The quoted diagnostic is now verbatim from the README.
-- **Gaps in the ESLint bulk-suppressions advice, now fixed:**
-  - A fixed suppressed violation makes ESLint exit non-zero until `--prune-suppressions`, which is checked against the ESLint docs. A row was added.
-  - `--suppress-rule` replaced `--suppress-all`, which hides unrelated lint debt.
-  - Bulk suppressions are ESLint-only.
-- **Oxlint** lints only script blocks in Vue/Svelte, per the README Frameworks table. A row was added.
-- **Lint-clean does not approve the design.** New tokens and variants need review, per evals.md and the red-team escapes. A row was added.
-- **awk:**
-  - The awk row now warns that under `LC_ALL=C` a non-ASCII literal in a bracket expression becomes a set of single bytes. Reproduced: `printf '가\n' | LC_ALL=C awk '$0 ~ /[–—]/'` matches, and the grouped `(–|—)` does not.
-  - The "Linux CI" framing was removed; it had no evidence.
-  - The bytes claim now has its own reproduction: RSTART=4, and `substr($0,1,1)` is byte `0xED`.
-  - `last_verified` was bumped.
-- **Gate snippet:**
-  - A misspelled name passed vacuously (`None == None`). It now exits with `not found at base: [...]`.
-  - `HEAD:./{path}` replaced `HEAD:{path}`, so the path resolves from the cwd.
-  - Re-run on the page's extracted snippet: good → rc=0, typo → rc=1, subdirectory → rc=0, bad → rc=1.
-  - The hunk-range "Instead of" row is corrected: base-coordinate `-U0` intersection is sound, and the row now says when it is not.
-- **Separately, not in this PR:** the code comment at `skills/wiki-plan/scripts/plan-gate.sh:246` says macOS awk "mixes byte RSTART with character substr()". The measurement shows both are byte-based; the abort comes from regex-decoding a split fragment. The `LC_ALL=C` fix there is still correct; only the comment's mechanism is off.
+- **Claim:** a Stop hook that treats "`cwd` matches and `tmux display-message -p '#S'` equals the recorded session" as "this is the managed worker" also matches other processes:
+  - any process started from the worker's pane, because it inherits `TMUX`/`TMUX_PANE`;
+  - when `TMUX` is unset, whatever the most recently used session is.
+- **Fix, gate side:** bind identity to a per-process id. Launch with `claude --session-id <uuid>`, record that id, and compare it with the hook input's `session_id`.
+- **Fix, receiving side:** before acting on a block, compare the parent command's prompt with the task the status entry names. If they differ, report it and stop.
+- **Sources checked:**
+  - https://man7.org/linux/man-pages/man1/tmux.1.html — "If a session is omitted, the current session is used if available; if no current session is available, the most recently used is chosen"; the pane ID "is passed to the child process of the pane in the TMUX_PANE environment variable".
+  - https://man7.org/linux/man-pages/man7/environ.7.html — "When a child process is created via fork(2), it inherits a copy of its parent's environment".
+  - https://code.claude.com/docs/en/hooks — the common input fields include `session_id` ("Current session identifier"). I fetched the live page.
+  - `claude --help` lists `--session-id <uuid>`.
+- **How verified:**
+  - Isolated `tmux -L kfprobe<pid>` server (tmux 3.7b, killed afterwards), two detached sessions `worker-a` and `worker-b`:
+    - A grandchild `sh -c "sh -c 'tmux display-message -p #S'"` started inside pane `worker-a` printed `worker-a`.
+    - The same query with `TMUX` unset printed `worker-b`, not an error.
+  - On the real server, this flush session itself (parent `hooks/auto-flush.sh`, `TMUX` unset) got `lo-17-oi1002` back from `tmux display-message -p '#S'`.
+  - The candidate's field evidence: `hooks/loop-gate.sh` blocked a knowledge-flush `claude -p` child with phase=implementing for task `tmain`.
+- **Correction to the candidate:** its stated mechanism, that inherited `TMUX` is the only path, is incomplete. The fallback to the most recently used session is a second path. `loop-gate.sh:90` guards on `[ -n "$TMUX" ]`, which closes the second path but not the first.
+- **Confidence:** verified.
 
 ## Existing-layer check
 
-Pages read: platforms-environment-unicode-text-matching, testing-quality-checks-that-cannot-pass, testing-quality-guard-shape-vs-consequence, testing-quality-source-text-wiring-assertions, frontend-design-custom-property-values-read-from-script
+Pages read: backend-python-language-bytecode-cache-staleness, testing-quality-mutation-harness-file-custody, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session
 
-- **Scanned by grep for overlap terms** (not read in full): platforms-shells-portable-shell-scripts, platforms-tools-bsd-vs-gnu-cli (has no awk content), frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, infrastructure-ci-cd-write-time-limit-guards, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan. Also the domain indexes for platforms, frontend and testing.
-- **`wiki_search` top hits (k=5):**
-  - #1: unicode-text-matching (trigger + LC_ALL=C edge case), portable-shell-scripts, unset-versus-empty-parameters, option-like-argument-values.
-  - #2: agent-facing-tool-surfaces, startup-time, component-composition, client-vs-server-state. None about design-system enforcement.
-  - #3: checks-that-cannot-pass (×4 chunks), evaluating-review-feedback.
-- **#1 → merged** into `platforms-environment-unicode-text-matching`: +1 edge-case row, +1 instead-of row, trigger sentence extended, +2 frontmatter sources, +2 Sources entries. That page already owns "a non-ASCII pattern must hold under `LC_ALL=C`". This is the same locale/byte topic with a different tool (awk) and a different failure (abort rather than silent mismatch). No conflict with its existing directive.
-- **#2 → new page** `frontend-design-design-system-lint-gate-for-agents`.
-  - anti-slop-visual-design states the rule in prose ("only `var(--token)`"), and write-time-limit-guards covers the baseline mechanism generically. Neither covers a design-system linter as an agent done-gate.
-  - Back-links added from anti-slop-visual-design and product-ui-vs-brand-surface.
-- **#3 → new page** `testing-quality-unchanged-function-gates`.
-  - checks-that-cannot-pass covers gates that cannot fail on an unwritten target. guard-shape-vs-consequence covers repo-wide shape guards. source-text-wiring-assertions covers regex-on-source call-presence tests.
-  - None covers "prove a named function untouched by a diff". The new trigger and directive (AST segment comparison) are distinct.
-  - Back-links added from guard-shape-vs-consequence and harness-reverse-controls.
-- **Deferred back-links**, because an open PR rewrites the same `related:` line and an edit here would conflict:
-  - checks-that-cannot-pass (#223)
-  - source-text-wiring-assertions (#241)
-  - changed-files-only-gates (#235)
-  - The new pages link to them forward, and the back-links can follow once those PRs land.
-- **Lint:** `node scripts/wiki-lint-prohibitions.js wiki` gives `violations: 0`, rc=0. `node scripts/wiki-structure-checks.js wiki` gives `pages: 357, indexes: 13, findings: 0`, rc=0. Every `related:` id in the new and changed pages resolves to an existing page.
+- **Insight 1:** `backend-python-language-bytecode-cache-staleness` already covers the timestamp+size collision, `__pycache__` purge, mtime bump, hash-based `.pyc`, `-B`, `copy2`, and fresh-spec imports. Its 2026-08-11 field row even shows consecutive mutants loading the first mutant's value.
+  - What was new: the `PYTHONPYCACHEPREFIX` remedy, and the explicit "same size as each other, not as the original" mutant-to-mutant case.
+  - **Merged, not created:** extended step 2 with the prefix option and added one edge row (including "reusing one prefix brings the collision back"). Also added two source lines plus the reproduction, a `When this applies` clause, and a `related:` link to `testing-quality-mutation-harness-file-custody` (that page is about backup/restore custody, not cache invalidation, so no duplicate).
+  - No conflict with existing directives (body line count after review fixes is below).
+- **Insight 2:** `infrastructure-agent-orchestration-session-completion-gates` owns the Stop/completion-gate topic. It already had a "several workers share one status directory → match by `cwd`" row, but nothing on session identity.
+  - `infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session` covers inherited env used *on purpose* (lock ownership). It does not cover inherited env misread as identity, so it is related, not a duplicate.
+  - **Merged, not created:** two edge rows (gate side, receiving side), one Instead-of row, a `When this applies` clause, and three source lines (tmux man, environ(7), reproduction). No conflict (cap 120; count after review fixes is below).
+- **Index rows extended:** `session-completion-gates` in `wiki/infrastructure/index.md` and `bytecode-cache-staleness` in `wiki/backend/python/index.md`. Two `revise` lines appended to `log.md`.
+- **Lint:**
+  - `node scripts/wiki-structure-checks.js <repo>/wiki --layer bundled` → `pages: 359, indexes: 13, findings: 0`.
+  - `node scripts/wiki-lint-prohibitions.js <repo>` → 3 violations, all already on main and none in the changed files (`plans/harvest-dedupe-processed/...`, `skills/graph-setup/SKILL.md`, `wiki/infrastructure/config/keys-ahead-of-their-consumer.md`).
+
+**Independent adversarial review:** `feature-dev:code-reviewer`, read-only, ran before commit and returned FAIL with 7 findings. All were fixed:
+
+1. The receiving-side `ps -o command= -p $PPID` step was unproven. It is now scoped to headless `claude -p` (interactive workers get their prompt by paste, so argv holds none), backed by this session's own reproduction.
+2. Identity bound to `session_id` alone was incomplete. Added an edge row: subagents share the parent's `session_id`, `agent_id` is "Present only when the hook fires inside a subagent call", and relaunch with `--resume` keeps the id while `--fork-session` mints a new one. Sources: hooks + cli-reference pages.
+3. The `session_id` / `--session-id` claims were moved into their own source bullets, citing hooks and https://code.claude.com/docs/en/cli-reference.
+4. `When this applies` on the gates page is back to 4 lines.
+5. Added the cost trade-off for the prefix option: full recompile including stdlib (the reproduction's prefix held an `opt/` tree) plus one directory per run. It now says when to choose the prefix and to delete each prefix directory.
+6. Step 5 on the bytecode page no longer implies that a length-changing mutant is safe. The index row was reworded to match. A re-check found one more gap (N1: the two-mutant edge row offered only the prefix). It now offers the purge first and refers to step 2 for when to prefer the prefix; the re-check confirmed findings 1–7 resolved.
+7. The tmux reproduction text no longer claims "most recently used" over "most recently created". A second isolated-server try (`send-keys` to `worker-a`) did not update session activity, so that run cannot separate the two; the rule is cited from the man page.
+
+Body lines after the fixes: 85 (bytecode) and 118 (gates). Both lints were re-run: structure 0 findings; prohibitions 3, all already on main, 0 in changed files.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`: #241, #239, #238, #237, #236, #235, #234, #233, #231, #230, #229, #228, #227, #226, #225, #223.
+Open `knowledge/*` heads listed via `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`: #253, #249, #244, #241, #239, #238, #237, #236, #235, #234, #233, #231, #230, #229, #228, #227, #226, #225, #223 (19 heads). I fetched all of them and searched every `+` line of `git diff origin/main...origin/<head> -- wiki/` for `pyc|pycache|bytecode|PYTHONPYCACHEPREFIX|mtime|TMUX|display-message|#S|session name`.
 
-Each head's `wiki/` diff against main was searched for the candidate terms:
-- #1: `towc|multibyte|LC_ALL=C|substr|RSTART`
-- #2: `shadcn|design.system|tailwind|eslint|bulk suppress|raw color`
-- #3: `get_source_segment|not touched|unchanged function|re-indent|removed line`
+| Candidate | Overlapping open PR | Verdict |
+|-----------|---------------------|---------|
+| c9bfb85cd7820c7e pyc mutant collision | none. No head touches `bytecode-cache-staleness.md`. #244 edits `wiki/backend/python/index.md` but a different row (circular-imports); none of the 19 heads' diffs add or remove a line naming `bytecode-cache-staleness` | new (merged into existing page) |
+| 10454e0809cda9c3 tmux identity in a Stop gate | none. #234 adds `platforms/processes/driving-a-tui-in-a-tmux-pane` (send-keys delivery confirmation, a different trigger). No head touches `session-completion-gates.md`. #223/#225/#239/#241 edit `wiki/infrastructure/index.md` but not the `session-completion-gates` row | new (merged into existing page) |
 
-| Candidate | Hits in open PRs | Verdict |
-|-----------|------------------|---------|
-| #1 awk towc | #241: 8 hits, all the word "substrings" in its YAML substring-test page. Unrelated. | **new** |
-| #2 design-system lint gate | #231, #228: one hit each. An OWASP quote and an ESLint custom-rule tutorial URL. Unrelated. | **new** |
-| #3 unchanged-function gate | none | **new** |
-
-Line-level conflicts were avoided where possible:
-- #223 rewrites the `related:` line of unicode-text-matching.md, so this PR leaves that line alone. Its new frontmatter source lines are inserted two lines away from it.
-- Index rows were inserted after their nearest sibling row, not at the table end where #225, #241 and #226 append.
-- `log.md` appends at the end, as every flush does.
+`log.md` and `.dev-loop/INGEST_REPORT.md` conflict with every open head, as usual for these flushes.
 
 ## Routing decision
 
-| Insight | Layer | Target |
-|---------|-------|--------|
-| #1 macOS awk towc | general | `platforms/environment/unicode-text-matching.md` (amended): edge-case row + instead-of row. Index load-when line extended |
-| #2 design-system lint gate | general | `frontend/design/design-system-lint-gate-for-agents.md` (new). Row placed after anti-slop-visual-design in `wiki/frontend/index.md` |
-| #3 unchanged-function gate | general | `testing/quality/unchanged-function-gates.md` (new). Row placed after checks-that-cannot-pass in `wiki/testing/index.md` |
+| Insight | Target | Action |
+|---------|--------|--------|
+| pyc mutant collision / `PYTHONPYCACHEPREFIX` | backend/python/language → `wiki/backend/python/language/bytecode-cache-staleness.md` | amend: step 2 + edge row + sources |
+| tmux session-name identity in a completion gate | infrastructure/agent-orchestration → `wiki/infrastructure/agent-orchestration/session-completion-gates.md` | amend: 2 edge rows + Instead-of row + sources |
 
-No new category was needed: each insight fits an existing category.
-
-Layer test:
-- #1 names dev-loop's `plan-gate.sh` only as field evidence. The directive holds for any macOS awk script.
-- #3 came from a linkly plan. The directive names no linkly code, and the field-evidence line was reworded to "an orchestration plan's task gate".
+No new category. Both insights fit an existing page whose trigger already owns the situation. The tmux lesson was also tested against `platforms/processes`, but its trigger is "a gate deciding which session is the worker", which `session-completion-gates` owns.
 
 ## Local-layer candidates
 
-none
+All 17 rows come from linkly (`/Users/choeyeong-gi/Desktop/workspace/linkly-seaslug`). They are wiki-plan Phase B "no owning wiki page" decisions for tasks t194 and t188, and each names linkly's own files, RFCs, or test layout. Run wiki-ingest inside that project if any are worth keeping.
+
+| Row | Decision | Target |
+|-----|----------|--------|
+| dbc435945b66cdc4 | t194 gateway port allocation for the new test | wiki-local/testing/data/gateway-test-port-allocation.md |
+| 4d8c8a66275a32b6 | t194 .orchestration/changelog/t194.md | wiki-local/infrastructure/agent-orchestration/task-changelog-entries.md |
+| d3ec9f1ff0551f33 | t194 final verification order (check_doc_snippets, suite, dev_doctor) | wiki-local/qa/process/final-verification-order.md |
+| f596944b2430ea3f | t188 clause keyword and position | wiki-local/backend/common/language-design/cached-clause-syntax.md |
+| fc9097e4cd761b9f | t188 hit and miss mechanics in mode A | wiki-local/backend/common/caching/cached-clause-mode-a.md |
+| c0fb97a87b805464 | t188 a workflow that writes what it reads with cached | wiki-local/backend/common/caching/cached-read-write-workflow.md |
+| 0c882f9626778c78 | t188 trace and metrics | wiki-local/backend/common/observability/cached-clause-trace.md |
+| f611967725ff1bae | t188 spec observation | wiki-local/testing/strategy/spec-observation-of-cache.md |
+| c47f84db67956bd8 | t188 IR schema and validate_ir | wiki-local/backend/common/language-design/ir-schema-validate-ir.md |
+| df5ebd6825225b41 | t188 ENFORCEMENT-MATRIX.md | wiki-local/qa/document-verification/enforcement-matrix.md |
+| 7a2c28929298bb40 | t188 RFC-0062 scope and Updates | wiki-local/qa/document-verification/rfc-updates-chain.md |
+| 625fd9411f9ca01e | t188 mutation anchors | wiki-local/testing/quality/mutation-anchors.md |
+| 120e5d1addd2df5d | t188 idempotency and vocabulary exports | wiki-local/backend/common/language-design/vocabulary-exports.md |
+| 295657db0e29ce85 | t188 interaction with main's new features | wiki-local/backend/common/change-impact/cached-clause-feature-interaction.md |
+| cbf1c446a26683a0 | t188 where the tests live | wiki-local/testing/strategy/test-placement.md |
+| b1d8effce181f9d8 | t188 changelog, blackboard, follow-up | wiki-local/infrastructure/agent-orchestration/task-closeout-artifacts.md |
+| fe85641fd860dd7f | t188 docs/backends.md | wiki-local/qa/document-verification/backends-doc.md |
+
+Separately, for the owner: `hooks/loop-gate.sh:86-95` is the real-world instance of insight 2. A headless child started under a worker's pane gets blocked as that worker. This PR records only the general lesson; the hook fix belongs in its own issue.
