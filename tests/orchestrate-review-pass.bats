@@ -133,12 +133,13 @@ lens_order() {
 
 # --- error/boundary: per-lens table distinguishes clean, findings, not-run -
 
-@test "review-report.md's per-lens table has 5 rows, each distinguishing clean/findings/not-run" {
+@test "review-report.md's per-lens table has 6 rows, each distinguishing clean/findings/not-run" {
   content="$(cat "$TEMPLATE")"
   clean_count="$(grep -c 'clean —' "$TEMPLATE")"
   notrun_count="$(grep -c 'not run —' "$TEMPLATE")"
-  [ "$clean_count" -eq 5 ]
-  [ "$notrun_count" -eq 5 ]
+  [ "$clean_count" -eq 6 ]
+  [ "$notrun_count" -eq 6 ]
+  [[ "$content" == *"| 6. Excess |"* ]]
   [[ "$content" == *"findings: F1, F2"* ]]
 }
 
@@ -277,4 +278,15 @@ lens_order() {
   awk '/^6\. \*\*Excess/{skip=1} !skip{print} skip && /Non-blocking\.$/{skip=0}' "$SKILL" > "$stripped"
   section="$(phase4_section "$stripped" | tr '\n' ' ' | tr -s ' ')"
   [[ "$section" != *"zero call sites outside its own tests"* ]]
+}
+
+@test "review-report.md states what an Excess finding's failure scenario is" {
+  content="$(tr '\n' ' ' < "$TEMPLATE" | tr -s ' ')"
+  [[ "$content" == *'For a lens 6 (Excess) finding, the failure scenario is the search command, its hit count, and "no brief or plan line needs it".'* ]]
+}
+
+@test "negative control: a review-report.md copy without the Excess row counts 5 clean rows" {
+  stripped="${BATS_TEST_TMPDIR}/review-report-no-excess.md"
+  grep -v '^| 6\. Excess |' "$TEMPLATE" > "$stripped"
+  [ "$(grep -c 'clean —' "$stripped")" -eq 5 ]
 }
