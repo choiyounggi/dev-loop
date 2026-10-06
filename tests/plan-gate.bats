@@ -655,3 +655,38 @@ lint_variant() { # <name> <sed expression> -> prints the variant plan dir
   [ "$status" -eq 3 ]
   [[ "$output" == *"malformed Lint bullet"* ]]
 }
+
+# --- CRLF plan files (D10) ---
+
+crlf_copy() { # <src-dir> <name> -> prints the CRLF copy dir
+  d="${BATS_TEST_TMPDIR}/crlf-$2"
+  mkdir -p "$d"
+  for f in "$1"/*.md; do sed 's/$/\r/' "$f" > "$d/$(basename "$f")"; done
+  printf '%s\n' "$d"
+}
+
+@test "CRLF: every gate id judges a CRLF copy of the passing fixture ok" {
+  d="$(crlf_copy "$FIX/passing" all)"
+  [[ "$(cat "$d/analysis.md")" == *$'\r'* ]]
+  for id in baseline-tests-ran affected-files-evidenced open-questions-resolved constraints-surveyed lint-surveyed research-evidenced groundings-exist decision-rows-complete requirements-covered reviewer-verdict; do
+    run sh "$PG" check "$id" "$d" "$WIKI"
+    [ "$status" -eq 0 ] || { echo "gate $id: $output"; false; }
+    [ "$output" = "ok" ]
+  done
+}
+
+@test "CRLF: emit A takes the Baseline command without a trailing CR" {
+  d="$(crlf_copy "$FIX/passing" emit)"
+  run sh "$PG" emit A "$d" "$WORK/plan-A-crlf.md"
+  [ "$status" -eq 0 ]
+  content="$(cat "$WORK/plan-A-crlf.md")"
+  [[ "$content" == *"CHECK: true && echo GATE_OK"* ]]
+  [[ "$content" != *$'\r'* ]]
+}
+
+@test "CRLF: a CRLF copy with no Ground truth heading still exits 4" {
+  d="$(crlf_copy "$FIX/passing" noheading)"
+  grep -v '^## Ground truth' "$d/analysis.md" > "$d/a.tmp" && mv "$d/a.tmp" "$d/analysis.md"
+  run sh "$PG" check lint-surveyed "$d"
+  [ "$status" -eq 4 ]
+}

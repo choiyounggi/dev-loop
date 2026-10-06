@@ -37,6 +37,7 @@ fail4() { echo fail; echo "plan-gate: $1" >&2; exit 4; }
 # line and the next "## " line (or EOF). Nested "### " subsections stay in.
 extract_l2() {
   awk -v hdr="$2" '
+    { sub(/\r$/, "") }
     $0 == hdr { flag=1; next }
     flag && /^## / { exit }
     flag { print }
@@ -47,6 +48,7 @@ extract_l2() {
 # line and the next heading of any level (or EOF).
 extract_l3() {
   awk -v hdr="$2" '
+    { sub(/\r$/, "") }
     $0 == hdr { flag=1; next }
     flag && /^#+ / { exit }
     flag { print }
@@ -54,7 +56,7 @@ extract_l3() {
 }
 
 # has_heading <file> <exact-heading-line>
-has_heading() { grep -Fxq -- "$2" "$1"; }
+has_heading() { tr -d '\r' < "$1" | grep -Fxq -- "$2"; }
 
 # literal_replace <token> <value> — reads text on stdin, replaces every
 # literal (non-regex) occurrence of <token>, writes to stdout.
@@ -318,7 +320,7 @@ check_requirements_covered() { # <plan-dir>
 check_reviewer_verdict() { # <plan-dir>
   file="$1/review-verdict.md"
   [ -f "$file" ] || fail4 "review-verdict.md not found in $1"
-  grep -Fxq 'VERDICT: PASS' "$file" || fail3 "no 'VERDICT: PASS' line in $file"
+  tr -d '\r' < "$file" | grep -Fxq 'VERDICT: PASS' || fail3 "no 'VERDICT: PASS' line in $file"
   ok
 }
 
