@@ -37,3 +37,22 @@ setup() {
   desc="$(awk '/^---$/{n++; next} n==1 && /^description: /' "$stripped")"
   [[ "$desc" != *'test/build/lint/typecheck/QA command'* ]]
 }
+
+# --- READMEs (task 04b) ---
+
+@test "README.md's role table names verify as test / build / lint / typecheck / QA" {
+  content="$(cat "${BATS_TEST_DIRNAME}/../README.md")"
+  [[ "$content" == *'your project'"'"'s **test / build / lint / typecheck / QA** command (the loop'"'"'s run step)'* ]]
+}
+
+@test "README.ko.md's role table names verify the same way" {
+  content="$(cat "${BATS_TEST_DIRNAME}/../README.ko.md")"
+  [[ "$content" == *'프로젝트의 **테스트 / 빌드 / 린트 / 타입체크 / QA** 명령 (루프의 실행 스텝)'* ]]
+}
+
+@test "negative control: a README.md copy with the old row fails the README check" {
+  old="${BATS_TEST_TMPDIR}/readme-old.md"
+  sed 's#test / build / lint / typecheck / QA#test / build / QA#' "${BATS_TEST_DIRNAME}/../README.md" > "$old"
+  content="$(cat "$old")"
+  [[ "$content" != *'**test / build / lint / typecheck / QA** command'* ]]
+}

@@ -126,7 +126,7 @@ can map its **capability roles** to your real tools so the loop uses them:
 
 | Role | Map to |
 |------|--------|
-| `verify` | your project's **test / build / QA** command (the loop's run step) |
+| `verify` | your project's **test / build / lint / typecheck / QA** command (the loop's run step) |
 | `knowledge` | your domain/team **wiki** or knowledge MCP (external facts) |
 | `explore` | code/symbol search (LSP, ripgrep, a source-search CLI) |
 | `tacit` | past incidents / danger-zone lore |
