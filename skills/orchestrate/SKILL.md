@@ -63,7 +63,7 @@ AskUserQuestion (and, when Orca is detected, one naming the substrate choice).
 Resolve the pluggable tool profile once up front:
 `sh ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh --summary`. It maps capability
 roles — `intake` (issue-tracker work-list source), `knowledge` (domain/policy),
-`tacit` (incidents/danger zones), `verify` (test/build/QA
+`tacit` (incidents/danger zones), `verify` (test/build/lint/typecheck/QA
 command), `explore` (code search; a fresh graphify graph when Preflight says
 so), `design` (visual/UI spec, e.g. Figma) — to
 whatever tools this installation has, or to generic defaults when unset (optional,
@@ -388,7 +388,7 @@ revise.
 | QA agents — task review and coordinator auditor cross-call, claude-fable-5-1 | `task-reviewer-r1` (medium) | `task-reviewer-r1`, `test-quality-auditor-r1` (medium) | `task-reviewer`, `test-quality-auditor` (high) | `task-reviewer`, `test-quality-auditor` (high) |
 | final review agent — Phase 5, claude-fable-5-1, picked by the run's highest task tier | `integration-reviewer-r1` (xhigh) | `integration-reviewer-r1` (xhigh) | `integration-reviewer` (max) | `integration-reviewer` (max) |
 | brief effort_level | simple | medium | complex | complex |
-| review lenses | 1 and 3 only | 1-4 | 1-5 | 1-5 plus the adversarial-change-review techniques recorded under lens 5 |
+| review lenses | 1, 3 and 6 only | 1-4 and 6 | 1-6 | 1-6 plus the adversarial-change-review techniques recorded under lens 5 |
 | coordinator auditor cross-call | none (floor only) | when tests look weak | mandatory | mandatory |
 | rework budget | 1 | 3 | 3 | 3 |
 | human gates | Gate 1 and 2 | Gate 1 and 2 | Gate 1 and 2 | Gate 1 and 2 (a per-task pre-merge gate is deferred, issue #192 section 9 question 1) |
@@ -1094,7 +1094,7 @@ entirely; the coordinator writes `reviews/<task>-rN.md` itself with line 1
 `case-count:<file>:<n>` / `no-assertion:<file>:<case>`) become the findings
 of `reviews/<task>-rN.md` —
 this consumes a rework round exactly like any other finding (run the rework
-sequence below). **Exit 0 or 2** — continue to the four-lens pass unchanged,
+sequence below). **Exit 0 or 2** — continue to the lens pass unchanged,
 and when the auditor is invoked, pass `floor=pass` or `floor=unknown`
 alongside it.
 
@@ -1131,11 +1131,25 @@ at Phase 5; per task, the agent applies these fixed lenses:
    only reviewer who sees every worktree at once, so cross-task ordering
    hazards are your job alone.
 5. **AC traceability** (R2 and above) — build the three-column table `| DoD item | gate id | test case |` with one row per `<definition_of_done>` item of the brief: gate id from `.dev-loop/gates/<task>.md`, test case as `<file>:<test name>`; any row with an empty gate or test cell is a Findings item whose failure scenario is the behavior that item guards going unverified (`wiki/qa/process/acceptance-criteria.md`).
+6. **Excess** — for each element the diff adds (a file, function or method,
+   class/interface/type, parameter, config key/flag/env var, dependency), name
+   the brief or plan line it serves: the Objective, a `<definition_of_done>`
+   item, or a D-number. An element the plan's decision table names is never an
+   Excess finding — a dispute with the plan belongs to lens 1. When no line
+   serves it AND a search shows one of (a) zero call sites outside its own
+   tests, (b) a re-implementation of an existing repo helper or a
+   standard-library/language function — name that function and where it
+   lives, (c) the same value passed for the new parameter, config key, or
+   option at every call site, (d) a new interface, abstract type, or factory
+   with exactly one implementation — it is a Findings item whose failure
+   scenario is that search command, its hit count, and "no brief or plan line
+   needs it". A complexity judgment with no such search evidence goes under
+   Non-blocking.
 
 **Lens set by tier.** The tier is passed to the agent and selects its lens
-set: when the task is R0, it runs lenses 1 and 3 only and writes
-`not run — R0 profile` in the other rows; when R1, lenses 1-4; when R2 or R3,
-lenses 1-5. When the task is R0 and a review finds a second blocking round,
+set: when the task is R0, it runs lenses 1, 3 and 6 only and writes
+`not run — R0 profile` in the other rows; when R1, lenses 1-4 and 6; when R2
+or R3, lenses 1-6. When the task is R0 and a review finds a second blocking round,
 escalate to the user with AskUserQuestion instead of dispatching a second
 rework — LO_MAX_REWORK stays the per-run bound; the R0 budget of 1 is
 enforced by the coordinator not re-dispatching.
