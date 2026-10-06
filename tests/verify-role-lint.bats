@@ -76,3 +76,23 @@ setup() {
   text="$(tr '\n' ' ' < "$old" | tr -s ' ')"
   [[ "$text" != *'test / build / lint / typecheck / QA command'* ]]
 }
+
+# --- resolve-tools.sh default description (task 04d) ---
+
+@test "unconfigured verify resolves to the test / build / lint / typecheck / QA description" {
+  LOOP_ORCH_CONFIG_HOME="${BATS_TEST_TMPDIR}/none-home.json" \
+  LOOP_ORCH_CONFIG_PROJECT="${BATS_TEST_TMPDIR}/none-proj.json" \
+    run bash "${BATS_TEST_DIRNAME}/../scripts/resolve-tools.sh" --summary
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'verify: default (built-in behavior)  [when: running tests / build / lint / typecheck / QA checks (step 5)]'* ]]
+}
+
+@test "negative control: a resolve-tools.sh copy with the old text prints the old line" {
+  old="${BATS_TEST_TMPDIR}/resolve-tools-old.sh"
+  sed 's#tests / build / lint / typecheck / QA checks#tests / build / QA checks#' \
+    "${BATS_TEST_DIRNAME}/../scripts/resolve-tools.sh" > "$old"
+  LOOP_ORCH_CONFIG_HOME="${BATS_TEST_TMPDIR}/none-home.json" \
+  LOOP_ORCH_CONFIG_PROJECT="${BATS_TEST_TMPDIR}/none-proj.json" \
+    run bash "$old" --summary
+  [[ "$output" != *'lint / typecheck / QA checks'* ]]
+}
