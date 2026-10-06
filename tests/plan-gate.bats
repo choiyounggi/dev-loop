@@ -648,3 +648,10 @@ lint_variant() { # <name> <sed expression> -> prints the variant plan dir
   [[ "$content" == *"- Lint: <lint or typecheck command> -> rc=<n>"* ]]
   [[ "$content" == *"- Lint: none — checked: <command that confirmed it>"* ]]
 }
+
+@test "check lint-surveyed: 'none — checked:' followed only by spaces -> fail exit 3" {
+  d="$(lint_variant blankcmd 's/^- Lint: .*/- Lint: none — checked:  /')"
+  run sh "$PG" check lint-surveyed "$d"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"malformed Lint bullet"* ]]
+}

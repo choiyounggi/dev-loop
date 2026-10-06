@@ -124,7 +124,7 @@ check_lint_surveyed() { # <plan-dir>
   has_heading "$file" "## Ground truth" || fail4 "## Ground truth section missing in $file"
   lines=$(extract_l2 "$file" "## Ground truth" | grep '^- Lint: ' || true)
   [ -n "$lines" ] || fail3 "no '- Lint: ' bullet under ## Ground truth (use '- Lint: none — checked: <command>' when the project has no lint or typecheck command)"
-  bad=$(printf '%s\n' "$lines" | grep -v -e '^- Lint: none — checked: .' -e '^- Lint: [^ ].* -> rc=[0-9][0-9]*$' || true)
+  bad=$(printf '%s\n' "$lines" | grep -v -e '^- Lint: none — checked: *[^ ]' -e '^- Lint: [^ ].* -> rc=[0-9][0-9]*$' || true)
   [ -z "$bad" ] || fail3 "malformed Lint bullet(s): $(printf '%s' "$bad" | head -1)"
   ok
 }
