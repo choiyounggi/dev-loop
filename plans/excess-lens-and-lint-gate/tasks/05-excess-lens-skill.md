@@ -15,6 +15,7 @@ skills/orchestrate/SKILL.md lists lens 6 `Excess` after lens 5, and all three ti
 3. SKILL.md Phase 4 Lens set by tier paragraph: `it runs lenses 1 and 3 only` -> `it runs lenses 1, 3 and 6 only`; `when R1, lenses 1-4; when R2 or R3,` + `lenses 1-5.` -> `when R1, lenses 1-4 and 6; when R2 or R3,` + `lenses 1-6.` (reflow the paragraph's line breaks only as needed).
 4. SKILL.md Phase 2 profile table row: `| review lenses | 1 and 3 only | 1-4 | 1-5 | 1-5 plus the adversarial-change-review techniques recorded under lens 5 |` -> `| review lenses | 1, 3 and 6 only | 1-4 and 6 | 1-6 | 1-6 plus the adversarial-change-review techniques recorded under lens 5 |`.
 5. SKILL.md Phase 4: `continue to the four-lens pass unchanged` -> `continue to the lens pass unchanged`.
+6. SKILL.md Preflight role list (plan repair from task 04c's sweep): `` `verify` (test/build/QA`` + newline + ``command)`` -> `` `verify` (test/build/lint/typecheck/QA`` + newline + ``command)``; add to tests/verify-role-lint.bats? No — assert it in tests/orchestrate-dispatch-contracts.bats (whitespace-normalized): Preflight text contains `` `verify` (test/build/lint/typecheck/QA command)``.
 ## Deliverables
 - skills/orchestrate/SKILL.md
 - tests/orchestrate-review-pass.bats
