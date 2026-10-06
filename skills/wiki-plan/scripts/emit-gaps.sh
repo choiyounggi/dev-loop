@@ -41,6 +41,7 @@ fi
 # (do not source plan-gate.sh — it runs main() on load).
 extract_l2() {
   awk -v hdr="$2" '
+    { sub(/\r$/, "") }
     $0 == hdr { flag=1; next }
     flag && /^## / { exit }
     flag { print }
