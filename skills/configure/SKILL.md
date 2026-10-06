@@ -2,7 +2,7 @@
 name: configure
 effort: medium
 argument-hint: "[global | repo]"
-description: Set up dev-loop's capability-role tool profile — map `knowledge` (your domain wiki / MCP), `verify` (your project's test/build/QA command), `explore` (code search), `tacit` (past incidents), and `design` (Figma/visual spec) to the actual tools this environment has, then write ~/.claude/dev-loop/tools.json (global) or <repo>/.dev-loop/tools.json (per-repo). Use when asked to "configure dev-loop", "set up tools", "map my wiki/test command", or "/dev-loop:configure".
+description: Set up dev-loop's capability-role tool profile — map `knowledge` (your domain wiki / MCP), `verify` (your project's test/build/lint/typecheck/QA command), `explore` (code search), `tacit` (past incidents), and `design` (Figma/visual spec) to the actual tools this environment has, then write ~/.claude/dev-loop/tools.json (global) or <repo>/.dev-loop/tools.json (per-repo). Use when asked to "configure dev-loop", "set up tools", "map my wiki/test command", or "/dev-loop:configure".
 ---
 
 # configure — set up the dev-loop tool profile
@@ -39,7 +39,7 @@ when it exists) also needs no config; it is not the `knowledge` role.
    | Role | Map to | How to find it |
    |------|--------|----------------|
    | `knowledge` | your domain/policy **wiki** or knowledge MCP | check available MCP servers (e.g. a `wiki_search`/`search_wiki` tool) |
-   | `verify` | your project's **test / build / QA** command | read `package.json` scripts / Makefile / `pom.xml` / CI config for the real command |
+   | `verify` | your project's **test / build / lint / typecheck / QA** command | read `package.json` scripts (test, lint, typecheck) / Makefile / `pom.xml` / CI config for the real command |
    | `explore` | code/symbol search (LSP, `rtb-sourcecode`, ripgrep) | what this repo/language supports |
    | `tacit` | past incidents / danger-zone lore (MCP) | check for a lore/incidents MCP |
    | `design` | Figma / visual-spec MCP | only if UI work; check for a Figma MCP |
