@@ -1,125 +1,69 @@
-# Knowledge flush — 3 insight(s)
-
-macOS awk aborting on split multibyte text, a lint gate for agent-written Tailwind UI, and proving a function unchanged with an AST comparison. **1 page amended, 2 new pages, 4 back-links. 0 dropped, 0 local-layer.**
+# Knowledge flush — 12 candidates: 3 ingested as new pages, 1 page amended, 9 plan-gaps retired as local-layer
 
 ## Verified best-practice
 
-### 1. macOS awk: `match()`/`substr()` over Korean text aborts → `LC_ALL=C awk` (queue `d7bc69bc97da5266`)
+**1. A file-level import cycle under NestJS decorator DI** (session insight `f60900a83428b15e`, plus nothing folded)
+- Claim: when a plain helper exported from one `*.service.ts` is imported by a service that the first one injects, Nest boot fails with `can't resolve dependencies … index [n]` while typecheck and unit tests pass. Fix: move the helper to its own file with no service imports, and keep a root-module compile test.
+- Sources checked: https://docs.nestjs.com/faq/common-errors (source `content/faq/errors.md` grepped verbatim: "A circular file import … two files end up importing each other", "move the constants to a separate file"); https://docs.nestjs.com/fundamentals/circular-dependency ("The order of instantiation is indeterminate", barrel files); https://www.typescriptlang.org/docs/handbook/decorators.html (metadata emitted as `Reflect.metadata("design:type", …)` decorator calls); https://github.com/pahen/madge.
+- Reproduced in a scratch project (`@nestjs/core` 11.2.7, TypeScript 5.9.3, Node 26.7.0, CommonJS): `tsc --noEmit` rc=0, a direct `ResearchService` call worked, boot printed `design:paramtypes [ undefined ]` + `Nest can't resolve dependencies of the ResumeService (?) … index [0]`. **New finding beyond the candidate:** swapping two import lines in `app.module.ts` made it boot, so load order decides it. Moving the helper to its own file booted in both orders. Under SWC (`@swc/core` 1.x, `decoratorMetadata`) the same cycle throws `ReferenceError: Cannot access 'ResearchService' before initialization` during load, so the page lists both symptoms. `madge --circular` exited 1 on the cyclic tree and 0 on the fixed tree (known-bad + known-good); a cycle made only of `import type` lines was reported until `.madgerc` set `skipTypeImports: true` (README example), and the real cycle was still caught with it set. An `import type` injected class compiles to `design:paramtypes [Function]` under tsc 5.9.3.
+- Confidence: **verified**.
 
-- **Claim (corrected):** macOS `/usr/bin/awk` (`awk version 20200816`) counts `length`/`RSTART`/`substr` in **bytes**, but POSIX says characters. So `substr(s, RSTART-1, 1)` can return half a character. A regex test on that fragment then aborts under a UTF-8 locale with `towc: multibyte conversion failure` (exit 2). Running the awk under `LC_ALL=C` makes every step byte-based and the abort goes away.
-- **Correction to the queued candidate:** the candidate said awk "mixes a byte-based RSTART with character-based substr()". Measured: both are byte-based. The abort comes from the **regex step** decoding a split fragment. A `match()`+`substr()` with no regex test on the fragment did not abort.
-- **Sources checked:**
-  - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html: `length`, `match` and `substr` are defined "in characters"; `LC_CTYPE` decides how bytes become characters.
-  - https://developer.apple.com/forums/thread/705559: the same `towc` error from macOS `/usr/bin/awk`; the poster reports GNU awk works.
-- **How verified (local, 2026-10-06, macOS 26.1, `LANG=en_US.UTF-8`):**
-  - `printf '한\n' | awk '{print length($0)}'` → `3` in both locales.
-  - `printf '한R1\n' | awk '{match($0,/R[0-9]+/); p=substr($0,RSTART-1,1); if (p ~ /[A-Za-z]/) print "x"}'` → `towc: multibyte conversion failure`, rc=2. With `LC_ALL=C` → rc=0.
-  - The real `_cited_rule_ids` awk from dev-loop `skills/wiki-plan/scripts/plan-gate.sh` (PR #242), run without `LC_ALL=C` on `검증 R1–R3 한글`: aborted, rc=2. With `LC_ALL=C`: printed `1 2 3 3 4 5 5`, rc=0.
-- **Not verified:** the candidate's claim that Ubuntu's mawk does not fail. gawk and mawk were not installed here, so the page says this is untested.
-- **Confidence:** verified (POSIX spec plus a local reproduction).
+**2. `response.json()` on a no-body response** (general kernel of plan-gap `26496c99f792f56c`)
+- Claim: a `fetch` wrapper that always ends with `response.json()` rejects on `204`/`205` and on an empty `200`; guard on status or on empty `text()`. A `304` is not `ok` (200–299), so it must be checked before the `!response.ok` branch.
+- Sources checked: https://fetch.spec.whatwg.org/ (verbatim: "A null body status is a status that is 101, 103, 204, 205, or 304"; "The json() method steps are … parse JSON from bytes. The above method can reject with a SyntaxError."); https://developer.mozilla.org/en-US/docs/Web/API/Response/json ("SyntaxError — The response body cannot be parsed as JSON."); https://www.rfc-editor.org/rfc/rfc9112#section-6.2 ("A sender MUST NOT send a Content-Length header field in any message that contains a Transfer-Encoding header field."); https://www.rfc-editor.org/rfc/rfc7540#section-8.1.2.4 ("HTTP/2 does not define a way to carry the version or reason phrase …" — why the error fallback uses `HTTP ${status}` instead of `statusText`).
+- Reproduced on Node v26.7.0: `new Response(null,{status:204}).json()` → `SyntaxError: Unexpected end of JSON input`; `new Response('',{status:200}).json()` → `SyntaxError`; `new Response(null,{status:304}).ok` → `false`.
+- Confidence: **verified**.
 
-### 2. Lint gate for agent-written UI in a Tailwind design system (queue `df76e2cefa92769b`)
-
-- **Claim:** turn prose design-system rules into `@shadcn/lint` rules, make lint-clean a done criterion, and loop the agent on diagnostics until the count is 0. On a legacy codebase, start at `warn` with a `--max-warnings` cap, or use ESLint bulk suppressions, and gate on "no new violations".
-- **Sources checked:**
-  - https://github.com/shadcn-ui/lint (README via `gh api`): Tailwind v4, ESLint/Oxlint, React/Svelte/Vue, the six-rule table, the per-model run table (8/8, 42–117 → 0), "10% to 48% less".
-  - https://github.com/shadcn-ui/lint/blob/main/docs/evals.md: methodology, 150+ runs, the rules-only control. Labelled on the page as a **vendor eval**.
-  - https://github.com/shadcn-ui/lint/blob/main/docs/adoption.md: warn, then `--max-warnings`, then bulk suppressions.
-  - https://eslint.org/docs/latest/use/suppressions and https://eslint.org/blog/2025/04/eslint-v9.24.0-released/: bulk suppressions arrived in v9.24.0.
-  - `packages/lint/package.json`: v0.2.0, peer `eslint >=9.30.0`, `node >=20.19`.
-- **Confidence:** verified for the tool's documented behaviour and the adoption path. The effect sizes are vendor-measured and labelled as such.
-
-### 3. Prove "function X unchanged" with an AST segment comparison, not a grep over removed diff lines (queue `ee42f6a325200abf`)
-
-- **Claim:** a grep for `^-.*X(` in the diff fails on correct work when a call to X is re-indented. Comparing `ast.get_source_segment` of X at base and in the working tree is exact, and the gate must also be run on a deliberately changed copy.
-- **Sources checked:**
-  - https://docs.python.org/3/library/ast.html#ast.get_source_segment: signature, returns `None` without position info, added in 3.8.
-  - https://git-scm.com/docs/git-show: the `<rev>:<path>` blob form. Checked in the local `git show --help`: "Shows the contents of the file … as they were current in the 10th last commit".
-- **How verified (local, Python 3.14.6, scratch git repo):**
-  - Wrapping `helper(a)` in `if a:` made the grep gate print `1`.
-  - The page's own snippet, extracted from the markdown and run as is, printed `changed: []` (rc=0) on that change and `changed: ['helper']` (rc=1) after one literal inside `helper` was changed.
-  - Decorator edge case checked: `get_source_segment` on a decorated `FunctionDef` returns text starting at `def`.
-- **Confidence:** verified.
-
-### Review (two fresh-context reviewers: one general, one adversarial; both returned FAIL, every finding fixed and re-checked)
-
-- **Vendor numbers.** The run table is 8/8 for four models and 6/8 for GPT 5.6 Sol, and now says so. The "Instead of" row now reports the control runs per model: Sonnet and Opus also reached zero from rules alone; Haiku missed one task; savings were about 10%, 31% and 48%. The quoted diagnostic is now verbatim from the README.
-- **Gaps in the ESLint bulk-suppressions advice, now fixed:**
-  - A fixed suppressed violation makes ESLint exit non-zero until `--prune-suppressions`, which is checked against the ESLint docs. A row was added.
-  - `--suppress-rule` replaced `--suppress-all`, which hides unrelated lint debt.
-  - Bulk suppressions are ESLint-only.
-- **Oxlint** lints only script blocks in Vue/Svelte, per the README Frameworks table. A row was added.
-- **Lint-clean does not approve the design.** New tokens and variants need review, per evals.md and the red-team escapes. A row was added.
-- **awk:**
-  - The awk row now warns that under `LC_ALL=C` a non-ASCII literal in a bracket expression becomes a set of single bytes. Reproduced: `printf '가\n' | LC_ALL=C awk '$0 ~ /[–—]/'` matches, and the grouped `(–|—)` does not.
-  - The "Linux CI" framing was removed; it had no evidence.
-  - The bytes claim now has its own reproduction: RSTART=4, and `substr($0,1,1)` is byte `0xED`.
-  - `last_verified` was bumped.
-- **Gate snippet:**
-  - A misspelled name passed vacuously (`None == None`). It now exits with `not found at base: [...]`.
-  - `HEAD:./{path}` replaced `HEAD:{path}`, so the path resolves from the cwd.
-  - Re-run on the page's extracted snippet: good → rc=0, typo → rc=1, subdirectory → rc=0, bad → rc=1.
-  - The hunk-range "Instead of" row is corrected: base-coordinate `-U0` intersection is sound, and the row now says when it is not.
-- **Separately, not in this PR:** the code comment at `skills/wiki-plan/scripts/plan-gate.sh:246` says macOS awk "mixes byte RSTART with character substr()". The measurement shows both are byte-based; the abort comes from regex-decoding a split fragment. The `LC_ALL=C` fix there is still correct; only the comment's mechanism is off.
+**3. Unused-code review findings on one slice of dependency-ordered work** (session insight `f3252df541e0b23d`)
+- Claim: a zero-caller / "every caller passes the same value" rule applied per task of a producer-before-consumer plan (or per change of a stacked series) fires on correct seams; exempt elements a later slice consumes, and require 2+ call sites before the same-value observation counts.
+- Sources checked: https://google.github.io/eng-practices/review/developer/small-cls.html (stacked CLs, "shared code or stubs that help isolate changes between layers", tell reviewers about the other CL); https://google.github.io/eng-practices/review/reviewer/looking-for.html (the over-engineering rule being scoped); https://github.com/choiyounggi/dev-loop/pull/246 (merged; lens 6 in `skills/orchestrate/SKILL.md` carries the exemption and the two-call-site rule; `tests/orchestrate-review-pass.bats` 37/37 ok on this branch).
+- No external source states the staged-work exemption itself, so it rests on field evidence. Confidence: **field-tested**.
 
 ## Existing-layer check
 
-Pages read: platforms-environment-unicode-text-matching, testing-quality-checks-that-cannot-pass, testing-quality-guard-shape-vs-consequence, testing-quality-source-text-wiring-assertions, frontend-design-custom-property-values-read-from-script
+Pages read: qa-process-evaluating-review-feedback, qa-process-llm-review-pipelines, qa-process-adversarial-change-review, testing-quality-cross-task-stub-assertions, backend-node-boundaries-runtime-validation, backend-common-change-impact-call-site-enumeration, backend-common-reliability-timeouts-and-retries, backend-common-api-design-error-responses, testing-strategy-import-time-side-effects
 
-- **Scanned by grep for overlap terms** (not read in full): platforms-shells-portable-shell-scripts, platforms-tools-bsd-vs-gnu-cli (has no awk content), frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, infrastructure-ci-cd-write-time-limit-guards, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan. Also the domain indexes for platforms, frontend and testing.
-- **`wiki_search` top hits (k=5):**
-  - #1: unicode-text-matching (trigger + LC_ALL=C edge case), portable-shell-scripts, unset-versus-empty-parameters, option-like-argument-values.
-  - #2: agent-facing-tool-surfaces, startup-time, component-composition, client-vs-server-state. None about design-system enforcement.
-  - #3: checks-that-cannot-pass (×4 chunks), evaluating-review-feedback.
-- **#1 → merged** into `platforms-environment-unicode-text-matching`: +1 edge-case row, +1 instead-of row, trigger sentence extended, +2 frontmatter sources, +2 Sources entries. That page already owns "a non-ASCII pattern must hold under `LC_ALL=C`". This is the same locale/byte topic with a different tool (awk) and a different failure (abort rather than silent mismatch). No conflict with its existing directive.
-- **#2 → new page** `frontend-design-design-system-lint-gate-for-agents`.
-  - anti-slop-visual-design states the rule in prose ("only `var(--token)`"), and write-time-limit-guards covers the baseline mechanism generically. Neither covers a design-system linter as an agent done-gate.
-  - Back-links added from anti-slop-visual-design and product-ui-vs-brand-surface.
-- **#3 → new page** `testing-quality-unchanged-function-gates`.
-  - checks-that-cannot-pass covers gates that cannot fail on an unwritten target. guard-shape-vs-consequence covers repo-wide shape guards. source-text-wiring-assertions covers regex-on-source call-presence tests.
-  - None covers "prove a named function untouched by a diff". The new trigger and directive (AST segment comparison) are distinct.
-  - Back-links added from guard-shape-vs-consequence and harness-reverse-controls.
-- **Deferred back-links**, because an open PR rewrites the same `related:` line and an edit here would conflict:
-  - checks-that-cannot-pass (#223)
-  - source-text-wiring-assertions (#241)
-  - changed-files-only-gates (#235)
-  - The new pages link to them forward, and the back-links can follow once those PRs land.
-- **Lint:** `node scripts/wiki-lint-prohibitions.js wiki` gives `violations: 0`, rc=0. `node scripts/wiki-structure-checks.js wiki` gives `pages: 357, indexes: 13, findings: 0`, rc=0. Every `related:` id in the new and changed pages resolves to an existing page.
+Also read: `INDEX.md`, `wiki/backend/node/index.md`, `wiki/backend/index.md` (integrations + api-design rows), `wiki/qa/index.md`.
+
+- Searches run over all of `wiki/`: `circular|import cycle|forwardRef` (3 hits, all SQL foreign-key or value-table pages, none about module imports); `\b204\b|No Content|response.json()` (no fetch-wrapper page; one Python `response.json()["a"]` row about shape validation); `zero call|no call site|unused code|dead code|call sites` and `per-task review|later task|stacked|dependency-ordered` (no page about unused-code findings on staged work).
+- Overlaps: `qa-process-evaluating-review-feedback` step 4 ("search for actual usage first; when nothing uses the capability, propose removing") would delete a producer slice's seam when applied to one slice. It is not a contradiction: I added an edge-case row that scopes the usage search to the whole series and links the new page. `testing-quality-cross-task-stub-assertions` is the testing-side sibling (stubs a later task replaces) and is linked.
+- Merged vs created: 3 new pages, 1 amended page (`qa-process-evaluating-review-feedback`: edge row + `related:` id). No conflicts with existing directives.
+- Related links added: NestJS page → import-time-side-effects (same "move the pure helper out of the heavy module" fix, Python side), runtime-validation; no-body page → error-responses, timeouts-and-retries, runtime-validation; qa page → evaluating-review-feedback, adversarial-change-review, cross-task-stub-assertions; evaluating-review-feedback → the new qa page.
+- Checks run on this branch: `node scripts/wiki-lint-prohibitions.js wiki` → `directives: 80`, `violations: 0` (same as the untouched-tree baseline, so the bats pin stays 80). `bats tests/wiki-*.bats tests/verify-role-lint.bats` → `1..265`, 265 ok, 0 not ok. `orchestrate-dispatch-contracts.bats` 69/69, `orchestrate-review-pass.bats` 37/37, `send-prompt.bats` 100/100. Body lengths 62 / 57 / 51 lines.
+
+- Independent adversarial review (fresh-context reviewer agent, read-only) returned FIX with 3 blocking findings, all applied: a `304` in a guard placed after `!response.ok` could never run (moved to its own edge row, checked before `!ok`); the `statusText` fallback is empty over HTTP/2/3 (now `HTTP ${status}`); the back-link misattributed a "whole series" rule to step 4 of evaluating-review-feedback (reworded to "widened"). Important findings applied: backend `node` routing row, the helper-file edge row, the step-3 spec condition (first project import is `AppModule`, `.overrideProvider` for connections), the unsourced "third provider" option removed, and the qa page renamed from `…-in-staged-changes` (reads as git staging) to `qa-process-unused-code-findings-in-dependency-ordered-work`. Two reviewer claims were wrong when tested, and the pages follow the tests: an `import type` class records `Function`, not `Object`, under tsc 5.9.3; SWC/CommonJS throws a `ReferenceError` instead of recording `Object`. A second pass by the same reviewer over the revised diff returned **PASS** (all blocking and important findings resolved; the one leftover — citing SWC's observed emit shape — was then added to the reproduction line).
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`: #241, #239, #238, #237, #236, #235, #234, #233, #231, #230, #229, #228, #227, #226, #225, #223.
+Listed 17 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244). Fetched each and grepped its `wiki/` diff additions for `nestjs.*(cycle|circular)`, `circular (file )?import`, `import cycle`, `204`, `null body`, `response.json`, `zero call`, `no call sites`, `unused code`, `later task's`, `stacked`, `dependency-ordered`, `toLocaleTimeString`.
 
-Each head's `wiki/` diff against main was searched for the candidate terms:
-- #1: `towc|multibyte|LC_ALL=C|substr|RSTART`
-- #2: `shadcn|design.system|tailwind|eslint|bulk suppress|raw color`
-- #3: `get_source_segment|not touched|unchanged function|re-indent|removed line`
-
-| Candidate | Hits in open PRs | Verdict |
-|-----------|------------------|---------|
-| #1 awk towc | #241: 8 hits, all the word "substrings" in its YAML substring-test page. Unrelated. | **new** |
-| #2 design-system lint gate | #231, #228: one hit each. An OWASP quote and an ESLint custom-rule tutorial URL. Unrelated. | **new** |
-| #3 unchanged-function gate | none | **new** |
-
-Line-level conflicts were avoided where possible:
-- #223 rewrites the `related:` line of unicode-text-matching.md, so this PR leaves that line alone. Its new frontmatter source lines are inserted two lines away from it.
-- Index rows were inserted after their nearest sibling row, not at the table end where #225, #241 and #226 append.
-- `log.md` appends at the end, as every flush does.
+- Only hit: #244 (`knowledge/choiyounggi-20261006-130905`) adds `backend-python-language-circular-imports`. It covers Python's `ImportError … partially initialized module` (fix: function-local import, third module, `TYPE_CHECKING`). It does not cover TypeScript, decorator metadata, or Nest DI, so there is nothing to fold. It is not on `main` yet, so it is not linked here. After both merge, link the two pages to each other.
+- Verdicts: insight 1 (NestJS cycle) → **new**; insight 2 (no-body JSON) → **new**; insight 3 (staged unused-code findings) → **new**. No candidate was folded or dropped as a pending duplicate.
 
 ## Routing decision
 
-| Insight | Layer | Target |
-|---------|-------|--------|
-| #1 macOS awk towc | general | `platforms/environment/unicode-text-matching.md` (amended): edge-case row + instead-of row. Index load-when line extended |
-| #2 design-system lint gate | general | `frontend/design/design-system-lint-gate-for-agents.md` (new). Row placed after anti-slop-visual-design in `wiki/frontend/index.md` |
-| #3 unchanged-function gate | general | `testing/quality/unchanged-function-gates.md` (new). Row placed after checks-that-cannot-pass in `wiki/testing/index.md` |
+| Candidate | Target | Why |
+|-----------|--------|-----|
+| `f60900a83428b15e` NestJS import cycle | `backend/node/runtime/import-cycle-under-decorator-di.md` (new) | Node stack mechanics of module evaluation at startup; `runtime` is the closest existing node category (event loop, shutdown). A new `modules` category for one page is not justified |
+| `26496c99f792f56c` (general kernel) `response.json()` on no-body | `backend/common/integrations/json-parse-of-a-no-body-response.md` (new) | Consuming another service's HTTP responses is `common/integrations`; it is language-agnostic within the Fetch API (browser, Node, Bun, Deno) |
+| `f3252df541e0b23d` unused-code findings on staged work | `qa/process/unused-code-findings-in-dependency-ordered-work.md` (new) + edge row in `qa/process/evaluating-review-feedback.md` | Review-process rule; `qa/process` already owns review practice (evaluating feedback, adversarial review, LLM review pipelines) |
 
-No new category was needed: each insight fits an existing category.
-
-Layer test:
-- #1 names dev-loop's `plan-gate.sh` only as field evidence. The directive holds for any macOS awk script.
-- #3 came from a linkly plan. The directive names no linkly code, and the field-evidence line was reworded to "an orchestration plan's task gate".
+No new category was created. `INDEX.md` route lines for backend (node subtree) and qa were widened to name the new pages' situations.
 
 ## Local-layer candidates
 
-none
+These 9 plan-gap rows are decisions that only make sense inside one repository's plan. They are excluded from this PR and retired from the queue. To keep any of them, run wiki-ingest inside that project.
+
+| Row | Project | Decision | Target |
+|-----|---------|----------|--------|
+| `dbc435945b66cdc4` | linkly-seaslug | reuse `_PORT_COUNTER` for the gateway test port | `wiki-local/testing/data/test-port-allocation.md` |
+| `4d8c8a66275a32b6` | linkly-seaslug | `### Changed` block for the t194 changelog | `wiki-local/infrastructure/process/changelog-section-choice.md` |
+| `d3ec9f1ff0551f33` | linkly-seaslug | final verification order (`check_doc_snippets.py` → full suite → `dev_doctor.sh`) | `wiki-local/qa/process/final-verification-order.md` |
+| `ec44fa217ef02206` | linkly-apply-mate-sunfish | `HH:MM:SS` log timestamp built from components. The general kernel was checked on Node 26.7.0 (`toLocaleTimeString('ko-KR',{hour12:false})` → `"9시 5분 7초"`, `en-US` → `"09:05:07"`), but it is too thin for a bundled page | `wiki-local/backend/observability/log-line-format.md` |
+| `f51af49971c60133` | linkly-apply-mate-sunfish | failure reason cut at the contract's 2000 chars | `wiki-local/backend/api-design/research-failure-reason.md` |
+| `3987b541a0cb513a` | linkly-apply-mate-sunfish | `watch --once` exit code (1 on a transient error) | `wiki-local/backend/cli/watch-once-exit-code.md` |
+| `ce78f7240c2d3484` | linkly-apply-mate-sunfish | `parseArgs` union + `parseWatchArgs` messages | `wiki-local/backend/cli/watch-subcommand-parsing.md` |
+| `060afa16a34aae8f` | linkly-apply-mate-sunfish | `watch` / `prewatch` package scripts | `wiki-local/platforms/toolchains/collector-package-scripts.md` |
+| `e54d4d57077f00f7` | linkly-apply-mate-sunfish | 409 `RESEARCH_ALREADY_READY` treated as done | `wiki-local/backend/api-design/research-already-ready-409.md` |
+
+`26496c99f792f56c` (the 204 guard in `createApiClient`) is also project-specific as written. Its general kernel was ingested as candidate 2 above, so it is not listed again here.

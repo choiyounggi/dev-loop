@@ -10,7 +10,7 @@ sources:
   - https://google.github.io/eng-practices/review/reviewer/looking-for.html
   - https://github.com/choiyounggi/dev-loop/pull/164
 last_verified: 2026-09-03
-related: [qa-process-defect-class-resweep-after-review, qa-process-adversarial-change-review, qa-process-llm-review-pipelines]
+related: [qa-process-defect-class-resweep-after-review, qa-process-adversarial-change-review, qa-process-llm-review-pipelines, qa-process-unused-code-findings-in-dependency-ordered-work]
 ---
 
 # Acting on Code Review Feedback
@@ -57,6 +57,7 @@ robustness or supporting features; you disagree with a finding.
 | A reviewer agent flagged pre-existing code outside the diff | Verify it, then file it as separate work — expanding the current change silently mixes concerns for every later reader |
 | The finding sits in the review **body** rather than an inline comment, so it quotes code without naming a file | Step 2 has no cited lines to open: grep the quoted string across the whole changed set before ruling on it, and rule only against the file the grep resolves it to |
 | The quoted code does not match the file you assumed, and sibling files implement the same contract | Read it as "not yet located", not as a false positive — the usual shape is that one sibling was already fixed and another still carries the defect, so the quote matches the file you did not check |
+| A reviewer flags code as unused, and a later task of the plan or a later change in the stack consumes it | Run the usage search of step 4, widened to every later slice; reply naming the consuming slice, and keep the element per [qa-process-unused-code-findings-in-dependency-ordered-work] |
 | A CI fact-checking review agent rules a claim "fabricated" because it cites a preview-gated or environment-local tool the runner cannot see | Split the verdict: accept the verifiability half (downgrade confidence to the experience tier, add public fetchable URLs, condition the directive on the tool being present in the session's roster) and refute the existence half with ground-truth evidence (roster listing, on-disk payload) in a PR comment |
 
 ## Instead of
