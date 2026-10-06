@@ -266,6 +266,8 @@ lens_order() {
 @test "lens 6 asks for the serving brief/plan line and blocks only on search evidence" {
   section="$(phase4_section "$SKILL" | tr '\n' ' ' | tr -s ' ')"
   [[ "$section" == *"name the brief or plan line it serves"* ]]
+  [[ "$section" == *"or a later task's Inputs"* ]]
+  [[ "$section" == *"two or more call sites that all pass the same value"* ]]
   [[ "$section" == *"zero call sites outside its own tests"* ]]
   [[ "$section" == *"standard-library/language function"* ]]
   [[ "$section" == *"exactly one implementation"* ]]
@@ -302,6 +304,8 @@ agent_flat() { # <file>
   text="$(agent_flat "$agent")"
   [[ "$text" == *'6. **Excess**'* ]]
   [[ "$text" == *'zero call sites outside its own tests'* ]]
+  [[ "$text" == *"or a later task's Inputs"* ]]
+  [[ "$text" == *'two or more call sites that all pass the same value'* ]]
   [[ "$text" == *'| R0 | lenses 1, 3 and 6; write not run — R0 profile in rows 2, 4, 5 |'* ]]
   [[ "$text" == *'| R1 | lenses 1-4 and 6; write not run — R1 profile in row 5 |'* ]]
   [[ "$text" == *'| R2 or R3 | lenses 1-6; R3 also applies the adversarial-change-review techniques under lens 5 |'* ]]
@@ -322,4 +326,11 @@ agent_flat() { # <file>
   sed 's/| R1 | lenses 1-4 and 6;/| R1 | lenses 1-4;/' "${BATS_TEST_DIRNAME}/../agents/task-reviewer.md" > "$old"
   text="$(agent_flat "$old")"
   [[ "$text" != *'| R1 | lenses 1-4 and 6; write not run — R1 profile in row 5 |'* ]]
+}
+
+@test "negative control: a Phase 4 copy without the later-task seam exemption fails the lens-6 check" {
+  stripped="${BATS_TEST_TMPDIR}/skill-no-seam.md"
+  sed "s/, or a later task's Inputs//" "$SKILL" > "$stripped"
+  section="$(phase4_section "$stripped" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$section" != *"or a later task's Inputs"* ]]
 }
