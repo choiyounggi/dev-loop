@@ -1,125 +1,70 @@
-# Knowledge flush — 3 insight(s)
+# Knowledge flush — 4 insight(s)
 
-macOS awk aborting on split multibyte text, a lint gate for agent-written Tailwind UI, and proving a function unchanged with an AST comparison. **1 page amended, 2 new pages, 4 back-links. 0 dropped, 0 local-layer.**
+2 new pages, 2 pages amended, 2 back-link pairs, 14 plan-gaps retired as local-layer.
 
 ## Verified best-practice
 
-### 1. macOS awk: `match()`/`substr()` over Korean text aborts → `LC_ALL=C awk` (queue `d7bc69bc97da5266`)
+1. **Absence assertions over output that carries generated names** (queue `9ba2e410cd60f318`) — when a test asserts a value is absent from text that also embeds a temp path, plant a long marker no generator can produce (`FAKE-SECRET-MARKER`), not a short number.
+   - Sources: https://github.com/python/cpython/blob/main/Lib/tempfile.py (`_RandomNameSequence`: 8 chars from `abcdefghijklmnopqrstuvwxyz0123456789_`, private `_Random()`), https://docs.python.org/3/library/tempfile.html, https://github.com/pytest-dev/pytest/blob/main/doc/en/how-to/tmp_path.rst (line 154: "`{num}` is a number that is incremented with each test suite run"), https://github.com/coe0718/hermes-review-loop/issues/153 (independent incident: `assertNotIn("404", out)` failed on `tmp404ad9f3`).
+   - Verified: re-ran on CPython 3.13.1 — 200,000 names, `42` in 0.55%, `7` in 19.6%, `192192192` in none; two `random.seed(0)` child runs printed different temp names; alphabet line and private RNG present in the installed source.
+   - Confidence: **verified**.
+2. **Testing that a call returns instead of blocking** (queue `f325971f5fede689`) — run the call in a daemon thread, `join(timeout)` + `is_alive()`, release the blocked call from the test thread (FIFO: open the opposite end with `O_NONBLOCK`), then fail.
+   - Sources: https://docs.python.org/3/library/threading.html, https://github.com/python/cpython/blob/main/Lib/test/support/threading_helper.py (`join_thread`: `thread.join(timeout)`, default `support.SHORT_TIMEOUT`), https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html, https://man7.org/linux/man-pages/man7/fifo.7.html, https://github.com/torvalds/linux/blob/master/fs/pipe.c, https://docs.python.org/3/library/subprocess.html — all returned HTTP 200.
+   - Verified: on CPython 3.13.1 / macOS — no-reader non-blocking writer open → `ENXIO`; reader blocked after `join(1.0)`; released by `O_WRONLY|O_NONBLOCK` once the reader existed; `Lock.release()` from another thread released a blocked `acquire`; child with a daemon thread stuck in FIFO `open()` exited in 0.04 s, non-daemon child still running at 5 s.
+   - Confidence: **verified**.
+3. **Several public entry methods calling one shared step** (queue `9d170e72c7079b74`) — one test per entry method, each proven by deleting only that method's call.
+   - Sources: existing page's https://pitest.org/quickstart/basic_concepts/ ("No coverage" vs "Survived"), plus a reproduction.
+   - Verified: isolated `git archive` copy of linkly `impl/` at HEAD a6bf247 — baseline 354 tests OK; replacing the `issue()` call to `_refresh_if_stale()` with `pass` reddened exactly `test_normal_issue_at_the_ttl_rereads_and_signs_with_the_new_key`; the `verify()` deletion reddened three verify-path tests; with that one issue-path test removed, the `issue()` deletion left all 353 tests green. File restored by copy (sha1 matched) and the scratch copy deleted.
+   - Confidence: **verified**.
+4. **Approving a text-gate escalation does not whitelist the text** (queue `f8128644e665efbf`) — when a keyword false positive on an inline script is approved, have the worker save the script to a project-local file and run it by path.
+   - Sources: https://github.com/choiyounggi/groundwork/blob/main/plugins/guardrails/hooks/bash-guard.sh (identical to the installed 1.2.2 copy by `diff -q`): in escalation mode every `ask` becomes a recorded `deny`; the hook keeps no approval state. https://code.claude.com/docs/en/hooks (hook receives the unexecuted command string).
+   - Verified: fed hook JSON straight to `bash-guard.sh` with `GROUNDWORK_ESCALATION_DIR` set — inline `node -e` with only a keyword label escalated on the first run and again on the identical re-run; the same script run by path passed; a keyword-free control passed; a real SQL statement still escalated (known-bad). Incidentally the live hook also blocked my own first reproduction command on the same keyword.
+   - Confidence: **verified**.
 
-- **Claim (corrected):** macOS `/usr/bin/awk` (`awk version 20200816`) counts `length`/`RSTART`/`substr` in **bytes**, but POSIX says characters. So `substr(s, RSTART-1, 1)` can return half a character. A regex test on that fragment then aborts under a UTF-8 locale with `towc: multibyte conversion failure` (exit 2). Running the awk under `LC_ALL=C` makes every step byte-based and the abort goes away.
-- **Correction to the queued candidate:** the candidate said awk "mixes a byte-based RSTART with character-based substr()". Measured: both are byte-based. The abort comes from the **regex step** decoding a split fragment. A `match()`+`substr()` with no regex test on the fragment did not abort.
-- **Sources checked:**
-  - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html: `length`, `match` and `substr` are defined "in characters"; `LC_CTYPE` decides how bytes become characters.
-  - https://developer.apple.com/forums/thread/705559: the same `towc` error from macOS `/usr/bin/awk`; the poster reports GNU awk works.
-- **How verified (local, 2026-10-06, macOS 26.1, `LANG=en_US.UTF-8`):**
-  - `printf '한\n' | awk '{print length($0)}'` → `3` in both locales.
-  - `printf '한R1\n' | awk '{match($0,/R[0-9]+/); p=substr($0,RSTART-1,1); if (p ~ /[A-Za-z]/) print "x"}'` → `towc: multibyte conversion failure`, rc=2. With `LC_ALL=C` → rc=0.
-  - The real `_cited_rule_ids` awk from dev-loop `skills/wiki-plan/scripts/plan-gate.sh` (PR #242), run without `LC_ALL=C` on `검증 R1–R3 한글`: aborted, rc=2. With `LC_ALL=C`: printed `1 2 3 3 4 5 5`, rc=0.
-- **Not verified:** the candidate's claim that Ubuntu's mawk does not fail. gawk and mawk were not installed here, so the page says this is untested.
-- **Confidence:** verified (POSIX spec plus a local reproduction).
-
-### 2. Lint gate for agent-written UI in a Tailwind design system (queue `df76e2cefa92769b`)
-
-- **Claim:** turn prose design-system rules into `@shadcn/lint` rules, make lint-clean a done criterion, and loop the agent on diagnostics until the count is 0. On a legacy codebase, start at `warn` with a `--max-warnings` cap, or use ESLint bulk suppressions, and gate on "no new violations".
-- **Sources checked:**
-  - https://github.com/shadcn-ui/lint (README via `gh api`): Tailwind v4, ESLint/Oxlint, React/Svelte/Vue, the six-rule table, the per-model run table (8/8, 42–117 → 0), "10% to 48% less".
-  - https://github.com/shadcn-ui/lint/blob/main/docs/evals.md: methodology, 150+ runs, the rules-only control. Labelled on the page as a **vendor eval**.
-  - https://github.com/shadcn-ui/lint/blob/main/docs/adoption.md: warn, then `--max-warnings`, then bulk suppressions.
-  - https://eslint.org/docs/latest/use/suppressions and https://eslint.org/blog/2025/04/eslint-v9.24.0-released/: bulk suppressions arrived in v9.24.0.
-  - `packages/lint/package.json`: v0.2.0, peer `eslint >=9.30.0`, `node >=20.19`.
-- **Confidence:** verified for the tool's documented behaviour and the adoption path. The effect sizes are vendor-measured and labelled as such.
-
-### 3. Prove "function X unchanged" with an AST segment comparison, not a grep over removed diff lines (queue `ee42f6a325200abf`)
-
-- **Claim:** a grep for `^-.*X(` in the diff fails on correct work when a call to X is re-indented. Comparing `ast.get_source_segment` of X at base and in the working tree is exact, and the gate must also be run on a deliberately changed copy.
-- **Sources checked:**
-  - https://docs.python.org/3/library/ast.html#ast.get_source_segment: signature, returns `None` without position info, added in 3.8.
-  - https://git-scm.com/docs/git-show: the `<rev>:<path>` blob form. Checked in the local `git show --help`: "Shows the contents of the file … as they were current in the 10th last commit".
-- **How verified (local, Python 3.14.6, scratch git repo):**
-  - Wrapping `helper(a)` in `if a:` made the grep gate print `1`.
-  - The page's own snippet, extracted from the markdown and run as is, printed `changed: []` (rc=0) on that change and `changed: ['helper']` (rc=1) after one literal inside `helper` was changed.
-  - Decorator edge case checked: `get_source_segment` on a decorated `FunctionDef` returns text starting at `def`.
-- **Confidence:** verified.
-
-### Review (two fresh-context reviewers: one general, one adversarial; both returned FAIL, every finding fixed and re-checked)
-
-- **Vendor numbers.** The run table is 8/8 for four models and 6/8 for GPT 5.6 Sol, and now says so. The "Instead of" row now reports the control runs per model: Sonnet and Opus also reached zero from rules alone; Haiku missed one task; savings were about 10%, 31% and 48%. The quoted diagnostic is now verbatim from the README.
-- **Gaps in the ESLint bulk-suppressions advice, now fixed:**
-  - A fixed suppressed violation makes ESLint exit non-zero until `--prune-suppressions`, which is checked against the ESLint docs. A row was added.
-  - `--suppress-rule` replaced `--suppress-all`, which hides unrelated lint debt.
-  - Bulk suppressions are ESLint-only.
-- **Oxlint** lints only script blocks in Vue/Svelte, per the README Frameworks table. A row was added.
-- **Lint-clean does not approve the design.** New tokens and variants need review, per evals.md and the red-team escapes. A row was added.
-- **awk:**
-  - The awk row now warns that under `LC_ALL=C` a non-ASCII literal in a bracket expression becomes a set of single bytes. Reproduced: `printf '가\n' | LC_ALL=C awk '$0 ~ /[–—]/'` matches, and the grouped `(–|—)` does not.
-  - The "Linux CI" framing was removed; it had no evidence.
-  - The bytes claim now has its own reproduction: RSTART=4, and `substr($0,1,1)` is byte `0xED`.
-  - `last_verified` was bumped.
-- **Gate snippet:**
-  - A misspelled name passed vacuously (`None == None`). It now exits with `not found at base: [...]`.
-  - `HEAD:./{path}` replaced `HEAD:{path}`, so the path resolves from the cwd.
-  - Re-run on the page's extracted snippet: good → rc=0, typo → rc=1, subdirectory → rc=0, bad → rc=1.
-  - The hunk-range "Instead of" row is corrected: base-coordinate `-U0` intersection is sound, and the row now says when it is not.
-- **Separately, not in this PR:** the code comment at `skills/wiki-plan/scripts/plan-gate.sh:246` says macOS awk "mixes byte RSTART with character substr()". The measurement shows both are byte-based; the abort comes from regex-decoding a split fragment. The `LC_ALL=C` fix there is still correct; only the comment's mechanism is off.
+Note: pages 1 and 2 were drafted by an earlier flush run that stopped before committing (untracked files left in the checkout at 02:09). I did not take them on trust: every measurable claim was re-run above and every cited URL was fetched.
 
 ## Existing-layer check
 
-Pages read: platforms-environment-unicode-text-matching, testing-quality-checks-that-cannot-pass, testing-quality-guard-shape-vs-consequence, testing-quality-source-text-wiring-assertions, frontend-design-custom-property-values-read-from-script
+Pages read: testing-quality-tests-that-cannot-fail, testing-quality-source-text-wiring-assertions, testing-data-artifact-leakage-from-a-suite, security-data-masking-verification, testing-quality-policy-at-several-return-sites, testing-strategy-cross-layer-effect-tests, platforms-shells-command-text-inspected-before-execution, platforms-tools-agent-permission-classifier-denials, testing-strategy-signal-delivery-to-a-process-under-test
 
-- **Scanned by grep for overlap terms** (not read in full): platforms-shells-portable-shell-scripts, platforms-tools-bsd-vs-gnu-cli (has no awk content), frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, infrastructure-ci-cd-write-time-limit-guards, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan. Also the domain indexes for platforms, frontend and testing.
-- **`wiki_search` top hits (k=5):**
-  - #1: unicode-text-matching (trigger + LC_ALL=C edge case), portable-shell-scripts, unset-versus-empty-parameters, option-like-argument-values.
-  - #2: agent-facing-tool-surfaces, startup-time, component-composition, client-vs-server-state. None about design-system enforcement.
-  - #3: checks-that-cannot-pass (×4 chunks), evaluating-review-feedback.
-- **#1 → merged** into `platforms-environment-unicode-text-matching`: +1 edge-case row, +1 instead-of row, trigger sentence extended, +2 frontmatter sources, +2 Sources entries. That page already owns "a non-ASCII pattern must hold under `LC_ALL=C`". This is the same locale/byte topic with a different tool (awk) and a different failure (abort rather than silent mismatch). No conflict with its existing directive.
-- **#2 → new page** `frontend-design-design-system-lint-gate-for-agents`.
-  - anti-slop-visual-design states the rule in prose ("only `var(--token)`"), and write-time-limit-guards covers the baseline mechanism generically. Neither covers a design-system linter as an agent done-gate.
-  - Back-links added from anti-slop-visual-design and product-ui-vs-brand-surface.
-- **#3 → new page** `testing-quality-unchanged-function-gates`.
-  - checks-that-cannot-pass covers gates that cannot fail on an unwritten target. guard-shape-vs-consequence covers repo-wide shape guards. source-text-wiring-assertions covers regex-on-source call-presence tests.
-  - None covers "prove a named function untouched by a diff". The new trigger and directive (AST segment comparison) are distinct.
-  - Back-links added from guard-shape-vs-consequence and harness-reverse-controls.
-- **Deferred back-links**, because an open PR rewrites the same `related:` line and an edit here would conflict:
-  - checks-that-cannot-pass (#223)
-  - source-text-wiring-assertions (#241)
-  - changed-files-only-gates (#235)
-  - The new pages link to them forward, and the back-links can follow once those PRs land.
-- **Lint:** `node scripts/wiki-lint-prohibitions.js wiki` gives `violations: 0`, rc=0. `node scripts/wiki-structure-checks.js wiki` gives `pages: 357, indexes: 13, findings: 0`, rc=0. Every `related:` id in the new and changed pages resolves to an existing page.
+- `wiki_search` top hits per candidate: (1) tests-that-cannot-fail, artifact-leakage-from-a-suite, assertion-scanner-false-positive-on-unittest-convention, autouse-fixture-shadows-function-under-test, path-valued-config — none covers choosing an absence marker; (2) parsing-cli-structured-output, java threads-and-memory, command-text-inspected-before-execution, non-interactive-cli-invocation, control-signals-vs-primary-artifacts — none covers a deadline for a blocking call in a test; (3) orm transaction-boundaries, dict-subclass-attribute-loss-on-copy, unchanged-function-gates, surviving-mutant-equivalence-triage, java coroutines — none; grep found `policy-at-several-return-sites` as the same pattern (one test per site, proven by per-site reversion); (4) agent-permission-classifier-denials, deny-rules-under-bypassed-permissions, unset-versus-empty-parameters, tool-diagnostics-without-a-failing-exit-code, command-text-inspected-before-execution.
+- Merged: (3) into `testing-quality-policy-at-several-return-sites` (trigger sentence widened, one edge row, one field-measurement source); (4) into `platforms-shells-command-text-inspected-before-execution` (one edge row, field context, groundwork source). That page is at 120 body lines.
+- Created: `testing-quality-absence-assertions-over-generated-output`, `testing-strategy-calls-that-must-not-block`.
+- Conflicts: none. `agent-permission-classifier-denials` says "retry once" for the Claude Code auto-mode classifier, which judges the action; the new row covers a text-matching hook that re-matches identical text, so the two do not contradict.
+- Back-links added: masking-verification → absence page; signal-delivery-to-a-process-under-test → calls page; policy-at-several-return-sites ↔ cross-layer-effect-tests. Deferred (an open PR rewrites that `related:` line): tests-that-cannot-fail → absence page (#223), async-testing → calls page (#226).
+- Deferred index edit: the `wiki/platforms/index.md` load-when line for `command-text-inspected-before-execution` should gain "an approved keyword false positive on an inline script escalates again on re-run"; #223 inserts a row directly after that line, so the edit waits until #223 lands.
+- Independent review (feature-dev:code-reviewer, adversarial brief): one major finding fixed (the row now says to write the scratch file with a non-shell tool, since a heredoc carries the keyword in its command text), plus minor fixes: FIFO release scoped to Linux source + macOS measurement, the field line no longer says "4 tests" next to `failures=5`, the row scoped to keyword-matching hooks and cross-referenced to the classifier page.
+- Lint: `node scripts/wiki-structure-checks.js wiki/` → "pages: 361, indexes: 13, findings: 0"; `node scripts/wiki-lint-prohibitions.js wiki/` → 80/80 directives compliant, 0 violations.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`: #241, #239, #238, #237, #236, #235, #234, #233, #231, #230, #229, #228, #227, #226, #225, #223.
+Open `knowledge/*` heads listed: #223, #225–#231, #233–#239, #241, #244, #249, #253, #254, #255 (21 PRs). Each head was fetched and its `wiki/` diff searched for `fifo`, `O_NONBLOCK`, `is_alive`, `tempfile`, `assertNotIn`, `entry method`, `public method`, `false positive`, `scratch file`, `run it by path`.
 
-Each head's `wiki/` diff against main was searched for the candidate terms:
-- #1: `towc|multibyte|LC_ALL=C|substr|RSTART`
-- #2: `shadcn|design.system|tailwind|eslint|bulk suppress|raw color`
-- #3: `get_source_segment|not touched|unchanged function|re-indent|removed line`
+| Candidate | Overlapping heads | Verdict |
+|-----------|-------------------|---------|
+| 1 absence assertions | none (no hits for tempfile/assertNotIn) | new |
+| 2 calls that must not block | #225 hit `fifo` only as "a FIFO queue or mutex" for request serialization — unrelated | new |
+| 3 entry methods sharing a step | #238 hit `entry method` only in a transaction-boundary row — unrelated | new (merge into existing page) |
+| 4 approval does not whitelist text | `false positive` hits in #249/#226/#225/#223 are about review findings and an assertion scanner — unrelated | new (merge into existing page) |
 
-| Candidate | Hits in open PRs | Verdict |
-|-----------|------------------|---------|
-| #1 awk towc | #241: 8 hits, all the word "substrings" in its YAML substring-test page. Unrelated. | **new** |
-| #2 design-system lint gate | #231, #228: one hit each. An OWASP quote and an ESLint custom-rule tutorial URL. Unrelated. | **new** |
-| #3 unchanged-function gate | none | **new** |
-
-Line-level conflicts were avoided where possible:
-- #223 rewrites the `related:` line of unicode-text-matching.md, so this PR leaves that line alone. Its new frontmatter source lines are inserted two lines away from it.
-- Index rows were inserted after their nearest sibling row, not at the table end where #225, #241 and #226 append.
-- `log.md` appends at the end, as every flush does.
+To avoid conflicts: #230 rewrites the `related:` line of `command-text-inspected-before-execution`, so this PR leaves that page's `last_verified` line (adjacent to `related:`) unchanged and only inserts the source above it.
 
 ## Routing decision
 
-| Insight | Layer | Target |
-|---------|-------|--------|
-| #1 macOS awk towc | general | `platforms/environment/unicode-text-matching.md` (amended): edge-case row + instead-of row. Index load-when line extended |
-| #2 design-system lint gate | general | `frontend/design/design-system-lint-gate-for-agents.md` (new). Row placed after anti-slop-visual-design in `wiki/frontend/index.md` |
-| #3 unchanged-function gate | general | `testing/quality/unchanged-function-gates.md` (new). Row placed after checks-that-cannot-pass in `wiki/testing/index.md` |
+| Insight | Target |
+|---------|--------|
+| 1 | `testing/quality/absence-assertions-over-generated-output.md` (new page; quality = assertion design) |
+| 2 | `testing/strategy/calls-that-must-not-block.md` (new page; strategy, next to signal-delivery-to-a-process-under-test) |
+| 3 | `testing/quality/policy-at-several-return-sites.md` (merged edge case; same mechanism: one test per site, proven by per-site deletion) |
+| 4 | `platforms/shells/command-text-inspected-before-execution.md` (merged edge case; the page already owns "gate reads raw command text") |
 
-No new category was needed: each insight fits an existing category.
-
-Layer test:
-- #1 names dev-loop's `plan-gate.sh` only as field evidence. The directive holds for any macOS awk script.
-- #3 came from a linkly plan. The directive names no linkly code, and the field-evidence line was reworded to "an orchestration plan's task gate".
+No new category.
 
 ## Local-layer candidates
 
-none
+All 14 `plan-gaps.jsonl` rows are linkly plan decisions (t196 `kb/cloud/*` documents, frontmatter, index triggers, changelog, scope; t195 `docs/gunicorn-load-measurement.md` structure). They name one repository's own files and conventions, so they are excluded and retired:
+
+- `4c4b70c3be1c329a`, `8538da78fff694a2`, `a8da0e5e2d3a4818`, `35d60b29dfc8425d`, `fb33a53b95677a01`, `bb2eb5af940043fc`, `5992b207b903f52a`, `6257cd01bd6e28dd`, `ed71370ab17aa81a`, `210301df51f2bcd1`, `64f13d0e8f0c4053`, `76f675e77de1ddeb`, `59774840d750d38e` → linkly t196 → `wiki-local/infrastructure/cloud/kb-cloud-documents.md` (run wiki-ingest inside that project)
+- `12ee112143e36140` → linkly t195 → `wiki-local/qa/performance/gunicorn-load-measurement-doc.md` (run wiki-ingest inside that project)
+
+Separately for the owner: `skills/orchestrate/SKILL.md` (around line 580) tells the coordinator to answer an approved escalation with `"approved — re-run: <cmd>"`. For a keyword false positive that instruction loops (insight 4). That wording may be worth changing in a code PR.

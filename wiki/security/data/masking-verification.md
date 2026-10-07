@@ -8,7 +8,7 @@ sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
   - "Local reproduction (lnpl 0.2.0, 2026-08-05): one `--json` run held the raw planted card number at result.bindings while the trace/log channel showed `***`; an unmasked control field appeared in both"
 last_verified: 2026-09-08
-related: [security-data-pii-handling, testing-quality-harness-reverse-controls, qa-exploratory-override-control-pairs, backend-common-change-impact-call-site-enumeration]
+related: [security-data-pii-handling, testing-quality-harness-reverse-controls, qa-exploratory-override-control-pairs, backend-common-change-impact-call-site-enumeration, testing-quality-absence-assertions-over-generated-output]
 ---
 
 # Verifying Masking Across Every Output Channel

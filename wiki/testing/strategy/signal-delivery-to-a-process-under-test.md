@@ -9,7 +9,7 @@ sources:
   - https://www.gnu.org/software/bash/manual/bash.html#Signals
   - https://docs.python.org/3/library/subprocess.html#subprocess.Popen.send_signal
 last_verified: 2026-08-07
-related: [platforms-processes-non-interactive-cli-invocation]
+related: [platforms-processes-non-interactive-cli-invocation, testing-strategy-calls-that-must-not-block]
 ---
 
 # Signal Delivery to a Process Under Test
