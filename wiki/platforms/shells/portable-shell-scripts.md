@@ -45,7 +45,7 @@ non-interactive environment).
    creation), verify the state with an independent command (`test -e`, `git worktree
    list`), not with a following `echo` that prints success unconditionally.
 4. When a script written for bash runs in zsh (or a user pastes it into a zsh
-   terminal), these behaviors invert:
+   terminal), these behaviors invert (a colon right after an unbraced `$name` is another: [platforms-shells-colon-after-an-unbraced-parameter]):
 
 | Behavior | bash/sh | zsh | Portable action |
 |----------|---------|-----|-----------------|
