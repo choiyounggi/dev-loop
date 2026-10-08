@@ -1,125 +1,95 @@
-# Knowledge flush — 3 insight(s)
+# Knowledge flush — 1 insight(s)
 
-macOS awk aborting on split multibyte text, a lint gate for agent-written Tailwind UI, and proving a function unchanged with an AST comparison. **1 page amended, 2 new pages, 4 back-links. 0 dropped, 0 local-layer.**
+A review's "also assert X" fix that edits an existing test block can delete the assertion other mutants depended on, and re-running only the named mutant hides that. **1 page amended (new step 6), 0 new pages, 1 back-link. 7 plan-gaps retired as local-layer, 0 dropped.**
+
+Claimed 8 queue rows (run `20261008-124951-26572`): 1 harvested ★ Insight (`4614be6ce89cc5c5`) and 7 wiki-plan `[no-wiki]` plan-gap rows from linkly task t216.
 
 ## Verified best-practice
 
-### 1. macOS awk: `match()`/`substr()` over Korean text aborts → `LC_ALL=C awk` (queue `d7bc69bc97da5266`)
+**`4614be6ce89cc5c5` — keep the block's assertions, then re-run every mutant it covers** (confidence: **verified**)
 
-- **Claim (corrected):** macOS `/usr/bin/awk` (`awk version 20200816`) counts `length`/`RSTART`/`substr` in **bytes**, but POSIX says characters. So `substr(s, RSTART-1, 1)` can return half a character. A regex test on that fragment then aborts under a UTF-8 locale with `towc: multibyte conversion failure` (exit 2). Running the awk under `LC_ALL=C` makes every step byte-based and the abort goes away.
-- **Correction to the queued candidate:** the candidate said awk "mixes a byte-based RSTART with character-based substr()". Measured: both are byte-based. The abort comes from the **regex step** decoding a split fragment. A `match()`+`substr()` with no regex test on the fragment did not abort.
-- **Sources checked:**
-  - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html: `length`, `match` and `substr` are defined "in characters"; `LC_CTYPE` decides how bytes become characters.
-  - https://developer.apple.com/forums/thread/705559: the same `towc` error from macOS `/usr/bin/awk`; the poster reports GNU awk works.
-- **How verified (local, 2026-10-06, macOS 26.1, `LANG=en_US.UTF-8`):**
-  - `printf '한\n' | awk '{print length($0)}'` → `3` in both locales.
-  - `printf '한R1\n' | awk '{match($0,/R[0-9]+/); p=substr($0,RSTART-1,1); if (p ~ /[A-Za-z]/) print "x"}'` → `towc: multibyte conversion failure`, rc=2. With `LC_ALL=C` → rc=0.
-  - The real `_cited_rule_ids` awk from dev-loop `skills/wiki-plan/scripts/plan-gate.sh` (PR #242), run without `LC_ALL=C` on `검증 R1–R3 한글`: aborted, rc=2. With `LC_ALL=C`: printed `1 2 3 3 4 5 5`, rc=0.
-- **Not verified:** the candidate's claim that Ubuntu's mawk does not fail. gawk and mawk were not installed here, so the page says this is untested.
-- **Confidence:** verified (POSIX spec plus a local reproduction).
+Claim: when a review's "also assert X" fix lands in an existing test block, put the new assertion beside the block's existing ones (a different input or environment gets its own case), diff the block's assertion lines before and after, and re-run every mutant the block covers, comparing each verdict with the pre-edit run. Re-running only the named mutant cannot see the mutants that an assertion removed by the edit used to kill.
 
-### 2. Lint gate for agent-written UI in a Tailwind design system (queue `df76e2cefa92769b`)
+Sources — each quote compared character-for-character against the raw page with `curl` + `/usr/bin/grep` on 2026-10-08:
 
-- **Claim:** turn prose design-system rules into `@shadcn/lint` rules, make lint-clean a done criterion, and loop the agent on diagnostics until the count is 0. On a legacy codebase, start at `warn` with a `--max-warnings` cap, or use ESLint bulk suppressions, and gate on "no new violations".
-- **Sources checked:**
-  - https://github.com/shadcn-ui/lint (README via `gh api`): Tailwind v4, ESLint/Oxlint, React/Svelte/Vue, the six-rule table, the per-model run table (8/8, 42–117 → 0), "10% to 48% less".
-  - https://github.com/shadcn-ui/lint/blob/main/docs/evals.md: methodology, 150+ runs, the rules-only control. Labelled on the page as a **vendor eval**.
-  - https://github.com/shadcn-ui/lint/blob/main/docs/adoption.md: warn, then `--max-warnings`, then bulk suppressions.
-  - https://eslint.org/docs/latest/use/suppressions and https://eslint.org/blog/2025/04/eslint-v9.24.0-released/: bulk suppressions arrived in v9.24.0.
-  - `packages/lint/package.json`: v0.2.0, peer `eslint >=9.30.0`, `node >=20.19`.
-- **Confidence:** verified for the tool's documented behaviour and the adoption path. The effect sizes are vendor-measured and labelled as such.
+- https://stryker-mutator.io/docs/stryker-js/incremental/ (raw source: `docs/incremental.md` in stryker-js) — "Reuse is possible when: A mutant was "Killed"; the culprit test still exists, and it didn't change." The runner table decides whether a test edit is seen at all: Jest, Vitest, CucumberJS "Full"; Mocha, Tap "Stryker assumes all tests inside a file changed when that file changed"; Jasmine, Karma "Stryker will only see test changes for tests that are added or removed"; Command "will only detect changes in mutants, not their tests"; "Static mutants don't have test coverage; thus, Stryker won't detect test changes for them"; `--force` reruns "all mutants in scope, regardless of the incremental file".
+- https://pitest.org/quickstart/incremental_analysis/ — "If a mutation was killed in the last run and neither the class under test or the killing test has changed, then it can be assumed that this mutation is still killed."; for a changed killing test, "it is likely that the last killing test will still kill it and it should therefore be prioritised above others."
 
-### 3. Prove "function X unchanged" with an AST segment comparison, not a grep over removed diff lines (queue `ee42f6a325200abf`)
+Both tools keep a "Killed" verdict only while its killing test is unchanged. Step 6 applies that rule by hand, and the new edge row covers the Stryker runners that cannot see an in-place edit.
 
-- **Claim:** a grep for `^-.*X(` in the diff fails on correct work when a call to X is re-indented. Comparing `ast.get_source_segment` of X at base and in the working tree is exact, and the gate must also be run on a deliberately changed copy.
-- **Sources checked:**
-  - https://docs.python.org/3/library/ast.html#ast.get_source_segment: signature, returns `None` without position info, added in 3.8.
-  - https://git-scm.com/docs/git-show: the `<rev>:<path>` blob form. Checked in the local `git show --help`: "Shows the contents of the file … as they were current in the 10th last commit".
-- **How verified (local, Python 3.14.6, scratch git repo):**
-  - Wrapping `helper(a)` in `if a:` made the grep gate print `1`.
-  - The page's own snippet, extracted from the markdown and run as is, printed `changed: []` (rc=0) on that change and `changed: ['helper']` (rc=1) after one literal inside `helper` was changed.
-  - Decorator edge case checked: `get_source_segment` on a decorated `FunctionDef` returns text starting at `def`.
-- **Confidence:** verified.
+Local reproduction (Node 26.7.0, `node:test`; one fresh directory per test variant × mutant; each `sed` mutation checked as applied with `cmp`):
 
-### Review (two fresh-context reviewers: one general, one adversarial; both returned FAIL, every finding fixed and re-checked)
+| Test block | Unmutated | N0 no-op control | N1 `'debug'`→`'info'` | N2 `42`→`0` | A21 `=== 'production'`→`=== 'prod'` (named mutant) |
+|---|---|---|---|---|---|
+| Before the fix | pass | survived | killed | killed | survived |
+| Fix that rewrites the block for `'production'` | pass | survived | **survived** | **survived** | killed |
+| Fix that adds the `'production'` assertions beside the old ones | pass | survived | killed | killed | killed |
 
-- **Vendor numbers.** The run table is 8/8 for four models and 6/8 for GPT 5.6 Sol, and now says so. The "Instead of" row now reports the control runs per model: Sonnet and Opus also reached zero from rules alone; Haiku missed one task; savings were about 10%, 31% and 48%. The quoted diagnostic is now verbatim from the README.
-- **Gaps in the ESLint bulk-suppressions advice, now fixed:**
-  - A fixed suppressed violation makes ESLint exit non-zero until `--prune-suppressions`, which is checked against the ESLint docs. A row was added.
-  - `--suppress-rule` replaced `--suppress-all`, which hides unrelated lint debt.
-  - Bulk suppressions are ESLint-only.
-- **Oxlint** lints only script blocks in Vue/Svelte, per the README Frameworks table. A row was added.
-- **Lint-clean does not approve the design.** New tokens and variants need review, per evals.md and the red-team escapes. A row was added.
-- **awk:**
-  - The awk row now warns that under `LC_ALL=C` a non-ASCII literal in a bracket expression becomes a set of single bytes. Reproduced: `printf '가\n' | LC_ALL=C awk '$0 ~ /[–—]/'` matches, and the grouped `(–|—)` does not.
-  - The "Linux CI" framing was removed; it had no evidence.
-  - The bytes claim now has its own reproduction: RSTART=4, and `substr($0,1,1)` is byte `0xED`.
-  - `last_verified` was bumped.
-- **Gate snippet:**
-  - A misspelled name passed vacuously (`None == None`). It now exits with `not found at base: [...]`.
-  - `HEAD:./{path}` replaced `HEAD:{path}`, so the path resolves from the cwd.
-  - Re-run on the page's extracted snippet: good → rc=0, typo → rc=1, subdirectory → rc=0, bad → rc=1.
-  - The hunk-range "Instead of" row is corrected: base-coordinate `-U0` intersection is sound, and the row now says when it is not.
-- **Separately, not in this PR:** the code comment at `skills/wiki-plan/scripts/plan-gate.sh:246` says macOS awk "mixes byte RSTART with character substr()". The measurement shows both are byte-based; the abort comes from regex-decoding a split fragment. The `LC_ALL=C` fix there is still correct; only the comment's mechanism is off.
+The before/after assertion-line diff named both lines the rewrite removed (`assert.equal(c.logLevel, 'debug')`, `assert.equal(c.seed, 42)`) and none for the additive fix. The scratch directory was deleted after the run.
+
+Field evidence (originating session, linkly-invitation task t2 Task 06 attempt 4; not re-run here): swapping the block's `NODE_ENV=test` assertion for a production one killed A9 and A21 while N1–N3 survived with 4/4 tests passing; re-adding the two removed lines killed them.
+
+**7 plan-gap rows (t216)** — not researched as general practice: every directive names linkly's own modules (`impl/lnpl/lower.py`, `spec._check_given`, the `CODES`/`SEVERITY_OF`/`HINTS` registry, RFC numbering), so all seven fail the layer test. No confidence is claimed for them.
 
 ## Existing-layer check
 
-Pages read: platforms-environment-unicode-text-matching, testing-quality-checks-that-cannot-pass, testing-quality-guard-shape-vs-consequence, testing-quality-source-text-wiring-assertions, frontend-design-custom-property-values-read-from-script
+Route: `INDEX.md` → testing ("cases/assertions", "verifying tests can actually fail") → `wiki/testing/index.md` → quality; qa ("acting on code-review feedback") checked as well.
 
-- **Scanned by grep for overlap terms** (not read in full): platforms-shells-portable-shell-scripts, platforms-tools-bsd-vs-gnu-cli (has no awk content), frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, infrastructure-ci-cd-write-time-limit-guards, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan. Also the domain indexes for platforms, frontend and testing.
-- **`wiki_search` top hits (k=5):**
-  - #1: unicode-text-matching (trigger + LC_ALL=C edge case), portable-shell-scripts, unset-versus-empty-parameters, option-like-argument-values.
-  - #2: agent-facing-tool-surfaces, startup-time, component-composition, client-vs-server-state. None about design-system enforcement.
-  - #3: checks-that-cannot-pass (×4 chunks), evaluating-review-feedback.
-- **#1 → merged** into `platforms-environment-unicode-text-matching`: +1 edge-case row, +1 instead-of row, trigger sentence extended, +2 frontmatter sources, +2 Sources entries. That page already owns "a non-ASCII pattern must hold under `LC_ALL=C`". This is the same locale/byte topic with a different tool (awk) and a different failure (abort rather than silent mismatch). No conflict with its existing directive.
-- **#2 → new page** `frontend-design-design-system-lint-gate-for-agents`.
-  - anti-slop-visual-design states the rule in prose ("only `var(--token)`"), and write-time-limit-guards covers the baseline mechanism generically. Neither covers a design-system linter as an agent done-gate.
-  - Back-links added from anti-slop-visual-design and product-ui-vs-brand-surface.
-- **#3 → new page** `testing-quality-unchanged-function-gates`.
-  - checks-that-cannot-pass covers gates that cannot fail on an unwritten target. guard-shape-vs-consequence covers repo-wide shape guards. source-text-wiring-assertions covers regex-on-source call-presence tests.
-  - None covers "prove a named function untouched by a diff". The new trigger and directive (AST segment comparison) are distinct.
-  - Back-links added from guard-shape-vs-consequence and harness-reverse-controls.
-- **Deferred back-links**, because an open PR rewrites the same `related:` line and an edit here would conflict:
-  - checks-that-cannot-pass (#223)
-  - source-text-wiring-assertions (#241)
-  - changed-files-only-gates (#235)
-  - The new pages link to them forward, and the back-links can follow once those PRs land.
-- **Lint:** `node scripts/wiki-lint-prohibitions.js wiki` gives `violations: 0`, rc=0. `node scripts/wiki-structure-checks.js wiki` gives `pages: 357, indexes: 13, findings: 0`, rc=0. Every `related:` id in the new and changed pages resolves to an existing page.
+Pages read: testing-quality-surviving-mutant-equivalence-triage, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, qa-process-evaluating-review-feedback, testing-quality-policy-at-several-return-sites, testing-mocking-captured-call-arguments, testing-quality-minimum-case-set, testing-quality-expectation-sets-with-one-distinct-value, backend-common-errors-diagnostics-from-a-shared-code-path
+
+- `wiki_search` (k=5) on the candidate's trigger: policy-at-several-return-sites 0.768, surviving-mutant-equivalence-triage 0.763 and 0.725, captured-call-arguments 0.737, minimum-case-set 0.735. Only surviving-mutant-equivalence-triage shares the trigger — its "When this applies" already names "a reviewer asks for a test to cover a specific surviving mutant".
+- Whole-wiki search (`/usr/bin/grep` over every page): 46 pages mention mutants; none covers an edit that removes an assertion other mutants depended on. Three pages direct re-running the targeted mutant after adding a case or assertion (tests-that-cannot-fail, expectation-sets-with-one-distinct-value, policy-at-several-return-sites); none of them covers an edit that removes an existing assertion, so step 6 extends them and contradicts none. They are left unchanged to keep this diff small.
+- **Merged, not created**: surviving-mutant-equivalence-triage gains step 6 with a verdict table, 4 edge rows (Stryker incremental reuse by runner, a hand-rolled mutation script, a deliberate replacement, a survivor whose kill does not reproduce on the pre-edit block), 1 Instead-of row, 4 Sources lines, a "When this applies" clause and a step-1 pointer. Body: 115 lines (117 once #226 merges; limit 120 — the next addition to this page needs a split).
+- Related: added testing-quality-mutation-harness-file-custody (its step 6, "re-run the whole matrix" after a custody fix, is the same principle; it already links back, so the link is now two-way). The evaluating-review-feedback ↔ this-page link is already in open PR #226 and is not duplicated here.
+- Conflicts with existing directives: none flagged.
+- `wiki/testing/index.md`: the page's "load when" row now names the new use case (maintenance invariant 1).
+- `last_verified` stays 2026-08-07: open PR #226 bumps that exact line, and a second bump would add a merge conflict; the new claims carry dated sources.
+- Checks on this branch: `node scripts/wiki-structure-checks.js wiki` → `pages: 359, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line, in infrastructure/config/keys-ahead-of-their-consumer.md); no banned vague qualifier in any added line.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`: #241, #239, #238, #237, #236, #235, #234, #233, #231, #230, #229, #228, #227, #226, #225, #223.
+26 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253–#260), listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`. For each head, the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for the candidate's concepts (removed or replaced assertions, re-running all mutants, reviewer/auditor fixes, "also assert"), and every added line mentioning mutants was read.
 
-Each head's `wiki/` diff against main was searched for the candidate terms:
-- #1: `towc|multibyte|LC_ALL=C|substr|RSTART`
-- #2: `shadcn|design.system|tailwind|eslint|bulk suppress|raw color`
-- #3: `get_source_segment|not touched|unchanged function|re-indent|removed line`
+| Candidate | Overlapping open PR | Verdict |
+|---|---|---|
+| 4614be6ce89cc5c5 | None carries it. #226 edits the same page for a different situation (a survivor reported inside a PASS audit); #258 (additive mutants vs presence checks) and #259 (schema key coverage) are different situations | **new** |
+| 7 × t216 plan-gaps | No open PR body mentions t216 (all 26 bodies searched) | **new** → local layer |
 
-| Candidate | Hits in open PRs | Verdict |
-|-----------|------------------|---------|
-| #1 awk towc | #241: 8 hits, all the word "substrings" in its YAML substring-test page. Unrelated. | **new** |
-| #2 design-system lint gate | #231, #228: one hit each. An OWASP quote and an ESLint custom-rule tutorial URL. Unrelated. | **new** |
-| #3 unchanged-function gate | none | **new** |
-
-Line-level conflicts were avoided where possible:
-- #223 rewrites the `related:` line of unicode-text-matching.md, so this PR leaves that line alone. Its new frontmatter source lines are inserted two lines away from it.
-- Index rows were inserted after their nearest sibling row, not at the table end where #225, #241 and #226 append.
-- `log.md` appends at the end, as every flush does.
+Merge check (`git merge-tree --write-tree`, this branch against each head): no wiki page conflicts, including #226, whose four hunks on the shared page were avoided. Every head conflicts on `log.md` and the older ones also on this report file — the same two files the open PRs already conflict on with each other (#260 vs #259 and #255 vs #254 checked).
 
 ## Routing decision
 
-| Insight | Layer | Target |
-|---------|-------|--------|
-| #1 macOS awk towc | general | `platforms/environment/unicode-text-matching.md` (amended): edge-case row + instead-of row. Index load-when line extended |
-| #2 design-system lint gate | general | `frontend/design/design-system-lint-gate-for-agents.md` (new). Row placed after anti-slop-visual-design in `wiki/frontend/index.md` |
-| #3 unchanged-function gate | general | `testing/quality/unchanged-function-gates.md` (new). Row placed after checks-that-cannot-pass in `wiki/testing/index.md` |
+| Candidate | Layer | Target | Action |
+|---|---|---|---|
+| 4614be6ce89cc5c5 | bundled | `testing/quality/surviving-mutant-equivalence-triage.md` | merged as step 6 |
+| 7 × t216 plan-gaps | local (linkly) | see Local-layer candidates | excluded from this PR, retired from the queue |
 
-No new category was needed: each insight fits an existing category.
+No new category: testing/quality already holds the mutation-testing pages, and the target page's trigger covers this situation.
 
-Layer test:
-- #1 names dev-loop's `plan-gate.sh` only as field evidence. The directive holds for any macOS awk script.
-- #3 came from a linkly plan. The directive names no linkly code, and the field-evidence line was reworded to "an orchestration plan's task gate".
+## Independent review
+
+A fresh-context adversarial reviewer (a separate subagent, read-only on this checkout) re-fetched both sources, rebuilt the reproduction from its description (same matrix observed on Node 26.7.0) and re-ran both lint scripts. Verdict: CHANGES_REQUESTED, resolved before this PR:
+
+| Finding | Resolution |
+|---|---|
+| Step 6 said a "Killed" result is reused "only while its killing test is unchanged", dropping conditions both tools state (Stryker: the culprit test still exists; PIT: the class under test is unchanged too) | Fixed: "With the source untouched, PIT and Stryker apply the same rule: they reuse a "Killed" result only while its killing test still exists unchanged." |
+| The log line understated #226's overlap — it also edits this page's related list, Edge table and Sources, so merging it would need reconciliation in four places | Checked and not reproduced: `git merge-tree --write-tree` of this branch with #226 conflicts only in `log.md` and this report file, and the merged page carries 0 conflict markers. The log line now names #226's other three hunks and records that they merge cleanly |
+| Gap: a flaky mutant reads as lost coverage in step 6's table | Added an edge row: when a previously killed mutant survives while the assertion diff shows nothing removed, re-run it against the pre-edit block first; surviving there too marks a flaky verdict (testing-flaky-diagnosing-flaky-tests) |
+
+Kept: the reviewer's routing note (step 6's hygiene theme also sits near tests-that-cannot-fail) — the merge target stays, because this page's trigger already owns "a reviewer asks for a test to cover a specific surviving mutant" and the step-1 table now points into step 6.
 
 ## Local-layer candidates
 
-none
+| Row | Project | Target |
+|---|---|---|
+| Planning t216: deciding Where the check runs | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-spec-result-reads-input-check-site.md — run wiki-ingest inside that project |
+| Planning t216: deciding Which names an expect line asserts on | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-expect-result-candidate-names.md — run wiki-ingest inside that project |
+| Planning t216: deciding Condition (a): the bare name is a respond field | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-field-condition.md — run wiki-ingest inside that project |
+| Planning t216: deciding Condition (b): a same-name respond term wins | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-term-precedence.md — run wiki-ingest inside that project |
+| Planning t216: deciding Condition (c): given did not set the input | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-given-setter-suppression.md — run wiki-ingest inside that project |
+| Planning t216: deciding Severity, registry position, hint | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-diagnostic-code-registration.md — run wiki-ingest inside that project |
+| Planning t216: deciding RFC | linkly (linkly-dartfish worktree) | wiki-local/qa/document-verification/t216-no-rfc-for-warning-only-code.md — run wiki-ingest inside that project |
+
+All seven are wiki-plan Phase B decisions naming linkly's own modules; they are excluded from this PR and retired from the queue.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
