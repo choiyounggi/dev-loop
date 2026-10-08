@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 # scripts/gen-agent-tier-variants.sh: each tier-graded agent has a base file
-# (R3/R2) and a generated -r1 copy (R1/R0) one effort step lower, because the
-# Agent tool overrides `model` per call but never `effort`. These tests prove
+# (R3/R2) and a generated -r1 copy (R1/R0) one effort step lower, never below
+# high, because the Agent tool overrides `model` per call but never `effort`.
+# These tests prove
 # the committed copies are in sync with their bases, that --check catches
 # drift, and that a malformed base is refused.
 
@@ -23,12 +24,12 @@ frontmatter() {
   [ -z "$output" ]
 }
 
-@test "each -r1 copy is the R1/R0 column: renamed, one effort step lower, same model, same body" {
+@test "each -r1 copy is the R1/R0 column: renamed, one effort step lower floored at high, same model, same body" {
   for row in \
     "task-analyst|claude-fable-5-1|high" \
-    "task-planner|claude-opus-5-5|medium" \
-    "test-quality-auditor|claude-fable-5-1|medium" \
-    "task-reviewer|claude-fable-5-1|medium" \
+    "task-planner|claude-opus-5-5|high" \
+    "test-quality-auditor|claude-fable-5-1|high" \
+    "task-reviewer|claude-fable-5-1|high" \
     "integration-reviewer|claude-fable-5-1|xhigh"; do
     IFS='|' read -r name model effort <<< "$row"
     copy="${REPO_ROOT}/agents/${name}-r1.md"
