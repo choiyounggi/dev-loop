@@ -83,6 +83,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [transaction-boundaries](common/orm/transaction-boundaries.md) | Deciding where a DB transaction starts/ends in application code — service vs controller vs per-repository-call boundaries, what belongs inside, annotation/proxy pitfalls, read-only flags, chunking batch writes; debugging partial writes or connection-pool exhaustion around open transactions |
+| [prisma-7-config-env-and-generated-client](common/orm/prisma-7-config-env-and-generated-client.md) | Setting up Prisma ORM 7 or upgrading from 6: the CLI does not see `DATABASE_URL` from a `.env` file; `prisma generate` fails in `postinstall`, CI or a Docker build with `PrismaConfigEnvError`; the generated client is missing after a fresh clone or a `--frozen-lockfile` install; choosing between `env()`, a bare `process.env.X` (7.2.0+) and `?? ''` (before 7.2.0); a Dockerfile that installs before copying the schema, or `--ignore-scripts`; writing the generator block (`provider = "prisma-client"` needs an `output`; the client no longer lands in `node_modules`); whether to commit the generated client; where `prisma.config.ts` lives and what moved out of `package.json` |
 
 ### concurrency
 

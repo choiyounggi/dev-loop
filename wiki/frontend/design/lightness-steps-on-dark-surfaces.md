@@ -10,7 +10,7 @@ sources:
   - https://www.w3.org/TR/css-color-4/
   - "Local reproduction 2026-09-06: WCAG contrast ratios recomputed from the engine-measured sRGB bytes; a CSS Color 4 OKLab→sRGB conversion reproduced those bytes within ±2"
 last_verified: 2026-09-06
-related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements]
+related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements, frontend-accessibility-contrast-of-interactive-states]
 ---
 
 # Distinguishing States by OKLCH Lightness on a Dark Surface

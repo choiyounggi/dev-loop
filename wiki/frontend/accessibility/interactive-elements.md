@@ -10,7 +10,7 @@ sources:
   - https://developer.mozilla.org/en-US/docs/Web/API/Popover_API
   - https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/inert
 last_verified: 2026-08-24
-related: [frontend-forms-validation-timing, frontend-agent-interfaces-agent-facing-tool-surfaces, frontend-design-anti-slop-visual-design, frontend-design-responsive-layout, frontend-forms-dropzone-copy-without-drop-handlers]
+related: [frontend-forms-validation-timing, frontend-agent-interfaces-agent-facing-tool-surfaces, frontend-design-anti-slop-visual-design, frontend-design-responsive-layout, frontend-forms-dropzone-copy-without-drop-handlers, frontend-accessibility-contrast-of-interactive-states]
 ---
 
 # Building Clickable and Keyboard-Operable UI
