@@ -1,125 +1,93 @@
-# Knowledge flush — 3 insight(s)
+# Knowledge flush — 5 insight(s)
 
-macOS awk aborting on split multibyte text, a lint gate for agent-written Tailwind UI, and proving a function unchanged with an AST comparison. **1 page amended, 2 new pages, 4 back-links. 0 dropped, 0 local-layer.**
+Shell-lock owner PIDs written by a helper's own `$$`, preserving an interrupted run's leftovers before an automated `reset --hard`, multiline form values arriving as CRLF, anchor-killing cases for allowlist regexes, and zod 4 refinements running after a failed check. **5 new pages, 5 back-links. 0 dropped, 3 plan-gaps retired as local-layer.**
+
+Run: auto-flush child, run id `20261008-114912-66559`; 8 rows claimed (5 insights + 3 plan-gaps).
 
 ## Verified best-practice
 
-### 1. macOS awk: `match()`/`substr()` over Korean text aborts → `LC_ALL=C awk` (queue `d7bc69bc97da5266`)
+### 1. Owner PID in a shell lock written by a helper script → `verified`
+Claim: a lock helper that records its own `$$` records a PID that is dead as soon as the helper exits, so "past TTL and holder dead → reclaim" degrades to TTL-only; record the long-lived holder's PID (passed in), refresh from it, and store PID + start time.
+- https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html — 2.5.2: `$` is "the decimal process ID of the invoked shell".
+- https://man7.org/linux/man-pages/man2/kill.2.html — signal 0 performs "existence and permission checks" (EPERM edge row).
+- https://man7.org/linux/man-pages/man2/flock.2.html — lock tied to the open file description.
+- Source read: dev-loop `scripts/flush-lock.sh:64` writes `$$` in `_write_owner`; line 96 keeps the lock while `age <= TTL || _pid_alive`.
+- Local repro (macOS `/bin/sh`): helper-written `$$` → `kill -0` dead right after acquire while the caller ran; caller PID passed in → alive.
 
-- **Claim (corrected):** macOS `/usr/bin/awk` (`awk version 20200816`) counts `length`/`RSTART`/`substr` in **bytes**, but POSIX says characters. So `substr(s, RSTART-1, 1)` can return half a character. A regex test on that fragment then aborts under a UTF-8 locale with `towc: multibyte conversion failure` (exit 2). Running the awk under `LC_ALL=C` makes every step byte-based and the abort goes away.
-- **Correction to the queued candidate:** the candidate said awk "mixes a byte-based RSTART with character-based substr()". Measured: both are byte-based. The abort comes from the **regex step** decoding a split fragment. A `match()`+`substr()` with no regex test on the fragment did not abort.
-- **Sources checked:**
-  - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html: `length`, `match` and `substr` are defined "in characters"; `LC_CTYPE` decides how bytes become characters.
-  - https://developer.apple.com/forums/thread/705559: the same `towc` error from macOS `/usr/bin/awk`; the poster reports GNU awk works.
-- **How verified (local, 2026-10-06, macOS 26.1, `LANG=en_US.UTF-8`):**
-  - `printf '한\n' | awk '{print length($0)}'` → `3` in both locales.
-  - `printf '한R1\n' | awk '{match($0,/R[0-9]+/); p=substr($0,RSTART-1,1); if (p ~ /[A-Za-z]/) print "x"}'` → `towc: multibyte conversion failure`, rc=2. With `LC_ALL=C` → rc=0.
-  - The real `_cited_rule_ids` awk from dev-loop `skills/wiki-plan/scripts/plan-gate.sh` (PR #242), run without `LC_ALL=C` on `검증 R1–R3 한글`: aborted, rc=2. With `LC_ALL=C`: printed `1 2 3 3 4 5 5`, rc=0.
-- **Not verified:** the candidate's claim that Ubuntu's mawk does not fail. gawk and mawk were not installed here, so the page says this is untested.
-- **Confidence:** verified (POSIX spec plus a local reproduction).
+### 2. Resetting a reused checkout after an interrupted run → `verified`
+Claim: before an automated job's `checkout main && reset --hard origin/main`, inspect `status --porcelain` and unpushed commits, preserve leftovers (WIP branch/commit, or `add -A` + cached patch checked with `apply --check -R`), then reset.
+- https://git-scm.com/docs/git-reset — `--hard` overwrites tracked files, "may overwrite untracked files".
+- https://git-scm.com/docs/git-apply — `--check`, `-R`.
+- https://git-scm.com/docs/git-status — porcelain format, `--ignored`.
+- Local repro: `git diff` patch carried only the tracked edit (untracked file omitted); after `reset --hard` the tracked edit was gone, the untracked file stayed.
+- Field case: this skill's own step 1 met 19 uncommitted files from a run stopped by the usage limit (shipped later in #259).
+- Reviewer fixes applied: unpushed commits on the branch being reset (or a detached HEAD) need a `wip/` branch first; `git clean -x` deletes ignored files that neither preservation path carries.
 
-### 2. Lint gate for agent-written UI in a Tailwind design system (queue `df76e2cefa92769b`)
+### 3. Multiline form values arrive with CRLF → `verified`
+Claim: multipart/form-data (FormData bodies, server actions) and `<form>` urlencoded submission rewrite lone LF/CR to CRLF in names and string values; normalize before control-char/length checks and test through a FormData round trip.
+- https://html.spec.whatwg.org/multipage/form-control-infrastructure.html — 4.10.22.8 Multipart form data steps 1.1/1.2 (names; values that are not File objects), file-name escaping `%0A`/`%0D`/`%22`; 4.10.22.6 Converting an entry list to a list of name-value pairs (same rewrite).
+- Local repro (Node v26.7.0): `FormData` `'line1\nline2'` → `"line1\r\nline2"`, `'x\ry'` → `"x\r\ny"`; `URLSearchParams` body unchanged.
 
-- **Claim:** turn prose design-system rules into `@shadcn/lint` rules, make lint-clean a done criterion, and loop the agent on diagnostics until the count is 0. On a legacy codebase, start at `warn` with a `--max-warnings` cap, or use ESLint bulk suppressions, and gate on "no new violations".
-- **Sources checked:**
-  - https://github.com/shadcn-ui/lint (README via `gh api`): Tailwind v4, ESLint/Oxlint, React/Svelte/Vue, the six-rule table, the per-model run table (8/8, 42–117 → 0), "10% to 48% less".
-  - https://github.com/shadcn-ui/lint/blob/main/docs/evals.md: methodology, 150+ runs, the rules-only control. Labelled on the page as a **vendor eval**.
-  - https://github.com/shadcn-ui/lint/blob/main/docs/adoption.md: warn, then `--max-warnings`, then bulk suppressions.
-  - https://eslint.org/docs/latest/use/suppressions and https://eslint.org/blog/2025/04/eslint-v9.24.0-released/: bulk suppressions arrived in v9.24.0.
-  - `packages/lint/package.json`: v0.2.0, peer `eslint >=9.30.0`, `node >=20.19`.
-- **Confidence:** verified for the tool's documented behaviour and the adoption path. The effect sizes are vendor-measured and labelled as such.
+### 4. Anchor cases for an allowlist regex → `verified`
+Claim: malformed-value reject cases cannot detect a missing `^`/`$`; add a valid-value-with-prefix case per `^` and suffix case per `$`, prove each by deleting the anchor.
+- https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/ — regex mutator maps `^abc` → `abc`, `abc$` → `abc`.
+- https://docs.python.org/3/library/re.html — `$` also matches "just before the newline at the end of the string"; `re.fullmatch`.
+- Local repro (Node v26.7.0, Python 3.14.6): wrong-ext/short/empty rejected with and without `^`; `../`+valid and `/etc/`+valid rejected only with `^`; Python `re.search` matched `valid+'\n'`; JS `/m` accepted an embedded valid line.
+- Reviewer fix applied: under `re.fullmatch` the delete-anchor check is equivalent, so the page gives the alternative check there.
 
-### 3. Prove "function X unchanged" with an AST segment comparison, not a grep over removed diff lines (queue `ee42f6a325200abf`)
-
-- **Claim:** a grep for `^-.*X(` in the diff fails on correct work when a call to X is re-indented. Comparing `ast.get_source_segment` of X at base and in the working tree is exact, and the gate must also be run on a deliberately changed copy.
-- **Sources checked:**
-  - https://docs.python.org/3/library/ast.html#ast.get_source_segment: signature, returns `None` without position info, added in 3.8.
-  - https://git-scm.com/docs/git-show: the `<rev>:<path>` blob form. Checked in the local `git show --help`: "Shows the contents of the file … as they were current in the 10th last commit".
-- **How verified (local, Python 3.14.6, scratch git repo):**
-  - Wrapping `helper(a)` in `if a:` made the grep gate print `1`.
-  - The page's own snippet, extracted from the markdown and run as is, printed `changed: []` (rc=0) on that change and `changed: ['helper']` (rc=1) after one literal inside `helper` was changed.
-  - Decorator edge case checked: `get_source_segment` on a decorated `FunctionDef` returns text starting at `def`.
-- **Confidence:** verified.
-
-### Review (two fresh-context reviewers: one general, one adversarial; both returned FAIL, every finding fixed and re-checked)
-
-- **Vendor numbers.** The run table is 8/8 for four models and 6/8 for GPT 5.6 Sol, and now says so. The "Instead of" row now reports the control runs per model: Sonnet and Opus also reached zero from rules alone; Haiku missed one task; savings were about 10%, 31% and 48%. The quoted diagnostic is now verbatim from the README.
-- **Gaps in the ESLint bulk-suppressions advice, now fixed:**
-  - A fixed suppressed violation makes ESLint exit non-zero until `--prune-suppressions`, which is checked against the ESLint docs. A row was added.
-  - `--suppress-rule` replaced `--suppress-all`, which hides unrelated lint debt.
-  - Bulk suppressions are ESLint-only.
-- **Oxlint** lints only script blocks in Vue/Svelte, per the README Frameworks table. A row was added.
-- **Lint-clean does not approve the design.** New tokens and variants need review, per evals.md and the red-team escapes. A row was added.
-- **awk:**
-  - The awk row now warns that under `LC_ALL=C` a non-ASCII literal in a bracket expression becomes a set of single bytes. Reproduced: `printf '가\n' | LC_ALL=C awk '$0 ~ /[–—]/'` matches, and the grouped `(–|—)` does not.
-  - The "Linux CI" framing was removed; it had no evidence.
-  - The bytes claim now has its own reproduction: RSTART=4, and `substr($0,1,1)` is byte `0xED`.
-  - `last_verified` was bumped.
-- **Gate snippet:**
-  - A misspelled name passed vacuously (`None == None`). It now exits with `not found at base: [...]`.
-  - `HEAD:./{path}` replaced `HEAD:{path}`, so the path resolves from the cwd.
-  - Re-run on the page's extracted snippet: good → rc=0, typo → rc=1, subdirectory → rc=0, bad → rc=1.
-  - The hunk-range "Instead of" row is corrected: base-coordinate `-U0` intersection is sound, and the row now says when it is not.
-- **Separately, not in this PR:** the code comment at `skills/wiki-plan/scripts/plan-gate.sh:246` says macOS awk "mixes byte RSTART with character substr()". The measurement shows both are byte-based; the abort comes from regex-decoding a split fragment. The `LC_ALL=C` fix there is still correct; only the comment's mechanism is off.
+### 5. zod 4 runs later checks after a failed check → `verified`
+Claim: in zod 4 a failed continuable check (`.regex`, `.min`) does not stop later refinements, and a refine that throws escapes `safeParse`; fold the test into the refine, pass `{ abort: true }`, or make the refine total.
+- https://zod.dev/api — "Zod will execute all checks in sequence, even if one of them causes a validation error"; `abort`; `when` default.
+- Local repro (zod 4.6.5): chained `.regex().refine(BigInt…)` threw `SyntaxError` from `safeParse('abc')`; `{ abort: true }` → `invalid_format`; single refine → `custom`; refine call counts 1/1/0 after failed regex/min/type.
 
 ## Existing-layer check
 
-Pages read: platforms-environment-unicode-text-matching, testing-quality-checks-that-cannot-pass, testing-quality-guard-shape-vs-consequence, testing-quality-source-text-wiring-assertions, frontend-design-custom-property-values-read-from-script
+`wiki_search` (k=5) per candidate — top hits considered: inherited-lock-ownership-in-a-spawned-session, process-identity-by-path-and-hash (#1); control-signals-vs-primary-artifacts, worktree-isolated-workers, tests-that-cannot-fail, shared-run-state, unattended-worker-questions (#2); error-responses, write-path-assertions, exposing-an-origin-http-api, object-key-persistence, validation-timing (#3); escapes-in-shell-string-literals, xss-safe-rendering, exposing-an-origin-http-api (#4); checks-that-cannot-pass, event-loop-blocking (#5). None shares a trigger with a candidate, so all 5 are new pages (no merge).
 
-- **Scanned by grep for overlap terms** (not read in full): platforms-shells-portable-shell-scripts, platforms-tools-bsd-vs-gnu-cli (has no awk content), frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, infrastructure-ci-cd-write-time-limit-guards, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan. Also the domain indexes for platforms, frontend and testing.
-- **`wiki_search` top hits (k=5):**
-  - #1: unicode-text-matching (trigger + LC_ALL=C edge case), portable-shell-scripts, unset-versus-empty-parameters, option-like-argument-values.
-  - #2: agent-facing-tool-surfaces, startup-time, component-composition, client-vs-server-state. None about design-system enforcement.
-  - #3: checks-that-cannot-pass (×4 chunks), evaluating-review-feedback.
-- **#1 → merged** into `platforms-environment-unicode-text-matching`: +1 edge-case row, +1 instead-of row, trigger sentence extended, +2 frontmatter sources, +2 Sources entries. That page already owns "a non-ASCII pattern must hold under `LC_ALL=C`". This is the same locale/byte topic with a different tool (awk) and a different failure (abort rather than silent mismatch). No conflict with its existing directive.
-- **#2 → new page** `frontend-design-design-system-lint-gate-for-agents`.
-  - anti-slop-visual-design states the rule in prose ("only `var(--token)`"), and write-time-limit-guards covers the baseline mechanism generically. Neither covers a design-system linter as an agent done-gate.
-  - Back-links added from anti-slop-visual-design and product-ui-vs-brand-surface.
-- **#3 → new page** `testing-quality-unchanged-function-gates`.
-  - checks-that-cannot-pass covers gates that cannot fail on an unwritten target. guard-shape-vs-consequence covers repo-wide shape guards. source-text-wiring-assertions covers regex-on-source call-presence tests.
-  - None covers "prove a named function untouched by a diff". The new trigger and directive (AST segment comparison) are distinct.
-  - Back-links added from guard-shape-vs-consequence and harness-reverse-controls.
-- **Deferred back-links**, because an open PR rewrites the same `related:` line and an edit here would conflict:
-  - checks-that-cannot-pass (#223)
-  - source-text-wiring-assertions (#241)
-  - changed-files-only-gates (#235)
-  - The new pages link to them forward, and the back-links can follow once those PRs land.
-- **Lint:** `node scripts/wiki-lint-prohibitions.js wiki` gives `violations: 0`, rc=0. `node scripts/wiki-structure-checks.js wiki` gives `pages: 357, indexes: 13, findings: 0`, rc=0. Every `related:` id in the new and changed pages resolves to an existing page.
+Pages read: infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session, backend-common-jobs-scheduled-job-overlap, backend-common-concurrency-distributed-locks, backend-node-boundaries-runtime-validation, testing-quality-harness-reverse-controls, infrastructure-agent-orchestration-shared-run-state, security-input-validation-at-trust-boundaries, testing-quality-checks-that-cannot-pass, testing-quality-tests-that-cannot-fail, platforms-filesystems-paths-case-and-line-endings, infrastructure-agent-orchestration-usage-limit-paused-workers
+
+Overlap notes:
+- distributed-locks owns TTL watchdog refresh for Redis-style locks; the new lock page links to it for step 3 instead of restating it.
+- inherited-lock-ownership owns run-id inheritance; the new page covers the PID field of the same owner record.
+- runtime-validation owns "validate at the boundary with zod"; the new zod page covers check-chain semantics only.
+- No conflicts flagged.
+
+Back-links added (`related:`): inherited-lock-ownership-in-a-spawned-session, distributed-locks, scheduled-job-overlap → lock page; shared-run-state → reset page; harness-reverse-controls → anchor page.
+
+Deferred back-links (pages an open PR rewrites the `related:` line of): runtime-validation → zod page (#233 edits that line); validation-at-trust-boundaries → CRLF/anchor pages (#228); paths-case-and-line-endings → CRLF page (#228); tests-that-cannot-fail → anchor page (#223/#258). The lock page's link to `platforms-processes-signalling-a-remembered-pid` is deferred because that page exists only on #259.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`: #241, #239, #238, #237, #236, #235, #234, #233, #231, #230, #229, #228, #227, #226, #225, #223.
+Open `knowledge/*` heads diffed (`git diff origin/main...origin/<head> -- wiki/`): #223, #225–#231, #233–#239, #241, #244, #249, #253–#259 (25 heads).
 
-Each head's `wiki/` diff against main was searched for the candidate terms:
-- #1: `towc|multibyte|LC_ALL=C|substr|RSTART`
-- #2: `shadcn|design.system|tailwind|eslint|bulk suppress|raw color`
-- #3: `get_source_segment|not touched|unchanged function|re-indent|removed line`
+| Candidate | Overlapping open PR | Verdict |
+|---|---|---|
+| 1 lock owner PID | #259 `platforms/processes/signalling-a-remembered-pid` is adjacent (verify a remembered PID before signalling) but covers a different trigger | new |
+| 2 reset reused checkout | none | new |
+| 3 FormData CRLF | none (#233 NestJS multer errors, #241 headless upload — different triggers) | new |
+| 4 regex anchors | none | new |
+| 5 zod 4 continuable checks | #259 `schema-rejection-key-coverage` (per-key rejection tests) and #257 `structured-output-schema-from-zod` — different triggers | new |
 
-| Candidate | Hits in open PRs | Verdict |
-|-----------|------------------|---------|
-| #1 awk towc | #241: 8 hits, all the word "substrings" in its YAML substring-test page. Unrelated. | **new** |
-| #2 design-system lint gate | #231, #228: one hit each. An OWASP quote and an ESLint custom-rule tutorial URL. Unrelated. | **new** |
-| #3 unchanged-function gate | none | **new** |
-
-Line-level conflicts were avoided where possible:
-- #223 rewrites the `related:` line of unicode-text-matching.md, so this PR leaves that line alone. Its new frontmatter source lines are inserted two lines away from it.
-- Index rows were inserted after their nearest sibling row, not at the table end where #225, #241 and #226 append.
-- `log.md` appends at the end, as every flush does.
+Merge check (`git merge-tree --write-tree` against every head): the only conflicts this branch adds are the shared `log.md` append and `.dev-loop/INGEST_REPORT.md`, which every flush branch already conflicts on. A `wiki/backend/node/index.md` conflict with #233 was removed by placing the zod row above the `runtime-validation` row.
 
 ## Routing decision
 
-| Insight | Layer | Target |
-|---------|-------|--------|
-| #1 macOS awk towc | general | `platforms/environment/unicode-text-matching.md` (amended): edge-case row + instead-of row. Index load-when line extended |
-| #2 design-system lint gate | general | `frontend/design/design-system-lint-gate-for-agents.md` (new). Row placed after anti-slop-visual-design in `wiki/frontend/index.md` |
-| #3 unchanged-function gate | general | `testing/quality/unchanged-function-gates.md` (new). Row placed after checks-that-cannot-pass in `wiki/testing/index.md` |
+| Insight | Target |
+|---|---|
+| 1 | platforms/processes/lock-owner-pid-from-the-holding-process.md (new) — process/PID mechanics, next to background-services |
+| 2 | infrastructure/agent-orchestration/resetting-a-reused-checkout-after-an-interrupted-run.md (new) — automated agent jobs reusing a checkout |
+| 3 | backend/common/api-design/multiline-form-values-arrive-with-crlf.md (new) — HTML-spec behavior, not Node-specific, so `common` |
+| 4 | testing/quality/anchor-cases-for-allowlist-regexes.md (new) |
+| 5 | backend/node/boundaries/zod-4-checks-continue-after-a-failure.md (new) — next to runtime-validation |
 
-No new category was needed: each insight fits an existing category.
-
-Layer test:
-- #1 names dev-loop's `plan-gate.sh` only as field evidence. The directive holds for any macOS awk script.
-- #3 came from a linkly plan. The directive names no linkly code, and the field-evidence line was reworded to "an orchestration plan's task gate".
+No new categories. Index rows added in `wiki/platforms/index.md`, `wiki/infrastructure/index.md`, `wiki/backend/index.md`, `wiki/backend/node/index.md`, `wiki/testing/index.md`; 5 `log.md` ingest entries. Lint: `wiki-structure-checks.js wiki --layer bundled` → 0 findings; `wiki-lint-prohibitions.js` → no violations in the new pages (8 pre-existing elsewhere). Adversarial review (feature-dev:code-reviewer): 3 findings (2 HIGH, 1 LOW), all fixed before commit.
 
 ## Local-layer candidates
 
-none
+| Row | Project | Target |
+|---|---|---|
+| Planning t213: deciding Exact rejection message | linkly (linkly-dartfish worktree) | wiki-local/backend/common/t213-rejection-message.md — run wiki-ingest inside that project |
+| Planning t214: deciding Byte-identity for inputs with no Password-family key | linkly (linkly-dartfish worktree) | wiki-local/backend/common/t214-password-family-byte-identity.md — run wiki-ingest inside that project |
+| Planning t214: deciding Which entities decide Password-family | linkly (linkly-dartfish worktree) | wiki-local/backend/common/t214-password-family-entities.md — run wiki-ingest inside that project |
+
+All three are wiki-plan Phase B decisions naming one repository's own tasks; excluded from this PR and retired.

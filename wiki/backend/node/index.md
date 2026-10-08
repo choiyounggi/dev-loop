@@ -24,4 +24,5 @@ own the Node mechanics.
 
 | Page | Load when |
 |------|-----------|
+| [zod-4-checks-continue-after-a-failure](boundaries/zod-4-checks-continue-after-a-failure.md) | A zod 4 schema chains `.regex()`/`.min()`/other checks and then a `.refine()`/`.superRefine()` whose function throws or misjudges input the earlier check should have excluded (`BigInt`, `new URL`, `JSON.parse`) |
 | [runtime-validation](boundaries/runtime-validation.md) | Typing request bodies/query params/env vars/third-party responses/queue messages in a TypeScript service; an `as` cast on external data; runtime shape errors deep inside code that compiled fine; choosing where schema parse lives (handler, startup config, consumer) and where static types alone suffice |
