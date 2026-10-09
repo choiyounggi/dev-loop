@@ -16,6 +16,7 @@ setup() {
   AGENT2="${REPO_ROOT}/agents/test-quality-auditor.md"
   AGENT3="${REPO_ROOT}/agents/task-reviewer.md"
   AGENT4="${REPO_ROOT}/agents/task-planner.md"
+  AGENT5="${REPO_ROOT}/agents/task-analyst.md"
 }
 
 # Collapses embedded newlines to a single space so a substring assertion
@@ -68,20 +69,18 @@ orca_protocol_section() {
   awk '/^## Orca worker protocol/{p=1} p && /^## Subagent usage protocol/{exit} p' "$1"
 }
 
-# --- 1: agent file exists, frontmatter pins name and carries NO model pin --
+# --- 1: agent file exists, frontmatter pins name and the final-review model --
 
-@test "agents/integration-reviewer.md exists with name and NO model pin (issue #200)" {
+@test "agents/integration-reviewer.md exists with name and the final-review model pin" {
   [ -f "$AGENT" ]
   head -10 "$AGENT" | grep -qF 'name: integration-reviewer'
-  run sh -c "head -10 '$AGENT' | grep -q '^model:'"
-  [ "$status" -ne 0 ]
+  [[ "$(head -10 "$AGENT")" == *$'\n'"model: claude-fable-5-1"$'\n'* ]]
 }
 
-@test "negative control: a frontmatter copy WITH a model pin fails the no-pin check" {
+@test "negative control: a frontmatter copy with a different model fails the pin check" {
   pinned="${BATS_TEST_TMPDIR}/agent-pinned.md"
-  awk '/^name:/{print; print "model: fable"; next} {print}' "$AGENT" > "$pinned"
-  run sh -c "head -10 '$pinned' | grep -q '^model:'"
-  [ "$status" -eq 0 ]
+  sed 's/^model: .*/model: sonnet/' "$AGENT" > "$pinned"
+  [[ "$(head -10 "$pinned")" != *$'\n'"model: claude-fable-5-1"$'\n'* ]]
 }
 
 # --- 2: agent body is read-only with the fixed VERDICT/FINDINGS contract ---
@@ -182,8 +181,8 @@ orca_protocol_section() {
 
 # --- 6b: both review agents prohibit git stash, with the refs/stash rationale (issue #166) ---
 
-@test "all four agent files carry the git-stash prohibition and refs/stash rationale" {
-  for f in "$AGENT" "$AGENT2" "$AGENT3" "$AGENT4"; do
+@test "all five agent files carry the git-stash prohibition and refs/stash rationale" {
+  for f in "$AGENT" "$AGENT2" "$AGENT3" "$AGENT4" "$AGENT5"; do
     content="$(cat "$f")"
     [[ "$content" == *'NEVER `git stash`'* ]]
     [[ "$content" == *"refs/stash"* ]]
@@ -314,11 +313,10 @@ orca_protocol_section() {
 
 # --- 7: task-reviewer agent (issue #192 stage 4) ---------------------------
 
-@test "agents/task-reviewer.md exists with name and NO model pin" {
+@test "agents/task-reviewer.md exists with name and the QA model pin" {
   [ -f "$AGENT3" ]
   head -10 "$AGENT3" | grep -qF 'name: task-reviewer'
-  run sh -c "head -10 '$AGENT3' | grep -q '^model:'"
-  [ "$status" -ne 0 ]
+  [[ "$(head -10 "$AGENT3")" == *$'\n'"model: claude-fable-5-1"$'\n'* ]]
 }
 
 @test "task-reviewer body lists every explicit input and the first-line VERDICT contract" {
@@ -414,15 +412,15 @@ orca_protocol_section() {
 
 # --- 8: task-planner agent (issue #192 stage 5) ---
 
-@test "agents/task-planner.md exists with name, a tools line that includes Skill and Write and excludes Agent, and NO model pin" {
+@test "agents/task-planner.md exists with name, a tools line that includes Skill and Write and excludes Agent, and the design-row model pin" {
   [ -f "$AGENT4" ]
   head -10 "$AGENT4" | grep -qF 'name: task-planner'
   tools_line="$(head -10 "$AGENT4" | grep '^tools:')"
   [[ "$tools_line" == *"Skill"* ]]
   [[ "$tools_line" == *"Write"* ]]
   [[ "$tools_line" != *"Agent"* ]]
-  run sh -c "head -10 '$AGENT4' | grep -q '^model:'"
-  [ "$status" -ne 0 ]
+  head -10 "$AGENT4" | grep -qx 'model: claude-opus-5-5'
+  [[ "$(head -10 "$AGENT4")" == *$'\n'"model: claude-opus-5-5"$'\n'* ]]
 }
 
 @test "negative control: a task-planner copy with Agent added to tools fails the no-Agent check" {
@@ -489,4 +487,56 @@ orca_protocol_section() {
   grep -v 're-enters the two-stage handshake' "$AGENT4" > "$stripped"
   content="$(normalize_ws "$(cat "$stripped")")"
   [[ "$content" != *"re-enters the two-stage handshake"* ]]
+}
+
+# --- 9: task-analyst agent (wiki-plan Phase A split out of task-planner) ---
+
+@test "agents/task-analyst.md exists with name and a tools line that includes Skill and Write and excludes Agent" {
+  [ -f "$AGENT5" ]
+  head -10 "$AGENT5" | grep -qF 'name: task-analyst'
+  tools_line="$(head -10 "$AGENT5" | grep '^tools:')"
+  [[ "$tools_line" == *"Skill"* ]]
+  [[ "$tools_line" == *"Write"* ]]
+  [[ "$tools_line" != *"Agent"* ]]
+}
+
+@test "task-analyst body lists every input, stops at gate-A, and fixes the ANALYSIS REPORT fields" {
+  content="$(normalize_ws "$(cat "$AGENT5")")"
+  for want in "task id" "brief path" "plan dir" "gates dir" "risk tier" "wiki root" "integ ref" \
+              "ask for them rather than guessing" "stop at gate-A" "plan dir:" "gate-A rc:" \
+              "expected size:" "contradiction:"; do
+    [[ "$content" == *"$want"* ]]
+  done
+}
+
+@test "task-analyst write scope is analysis.md and the gate-A ledger only" {
+  content="$(normalize_ws "$(cat "$AGENT5")")"
+  [[ "$content" == *"{ORCH_DIR}/plans/<task>/analysis.md"* ]]
+  [[ "$content" == *".dev-loop/gates/plan-A-<task>.md"* ]]
+  [[ "$content" != *"plan-B-<task>.md"* ]]
+  [[ "$content" == *'never call `status-update.sh`'* ]]
+}
+
+@test "task-analyst R0 row abandons research-evidenced on gate-A, and round 3 takes the gap report" {
+  r0="$(grep '^| R0 |' "$AGENT5")"
+  [[ "$r0" == *"gate-A with the \`research-evidenced\` ABANDON line"* ]]
+  content="$(normalize_ws "$(cat "$AGENT5")")"
+  [[ "$content" == *"from the brief AND the forwarded gap report"* ]]
+}
+
+@test "task-planner R0 row abandons only reviewer-verdict on gate-B (research-evidenced is a gate-A id)" {
+  r0="$(grep '^| R0 |' "$AGENT4")"
+  [[ "$r0" == *"gate-B with the \`reviewer-verdict\` ABANDON line"* ]]
+  [[ "$r0" != *"two ABANDON lines"* ]]
+}
+
+@test "negative control: the pre-split planner R0 row fails the gate-B abandon check" {
+  r0='| R0 | wiki-plan lite mode: gate-B with the two ABANDON lines, Phase C; no stop, no reviewer |'
+  [[ "$r0" != *"gate-B with the \`reviewer-verdict\` ABANDON line"* ]]
+}
+
+@test "task-planner writes only the gate-B ledger and reads the gate-A one" {
+  content="$(normalize_ws "$(cat "$AGENT4")")"
+  [[ "$content" == *"the gate ledger \`.dev-loop/gates/plan-B-<task>.md\`"* ]]
+  [[ "$content" == *"You read \`analysis.md\` and \`.dev-loop/gates/plan-A-<task>.md\` and write neither"* ]]
 }

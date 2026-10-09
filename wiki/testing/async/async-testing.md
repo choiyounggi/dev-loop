@@ -10,8 +10,8 @@ sources:
   - https://jestjs.io/docs/expect
   - https://testing-library.com/docs/dom-testing-library/api-async/
   - https://martinfowler.com/articles/nonDeterminism.html
-last_verified: 2026-08-29
-related: [testing-quality-tests-that-cannot-fail, testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-injected-clock-duration-assertions, platforms-processes-sentinel-driven-repl-payloads, testing-quality-narration-based-ordering-assertions]
+last_verified: 2026-09-28
+related: [testing-quality-tests-that-cannot-fail, testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-injected-clock-duration-assertions, platforms-processes-sentinel-driven-repl-payloads, testing-quality-narration-based-ordering-assertions, testing-async-transient-state-behind-a-controlled-gate]
 ---
 
 # Testing Asynchronous Code Deterministically
@@ -38,6 +38,7 @@ un-awaited promises; or an async test intermittently interferes with the next te
 | UI or state that appears asynchronously | Poll the **condition** with a bounded-timeout wait (`waitFor`/`findBy`-style) and assert the final state; the test proceeds the moment the condition holds |
 | Event-emitter / callback API | Wrap the event in a promise (`once`-style helper) and `await` it, then assert |
 | Fire-and-forget side effect | Expose a completion handle (returned promise, flush/drain hook) and await it in the test; when no handle can exist, poll the durable outcome (row above) |
+| A transient mid-run state that a background finisher/teardown will clear (a controls-map entry, a pending approval) | A condition wait cannot distinguish "not yet" from "already wiped": park the system behind a decision the test controls, assert inside the park, then release → [testing-async-transient-state-behind-a-controlled-gate] |
 | Code that consumes a stream record-by-record (readline prompts, a line-delimited protocol) driven from an in-memory test double | Write one record per macrotask turn — `input.write(line + '\n'); await new Promise(r => setImmediate(r))` — and share one reader instance across the whole interaction rather than constructing one per prompt |
 
 3. **Contain leaked work.** A promise or timer that outlives its test corrupts

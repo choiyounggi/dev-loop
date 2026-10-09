@@ -8,7 +8,7 @@ sources:
   - https://jqlang.org/manual/
   - https://stackoverflow.com/questions/48898983/jq-index-1-not-working-when-element-is-an-array
 last_verified: 2026-09-10
-related: [platforms-shells-portable-shell-scripts, platforms-shells-escapes-in-shell-string-literals, testing-quality-tests-that-cannot-fail]
+related: [platforms-shells-portable-shell-scripts, platforms-shells-escapes-in-shell-string-literals, testing-quality-tests-that-cannot-fail, platforms-tools-unicode-escape-in-a-jq-regex]
 ---
 
 # A jq Predicate That Pipes an Array Into `index(.)` Inside a Generator

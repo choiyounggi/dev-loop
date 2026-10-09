@@ -6,8 +6,9 @@
 #   plan-gate.sh emit  <A|B> <plan-dir> <out-file>          write gates ledger from templates/plan-gates.md
 #
 # Gate ids (A): baseline-tests-ran affected-files-evidenced open-questions-resolved
-#               constraints-surveyed research-evidenced
-# Gate ids (B): groundings-exist decision-rows-complete reviewer-verdict
+#               constraints-surveyed lint-surveyed research-evidenced
+# Gate ids (B): groundings-exist decision-rows-complete requirements-covered
+#               reviewer-verdict
 #   groundings-exist resolves wiki-local/... under the project root (see project_root_for)
 #
 # Exit codes: 0 ok | 2 usage | 3 check failed (content defect, stderr itemizes)
@@ -36,6 +37,7 @@ fail4() { echo fail; echo "plan-gate: $1" >&2; exit 4; }
 # line and the next "## " line (or EOF). Nested "### " subsections stay in.
 extract_l2() {
   awk -v hdr="$2" '
+    { gsub(/\r/, "") }
     $0 == hdr { flag=1; next }
     flag && /^## / { exit }
     flag { print }
@@ -46,6 +48,7 @@ extract_l2() {
 # line and the next heading of any level (or EOF).
 extract_l3() {
   awk -v hdr="$2" '
+    { gsub(/\r/, "") }
     $0 == hdr { flag=1; next }
     flag && /^#+ / { exit }
     flag { print }
@@ -53,7 +56,7 @@ extract_l3() {
 }
 
 # has_heading <file> <exact-heading-line>
-has_heading() { grep -Fxq -- "$2" "$1"; }
+has_heading() { tr -d '\r' < "$1" | grep -Fxq -- "$2"; }
 
 # literal_replace <token> <value> — reads text on stdin, replaces every
 # literal (non-regex) occurrence of <token>, writes to stdout.
@@ -114,6 +117,17 @@ check_constraints_surveyed() { # <plan-dir>
   has_heading "$file" "## Constraints" || fail4 "## Constraints section missing in $file"
   bullets=$(extract_l2 "$file" "## Constraints" | grep -c '^- ' || true)
   [ "$bullets" -ge 1 ] || fail3 "## Constraints has no bullets (use '- none — checked: <command>' if none apply)"
+  ok
+}
+
+check_lint_surveyed() { # <plan-dir>
+  file="$1/analysis.md"
+  [ -f "$file" ] || fail4 "analysis.md not found in $1"
+  has_heading "$file" "## Ground truth" || fail4 "## Ground truth section missing in $file"
+  lines=$(extract_l2 "$file" "## Ground truth" | grep '^- Lint: ' || true)
+  [ -n "$lines" ] || fail3 "no '- Lint: ' bullet under ## Ground truth (use '- Lint: none — checked: <command>' when the project has no lint or typecheck command)"
+  bad=$(printf '%s\n' "$lines" | grep -v -e '^- Lint: none — checked: *[^ ]' -e '^- Lint: [^ ].* -> rc=[0-9][0-9]*$' || true)
+  [ -z "$bad" ] || fail3 "malformed Lint bullet(s): $(printf '%s' "$bad" | head -1)"
   ok
 }
 
@@ -215,10 +229,98 @@ EOF
   ok
 }
 
+# _rule_ids <analysis.md> — per ## Requirements data row: every R<n> number
+# the Rule cell leads with ("R1/R2", "R3, R4" give two), or "-" when the cell
+# carries no leading R<n> id.
+_rule_ids() {
+  extract_l2 "$1" "## Requirements" | LC_ALL=C awk -F'|' '
+    /^\|/ {
+      n++
+      if (n == 1) next
+      line = $0; gsub(/[-:| \t]/, "", line)
+      if (line == "") next
+      v = $2; gsub(/^[ \t*`_]+/, "", v)
+      if (!match(v, /^R[0-9]+/)) { print "-"; next }
+      print substr(v, 2, RLENGTH - 1) + 0
+      v = substr(v, RLENGTH + 1)
+      while (match(v, /^[a-z]?[ \t]*[\/,&][ \t]*R[0-9]+/)) {
+        id = substr(v, 1, RLENGTH)
+        sub(/^.*R/, "", id)
+        print id + 0
+        v = substr(v, RLENGTH + 1)
+      }
+    }
+  '
+}
+
+# _cited_rule_ids — reads text on stdin, prints every R<n> number it names,
+# one per line. A match preceded by a letter, digit or "_" is not an id
+# ("PR12", "XR3"). A range "R4-R9" / "R4–9" / "R4..R9" names every number in it.
+# LC_ALL=C: macOS awk mixes byte RSTART with character substr() under a UTF-8
+# locale and aborts on Korean text ("towc: multibyte conversion failure").
+_cited_rule_ids() {
+  LC_ALL=C awk '
+    {
+      s = $0
+      while (match(s, /R[0-9]+/)) {
+        pre = (RSTART > 1) ? substr(s, RSTART - 1, 1) : ""
+        num = substr(s, RSTART + 1, RLENGTH - 1) + 0
+        s = substr(s, RSTART + RLENGTH)
+        if (pre ~ /[A-Za-z0-9_]/) continue
+        print num
+        if (match(s, /^[a-z]?[ \t]*(-|–|—|\.\.)[ \t]*R?[0-9]+/)) {
+          r = substr(s, RSTART, RLENGTH)
+          sub(/^.*[^0-9]/, "", r)
+          hi = r + 0
+          for (k = num + 1; k <= hi && k - num <= 1000; k++) print k
+        }
+      }
+    }
+  '
+}
+
+# _first_decision_table <design.md> — data rows of the FIRST table under
+# ## Decisions only; a later table in that section (alternatives, risks) is
+# not a decision row and must not count as citing a Rule.
+_first_decision_table() {
+  extract_l2 "$1" "## Decisions" | awk '
+    /^\|/ {
+      started = 1
+      n++
+      if (n == 1) next
+      line = $0; gsub(/[-:| \t]/, "", line)
+      if (line == "") next
+      print
+      next
+    }
+    started { exit }
+  '
+}
+
+check_requirements_covered() { # <plan-dir>
+  analysis="$1/analysis.md"
+  design="$1/design.md"
+  [ -f "$analysis" ] || fail4 "analysis.md not found in $1"
+  [ -f "$design" ] || fail4 "design.md not found in $1"
+  has_heading "$analysis" "## Requirements" || fail4 "## Requirements section missing in $analysis"
+  has_heading "$design" "## Decisions" || fail4 "## Decisions section missing in $design"
+  rules=$(_rule_ids "$analysis")
+  [ -n "$rules" ] || fail3 "## Requirements has no rule rows"
+  unnumbered=$(printf '%s\n' "$rules" | grep -c '^-$' || true)
+  [ "$unnumbered" -eq 0 ] || fail3 "$unnumbered ## Requirements row(s) have no leading R<n> id in the Rule cell"
+  cited=$(_first_decision_table "$design" | _cited_rule_ids | sort -n -u)
+  missing=""
+  for id in $(printf '%s\n' "$rules" | sort -n -u); do
+    printf '%s\n' "$cited" | grep -qx "$id" || missing="$missing R$id"
+  done
+  [ -z "$missing" ] || fail3 "Rule(s) named by no ## Decisions row:$missing"
+  ok
+}
+
 check_reviewer_verdict() { # <plan-dir>
   file="$1/review-verdict.md"
   [ -f "$file" ] || fail4 "review-verdict.md not found in $1"
-  grep -Fxq 'VERDICT: PASS' "$file" || fail3 "no 'VERDICT: PASS' line in $file"
+  tr -d '\r' < "$file" | grep -Fxq 'VERDICT: PASS' || fail3 "no 'VERDICT: PASS' line in $file"
   ok
 }
 
@@ -235,9 +337,11 @@ do_check() {
     affected-files-evidenced) check_affected_files_evidenced "$plan_dir" ;;
     open-questions-resolved) check_open_questions_resolved "$plan_dir" ;;
     constraints-surveyed) check_constraints_surveyed "$plan_dir" ;;
+    lint-surveyed) check_lint_surveyed "$plan_dir" ;;
     research-evidenced) check_research_evidenced "$plan_dir" ;;
     groundings-exist) check_groundings_exist "$plan_dir" "$wiki_root" ;;
     decision-rows-complete) check_decision_rows_complete "$plan_dir" ;;
+    requirements-covered) check_requirements_covered "$plan_dir" ;;
     reviewer-verdict) check_reviewer_verdict "$plan_dir" ;;
     *) echo "plan-gate: unknown gate id: $gate_id" >&2; exit 2 ;;
   esac
