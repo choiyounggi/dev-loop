@@ -137,3 +137,18 @@ setup() {
   [[ "$(grep -n 'Gate ids:' "${BATS_TEST_DIRNAME}/../skills/wiki-plan/SKILL.md" | grep groundings-exist)" == *"gaps-emitted"* ]]
   [[ "$(cat "${BATS_TEST_DIRNAME}/../templates/plan-gates.md")" == *"- [ ] gaps-emitted:"* ]]
 }
+
+# --- CRLF design.md (plans/excess-lens-and-lint-gate D10) ---
+
+@test "CRLF: a CRLF design.md records the same [no-wiki] gap lines, with no CR in them" {
+  d="${BATS_TEST_TMPDIR}/crlf/nowiki"
+  mkdir -p "$d"
+  for f in "$FIX/nowiki"/*.md; do sed 's/$/\r/' "$f" > "$d/$(basename "$f")"; done
+  [[ "$(cat "$d/design.md")" == *$'\r'* ]]
+  run --separate-stderr sh "$EG" "$d"
+  [ "$status" -eq 0 ]
+  log="$(cat "$WORK/log.md")"
+  [[ "$log" == *"gap | nowiki/D2: Queue write path — direct JSONL append"* ]]
+  [[ "$log" == *"gap | nowiki/D4: Gap line key — date-free prefix"* ]]
+  [[ "$log" != *$'\r'* ]]
+}

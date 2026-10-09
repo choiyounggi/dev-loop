@@ -62,7 +62,7 @@ Run it two ways:
   executor — the wiki-executor discipline (load only named pages, decisions win,
   BLOCKED-on-gap) is folded into this loop.
 - **A whole goal, split across parallel worker sessions** → the `orchestrate`
-  skill: intake → decompose (approval gate) → dispatch loop: plan (wiki-plan on the task-planner agent) →
+  skill: intake → decompose (approval gate) → dispatch loop: plan (wiki-plan on the task-analyst + task-planner agents) →
   implement + review (each session runs `loop-implement`) → integration test →
   pre-merge gate → merge. There is no wave barrier: a dependency graph plus slot
   accounting starts each task the moment its own dependencies are approved and a
@@ -126,7 +126,7 @@ can map its **capability roles** to your real tools so the loop uses them:
 
 | Role | Map to |
 |------|--------|
-| `verify` | your project's **test / build / QA** command (the loop's run step) |
+| `verify` | your project's **test / build / lint / typecheck / QA** command (the loop's run step) |
 | `knowledge` | your domain/team **wiki** or knowledge MCP (external facts) |
 | `explore` | code/symbol search (LSP, ripgrep, a source-search CLI) |
 | `tacit` | past incidents / danger-zone lore |
@@ -298,7 +298,9 @@ dev-loop/
 ├── skills/                           # the 9 skills above (user-invocable; appear in the / menu by skill name)
 ├── agents/test-quality-auditor.md    # bundled independent test auditor (loop step 6.5)
 ├── agents/task-reviewer.md           # bundled fresh-context per-task reviewer (orchestrate Phase 4)
-├── agents/task-planner.md            # bundled fresh-context per-task planner (orchestrate Phase 3 step 2a)
+├── agents/task-analyst.md            # bundled fresh-context per-task analyst, wiki-plan Phase A (orchestrate Phase 3 step 2a)
+├── agents/task-planner.md            # bundled fresh-context per-task planner, wiki-plan Phase B+C (orchestrate Phase 3 step 2a)
+├── agents/*-r1.md                    # generated R1/R0 copies, one effort step lower, never below high (scripts/gen-agent-tier-variants.sh)
 ├── hooks/
 │   ├── hooks.json
 │   ├── preflight.sh                  # SessionStart: git/tmux/jq advisory

@@ -37,6 +37,11 @@ either script were needed or made.
   EXPECT: ok
   EVIDENCE: pending
 
+- [ ] lint-surveyed: analysis.md's `## Ground truth` records every lint/typecheck command as `- Lint: <command> -> rc=<n>` (or one `- Lint: none — checked: <command>` line)
+  CHECK: sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check lint-surveyed {PLAN_DIR}
+  EXPECT: ok
+  EVIDENCE: pending
+
 - [ ] research-evidenced: analysis.md's `## Research` has at least one query/source row or an explicit no-useful-results line
   CHECK: sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check research-evidenced {PLAN_DIR}
   EXPECT: ok
@@ -50,6 +55,11 @@ either script were needed or made.
 
 - [ ] decision-rows-complete: every data row in design.md's `## Decisions` has all six cells filled in
   CHECK: sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check decision-rows-complete {PLAN_DIR}
+  EXPECT: ok
+  EVIDENCE: pending
+
+- [ ] requirements-covered: every Rule id (R<n>) in analysis.md's `## Requirements` is named by at least one data row of design.md's `## Decisions` (ranges like R4-R6 count)
+  CHECK: sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check requirements-covered {PLAN_DIR}
   EXPECT: ok
   EVIDENCE: pending
 

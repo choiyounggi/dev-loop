@@ -24,7 +24,7 @@
 #
 #   exit 0    launched and the prompt is confirmed submitted
 #   exit 1    wrong argument count
-#   exit 2    invalid permission mode, invalid worker model, invalid session
+#   exit 2    invalid permission mode, invalid worker model or effort, invalid session
 #             name, a worktree argument that is not a git work-tree root, or
 #             an LO_STATUS_DIR/LO_TASK_ID pair with exactly one set (issue #123)
 #   exit 4    the REPL never became ready (prints the last screen)
@@ -38,8 +38,10 @@
 #   LO_DRY_RUN         print the resolved session name and exit
 #   LO_TMUX            tmux binary (default: the one on PATH)
 #   LO_CLAUDE          claude binary (default: the search below)
-#   DEV_LOOP_WORKER_MODEL  model the WORKER runs (e.g. claude-sonnet-5). Unset =
+#   DEV_LOOP_WORKER_MODEL  model the WORKER runs (e.g. claude-sonnet-5-5). Unset =
 #                      omit --model, so the worker inherits the configured model.
+#   DEV_LOOP_WORKER_EFFORT  effort level the WORKER runs (low|medium|high|xhigh|max),
+#                      exported to it as CLAUDE_CODE_EFFORT_LEVEL. Unset = none.
 #   LO_READY_TIMEOUT / LO_READY_INTERVAL   REPL-ready budget (default 60 / 2);
 #                      attempts = floor(timeout/interval), minimum 1
 #   LO_READY_EXTRA / LO_TRUST_EXTRA        extra screen-match substrings
@@ -98,6 +100,15 @@ if [ -n "$model" ]; then
     *[!A-Za-z0-9._\[\]-]*) echo "launch-session: invalid model '$model'" >&2; exit 2 ;;
   esac
 fi
+# Worker effort, passed as CLAUDE_CODE_EFFORT_LEVEL rather than --effort: a
+# skill's `effort` frontmatter (loop-implement pins high) overrides --effort but
+# not the environment variable, which also reaches the worker's own subagents.
+# Unset = no variable, so the worker keeps the user's configured level.
+effort="${DEV_LOOP_WORKER_EFFORT:-}"
+case "$effort" in
+  ''|low|medium|high|xhigh|max) : ;;
+  *) echo "launch-session: invalid effort '$effort'" >&2; exit 2 ;;
+esac
 
 # Resolve-only mode: print the effective session name and exit before touching
 # tmux/claude. Lets the orchestrator (and tests) learn the exact name.
@@ -185,7 +196,9 @@ if [ -n "$esc" ]; then
   # metacharacters can't break or inject into the launched command
   launchcmd="$launchcmd && export GROUNDWORK_ESCALATION_DIR='$esc' && export GROUNDWORK_TASK_ID='$session'"
 fi
-launchcmd="$launchcmd && \"$CLAUDE\" --permission-mode $perm"
+effort_env=""
+[ -n "$effort" ] && effort_env="CLAUDE_CODE_EFFORT_LEVEL=$effort "
+launchcmd="$launchcmd && ${effort_env}\"$CLAUDE\" --permission-mode $perm"
 [ -n "$model" ] && launchcmd="$launchcmd --model '$model'"
 "$TMUX_BIN" send-keys -t "$session" "$launchcmd" Enter
 

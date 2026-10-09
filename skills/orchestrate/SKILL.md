@@ -63,7 +63,7 @@ AskUserQuestion (and, when Orca is detected, one naming the substrate choice).
 Resolve the pluggable tool profile once up front:
 `sh ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh --summary`. It maps capability
 roles — `intake` (issue-tracker work-list source), `knowledge` (domain/policy),
-`tacit` (incidents/danger zones), `verify` (test/build/QA
+`tacit` (incidents/danger zones), `verify` (test/build/lint/typecheck/QA
 command), `explore` (code search; a fresh graphify graph when Preflight says
 so), `design` (visual/UI spec, e.g. Figma) — to
 whatever tools this installation has, or to generic defaults when unset (optional,
@@ -100,7 +100,8 @@ integration diff until this final gate. Per-task diffs are read by the
 `task-reviewer` agent at Phase 4 the same way, so this session reads no
 worktree diff at all before Gate 2. Per-task plans are written and re-planned
 on the `task-planner` agent at Phase 3 step 2a the same way, so this session
-holds no plan body either.
+holds no plan body either (Phase A on the `task-analyst` agent, Phase B and
+C on `task-planner`).
 
 The middle row is the one that matters. Gate 1 and Gate 2 are the *first* and
 *last* things a run does, so on their own they leave the long autonomous middle
@@ -145,16 +146,27 @@ re-reads `{ORCH_DIR}/plans/<task>.md` from disk anyway, so send `plan patched at
 the fix in the prompt.
 
 **Re-plan ladder — bound the loop.** Track each task's round count in your head
-from the review/patch history already on disk (no new state file). Rounds 1–2
-on a task are SCOPED PATCHES: the same task-planner agent patches only the
-reported gap (one SendMessage), then the cheap re-send above. Round 3 is ONE
-full re-plan and goes through the two-stage handshake again: the same agent
-deletes its stale `review-verdict.md`, rewrites `plans/<task>.md` wholesale by
-re-running `wiki-plan` from Phase A on the planning model, and STOPs with a
-fresh STOP REPORT instead of a FINAL REPORT — you run `plan-reviewer` again on
-the redesigned `design.md` before it emits gate-B, exactly as in the first
-handshake, rather than patching a single section — a third scoped patch is
-the signal the section-level fixes aren't converging. A task that still
+from the review/patch history already on disk (no new state file). Route each
+gap report by what it faults. A gap in the analysis (`analysis.md`'s
+requirements, ground truth, or constraints) goes to the same `task-analyst`
+first — SendMessage it the gap report, wait for its fresh ANALYSIS REPORT, and
+re-run gate-A yourself — and then to the same task-planner agent with
+"analysis.md changed — re-check the plan against it". Any other gap goes to
+the same task-planner agent only. Rounds 1–2 on a task are SCOPED PATCHES: the
+planner patches only the reported gap, then the cheap re-send above. Round 3
+is ONE full re-plan and goes through the two-stage handshake again, in this
+order:
+1. SendMessage the same `task-analyst` the gap report and "round 3 — re-run
+   Phase A wholesale"; wait for its ANALYSIS REPORT and re-run gate-A yourself.
+2. SendMessage the same task-planner agent "round 3 — analysis rewritten": it
+   deletes its stale `review-verdict.md`, rewrites `plans/<task>.md` wholesale
+   from the new `analysis.md`, and STOPs with a fresh STOP REPORT instead of a
+   FINAL REPORT.
+3. Run `plan-reviewer` again on the redesigned `design.md` before the planner
+   emits gate-B, exactly as in the first handshake.
+
+A full re-plan replaces patching a single section because a third scoped
+patch is the signal the section-level fixes aren't converging. A task that still
 reports a plan gap after its round-3 full re-plan is a deadlock-grade
 escalation to the user: report it and get a human decision, same as a Phase 3
 step 1 exit-3 DEADLOCK. There is never a round 4.
@@ -368,10 +380,15 @@ revise.
 
 | | R0 trivial | R1 normal | R2 high | R3 critical |
 |---|---|---|---|---|
-| planning | wiki-plan lite | full A/B/C | full A/B/C, plan-reviewer required | R2 plus a second plan-reviewer call with a different Agent model override |
-| worker model (DEV_LOOP_WORKER_MODEL) | claude-sonnet-5 | claude-sonnet-5 | claude-opus-5 | claude-opus-5 |
+| planning | wiki-plan lite | full A/B/C | full A/B/C, plan-reviewer required | R2 plus a second plan-reviewer call with the Agent model override `fable` |
+| analysis agent — wiki-plan Phase A, claude-fable-5-1 | `task-analyst-r1` (high) | `task-analyst-r1` (high) | `task-analyst` (xhigh) | `task-analyst` (xhigh) |
+| design agent — wiki-plan Phase B+C, claude-opus-5-5 | `task-planner-r1` (high) | `task-planner-r1` (high) | `task-planner` (high) | `task-planner` (high) |
+| worker model (DEV_LOOP_WORKER_MODEL) | claude-sonnet-5-5 | claude-sonnet-5-5 | claude-sonnet-5-5 | claude-sonnet-5-5 |
+| worker effort (DEV_LOOP_WORKER_EFFORT) | high | high | high | high |
+| QA agents — task review and coordinator auditor cross-call, claude-fable-5-1 | `task-reviewer-r1` (high) | `task-reviewer-r1`, `test-quality-auditor-r1` (high) | `task-reviewer`, `test-quality-auditor` (high) | `task-reviewer`, `test-quality-auditor` (high) |
+| final review agent — Phase 5, claude-fable-5-1, picked by the run's highest task tier | `integration-reviewer-r1` (xhigh) | `integration-reviewer-r1` (xhigh) | `integration-reviewer` (max) | `integration-reviewer` (max) |
 | brief effort_level | simple | medium | complex | complex |
-| review lenses | 1 and 3 only | 1-4 | 1-5 | 1-5 plus the adversarial-change-review techniques recorded under lens 5 |
+| review lenses | 1, 3 and 6 only | 1-4 and 6 | 1-6 | 1-6 plus the adversarial-change-review techniques recorded under lens 5 |
 | coordinator auditor cross-call | none (floor only) | when tests look weak | mandatory | mandatory |
 | rework budget | 1 | 3 | 3 | 3 |
 | human gates | Gate 1 and 2 | Gate 1 and 2 | Gate 1 and 2 | Gate 1 and 2 (a per-task pre-merge gate is deferred, issue #192 section 9 question 1) |
@@ -381,6 +398,35 @@ number above lives only in this table and the prose cites the table. The
 "coordinator auditor cross-call" row states only Phase 4's cross-call
 obligation on the coordinator side — the worker's own step 6.5 auditor call
 is unchanged at every tier.
+
+Each agent row names the file to call; the parenthesis is the effort its
+frontmatter pins, next to the model it pins. Effort lives only in an agent's
+frontmatter — the Agent tool overrides `model` per call, never `effort` — so
+each role has a base file (R3 and R2) and a generated `-r1` copy one effort
+step lower (R1 and R0); edit only the base file and re-run
+`scripts/gen-agent-tier-variants.sh`. **Floor:** every analysis, design, and
+QA agent — `plan-reviewer` included, which pins claude-opus-5-5 at high —
+runs at claude-opus-5-5 or claude-fable-5-1 and at high effort or above at
+every tier, so an `-r1` copy never steps below high and the worker effort
+stays high, the level its step 6.5 self-audit inherits. The launch scripts
+hand the worker its effort as `CLAUDE_CODE_EFFORT_LEVEL`, not `--effort`,
+because a skill's `effort` frontmatter (loop-implement pins `high`) overrides
+`--effort` but not that variable. The variable also outranks every subagent's frontmatter, so
+the worker's own step 6.5 self-audit — the base `test-quality-auditor`, the
+one agent the worker prompt names — runs at the worker's level, which is the
+QA row's level at every tier; the `-r1` auditor is the coordinator's
+cross-call.
+
+**A 429 is not a verdict.** When any of these agent calls fails with an HTTP
+429 naming a model limit (e.g. a Fable limit), re-run the same agent with the
+Agent tool's `model` override set to whichever of `opus` and `fable` the 429
+does not name, and escalate to the user when that also fails — never retry on
+`sonnet`, which is below the floor. The override changes the model only; the
+agent file's effort still applies.
+
+For the same reason as the worker's variable, start the coordinator with
+`CLAUDE_CODE_EFFORT_LEVEL` unset: set there, it flattens every agent's pinned
+effort to one level.
 
 Waves are **an illustration in the Gate 1 report, not an execution unit.**
 Execution is decided by `ready-set.sh`: a task runs as soon as its dependencies
@@ -611,6 +657,7 @@ you instead of making you poll. Replace steps 1–3 below with O1–O5:
   `deny` + escalation and the worker stalls on the coordinator for every one of
   them. Then, with the escalation env exported:
   `GROUNDWORK_ESCALATION_DIR=<abs> GROUNDWORK_TASK_ID=<task>
+  DEV_LOOP_WORKER_MODEL=<id from the profile table> DEV_LOOP_WORKER_EFFORT=<level from the profile table>
   scripts/orca-worker-start.sh --task <task_id> --worktree id:<repoId>::<path>
   --agent claude` → prints `dispatch=<id>` and `handle=<agent-handle>`. For this
   task's **next** phase pass `--terminal <handle>` **together with** `--worktree
@@ -751,7 +798,7 @@ reasoning-effort flags) that `worker-start` cannot express.
    that PRODUCES a shared surface (Phase 2) reorders its own steps so the stub
    it commits can quote a real signature and land before its own worktree
    exists: run step 2a's `wiki-plan` invocation for this task FIRST (on the
-   `task-planner` agent) — it writes `plans/<task>.md`, but do not launch yet
+   `task-analyst` agent, then the `task-planner` agent) — it writes `plans/<task>.md`, but do not launch yet
    — then commit the stub below, THEN
    step 1 (`setup-worktrees.sh`, whose worktree now branches from a tip that
    already contains the stub), then step 2 (write the brief, referencing the
@@ -797,43 +844,64 @@ reasoning-effort flags) that `worker-start` cannot express.
    `briefs/<task>.md` / `plans/<task>.md` references above stay relative — the
    coordinator's cwd is the main repo root.
 
-   **2a. Plan it yourself, before launching — on the `task-planner` agent,
-   never in this session.** Invoke the bundled `task-planner` agent (Agent
-   tool, fresh context) for this task: it runs the bundled `wiki-plan` skill
-   and writes `plans/<task>/` plus the flat `plans/<task>.md`. Planning still
-   belongs to the coordinator side on purpose: a worker can be pinned to a
-   cheaper tier (`DEV_LOOP_WORKER_MODEL`), and a plan is where an unmade
+   **2a. Plan it yourself, before launching — on the `task-analyst` and
+   `task-planner` agents, never in this session.** First invoke the bundled
+   `task-analyst` agent (Agent tool, fresh context) for this task: it runs
+   `wiki-plan` Phase A, writes `plans/<task>/analysis.md` and the gate-A
+   ledger, and replies with its ANALYSIS REPORT. Re-run `gate-check.sh --run`
+   on the gate-A ledger yourself; on exit 0 invoke the bundled `task-planner`
+   agent, which runs Phase B and C from that analysis and writes
+   `plans/<task>/` plus the flat `plans/<task>.md`. Planning still
+   belongs to the coordinator side on purpose: a worker runs a cheaper tier
+   (`DEV_LOOP_WORKER_MODEL`), and a plan is where an unmade
    decision becomes the implementer's guess — so the plan must come from the
-   strongest model in the run, not from whatever tier is executing. The agent
-   inherits the coordinator model (it carries no `model:` pin), so that
+   pinned planning models, not from whatever tier is executing. Both agents
+   pin their model and effort in frontmatter (the Tier to pipeline profile
+   table names the file per tier), so that
    guarantee holds without this session holding a single plan body: you read
-   only the agent's fixed report, the gate ledgers' exit codes you re-run
+   only the agents' fixed reports, the gate ledgers' exit codes you re-run
    yourself, and the Size verdict line — never `analysis.md`, `design.md`,
-   `plan.md`, or the flat plan. Pass it the task id, brief path, plan dir,
+   `plan.md`, or the flat plan. Pass each agent the task id, brief path, plan dir,
    gates dir, risk tier, wiki root, integ ref, and any pointer files (issue
    text, user decisions, blackboard).
 
    **Apply the tier's profile here.** Read the task's risk from graph.json
-   first and pass the tier to the agent: when R0, the agent runs wiki-plan in
-   lite mode; when R1, full Phase A/B/C; when R2 or R3, full with the
-   plan-reviewer call required (R3: a second call with a different Agent
-   model override, both verdicts recorded). In every full-mode tier the
+   first, call the profile table's file for that tier (`task-analyst-r1` /
+   `task-planner-r1` at R0 and R1), and pass the tier to both agents: when R0,
+   they run wiki-plan in lite mode; when R1, full Phase A/B/C; when R2 or R3, full with the
+   plan-reviewer call required (R3: a second call with the Agent model
+   override `fable`, both verdicts recorded). In every full-mode tier the
    plan-reviewer call is yours, not the agent's — see the two-stage handshake
    below. Then re-check the plan-derived signals (size:large, no-wiki:<n>) and raise the
-   tier per the Phase 2 rule before launching. At launch, prefix the model on
-   the call itself, never export it:
-   `DEV_LOOP_WORKER_MODEL=<id from the profile table> LO_STATUS_DIR=<abs status dir> LO_TASK_ID=<task> scripts/launch-session.sh lo-<n> <worktree> bypassPermissions "<plan prompt>"`
-   — launch-session.sh reads the variable per call, so each dispatch carries
+   tier per the Phase 2 rule before launching. A raise that changes the
+   planning profile — out of R0 (lite to full), or from R0/R1 to R2/R3 (`-r1`
+   to base agents) — re-plans on the new tier's agents from Phase A, with the
+   new tier's plan-reviewer calls, before launching. At launch, prefix the model and
+   effort on the call itself, never export it:
+   `DEV_LOOP_WORKER_MODEL=<id from the profile table> DEV_LOOP_WORKER_EFFORT=<level from the profile table> LO_STATUS_DIR=<abs status dir> LO_TASK_ID=<task> scripts/launch-session.sh lo-<n> <worktree> bypassPermissions "<plan prompt>"`
+   — launch-session.sh reads both variables per call, so each dispatch carries
    its own tier.
 
    **Two-stage handshake (full mode).** The agent stops after writing
    `design.md` and replies with its stop report (plan dir, gate-A rc, decision
-   and no-wiki counts, expected size, contradiction line). You then run the
+   and no-wiki counts, expected size, contradiction line). Before this and
+   every later reviewer call, run
+   `sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check requirements-covered <plan dir>`.
+   On `fail`, forward its stderr with SendMessage: a "no leading R<n> id"
+   failure to the same `task-analyst` first (wait for its ANALYSIS REPORT and
+   re-run gate-A), any other failure to the same task-planner; then wait for a
+   fresh stop report. These bounces are not reviewer calls, but a third
+   `fail` on the same task is escalated to the user, like a third reviewer
+   FAIL. You then run the
    `plan-reviewer` agent yourself (Agent tool) on `analysis.md` + `design.md`,
    record its full output under `design.md`'s `## Review`, and on
    `VERDICT: PASS` write just that line into `<plan dir>/review-verdict.md`;
-   on `VERDICT: FAIL` forward the blocking findings to the same agent with
-   SendMessage and wait for a fresh stop report (bounded at 3 reviewer calls,
+   on `VERDICT: FAIL` forward the blocking findings with SendMessage — a
+   finding against `analysis.md` to the same `task-analyst` first (wait for its
+   fresh ANALYSIS REPORT and re-run gate-A), then always to the same
+   `task-planner` with the remaining findings, plus "analysis.md changed —
+   re-check design.md against it" when the analyst changed it — and wait for
+   a fresh stop report (bounded at 3 reviewer calls,
    R3 always two). Then resume the same agent with SendMessage: "verdict
    recorded — emit gate-B, run Phase C, write the flat plan, reply with the
    final report". R0 lite mode has no stop: the agent runs straight through
@@ -851,7 +919,8 @@ reasoning-effort flags) that `worker-start` cannot express.
    each — a lite-mode `ABANDON` entry with a recorded reason still counts as
    passing that gate. A plan with no evidence — the ledger is missing, or any
    gate reads `UNMET` or `CLAIMED` — must not be dispatched: send the agent
-   back to `wiki-plan`'s corresponding Phase with SendMessage instead of
+   that owns the failing ledger (gate-A: `task-analyst`, gate-B:
+   `task-planner`) back to `wiki-plan`'s corresponding Phase with SendMessage instead of
    launching a worker on it — and re-run `gate-check.sh --run` yourself on
    both ledgers after every report: the agent's report is a claim, the
    ledger's exit code is the evidence.
@@ -873,22 +942,25 @@ reasoning-effort flags) that `worker-start` cannot express.
    — same duty as a mid-run split — then resume this loop with the (possibly
    changed) task set.
 
-   Because the agent inherits this session's model, **the planning model is
-   whatever model this coordinator session is running**. There is no separate setting to turn: to plan
-   on a stronger tier than you implement on, start the coordinator on that tier
-   (`claude --model <planning model>`). The worker model is set per dispatch from
+   Because both agents pin their own model, **the planning models are the
+   profile table's analysis and design rows, whatever model this coordinator
+   session is running**. To change them, edit the `model:` and `effort:` lines
+   in the base agent file and re-run `scripts/gen-agent-tier-variants.sh`; on a
+   model-scoped 429 follow the 429 rule under the profile table. The worker
+   model and effort are set per dispatch from
    the Tier to pipeline profile table, prefixed on the launch call below — never
    exported run-wide for the session.
 
    A worker that reports the plan is contradictory or under-decided is telling you
    the planning pass was wrong: forward the gap report verbatim with SendMessage
-   to the same task-planner agent that wrote the plan (it patches `plans/<task>.md`
+   (a gap in the analysis goes to the same `task-analyst` first — Re-plan
+   ladder) to the same task-planner agent that wrote the plan (it patches `plans/<task>.md`
    from its intact context and replies with a fresh final report), re-run the gate
    and Size checks above, and re-send §1. Do not
    let the worker re-plan — that silently moves planning back onto the worker tier,
    which is the thing this step exists to prevent — and do not patch the plan in
    this session either (Coordinator token budget, Known amplifier). Then
-   `DEV_LOOP_WORKER_MODEL=<id from the profile table> LO_STATUS_DIR=<abs status dir>
+   `DEV_LOOP_WORKER_MODEL=<id from the profile table> DEV_LOOP_WORKER_EFFORT=<level from the profile table> LO_STATUS_DIR=<abs status dir>
    LO_TASK_ID=<task> scripts/launch-session.sh lo-<n> <worktree> bypassPermissions
    "<plan prompt>"`
    (plan prompt = templates/session-prompt.md §1 — the tmux set — with the
@@ -1027,12 +1099,13 @@ entirely; the coordinator writes `reviews/<task>-rN.md` itself with line 1
 `case-count:<file>:<n>` / `no-assertion:<file>:<case>`) become the findings
 of `reviews/<task>-rN.md` —
 this consumes a rework round exactly like any other finding (run the rework
-sequence below). **Exit 0 or 2** — continue to the four-lens pass unchanged,
+sequence below). **Exit 0 or 2** — continue to the lens pass unchanged,
 and when the auditor is invoked, pass `floor=pass` or `floor=unknown`
 alongside it.
 
 Run the review on the `task-reviewer` agent (Agent tool, fresh context — not
-this coordinator session). Pass it: the task id and round N, the worktree
+this coordinator session; `task-reviewer-r1` at R0 and R1, per the Tier to
+pipeline profile table). Pass it: the task id and round N, the worktree
 path, the integration ref, the `{ORCH_DIR}` paths of the brief and the plan,
 the task's risk tier, the floor result (`floor=pass` or `floor=unknown`), the
 absolute review output path `{ORCH_DIR}/reviews/<task>-rN.md`, and the
@@ -1063,17 +1136,33 @@ at Phase 5; per task, the agent applies these fixed lenses:
    only reviewer who sees every worktree at once, so cross-task ordering
    hazards are your job alone.
 5. **AC traceability** (R2 and above) — build the three-column table `| DoD item | gate id | test case |` with one row per `<definition_of_done>` item of the brief: gate id from `.dev-loop/gates/<task>.md`, test case as `<file>:<test name>`; any row with an empty gate or test cell is a Findings item whose failure scenario is the behavior that item guards going unverified (`wiki/qa/process/acceptance-criteria.md`).
+6. **Excess** — for each element the diff adds (a file, function or method,
+   class/interface/type, parameter, config key/flag/env var, dependency), name
+   the brief or plan line it serves: the Objective, a `<definition_of_done>`
+   item, a D-number, or a later task's Inputs — an element a later task
+   consumes is that task's seam, so it has no caller yet by design. An element
+   the plan's decision table names is never an Excess finding — a dispute with
+   the plan belongs to lens 1. When no line serves it AND a search shows one
+   of (a) zero call sites outside its own tests, (b) a re-implementation of an
+   existing repo helper or a standard-library/language function — name that
+   function and where it lives, (c) two or more call sites that all pass the
+   same value for the new parameter, config key, or option, (d) a new
+   interface, abstract type, or factory with exactly one implementation — it
+   is a Findings item whose failure scenario is that search command, its hit
+   count, and "no brief or plan line needs it". A complexity judgment with no
+   such search evidence goes under Non-blocking.
 
 **Lens set by tier.** The tier is passed to the agent and selects its lens
-set: when the task is R0, it runs lenses 1 and 3 only and writes
-`not run — R0 profile` in the other rows; when R1, lenses 1-4; when R2 or R3,
-lenses 1-5. When the task is R0 and a review finds a second blocking round,
+set: when the task is R0, it runs lenses 1, 3 and 6 only and writes
+`not run — R0 profile` in the other rows; when R1, lenses 1-4 and 6; when R2
+or R3, lenses 1-6. When the task is R0 and a review finds a second blocking round,
 escalate to the user with AskUserQuestion instead of dispatching a second
 rework — LO_MAX_REWORK stays the per-run bound; the R0 budget of 1 is
 enforced by the coordinator not re-dispatching.
 
 Alongside the pass, if a session's tests look weak, **cross-call
-`test-quality-auditor` yourself** (self-call + orchestrator cross-call).
+`test-quality-auditor` yourself** (self-call + orchestrator cross-call;
+`test-quality-auditor-r1` at R1, per the Tier to pipeline profile table).
 On shortfall, decide rework: `STATUS_DIR=.orchestration/status
 scripts/status-update.sh <task> rework` atomically increments `.attempt`;
 read the NEW value N from `status/<task>.json`, write `reviews/<task>-rN.md`
@@ -1201,7 +1290,9 @@ Merge-preview onto the integration branch and run the integration tests (use the
 responsible session as rework.
 
 Once tests are green, run the integration REVIEW via the `integration-reviewer`
-agent (Agent tool, fresh context — not this coordinator session): pass it the
+agent (Agent tool, fresh context — not this coordinator session;
+`integration-reviewer-r1` when every task in the run is R0 or R1, per the Tier
+to pipeline profile table): pass it the
 integration branch name, base ref, repo root, worktree paths, and the
 `{ORCH_DIR}` paths of `graph.json`/briefs/plans/reviews; it runs `git diff
 <base>...<integ>` itself. The coordinator consumes only its `VERDICT:
@@ -1315,7 +1406,7 @@ kept), so re-running it is safe. Note the difference from **partial resume** (Ph
   (issue #166); worker worktrees also carry a mechanical `Bash(git stash:*)` deny.
 - Always verify real state after worktree/session ops (`git worktree list`, `tmux ls`,
   status files) — never trust echo logs (set -e is fail-open in eval subshells).
-- Bundled agents only: `test-quality-auditor`, `integration-reviewer`, `task-reviewer`, `task-planner`. Don't
+- Bundled agents only: `test-quality-auditor`, `integration-reviewer`, `task-reviewer`, `task-analyst`, `task-planner`, and each one's `-r1` copy. Don't
   depend on built-in agent names (general-purpose/Explore/Plan are
   version-dependent).
 - A completed/excluded issue (partial resume) is injected as a **base output**, never

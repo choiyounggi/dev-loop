@@ -37,3 +37,9 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [intermittent-failures](concurrency/intermittent-failures.md) | The intermittent failure is in the system itself — an occasional prod error, a bug that appears only under load, behaviour you can trigger only sometimes — and you need to amplify it into an on-demand reproduction by finding the hidden variable (the unreliable thing is a test in your suite → wiki/testing/flaky/diagnosing-flaky-tests.md) |
+
+## network
+
+| Page | Load when |
+|------|-----------|
+| [epipe-write-ordering](network/epipe-write-ordering.md) | A test or reproduction must make a TCP write fail with EPIPE/`BrokenPipe`/`ECONNRESET` after the peer closed and a single post-close write keeps succeeding; deciding how many writes to issue, how to keep `SIGPIPE` from killing the process, and which write to assert on; a fixture's "first write succeeds" assumption breaks when the peer closes with unread data |
