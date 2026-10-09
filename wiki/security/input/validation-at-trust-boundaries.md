@@ -12,7 +12,7 @@ sources:
   - https://cmu-sei.github.io/secure-coding-standards/sei-cert-oracle-coding-standard-for-java/rules/input-output-fio/fio16-j/
   - https://zod.dev/api
 last_verified: 2026-09-03
-related: [security-authz-resource-level-checks, frontend-security-xss-safe-rendering, security-agent-exposure-in-session-tool-exposure]
+related: [security-authz-resource-level-checks, frontend-security-xss-safe-rendering, security-agent-exposure-in-session-tool-exposure, platforms-filesystems-trailing-separator-under-realpath]
 ---
 
 # Validating Data at a Trust Boundary
@@ -56,6 +56,7 @@ from other services/queues.
 | Message from your own internal service ("we trust our services") | Validate the shape at the consumer boundary anyway — the sender can be buggy or compromised; a trust boundary is wherever data enters code that acts on it |
 | Header value used in logic (`X-Forwarded-For`, `Host`) | Client-settable: validate format and accept forwarding headers only from your configured trusted proxy before using them |
 | A persisted numeric value positions or sizes an entity in a shared space (placement coordinates, scale, canvas/map position in a game or collaborative board) | The valid range is a domain rule (playfield rectangle, min/max scale), not a type limit — OWASP's semantic validation. Clamp to those bounds on the server at the write, or reject with the bound in the error; a shape-only schema (`z.number()`) accepts `x=-9999` and `scale=0.01`, which place the entity off-screen or invisible and break the rules the space enforces |
+| The user-supplied path may end in `/` or `/.` and the containment check relies on canonicalize/`realpath` rejecting `file/` | Check the raw string before resolving and decide by intent (reject, or require `is_dir()` after resolving): macOS resolves `file/` to `file`, glibc/musl return `ENOTDIR`, so the verdict otherwise differs between a Mac and Linux CI ([platforms-filesystems-trailing-separator-under-realpath]) |
 | Webhook provider offers no signature | Require a shared-secret token in the URL/header, and act on provider state re-fetched from the provider's API rather than on payload fields |
 
 ## Instead of
