@@ -7,6 +7,7 @@
 
 ## Ground truth
 - Baseline: true -> rc=0, HEAD abc1234, git status clean
+- Lint: true -> rc=0
 
 ### Affected files
 - skills/wiki-plan/scripts/plan-gate.sh — evidence: grep -rln plan-gate.sh tests -> 1 hits

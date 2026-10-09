@@ -87,6 +87,7 @@ step 7.
    | A new parameter reaching a query, path, template, or permission check | security, trust-boundary category |
    | A changed schema, index, or migration | databases |
    | A new or changed test file, assertion, or fixture | testing |
+   | A new color, spacing, radius, or font-size literal in UI code (a raw palette class like `bg-pink-500`, an arbitrary value like `p-[13px]`, a hex value in CSS), or a `className`/`style` override on a shared component | frontend, design category — run the lint gate in `wiki/frontend/design/design-system-lint-gate-for-agents.md` on the changed files and report each violation outside the recorded baseline; when the diff touches theme tokens or lint is clean but the diff restyles screens, run that page's theme-swap check |
    | A new or changed user action in a web UI (form, button handler, search/filter, state change) | frontend, agent-interfaces category — establish that the action has a registered tool or an exclusion-list entry, and that a changed handler still matches the tool's schema; then qa's agent-tool parity gate |
 
    Then compare the page set you reached against the page set the plan named. The

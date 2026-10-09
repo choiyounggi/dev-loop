@@ -8,7 +8,7 @@ sources:
   - https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html
   - https://git-scm.com/docs/git-check-ignore
 last_verified: 2026-09-28
-related: [qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-worker-reported-plan-contradiction]
+related: [qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-worker-reported-plan-contradiction, testing-quality-checks-that-cannot-pass, platforms-shells-env-var-off-switches, qa-document-verification-rationale-prose-after-a-config-value-change, backend-common-llm-binding-instructions-for-agents, platforms-tools-gitignore-directory-reinclusion]
 ---
 
 # Numeric Claims and Symbol Contracts in a Plan You Did Not Write
@@ -68,6 +68,24 @@ with "stop on any new failure").
    field") silently compares nothing when the target's actual entry has a
    different shape (a `url`-sourced self-reference has no local-path field),
    and a gate comparing nothing still reports a pass.
+8. **When the plan names a literal binary, path, or command that tests or the
+   implementation will invoke, confirm it on the real target machine before
+   writing anything around it** — check the literal path itself (`ls -l
+   <path>`, `test -x <path>`), not `command -v <name>`: a shell builtin of the
+   same name (`true`, `false`, `test`) satisfies `command -v` while the
+   absolute path the plan wrote is absent. Then follow the value into the
+   function that consumes it far enough to name the outcome bucket an absent
+   instance lands in — a missing binary is absorbed by design into a
+   "skipped"/"unavailable" branch rather than an error, so a case meant to
+   prove the error path and a case meant to prove the no-op path run the
+   same code and the suite proves neither.
+9. **When the plan or an agent-facing instruction states an empirical number
+   (a score threshold, a calibration range, a count) that a reproducible
+   artifact in the same repo measures, cite the artifact and its verdict
+   instead of the number** — fixture path, the command that runs it, and its
+   conclusion. A provisional number pinned in instruction text is falsified by
+   the next measurement, and each task's review reads only its own files, so
+   the contradiction surfaces only when both diffs are read together.
 
 | Finding | Do |
 |---------|----|
@@ -76,6 +94,8 @@ with "stop on any new failure").
 | A deliverable is gitignored or a decision has no enactment | Escalate as a plan defect; it blocks every consumer, not only you |
 | A task's Steps prose names another task's not-yet-built symbol in a direction the dependency table contradicts | Escalate as a plan defect with both readings attached; do not implement in the table's order until the plan owner rules |
 | A plan's structural premise (a manifest field's shape, a source type) was copied from a sibling repo's or task's plan rather than read from this target | Read the target's real manifest field once before dispatch; escalate if it differs from the copied premise instead of implementing a gate that would compare nothing |
+| A literal path, binary, or command the plan assumes present is absent on the real machine or lives elsewhere (`/bin/true` on macOS is `/usr/bin/true`) | Confirm the real location first; trace the consumer's branches for the absent case and escalate when it shares an outcome bucket with a case the plan means to keep distinct |
+| An instruction embeds a numeric range from an ad-hoc survey while a reproducible calibration artifact exists or is landing in a sibling task | Replace the number with the artifact path, its command, and its conclusion; keep the qualitative rule the number supported |
 | The plan freezes existing test bodies and also forbids new failures | Apply one production slice, run the whole suite, diff the failing set against the pre-change baseline, revert the probe, and report the delta as a plan defect — reading the plan cannot show whether its rule flips an existing assertion; only a run can |
 
 ## Edge cases
@@ -85,6 +105,7 @@ with "stop on any new failure").
 | The discrepancy is confirmed and fixed on the plan side | Record it as a ruling in the run ledger ([infrastructure-agent-orchestration-autonomous-decision-rulings]) so the next worker reading the same paragraph sees the correction |
 | The plan's numbers came from a tool you can also run | Run the tool on the plan's inputs; a tool the plan author ran by hand once is the same claim as prose |
 | The plan pre-approves silent correction of arithmetic | Correct it, cite the pre-approval in the ruling, and still report the original value alongside |
+| The plan's "binary missing" case and its "binary present, condition false" case both land in the same result (both `skipped`, both `Accepted`) | Escalate as a plan defect — the test cannot separate the two, so neither is proven ([testing-quality-checks-that-cannot-pass]) |
 | You are the plan's author and a step threads a value from one call site to another, or keys a lookup by an id built elsewhere (`sink[step_id]` read against a `step["id"]` written as `step_id + ".net"`) | Grep both ends before dispatch — the write site and the read site — and paste both expressions into the plan so the adopter checks a match rather than a claim; confirm too that the call path meant to carry a new argument reaches the target (a second entry point such as `_do_post → _respond` that bypasses the wrapper leaves the parameter unset). A mismatched key or an unreached path raises nothing — a default value, an unset field — so the plan reads as correct until an output is subtly wrong; have the implementer re-run the same greps against source before writing code |
 | You are the plan's author fixing design-token values (a palette) and pre-computing WCAG contrast for the plan | Open the contract test file and enumerate every (foreground role, background surface) pair it asserts — a role is checked on more surfaces than the visible ones (`muted` on `surfaceSoft` as well as on canvas and card) — then compute all of them; a pair the plan skipped comes back one round later as a worker's plan-gap report or a red contract test |
 | The only way to test a rule's compatibility is a probe that touches production code | Probe production code only, never the frozen tests; revert the probe (`git checkout -- <the probed files>`) and confirm `git status --porcelain` is empty before reporting, so the gap report is not itself a forbidden edit |
@@ -108,5 +129,8 @@ with "stop on any new failure").
 - Field evidence 2026-08-23 (dev-loop mpa1 orchestration run, dl-version-gate task): a coordinator wrote the version-gate plan for dev-loop by copying a sibling task's plan for a different repo, carrying over a local-path source pairing. dev-loop's own marketplace entry is a `url`-source self-reference, not a local path, so the copied pairing would have compared nothing and the gate would always pass. The worker's adopt-or-report gate flagged the premise instead of implementing it; the coordinator re-planned to a name-match pairing (r2), approved on 6 green bats cases — a full re-plan round that one `jq` read of the real `source` field would have avoided
 - Field evidence 2026-08-26 (linkly, plan authoring): two silent-failure wirings caught by grepping both ends before dispatch — `verb_sink[step_id]` read against a `step["id"]` written as `step_id + ".net"` (lower.py:2148 vs 1138), and `_respond` reachable through `_do_post` without the JSON-log wrapper meant to pass its new argument (wsgi.py:818-830); neither path would have raised, and the implementer's re-verification against source was the second catch
 - Field evidence 2026-08-30 (linkly-calendar t1, `TokenContractTests.swift`): the coordinator pre-computed contrast for canvas and card backgrounds only; the contract test also checks `muted` on `surfaceSoft`, which measured 4.41:1 (below the 4.5:1 AA floor) and forced a palette re-adjustment round recorded in `.orchestration/notes/decisions.md`
+- Local reproduction 2026-09-27 (macOS, Darwin 25.1.0, zsh): `ls -l /bin/true /bin/false` → "No such file or directory" for both; `/usr/bin/true` and `/usr/bin/false` present; `command -v true` and `type true` resolve to the shell builtin, so only a check on the literal path detects the absence
+- Field evidence 2026-09 (an agent-orchestration codebase's plan executor, task t3-browser-wiring; recorded by the originating session): a reviewed plan named `/bin/true`/`/bin/false` as test literals; tracing `locate_binary` (which joins even an absolute path against PATH directories) → `BinaryUnavailable` → `judge` → `skipped` → task `Accepted` showed the error case permanently red and the normal case indistinguishable from the boundary case
+- Field evidence 2026-09 (dev-loop `skills/wiki-plan/SKILL.md`, commit 906b2e7): the "never on score alone" sentence carried a parenthetical range `0.69-0.82` from a 22-query manual survey while a sibling task landed a 50-case reproducible calibration set (`tests/fixtures/wiki-retrieval-calibration.json`, run with `wiki-index.py eval --report`) that found no separable floor; the integration review caught the contradiction and the sentence now cites the fixture, command, and verdict with no number
 - Field evidence 2026-09-27 (seagrass, t174-inworkflow-write-state, adopt-only plan): the plan froze existing test bodies and required a stop on any new failure; replacing only the `repo_policy.seeded_entities` body with the plan's order-aware rule and running the whole suite moved failures from 1 to 2, the new one at `test_repo_policy.py:221` inside a class the plan froze. The probe was reverted (`git checkout --`, tree clean) and the contradiction reported as a plan gap before any implementation
 - Field evidence 2026-08-31 (linkly-calendar iOS design review): `LinklyModal.swift`, named in the draft as a reusable modal, was a bottom sheet (`grabber` + `.rect(topLeadingRadius:)`) with one consumer, and `LinklyCalendarRangeLozenge` had zero consumers by `grep -rn`; the design that planned to reuse both was corrected before implementation, and the grep commands were kept in the document

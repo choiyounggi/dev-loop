@@ -13,7 +13,7 @@ the generic built-in behavior. Nothing breaks when nothing is configured.
 | `intake`    | work-list source — an issue tracker the parent/child issues come from | orchestrate Phase 0 (Intake) |
 | `knowledge` | domain facts, business policy, code/status values | loop-implement step 1 (Analyze); orchestrate Phase 0/2 |
 | `tacit`     | past incidents, edge cases, coupling/danger zones | loop-implement step 1 (Analyze) + step 6 (Self-review) |
-| `verify`    | running the project's tests / build / QA checks   | loop-implement step 5 (Run); orchestrate Phase 5 (integration) |
+| `verify`    | running the project's tests / build / lint / typecheck / QA checks | loop-implement step 5 (Run); orchestrate Phase 5 (integration) |
 | `explore`   | locating code, symbols, call sites (read-only); optionally a fresh graphify code graph as a lead | loop-implement step 1 (Analyze) + step 6; orchestrate Preflight (freshness) + Phase 2 (leads) |
 | `design`    | visual/UI spec for FE/UI tasks (e.g. a Figma link in the issue) | orchestrate Phase 0/2 + brief; loop-implement step 1 (Analyze) |
 | `research`  | external best-practice/pitfall search for a feature's domain, and evidence for `[no-wiki]` decisions | wiki-plan Phase A4 (external research), Phase A3 (spike research), Phase B (`[no-wiki]` grounding) |

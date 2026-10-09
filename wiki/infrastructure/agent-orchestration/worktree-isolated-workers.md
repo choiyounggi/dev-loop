@@ -9,7 +9,7 @@ sources:
   - https://code.claude.com/docs/en/hooks
   - https://git-scm.com/docs/gitignore
 last_verified: 2026-09-08
-related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-shared-run-state, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-deny-rules-under-bypassed-permissions, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, infrastructure-agent-orchestration-verify-command-in-a-worker-brief, qa-process-scope-purity-checks, testing-quality-cross-task-stub-assertions, testing-strategy-real-cli-spot-check-for-new-execution-paths]
+related: [infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-shared-run-state, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-deny-rules-under-bypassed-permissions, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, infrastructure-agent-orchestration-verify-command-in-a-worker-brief, qa-process-scope-purity-checks, testing-quality-cross-task-stub-assertions, testing-strategy-real-cli-spot-check-for-new-execution-paths, platforms-tools-gitignore-directory-reinclusion]
 ---
 
 # Writing the Brief for a Worker Confined to Its Own Worktree

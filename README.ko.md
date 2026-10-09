@@ -116,7 +116,7 @@ loop-orchestrator처럼 dev-loop은 설정 **없이도** 완전히 범용으로 
 
 | Role | 매핑 대상 |
 |------|--------|
-| `verify` | 프로젝트의 **테스트 / 빌드 / QA** 명령 (루프의 실행 스텝) |
+| `verify` | 프로젝트의 **테스트 / 빌드 / 린트 / 타입체크 / QA** 명령 (루프의 실행 스텝) |
 | `knowledge` | 도메인/팀 **위키** 또는 knowledge MCP (외부 사실) |
 | `explore` | 코드/심볼 검색 (LSP, ripgrep, 소스 검색 CLI) |
 | `tacit` | 과거 인시던트 / danger-zone 사례 |
