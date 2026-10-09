@@ -80,6 +80,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [interactive-elements](accessibility/interactive-elements.md) | Building/reviewing any clickable or keyboard-operable UI (buttons, links, toggles, menus, dialogs, custom widgets); asked to make a div clickable; fixing focus/tab order; implementing a dropdown/tooltip/toast overlay or disabling background content behind an overlay |
+| [contrast-of-interactive-states](accessibility/contrast-of-interactive-states.md) | Proving text or focus-ring contrast of a component's hover, focus, active, or disabled state in a real browser (Playwright + Chromium), when a state uses a CSS `filter`, `opacity`, blend, or `outline-style: auto` so computed colours differ from painted ones; forcing a pseudo-class with CDP `CSS.forcePseudoState` because Playwright has no API for it; choosing between painted screenshot pixels and recomputing a filter with canvas `ctx.filter`; sampling the label colour, the fill, and the focus ring; a forced state still mid-transition; a state styled through an ancestor (`group-hover:`, `li:hover > a`) that a forced state on the child alone does not match; whether a disabled control or an unstyled browser focus ring counts toward the pass/fail |
 
 ## design
 
