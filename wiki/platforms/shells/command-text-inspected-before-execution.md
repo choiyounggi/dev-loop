@@ -7,8 +7,9 @@ confidence: verified
 sources:
   - https://code.claude.com/docs/en/hooks
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
+  - https://github.com/choiyounggi/groundwork/blob/main/plugins/guardrails/hooks/bash-guard.sh
 last_verified: 2026-08-06
-related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-shells-escapes-in-shell-string-literals, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-harness-mediated-tool-results, platforms-processes-tool-diagnostics-without-a-failing-exit-code, platforms-tools-agent-permission-classifier-denials, testing-quality-gate-parsing-vs-command-execution]
+related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-shells-escapes-in-shell-string-literals, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-harness-mediated-tool-results, platforms-processes-tool-diagnostics-without-a-failing-exit-code, platforms-tools-agent-permission-classifier-denials, testing-quality-gate-parsing-vs-command-execution, platforms-shells-heredoc-body-expansion-with-backtick-prose]
 ---
 
 # Commands Read as Text by a Gate Before the Shell Runs Them
@@ -87,6 +88,7 @@ on the first attempt.
 |------|------|
 | Blocking feedback appears without the gate's message | Exit code 2 sends the reason to **stderr**, not stdout; read stderr for the actual cause |
 | The gate matches an intended-as-prose mention of a dangerous command (in a commit message, doc, or test fixture) | Move the text into a file and pass it by path (step 4) rather than reshaping the sentence |
+| You approve an escalated match as a false positive (an inline `node -e` / heredoc script whose label strings contain `TRUNCATE`) and the worker must continue | Tell the worker to write the script with a non-shell Write/editor tool to a project-local scratch file (a `cat <<EOF` heredoc carries the keyword in its command text) and run it by path. A keyword-matching hook such as guardrails `bash-guard.sh` keeps no record of approvals: the identical command text matches and escalates again, so "approved — re-run the same command" loops. The auto-mode classifier judges the action instead ([platforms-tools-agent-permission-classifier-denials]) |
 | Path contains a space, so quoting is unavoidable | Relocate or symlink the target to a space-free path for gated commands; a gate that excludes quote characters cannot receive a quoted path at all |
 | The gate needs `~` expanded | Write the absolute path; a gate that resolves `~` itself is doing so on the literal tilde, which only works if it implements the expansion |
 | The same command must also be portable/robust as a script | Keep the gate-read argument literal and leave the rest of the script quoted normally ([platforms-shells-portable-shell-scripts]) — this page narrows one argument, it does not license unquoted expansions elsewhere |
@@ -128,4 +130,4 @@ directory empty while a Write-tool call succeeded, proving a command-text-scoped
 block, and the consumer would have polled forever. Gate-author side: the
 bare-token extractor denied a double-quoted `--body-file` path as missing; after
 quoted-form parsing plus `~`/`$HOME`/`${HOME}` expansion, the bats regressions
-(`tests/pre-flush-pr-gate.bats` 12–13) went red-then-green and still pass.
+(`tests/pre-flush-pr-gate.bats` 12–13) went red-then-green and still pass. 2026-10-07, guardrails `bash-guard.sh` (https://github.com/choiyounggi/groundwork/blob/main/plugins/guardrails/hooks/bash-guard.sh, `sql_drop` rule; in escalation mode every `ask` becomes a recorded `deny` with no approval state): fed the hook JSON directly, an inline `node -e` whose only keyword was a `TRUNCATE` label escalated on the first run and again on the identical re-run; the same script saved to a file and run by path passed, a keyword-free control passed, and a real `psql -c` `TRUNCATE` still escalated. The field case: two escalations 40 s apart on the same 8.5 KB inline mutation script.

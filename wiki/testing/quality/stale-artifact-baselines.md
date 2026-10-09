@@ -9,7 +9,7 @@ sources:
   - https://jestjs.io/docs/snapshot-testing
   - http://octopusinvitro.gitlab.io/blog/code-and-tech/approval-testing
 last_verified: 2026-08-06
-related: [testing-quality-differential-run-agreement, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, qa-deliverables-generated-artifacts-as-deliverable-source]
+related: [testing-quality-differential-run-agreement, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, qa-deliverables-generated-artifacts-as-deliverable-source, testing-quality-key-order-in-serialized-goldens]
 ---
 
 # A Previously Published Artifact as the "Before" Baseline

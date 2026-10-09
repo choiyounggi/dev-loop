@@ -8,8 +8,8 @@ sources:
   - https://raw.githubusercontent.com/nedbat/coveragepy/master/doc/branch.rst
   - https://pitest.org/quickstart/basic_concepts/
   - https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/
-last_verified: 2026-08-06
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-harness-reverse-controls, backend-common-change-impact-call-site-enumeration, testing-quality-precedence-between-competing-exit-conditions]
+last_verified: 2026-10-07
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-harness-reverse-controls, backend-common-change-impact-call-site-enumeration, testing-quality-precedence-between-competing-exit-conditions, testing-strategy-cross-layer-effect-tests]
 ---
 
 # Covering a Policy Applied at Several Return Sites of One Handler
@@ -19,7 +19,8 @@ related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-s
 One function applies the same policy at more than one of its own success
 returns — a CLI handler that computes an exit code (`--strict`, `--check`) and
 returns it from three branches, a controller that stamps the same header on
-several 200s, a resolver that tags each of its result shapes. Also when you are
+several 200s, a resolver that tags each of its result shapes — or one class whose
+several public entry methods each call the same internal step first. Also when you are
 judging whether an existing suite covers such a flag, or a reviewer asks "is the
 flag tested?" and the answer so far is one green test.
 
@@ -64,6 +65,7 @@ flag tested?" and the answer so far is one green test.
 | A site is unreachable through the public interface | Do not force it — either delete the dead return or move the test to the level that can reach it ([testing-quality-behavior-not-implementation]); an unreachable site's mutation survives forever and reads as a permanent gap |
 | The handler is refactored so all sites funnel through one wrapper | Re-run the per-site mutations once after the refactor: the sites collapsed, so the site list — and the case count it justified — changed |
 | A new branch adds a fourth return during review | Treat the missing per-site test as the review finding; the existing three staying green is exactly the signal that does not fire |
+| Several public entry methods each call one shared step first (a subclass whose `issue()` and `verify()` both open with `self._refresh_if_stale()`) | Treat each method's call as a site: one test per entry method that reaches the step only through that method, then delete that one call and require that test to redden. Tests written around the step's own behaviour (TTL, single-flight) go through whichever method is convenient, so the sibling method's call stays unguarded |
 | The policy is applied at error returns too | Enumerate those as sites as well; an error path that skips the policy fails the same way |
 | You can only mutate via a script | Assert the edit landed before reading the verdict — a pattern that matches nothing still exits 0 ([testing-quality-tests-that-cannot-fail]) |
 
@@ -82,3 +84,4 @@ flag tested?" and the answer so far is one green test.
 - https://pitest.org/quickstart/basic_concepts/ — "'Survived' means the mutation was not detected by the covering test"; "'No coverage' is the same as **Survived** except there were no tests that exercised the line of code where the mutation was created" — the two verdicts a per-site reversion distinguishes
 - https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/ — the Block Statement mutator "removes the content of every block statement", i.e. deleting the statement at one site is a standard mutation operator rather than an ad-hoc edit
 - Field measurement 2026-08-06 (linkly `impl/lnpl/cli.py`, `cmd_spec` returning 0 from three branches: `-o` without `--run`, stdout dump, and `--run` with all cases passing): reverting the two no-run `_strict_rc(...)` calls to bare `return 0` left 10 tests passing and reddened exactly the 2 new path-specific tests; before those tests existed the same reversion reddened nothing. The file was restored from a pre-mutation copy with an identical `sha256`, and the suite total rose 1272 → 1275 rather than dropping
+- Field measurement 2026-10-07 (linkly `impl/lnpl/drivers.py`, `RotatingHmacTokenProvider.issue()`/`verify()` each calling `_refresh_if_stale()`): in an isolated copy, replacing the `issue()` call with `pass` reddened exactly one test (`test_normal_issue_at_the_ttl_rereads_and_signs_with_the_new_key`) while the `verify()` deletion reddened three verify-path tests; with that one issue-path test removed, the `issue()` deletion left all 353 tests green — the gap the original audit found (368 green) before the test was added
