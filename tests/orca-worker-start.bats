@@ -406,10 +406,10 @@ flat_skill() {
 # (or fail) depending on their shell rather than on the code.
 
 @test "model: --model reaches the created terminal's claude command" {
-  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e DEV_LOOP_WORKER_EFFORT=high \
       bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude --model claude-sonnet-5
   [ "$status" -eq 0 ]
-  [[ "$output" == *"claude --permission-mode bypassPermissions --model 'claude-sonnet-5'"* ]]
+  [[ "$output" == *"CLAUDE_CODE_EFFORT_LEVEL=high claude --permission-mode bypassPermissions --model 'claude-sonnet-5'"* ]]
 }
 
 @test "model: DEV_LOOP_WORKER_MODEL is the default when --model is absent" {
@@ -436,11 +436,19 @@ flat_skill() {
   [[ "$output" == *"--model 'opus[1m]'"* ]]
 }
 
+@test "effort: an invalid effort is rejected before anything is created" {
+  run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e DEV_LOOP_WORKER_EFFORT='max; id' \
+      bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"invalid effort"* ]]
+}
+
 @test "model: unset adds no --model flag (boundary — unchanged behavior)" {
-  run env -u DEV_LOOP_WORKER_MODEL ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
+  run env -u DEV_LOOP_WORKER_MODEL -u DEV_LOOP_WORKER_EFFORT ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
       bash "$OWS" --task task_1 --worktree "id:r::/wt" --agent claude
   [ "$status" -eq 0 ]
   [[ "$output" != *"--model"* ]]
+  [[ "$output" != *"CLAUDE_CODE_EFFORT_LEVEL"* ]]
 }
 
 @test "model: a shell-metacharacter model is rejected, nothing is created" {

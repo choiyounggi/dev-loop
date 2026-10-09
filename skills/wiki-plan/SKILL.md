@@ -1,6 +1,5 @@
 ---
 name: wiki-plan
-effort: high
 argument-hint: "[what to build]"
 description: The fixed planning methodology for a capable model. Make every design decision grounded in a bundled wiki page (recording a decision-to-page map), then decompose the work into ordered, self-contained tasks, each naming the exact wiki pages that govern it. Runs as loop-implement step 2.
 ---
@@ -66,7 +65,9 @@ A quiet skip is never allowed — every abandonment must appear on the ledger an
 in the eventual task report's `GATES:` line. (This is the same abandonment
 mechanism `templates/gates.md` already uses.) gaps-emitted is never abandoned:
 it runs in lite mode too and simply records nothing when the [no-wiki] count
-is the zero the lite verdict assumed.
+is the zero the lite verdict assumed. `lint-surveyed` is never abandoned in
+lite mode either: it is one format check, and Phase C needs the recorded
+command.
 
 ## Phase A — Analyze (produces `plans/<feature>/analysis.md`)
 
@@ -75,7 +76,8 @@ and fill it in. Its section headers are parsed by `plan-gate.sh` — keep them
 exactly as the template has them.
 
 **A1. Requirements + acceptance examples** (Example Mapping: Rule / Concrete
-example / Open question). While a question is unresolved, mark it literally
+example / Open question). Start every Rule cell with its id — `R1: ...`,
+`R2: ...` — because Phase B Decision rows and Phase C `covers:` lines cite it. While a question is unresolved, mark it literally
 `OPEN: <question>` in the Open question cell — the gate fails while any `OPEN:`
 token remains, so leaving a question unresolved is what blocks entry to Phase B
 (Definition of Ready), not a missing checkbox.
@@ -84,6 +86,13 @@ token remains, so leaving a question unresolved is what blocks entry to Phase B
 - `Baseline: <test command> -> rc=<n>, HEAD <sha>, git status <clean|dirty>` —
   record one command that can be copy-pasted and re-run as-is; gate-A re-runs
   this exact command.
+- `Lint: <command> -> rc=<n>` — one bullet per lint or typecheck command the
+  project runs (package.json scripts named lint, typecheck, type-check or
+  check; Makefile lint targets; CI workflow steps that run a linter or type
+  checker; the `verify` role when it names one), run once now to record its
+  rc — or one `Lint: none — checked: <search command>` bullet when there is
+  none. gate-A's `lint-surveyed` checks this format only and never re-runs
+  the command.
 - `### Affected files` — every bullet needs an `evidence:` token backed by a
   real search (`<path> — evidence: <search command> -> <n> hits`). A
   code-graph hit (`explore` = graphify) may be cited only in the same bullet
@@ -115,7 +124,8 @@ sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh emit A plans/<fea
 sh ${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh --run .dev-loop/gates/plan-A-<feature>.md
 ```
 Gate ids: `baseline-tests-ran`, `affected-files-evidenced`,
-`open-questions-resolved`, `constraints-surveyed`, `research-evidenced`. Exit 0
+`open-questions-resolved`, `constraints-surveyed`, `lint-surveyed`,
+`research-evidenced`. Exit 0
 (every gate MET or explicitly ABANDONed) before entering Phase B; a failing
 gate means fixing `analysis.md`, not editing the gate.
 
@@ -146,13 +156,19 @@ Example, for a login feature:
 
 | # | Decision | Choice | Wiki basis | Rejected alternative | Testability |
 |---|----------|--------|------------|----------------------|-------------|
-| D1 | PK type for users | UUIDv7, app-generated | `wiki/databases/schema-design/primary-key-choice.md` | Auto-increment int — leaks row count, harder to shard | any insert path missing an explicit id |
-| D2 | Auth mechanism | Session cookie, not token | `wiki/security/authn/session-vs-token.md` | JWT — needless revocation complexity for this scale | session-fixation / logout test |
-| D3 | Re-signup after delete | Soft-delete + partial unique index | `wiki/databases/schema-design/soft-delete.md`, `wiki/databases/schema-design/partial-and-expression-indexes.md` | Hard delete — loses audit trail | re-signup integration test |
+| D1 | PK type for users | UUIDv7, app-generated | `wiki/databases/schema-design/primary-key-choice.md` | Auto-increment int — leaks row count, harder to shard | any insert path missing an explicit id; covers R1 |
+| D2 | Auth mechanism | Session cookie, not token | `wiki/security/authn/session-vs-token.md` | JWT — needless revocation complexity for this scale | session-fixation / logout test; covers R2 |
+| D3 | Re-signup after delete | Soft-delete + partial unique index | `wiki/databases/schema-design/soft-delete.md`, `wiki/databases/schema-design/partial-and-expression-indexes.md` | Hard delete — loses audit trail | re-signup integration test; covers R3 |
 
 `Testability` names the test/gate that would catch this decision being wrong —
 never leave it blank; a row missing any of the six cells fails
 `decision-rows-complete`.
+
+Every row also names the analysis.md Rule ids it covers — `covers R1, R3`, or a
+range like `R4-R6` — in any cell, usually `Testability`. A Rule named by no row
+was the most frequent blocking plan-reviewer finding, so `requirements-covered`
+checks it mechanically: every `R<n>` in `## Requirements` must appear in some
+`## Decisions` data row.
 
 **Semantic candidate check** — after the routing sweep, run the bundled-wiki
 vector index as a fail-open second path: once for the task as a whole (a
@@ -190,6 +206,12 @@ never feed `decision-rows-complete`. Only after this check finds no
 matching page does the decision's `Wiki basis` cell take the literal
 `[no-wiki]`.
 
+**Pre-review check** — before every `plan-reviewer` call, run
+`sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check requirements-covered plans/<feature>`.
+`fail` lists the uncovered Rules on stderr: fix `design.md` until it prints `ok`
+instead of spending a reviewer round on them. This check is not a reviewer call
+and does not count toward the 3-call bound.
+
 **Independent review** — call the `plan-reviewer` subagent (Agent tool) with:
 the `analysis.md` path (including its `## Research` section), the `design.md`
 path, the requester's original goal text, and the wiki root
@@ -199,14 +221,17 @@ path, the requester's original goal text, and the wiki root
 line into `plans/<feature>/review-verdict.md` (gate-B reads that file, not the
 `## Review` section). If `VERDICT: FAIL`, resolve every `blocking` finding and
 re-call — bounded at 3 total calls; a 3rd `FAIL` is STOP + escalate to the
-requester, not a forced PASS.
+requester, not a forced PASS. An HTTP 429 naming a model limit is not a
+verdict and not a call against the bound: re-run once with the Agent tool's
+`model` override set to whichever of `opus` and `fable` the 429 does not name,
+then escalate — never retry on `sonnet`.
 
 **gate-B**:
 ```
 sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh emit B plans/<feature> .dev-loop/gates/plan-B-<feature>.md
 sh ${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh --run .dev-loop/gates/plan-B-<feature>.md
 ```
-Gate ids: `groundings-exist`, `decision-rows-complete`, `reviewer-verdict`, `gaps-emitted`.
+Gate ids: `groundings-exist`, `decision-rows-complete`, `requirements-covered`, `reviewer-verdict`, `gaps-emitted`.
 Exit 0 before entering Phase C.
 
 ## Phase C — Decompose (produces `plans/<feature>/plan.md` + `tasks/NN-*.md`)
@@ -273,12 +298,28 @@ Exit 0 before entering Phase C.
      declaring its update is a plan defect, not a surprise for the implementer.
    ## Verify
    - <command to run and what output means success; or concrete checklist>
+   - lint: <one line per Lint bullet — see the Lint gating table below>
    - covers: R<n> — the `## Requirements` row (from analysis.md's A1) this
      task's verification proves; a task covering no Rule is a scope-creep
      signal, and a Rule covered by no task is a coverage gap.
    ## Out of scope
    - <the adjacent thing the next task does — so the implementer stops at the boundary>
    ```
+
+   **Lint gating in every task's `## Verify`.** For each `- Lint:` bullet in
+   analysis.md's `## Ground truth`, write one lint line into every task's
+   Verify:
+
+   | Ground truth bullet | Task Verify line |
+   |---|---|
+   | `Lint: <command> -> rc=0` | `- lint: <command> && echo LINT_OK` — `<command>` copied verbatim; success = `LINT_OK` printed |
+   | `Lint: <command> -> rc=<non-zero>`, the tool accepts file operands | `- lint: fs=(); for f in <only the Deliverables paths this tool lints>; do [ -f "$f" ] && fs+=("$f"); done; echo "lint files (${#fs[@]}): ${fs[*]-}"; if [ ${#fs[@]} -eq 0 ]; then echo "lint skipped: no lintable Deliverables remain"; else <tool invocation that takes files> "${fs[@]}"; fi && echo LINT_OK` (bash) — the untouched tree already fails, so only this task's files are judged; deleted files and paths with spaces pass through safely, and an empty list is reported, not hidden |
+   | `Lint: <command> -> rc=<non-zero>`, the tool takes no file operands | `- lint: not gated — baseline rc=<n>, <command> takes no file operands`; loop-implement step 0 records it as `ABANDON: <gate id> baseline rc=<n>, <command> takes no file operands` |
+   | `Lint: none — checked: ...` | no lint line |
+
+   Warnings block only when the recorded command already promotes them (a
+   lint script running `eslint --max-warnings 0`); the plan never adds a
+   warning-promotion flag.
 
 6. **Self-check before handing off.** For each task, simulate a Haiku-grade
    implementer: reading ONLY that file + its wiki pages, is there any point where
@@ -291,7 +332,9 @@ Exit 0 before entering Phase C.
    check coverage both directions: every Rule in analysis.md's `## Requirements`
    is named by at least one task's `covers:` line, and every task's `covers:`
    line names a Rule that actually exists — an orphan on either side goes back
-   to Phase A/C for repair before dispatch.
+   to Phase A/C for repair before dispatch. Then check lint: every task's
+   Verify carries one lint line per `- Lint:` bullet, per the Lint gating
+   table.
 
 ## Execution handoff
 

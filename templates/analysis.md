@@ -13,15 +13,24 @@ below is a content defect (exit 3).
 Example-Mapping table: one row per rule, with a concrete Given/When/Then
 example. Leave "Open question" blank once resolved; while unresolved, mark
 it `OPEN: <question>` — the open-questions-resolved gate fails while any
-`OPEN:` token remains in this section.
+`OPEN:` token remains in this section. Start every Rule cell with its id
+(`R1: ...`, `R2: ...`): design.md's Decision rows and Phase C `covers:` lines
+cite these ids, and gate-B's requirements-covered fails a row without one.
 | Rule | Concrete example | Open question |
 |------|------------------|---------------|
 
 ## Ground truth
 - Baseline: <test command> -> rc=<n>, HEAD <sha>, git status <clean|dirty>
+- Lint: <lint or typecheck command> -> rc=<n>
 
 The baseline-tests-ran gate re-runs the exact `<test command>` above; record
 one command that can be copy-pasted and re-executed as-is.
+
+Add one `- Lint:` bullet per lint or typecheck command the project runs, with
+the rc you got running it now, or a single
+`- Lint: none — checked: <command that confirmed it>` bullet. The
+lint-surveyed gate fails without one; it checks the format only and never
+re-runs the command.
 
 ### Affected files
 Every bullet MUST include an `evidence:` token backed by a real search — the
