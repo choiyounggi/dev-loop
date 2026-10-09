@@ -8,7 +8,10 @@ sources:
   - https://code.claude.com/docs/en/hooks
   - https://csf.tools/reference/nist-sp-800-53/r5/ac/ac-5/
   - https://github.com/Leonxlnx/unlazy/blob/main/scripts/stop-hook.mjs
-last_verified: 2026-09-08
+  - https://man7.org/linux/man-pages/man1/tmux.1.html
+  - https://man7.org/linux/man-pages/man7/environ.7.html
+  - https://code.claude.com/docs/en/cli-reference
+last_verified: 2026-10-06
 related: [infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-worktree-isolated-workers, platforms-processes-tool-diagnostics-without-a-failing-exit-code, infrastructure-agent-orchestration-dispatching-after-a-completion-report, infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal, infrastructure-agent-orchestration-client-bound-pty-coordinator-loss, infrastructure-agent-orchestration-gate-evidence-exit-code-class, infrastructure-ci-cd-write-time-limit-guards]
 ---
 
@@ -16,11 +19,10 @@ related: [infrastructure-agent-orchestration-pane-delivery-confirmation, infrast
 
 ## When this applies
 
-You are writing a completion gate — a `Stop`/`SubagentStop` hook or equivalent —
-that refuses to let an orchestrated worker session end while its recorded phase
-says the work is unfinished. Also when such a gate fires on a worker that did
-exactly what its own prompt told it to do — including when you *are* that worker,
-parked at an instructed pause and receiving the nudge every turn.
+You are writing a completion gate (a `Stop`/`SubagentStop` hook) that keeps an
+orchestrated worker from ending while its recorded phase is unfinished; or such a
+gate fires on a worker that followed its prompt (including you, parked at an
+instructed pause), names the worker by `cwd` + tmux session, or blocks you for a task you were never given.
 
 ## Do this
 
@@ -97,6 +99,9 @@ parked at an instructed pause and receiving the nudge every turn.
 | A worker legitimately stops at an approval point but its status was never updated | The gate is right to block; make the status update the last step of the instructed pause so "stopped where told" and "recorded as paused" cannot diverge |
 | The gate's state file is unreadable or its parser is missing | Exit 0 and log — a gate that blocks on its own malfunction traps every session |
 | Several workers share one status directory | Match the entry by the session's resolved physical `cwd`; on macOS resolve `/var`→`/private/var` and symlinks on both sides before comparing |
+| The gate decides "this session is the managed worker" from `cwd` plus the tmux session name (`tmux display-message -p '#S'`) | The name identifies a pane, not a process. Every process started from the pane inherits its `TMUX`/`TMUX_PANE` environment, so a headless agent that a hook launches in the worker's folder reports the worker's name. With `TMUX` unset, the command does not fail; it falls back to the most recently used session. Bind identity to a value only the worker has: launch it with a fixed session id (`claude --session-id <uuid>`), record that id in the status entry, and compare it with the hook input's `session_id` |
+| The identity check compares `session_id` alone | A subagent's hook input carries its parent's `session_id`; `agent_id` is "Present only when the hook fires inside a subagent call". Handle a `SubagentStop` (or any input with `agent_id`) as the subagent, not the worker. When the worker is relaunched, resume it with `--resume <uuid>` so the id stays the same, or record the new id: `--fork-session` mints a new one |
+| You are blocked with "finish your loop" for a task your own prompt never mentioned | Check that you are that worker before acting: compare the task the block names with the task in your own instructions. For a headless `claude -p`, `ps -o command= -p $PPID` run from your tool shell prints your own agent process and its prompt argument; an interactive worker received its prompt by paste, so argv holds none. If the tasks differ, report the misidentification and end the turn, leaving that task's status and files untouched |
 | A phase means "waiting on another worker" | Terminal — the worker cannot progress it; the orchestrator's wait loop owns that transition |
 | The worker cannot reach a terminal phase because the task is genuinely blocked | Provide a `failed` transition it may record itself; without one, the only escapes are fabricated completion or an eight-block override |
 | You are the worker and the nudge repeats every turn at an instructed pause | Read it as a gate-vs-prompt mismatch, not as work you skipped; inventing extra work to satisfy it writes code the brief did not ask for |
@@ -111,6 +116,7 @@ parked at an instructed pause and receiving the nudge every turn.
 | Treat an unrecognized phase value as unfinished | Treat it as terminal and log the value | A typo or a newly added phase would otherwise trap sessions until someone reads the hook |
 | Rely on the block message alone to stop a loop | Return early on the harness's re-entry flag first | The message does not bound repetition; the flag is what makes the gate fire once |
 | Advance your phase to a terminal value to stop a gate firing on you | Hold the instructed phase and report the gate-vs-prompt mismatch to the coordinator | The terminal values that would silence it are the review verdict; writing one makes the reviewed party its own approver, and the scheduler reads it as reviewed |
+| Treat a matching tmux session name as proof the stopping session is the worker | Compare a per-process id recorded at launch with the hook input's `session_id` | Any process started from the worker's pane inherits the pane's tmux environment, and outside a pane the name lookup falls back to the most recently used session |
 | Trust a self-reported phase/status field as proof the work is done | Add a gate that parses a ledger of actual command exit codes and output, written only by running the check | The worker can set a phase field to any value for free; it cannot fabricate a ledger entry without the command actually passing |
 
 ## Sources
@@ -121,3 +127,8 @@ parked at an instructed pause and receiving the nudge every turn.
 - Field reproduction 2026-09-08, dev-loop repo `hooks/loop-gate.sh` (Gate 2, lines 112–174): parses `.dev-loop/gates/*.md` via `gate-check.sh --status` (never executes CHECK commands from the Stop hook), blocks on UNMET/CLAIMED/malformed, releases after `MAX_GATE_BLOCKS=6` consecutive blocks with an unchanged ledger hash — in addition to Gate 1's self-reported-phase check; `tests/loop-gate.bats` "releases after 6 blocks without ledger progress" and "ledger progress resets the no-progress counter" pin the valve
 - Field reproduction 2026-08-13, dev-loop repo at `fa89dc2`: a worker parked at `impl_done` per `skills/orchestrate/templates/session-prompt.md:75` ("run `… status-update.sh {TASK} impl_done …` and wait") received "verification loop incomplete" on every turn, because `hooks/loop-gate.sh:55` accepts only `done|approved|merged|failed|""` while `skills/orchestrate/scripts/status-update.sh:6` lists `impl_done` as a first-class phase. The three values that would have silenced it are exactly the three `skills/orchestrate/scripts/ready-set.sh:74` counts as dependency-satisfying (`approved|merged|done`), and that file states the rule the fabrication would break: "A dependency counts as satisfied only at `approved` or higher, NOT at impl_done: a task that consumes an unreviewed interface has to be redone when rework changes that signature"
 - Field reproduction 2026-08-05, dev-loop repo at `95cf947`: `hooks/loop-gate.sh:55` lists `done|approved|merged|failed|""` as terminal, while `skills/orchestrate/templates/session-prompt.md:20` instructs a plan-phase worker to record `plan_ready` and "wait for an approval message. Do NOT write implementation code yet." A worker that followed its prompt exactly was blocked; the `stop_hook_active` early return at line 30 is what kept the block from repeating
+- https://man7.org/linux/man-pages/man1/tmux.1.html — "If a session is omitted, the current session is used if available; if no current session is available, the most recently used is chosen"; the pane ID "is passed to the child process of the pane in the TMUX_PANE environment variable"
+- https://man7.org/linux/man-pages/man7/environ.7.html — "When a child process is created via fork(2), it inherits a copy of its parent's environment"
+- https://code.claude.com/docs/en/hooks (first source, read 2026-10-06) — common input fields: `session_id` "Current session identifier"; `agent_id` "Unique identifier for the subagent. Present only when the hook fires inside a subagent call. Use this to distinguish subagent hook calls from main-thread calls"
+- https://code.claude.com/docs/en/cli-reference — `--session-id`: "Use a specific session ID for the conversation (must be a valid UUID)"; `--fork-session`: "When resuming, create a new session ID instead of reusing the original"
+- Field reproduction 2026-10-06 (dev-loop `hooks/loop-gate.sh`, tmux 3.7b): the gate blocked a headless knowledge-flush `claude -p` with "phase=implementing" for an orchestrated task, because `tmux display-message -p '#S'` inside it returned the worker's session name and the status entry's `.session` matched. On an isolated `tmux -L` server, a grandchild shell started from pane `worker-a` printed `worker-a`; the same query with `TMUX` unset printed `worker-b`, not an error (`worker-b` was created last and no client was attached, so this run cannot separate "created last" from "used last"; the fallback rule itself is the man page's). In the same flush session, launched by `hooks/auto-flush.sh`, `ps -o command= -p $PPID` from the tool shell printed `claude -p Run the dev-loop:knowledge-flush skill now…`, its own agent process
