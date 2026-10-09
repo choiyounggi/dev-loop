@@ -7,8 +7,8 @@ confidence: verified
 sources:
   - https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html
   - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html
-last_verified: 2026-07-10
-related: [debugging-methodology-isolate-by-bisection, debugging-methodology-reproduce-first, testing-flaky-diagnosing-flaky-tests, testing-quality-proving-a-critical-section-is-lock-protected]
+last_verified: 2026-09-27
+related: [debugging-methodology-isolate-by-bisection, debugging-methodology-reproduce-first, testing-flaky-diagnosing-flaky-tests, testing-quality-proving-a-critical-section-is-lock-protected, debugging-methodology-hypothesis-testing]
 ---
 
 # Making an Intermittent Failure Reproducible
@@ -47,10 +47,20 @@ your suite, go to wiki/testing/flaky/diagnosing-flaky-tests.md.
 | Environment (CI-only) | Reproduce CI's constraints locally: same container image, CPU/memory limits, and test parallelism |
 | Clock | Freeze/set the clock in the reproduction to the suspicious boundary |
 
-4. Once the failure reproduces on demand, you have a reproduction — locate the
+4. Before wiring diagnostic instrumentation into the loop, when the symptom is
+   a value several code paths can produce (an error variant, a status code, a
+   panic message built at one shared site), enumerate every producer with one
+   exhaustive search (`grep -n '<SymptomValue>' <files>`) and classify each
+   hit — assigns, produces independently, unreachable, consumes — by tracing
+   its data flow, not by the shape of the surrounding code. Instrument every
+   producer, and keep the loop's stop condition on the symptom text alone: a
+   stop condition of "symptom AND my diagnostic line" classifies a genuine
+   reproduction from an uninstrumented producer as "not the target", burns the
+   run budget, and ends in a false "could not reproduce".
+5. Once the failure reproduces on demand, you have a reproduction — locate the
    cause with [debugging-methodology-isolate-by-bisection], using N runs per
    probe so a lucky pass cannot misdirect the search.
-5. Keep the amplified reproduction (stress loop, ordering seed, sleep injection)
+6. Keep the amplified reproduction (stress loop, ordering seed, sleep injection)
    until the fix is verified: the fix must survive the same amplification that
    made the bug reliable.
 
@@ -60,6 +70,7 @@ your suite, go to wiki/testing/flaky/diagnosing-flaky-tests.md.
 |------|------|
 | Adding logging/debugger makes it stop failing | The observation shifted the timing. Use lighter probes: counters, pre-buffered logs, post-mortem state dumps — and rely on loop statistics rather than stepping |
 | Failure rate is so low that even loops rarely hit it | Amplify harder (more concurrency, fewer cores, smaller pools, injected delays at the suspected point) — raise the probability, don't raise patience |
+| A first pass labelled some producers of the symptom value "inert references" without tracing them | Treat every hit as a producer until its data flow says otherwise — a site that never reads the traced variable can still write the symptom (`handle.await.unwrap_or(Failed)`); re-run the exhaustive grep after any refactor of the symptom value |
 | Retry-on-failure is already wallpapering over it in CI | Keep the retry data: a quarantined/retried test's failure rate is your reproduction-rate baseline; debug from the recorded failures rather than deleting them |
 | It reproduces only in prod, never in any test rig | Capture evidence in place per [debugging-methodology-reproduce-first]: correlation-id logs, thread dumps at failure time, and replicate prod's concurrency shape in staging |
 
@@ -75,3 +86,4 @@ your suite, go to wiki/testing/flaky/diagnosing-flaky-tests.md.
 
 - https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html — flaky test causes (concurrency, infrastructure) and why rerun-until-pass is insufficient
 - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html — flakiness correlates with test size/resource use; ordering and environment as sources
+- Field evidence 2026-09 (a Rust orchestration controller, task t1-flaky-m5; integration test failing only under load): `grep -n 'RunOutcomeDto::Failed' controller.rs` → 5 hits — two assignments (:869, :918), one independent producer (:1479, `handle.await.unwrap_or(Failed)`), one unreachable (:1480), one consumer (:1487); the initial plan had instrumented only the two assignments and gated the loop on "panic AND diagnostic line". With every producer instrumented and the stop condition on the panic text alone, the failure reproduced on the first run and held a 3/21 rate for bisection

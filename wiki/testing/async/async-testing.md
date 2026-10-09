@@ -10,8 +10,8 @@ sources:
   - https://jestjs.io/docs/expect
   - https://testing-library.com/docs/dom-testing-library/api-async/
   - https://martinfowler.com/articles/nonDeterminism.html
-last_verified: 2026-08-29
-related: [testing-quality-tests-that-cannot-fail, testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-injected-clock-duration-assertions, platforms-processes-sentinel-driven-repl-payloads, testing-quality-narration-based-ordering-assertions]
+last_verified: 2026-09-28
+related: [testing-quality-tests-that-cannot-fail, testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-injected-clock-duration-assertions, platforms-processes-sentinel-driven-repl-payloads, testing-quality-narration-based-ordering-assertions, testing-async-transient-state-behind-a-controlled-gate]
 ---
 
 # Testing Asynchronous Code Deterministically
@@ -38,6 +38,7 @@ un-awaited promises; or an async test intermittently interferes with the next te
 | UI or state that appears asynchronously | Poll the **condition** with a bounded-timeout wait (`waitFor`/`findBy`-style) and assert the final state; the test proceeds the moment the condition holds |
 | Event-emitter / callback API | Wrap the event in a promise (`once`-style helper) and `await` it, then assert |
 | Fire-and-forget side effect | Expose a completion handle (returned promise, flush/drain hook) and await it in the test; when no handle can exist, poll the durable outcome (row above) |
+| A transient mid-run state that a background finisher/teardown will clear (a controls-map entry, a pending approval) | A condition wait cannot distinguish "not yet" from "already wiped": park the system behind a decision the test controls, assert inside the park, then release → [testing-async-transient-state-behind-a-controlled-gate] |
 | Code that consumes a stream record-by-record (readline prompts, a line-delimited protocol) driven from an in-memory test double | Write one record per macrotask turn — `input.write(line + '\n'); await new Promise(r => setImmediate(r))` — and share one reader instance across the whole interaction rather than constructing one per prompt |
 
 3. **Contain leaked work.** A promise or timer that outlives its test corrupts
@@ -64,6 +65,7 @@ un-awaited promises; or an async test intermittently interferes with the next te
 | Runner reports an unhandled rejection after the suite passes | A promise was created without `await`/`return` — find it and await it; do not silence the warning |
 | Assertions run inside a `.then`/callback the test never awaits | Add `expect.assertions(n)` / `expect.hasAssertions()` so the test fails when the callback is skipped, then restructure to await-then-assert |
 | A stream-fed test hangs after consuming the first record, with the later records never delivered | The records arrived in one chunk: a readable concatenates buffered writes, and a line-oriented consumer walks every delimiter in that chunk synchronously, discarding the lines no reader is waiting for. Write one record per turn (table row above) and re-run |
+| Teardown deletes a directory or closes a socket that spawned runtime tasks (tokio and similar) still use, from a `Drop`/destructor or a cleanup call placed after the assertions | Abort *and await* every task handle before the delete, on the single path every outcome takes — `abort()` returns before the task stops, and a failing assertion skips a trailing cleanup → [testing-async-teardown-after-aborted-tasks] |
 | The consumer is rebuilt per prompt (a new interface inside a retry loop) | Construct it once per interaction and reuse it — a second instance attached to the same stream competes for the same buffered data, so records land in whichever instance reads first |
 
 ## Instead of
