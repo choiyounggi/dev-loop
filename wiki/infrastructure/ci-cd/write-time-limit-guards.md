@@ -10,7 +10,7 @@ sources:
   - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation-ratcheting
   - https://eslint.org/docs/latest/use/suppressions
 last_verified: 2026-09-17
-related: [backend-common-change-impact-corpus-sweep-before-a-rejection-rule, infrastructure-ci-cd-changed-files-only-gates, infrastructure-agent-orchestration-session-completion-gates]
+related: [backend-common-change-impact-corpus-sweep-before-a-rejection-rule, infrastructure-ci-cd-changed-files-only-gates, infrastructure-agent-orchestration-session-completion-gates, frontend-design-design-system-lint-gate-for-agents]
 ---
 
 # Write-Time Limit Guards Over a State That Already Exceeds the Limit

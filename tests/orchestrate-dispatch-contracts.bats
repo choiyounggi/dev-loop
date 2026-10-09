@@ -376,9 +376,12 @@ brief_dependencies_region() {
   [[ "$section" == *"Tier to pipeline profile"* ]]
   [[ "$section" == *"R0 trivial"* ]]
   [[ "$section" == *"R3 critical"* ]]
-  [[ "$section" == *"claude-sonnet-5"* ]]
-  [[ "$section" == *"claude-opus-5"* ]]
-  [[ "$section" == *"1 and 3 only"* ]]
+  [[ "$section" == *"claude-sonnet-5-5"* ]]
+  [[ "$section" == *"claude-opus-5-5"* ]]
+  [[ "$section" == *"claude-fable-5-1"* ]]
+  [[ "$section" == *"worker effort (DEV_LOOP_WORKER_EFFORT) | high | high | high | high"* ]]
+  [[ "$section" == *"scripts/gen-agent-tier-variants.sh"* ]]
+  [[ "$section" == *"| review lenses | 1, 3 and 6 only | 1-4 and 6 | 1-6 | 1-6 plus the adversarial-change-review techniques recorded under lens 5 |"* ]]
 }
 
 @test "negative control: a Phase 2 copy without the profile table fails the tier-profile check" {
@@ -407,7 +410,9 @@ brief_dependencies_region() {
 @test "Phase 4 selects the lens set by tier and escalates an R0 second round" {
   section="$(normalize_ws "$(phase4_section "$SKILL")")"
   [[ "$section" == *"Lens set by tier"* ]]
-  [[ "$section" == *"lenses 1 and 3 only"* ]]
+  [[ "$section" == *"lenses 1, 3 and 6 only"* ]]
+  [[ "$section" == *"when R1, lenses 1-4 and 6;"* ]]
+  [[ "$section" == *"when R2 or R3, lenses 1-6."* ]]
   [[ "$section" == *"not run — R0 profile"* ]]
   [[ "$section" == *"instead of dispatching a second rework"* ]]
 }
@@ -441,6 +446,7 @@ brief_dependencies_region() {
   section="$(normalize_ws "$(step2a_section "$SKILL")")"
   operative="${section#*this session either (Coordinator token budget, Known amplifier). Then}"
   [[ "$operative" == *"DEV_LOOP_WORKER_MODEL=<id from the profile table>"* ]]
+  [[ "$operative" == *"DEV_LOOP_WORKER_EFFORT=<level from the profile table>"* ]]
   [[ "$operative" == *"scripts/launch-session.sh"* ]]
 }
 
@@ -488,17 +494,17 @@ brief_dependencies_region() {
   [[ "$section" != *"review-verdict.md"* ]]
 }
 
-@test "step 2a keeps the planning model on the coordinator: the agent inherits the coordinator model" {
+@test "step 2a plans on pinned agents: the planning models are the profile table's rows" {
   section="$(normalize_ws "$(step2a_section "$SKILL")")"
-  [[ "$section" == *"inherits the coordinator model"* ]]
-  [[ "$section" == *"planning model is whatever model this coordinator session is running"* ]]
+  [[ "$section" == *"Both agents pin their model and effort in frontmatter"* ]]
+  [[ "$section" == *"the planning models are the profile table's analysis and design rows"* ]]
 }
 
-@test "negative control: a step-2a copy without the inherits sentence fails the planning-model check" {
-  fixture="${BATS_TEST_TMPDIR}/step2a-no-inherits.md"
-  grep -v 'inherits the coordinator model' "$SKILL" > "$fixture"
+@test "negative control: a step-2a copy without the pin sentence fails the planning-model check" {
+  fixture="${BATS_TEST_TMPDIR}/step2a-no-pin.md"
+  grep -v 'the planning models are the' "$SKILL" > "$fixture"
   section="$(normalize_ws "$(step2a_section "$fixture")")"
-  [[ "$section" != *"inherits the coordinator model"* ]]
+  [[ "$section" != *"the planning models are the profile table's analysis and design rows"* ]]
 }
 
 @test "boundary: the step-2a extractor still yields a non-empty section that stops before the watch-status line" {
@@ -522,10 +528,10 @@ brief_dependencies_region() {
   [[ "$section" != *"SendMessage"* ]]
 }
 
-@test "step 0 runs the wiki-plan invocation on the task-planner agent" {
+@test "step 0 runs the wiki-plan invocation on the task-analyst then task-planner agents" {
   section="$(normalize_ws "$(step0_section "$SKILL")")"
   [[ "$section" == *"run step 2a's \`wiki-plan\` invocation for this task FIRST"* ]]
-  [[ "$section" == *'(on the `task-planner` agent)'* ]]
+  [[ "$section" == *'(on the `task-analyst` agent, then the `task-planner` agent)'* ]]
 }
 
 @test "negative control: a step-0 copy without the task-planner clause fails the producer check" {
@@ -534,9 +540,9 @@ brief_dependencies_region() {
   # per-line sed/grep can never match it — slurp the whole file and let \s+
   # absorb the line break (tests-that-cannot-fail: a per-line strip here
   # would silently no-op and the negative control would falsely pass).
-  perl -0777 -pe 's/\(on the\s+`task-planner`\s+agent\)//' "$SKILL" > "$fixture"
+  perl -0777 -pe 's/\(on the\s+`task-analyst`\s+agent,\s+then\s+the\s+`task-planner`\s+agent\)//' "$SKILL" > "$fixture"
   section="$(normalize_ws "$(step0_section "$fixture")")"
-  [[ "$section" != *'(on the `task-planner` agent)'* ]]
+  [[ "$section" != *'(on the `task-analyst` agent, then the `task-planner` agent)'* ]]
 }
 
 @test "Re-plan ladder round 3 re-enters the two-stage handshake instead of passing gate-B on a stale verdict" {
@@ -552,4 +558,72 @@ brief_dependencies_region() {
   grep -v 'goes through the two-stage handshake again' "$SKILL" > "$fixture"
   section="$(normalize_ws "$(token_budget_section "$fixture")")"
   [[ "$section" != *"goes through the two-stage handshake again"* ]]
+}
+
+# --- 14: per-role agent profile (planning split, QA, final review) ---
+
+@test "every agent named in the profile table pins the effort its cell states" {
+  rows="$(phase2_section "$SKILL" | grep -E '^\| (analysis|design|QA|final review) agent')"
+  [ "$(printf '%s\n' "$rows" | wc -l)" -eq 4 ]
+  checked=0
+  while IFS= read -r row; do
+    IFS='|' read -r -a cells <<< "$row"
+    for cell in "${cells[@]:2}"; do
+      eff="$(printf '%s' "$cell" | grep -o '([a-z]*)' | tr -d '()')"
+      [ -n "$eff" ] || continue
+      for name in $(printf '%s' "$cell" | grep -o '`[a-z0-9-]*`' | tr -d '`'); do
+        fm="$(awk '/^---$/{n++; next} n==1' "${REPO_ROOT}/agents/${name}.md")"
+        [[ "$fm" == *$'\n'"effort: ${eff}"* ]]
+        checked=$((checked + 1))
+      done
+    done
+  done <<< "$rows"
+  [ "$checked" -eq 19 ]
+}
+
+@test "negative control: a profile cell whose effort disagrees with the agent file fails the check" {
+  fm="$(awk '/^---$/{n++; next} n==1' "${REPO_ROOT}/agents/task-analyst-r1.md")"
+  [[ "$fm" != *$'\n'"effort: xhigh"* ]]
+}
+
+@test "the coordinator carries the 429-is-not-a-verdict rule for every pinned agent call" {
+  section="$(normalize_ws "$(phase2_section "$SKILL")")"
+  [[ "$section" == *"A 429 is not a verdict."* ]]
+  [[ "$section" == *"whichever of \`opus\` and \`fable\` the 429 does not name"* ]]
+  [[ "$section" == *"never retry on \`sonnet\`"* ]]
+}
+
+@test "negative control: a Phase 2 copy without the 429 rule fails the check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-429.md"
+  grep -v 'A 429 is not a verdict' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(phase2_section "$fixture")")"
+  [[ "$section" != *"A 429 is not a verdict."* ]]
+}
+
+@test "a tier raise that changes the planning profile re-plans on the new tier's agents" {
+  section="$(normalize_ws "$(step2a_section "$SKILL")")"
+  [[ "$section" == *"A raise that changes the planning profile"* ]]
+  [[ "$section" == *"re-plans on the new tier's agents from Phase A"* ]]
+}
+
+@test "round 3 messages the task-analyst before the task-planner" {
+  section="$(normalize_ws "$(token_budget_section "$SKILL")")"
+  [[ "$section" == *"1. SendMessage the same \`task-analyst\`"*"2. SendMessage the same task-planner agent"*"3. Run \`plan-reviewer\` again"* ]]
+}
+
+@test "boundary: an empty profile section fails the per-role row count" {
+  rows="$(printf '' | grep -E '^\| (analysis|design|QA|final review) agent' || true)"
+  [ -z "$rows" ]
+}
+
+@test "negative control: a Phase 4 copy with the old R1 lens set fails the R1 check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-old-r1.md"
+  sed 's/lenses 1-4 and 6/lenses 1-4/' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(phase4_section "$fixture")")"
+  [[ "$section" != *"when R1, lenses 1-4 and 6;"* ]]
+}
+
+@test "Preflight's role list names verify as the test/build/lint/typecheck/QA command" {
+  text="$(normalize_ws "$(cat "$SKILL")")"
+  [[ "$text" == *'`verify` (test/build/lint/typecheck/QA command)'* ]]
 }
