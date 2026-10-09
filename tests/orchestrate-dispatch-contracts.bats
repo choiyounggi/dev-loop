@@ -379,7 +379,7 @@ brief_dependencies_region() {
   [[ "$section" == *"claude-sonnet-5-5"* ]]
   [[ "$section" == *"claude-opus-5-5"* ]]
   [[ "$section" == *"claude-fable-5-1"* ]]
-  [[ "$section" == *"worker effort (DEV_LOOP_WORKER_EFFORT) | medium | medium | high | high"* ]]
+  [[ "$section" == *"worker effort (DEV_LOOP_WORKER_EFFORT) | high | high | high | high"* ]]
   [[ "$section" == *"scripts/gen-agent-tier-variants.sh"* ]]
   [[ "$section" == *"| review lenses | 1, 3 and 6 only | 1-4 and 6 | 1-6 | 1-6 plus the adversarial-change-review techniques recorded under lens 5 |"* ]]
 }
@@ -589,7 +589,8 @@ brief_dependencies_region() {
 @test "the coordinator carries the 429-is-not-a-verdict rule for every pinned agent call" {
   section="$(normalize_ws "$(phase2_section "$SKILL")")"
   [[ "$section" == *"A 429 is not a verdict."* ]]
-  [[ "$section" == *"\`opus\`, then \`sonnet\`, skipping the family the 429 names"* ]]
+  [[ "$section" == *"whichever of \`opus\` and \`fable\` the 429 does not name"* ]]
+  [[ "$section" == *"never retry on \`sonnet\`"* ]]
 }
 
 @test "negative control: a Phase 2 copy without the 429 rule fails the check" {
