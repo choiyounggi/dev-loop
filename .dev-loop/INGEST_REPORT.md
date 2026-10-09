@@ -1,93 +1,95 @@
-# Knowledge flush — 5 insight(s)
+# Knowledge flush — 1 insight(s)
 
-Shell-lock owner PIDs written by a helper's own `$$`, preserving an interrupted run's leftovers before an automated `reset --hard`, multiline form values arriving as CRLF, anchor-killing cases for allowlist regexes, and zod 4 refinements running after a failed check. **5 new pages, 5 back-links. 0 dropped, 3 plan-gaps retired as local-layer.**
+A review's "also assert X" fix that edits an existing test block can delete the assertion other mutants depended on, and re-running only the named mutant hides that. **1 page amended (new step 6), 0 new pages, 1 back-link. 7 plan-gaps retired as local-layer, 0 dropped.**
 
-Run: auto-flush child, run id `20261008-114912-66559`; 8 rows claimed (5 insights + 3 plan-gaps).
+Claimed 8 queue rows (run `20261008-124951-26572`): 1 harvested ★ Insight (`4614be6ce89cc5c5`) and 7 wiki-plan `[no-wiki]` plan-gap rows from linkly task t216.
 
 ## Verified best-practice
 
-### 1. Owner PID in a shell lock written by a helper script → `verified`
-Claim: a lock helper that records its own `$$` records a PID that is dead as soon as the helper exits, so "past TTL and holder dead → reclaim" degrades to TTL-only; record the long-lived holder's PID (passed in), refresh from it, and store PID + start time.
-- https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html — 2.5.2: `$` is "the decimal process ID of the invoked shell".
-- https://man7.org/linux/man-pages/man2/kill.2.html — signal 0 performs "existence and permission checks" (EPERM edge row).
-- https://man7.org/linux/man-pages/man2/flock.2.html — lock tied to the open file description.
-- Source read: dev-loop `scripts/flush-lock.sh:64` writes `$$` in `_write_owner`; line 96 keeps the lock while `age <= TTL || _pid_alive`.
-- Local repro (macOS `/bin/sh`): helper-written `$$` → `kill -0` dead right after acquire while the caller ran; caller PID passed in → alive.
+**`4614be6ce89cc5c5` — keep the block's assertions, then re-run every mutant it covers** (confidence: **verified**)
 
-### 2. Resetting a reused checkout after an interrupted run → `verified`
-Claim: before an automated job's `checkout main && reset --hard origin/main`, inspect `status --porcelain` and unpushed commits, preserve leftovers (WIP branch/commit, or `add -A` + cached patch checked with `apply --check -R`), then reset.
-- https://git-scm.com/docs/git-reset — `--hard` overwrites tracked files, "may overwrite untracked files".
-- https://git-scm.com/docs/git-apply — `--check`, `-R`.
-- https://git-scm.com/docs/git-status — porcelain format, `--ignored`.
-- Local repro: `git diff` patch carried only the tracked edit (untracked file omitted); after `reset --hard` the tracked edit was gone, the untracked file stayed.
-- Field case: this skill's own step 1 met 19 uncommitted files from a run stopped by the usage limit (shipped later in #259).
-- Reviewer fixes applied: unpushed commits on the branch being reset (or a detached HEAD) need a `wip/` branch first; `git clean -x` deletes ignored files that neither preservation path carries.
+Claim: when a review's "also assert X" fix lands in an existing test block, put the new assertion beside the block's existing ones (a different input or environment gets its own case), diff the block's assertion lines before and after, and re-run every mutant the block covers, comparing each verdict with the pre-edit run. Re-running only the named mutant cannot see the mutants that an assertion removed by the edit used to kill.
 
-### 3. Multiline form values arrive with CRLF → `verified`
-Claim: multipart/form-data (FormData bodies, server actions) and `<form>` urlencoded submission rewrite lone LF/CR to CRLF in names and string values; normalize before control-char/length checks and test through a FormData round trip.
-- https://html.spec.whatwg.org/multipage/form-control-infrastructure.html — 4.10.22.8 Multipart form data steps 1.1/1.2 (names; values that are not File objects), file-name escaping `%0A`/`%0D`/`%22`; 4.10.22.6 Converting an entry list to a list of name-value pairs (same rewrite).
-- Local repro (Node v26.7.0): `FormData` `'line1\nline2'` → `"line1\r\nline2"`, `'x\ry'` → `"x\r\ny"`; `URLSearchParams` body unchanged.
+Sources — each quote compared character-for-character against the raw page with `curl` + `/usr/bin/grep` on 2026-10-08:
 
-### 4. Anchor cases for an allowlist regex → `verified`
-Claim: malformed-value reject cases cannot detect a missing `^`/`$`; add a valid-value-with-prefix case per `^` and suffix case per `$`, prove each by deleting the anchor.
-- https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/ — regex mutator maps `^abc` → `abc`, `abc$` → `abc`.
-- https://docs.python.org/3/library/re.html — `$` also matches "just before the newline at the end of the string"; `re.fullmatch`.
-- Local repro (Node v26.7.0, Python 3.14.6): wrong-ext/short/empty rejected with and without `^`; `../`+valid and `/etc/`+valid rejected only with `^`; Python `re.search` matched `valid+'\n'`; JS `/m` accepted an embedded valid line.
-- Reviewer fix applied: under `re.fullmatch` the delete-anchor check is equivalent, so the page gives the alternative check there.
+- https://stryker-mutator.io/docs/stryker-js/incremental/ (raw source: `docs/incremental.md` in stryker-js) — "Reuse is possible when: A mutant was "Killed"; the culprit test still exists, and it didn't change." The runner table decides whether a test edit is seen at all: Jest, Vitest, CucumberJS "Full"; Mocha, Tap "Stryker assumes all tests inside a file changed when that file changed"; Jasmine, Karma "Stryker will only see test changes for tests that are added or removed"; Command "will only detect changes in mutants, not their tests"; "Static mutants don't have test coverage; thus, Stryker won't detect test changes for them"; `--force` reruns "all mutants in scope, regardless of the incremental file".
+- https://pitest.org/quickstart/incremental_analysis/ — "If a mutation was killed in the last run and neither the class under test or the killing test has changed, then it can be assumed that this mutation is still killed."; for a changed killing test, "it is likely that the last killing test will still kill it and it should therefore be prioritised above others."
 
-### 5. zod 4 runs later checks after a failed check → `verified`
-Claim: in zod 4 a failed continuable check (`.regex`, `.min`) does not stop later refinements, and a refine that throws escapes `safeParse`; fold the test into the refine, pass `{ abort: true }`, or make the refine total.
-- https://zod.dev/api — "Zod will execute all checks in sequence, even if one of them causes a validation error"; `abort`; `when` default.
-- Local repro (zod 4.6.5): chained `.regex().refine(BigInt…)` threw `SyntaxError` from `safeParse('abc')`; `{ abort: true }` → `invalid_format`; single refine → `custom`; refine call counts 1/1/0 after failed regex/min/type.
+Both tools keep a "Killed" verdict only while its killing test is unchanged. Step 6 applies that rule by hand, and the new edge row covers the Stryker runners that cannot see an in-place edit.
+
+Local reproduction (Node 26.7.0, `node:test`; one fresh directory per test variant × mutant; each `sed` mutation checked as applied with `cmp`):
+
+| Test block | Unmutated | N0 no-op control | N1 `'debug'`→`'info'` | N2 `42`→`0` | A21 `=== 'production'`→`=== 'prod'` (named mutant) |
+|---|---|---|---|---|---|
+| Before the fix | pass | survived | killed | killed | survived |
+| Fix that rewrites the block for `'production'` | pass | survived | **survived** | **survived** | killed |
+| Fix that adds the `'production'` assertions beside the old ones | pass | survived | killed | killed | killed |
+
+The before/after assertion-line diff named both lines the rewrite removed (`assert.equal(c.logLevel, 'debug')`, `assert.equal(c.seed, 42)`) and none for the additive fix. The scratch directory was deleted after the run.
+
+Field evidence (originating session, linkly-invitation task t2 Task 06 attempt 4; not re-run here): swapping the block's `NODE_ENV=test` assertion for a production one killed A9 and A21 while N1–N3 survived with 4/4 tests passing; re-adding the two removed lines killed them.
+
+**7 plan-gap rows (t216)** — not researched as general practice: every directive names linkly's own modules (`impl/lnpl/lower.py`, `spec._check_given`, the `CODES`/`SEVERITY_OF`/`HINTS` registry, RFC numbering), so all seven fail the layer test. No confidence is claimed for them.
 
 ## Existing-layer check
 
-`wiki_search` (k=5) per candidate — top hits considered: inherited-lock-ownership-in-a-spawned-session, process-identity-by-path-and-hash (#1); control-signals-vs-primary-artifacts, worktree-isolated-workers, tests-that-cannot-fail, shared-run-state, unattended-worker-questions (#2); error-responses, write-path-assertions, exposing-an-origin-http-api, object-key-persistence, validation-timing (#3); escapes-in-shell-string-literals, xss-safe-rendering, exposing-an-origin-http-api (#4); checks-that-cannot-pass, event-loop-blocking (#5). None shares a trigger with a candidate, so all 5 are new pages (no merge).
+Route: `INDEX.md` → testing ("cases/assertions", "verifying tests can actually fail") → `wiki/testing/index.md` → quality; qa ("acting on code-review feedback") checked as well.
 
-Pages read: infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session, backend-common-jobs-scheduled-job-overlap, backend-common-concurrency-distributed-locks, backend-node-boundaries-runtime-validation, testing-quality-harness-reverse-controls, infrastructure-agent-orchestration-shared-run-state, security-input-validation-at-trust-boundaries, testing-quality-checks-that-cannot-pass, testing-quality-tests-that-cannot-fail, platforms-filesystems-paths-case-and-line-endings, infrastructure-agent-orchestration-usage-limit-paused-workers
+Pages read: testing-quality-surviving-mutant-equivalence-triage, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, qa-process-evaluating-review-feedback, testing-quality-policy-at-several-return-sites, testing-mocking-captured-call-arguments, testing-quality-minimum-case-set, testing-quality-expectation-sets-with-one-distinct-value, backend-common-errors-diagnostics-from-a-shared-code-path
 
-Overlap notes:
-- distributed-locks owns TTL watchdog refresh for Redis-style locks; the new lock page links to it for step 3 instead of restating it.
-- inherited-lock-ownership owns run-id inheritance; the new page covers the PID field of the same owner record.
-- runtime-validation owns "validate at the boundary with zod"; the new zod page covers check-chain semantics only.
-- No conflicts flagged.
-
-Back-links added (`related:`): inherited-lock-ownership-in-a-spawned-session, distributed-locks, scheduled-job-overlap → lock page; shared-run-state → reset page; harness-reverse-controls → anchor page.
-
-Deferred back-links (pages an open PR rewrites the `related:` line of): runtime-validation → zod page (#233 edits that line); validation-at-trust-boundaries → CRLF/anchor pages (#228); paths-case-and-line-endings → CRLF page (#228); tests-that-cannot-fail → anchor page (#223/#258). The lock page's link to `platforms-processes-signalling-a-remembered-pid` is deferred because that page exists only on #259.
+- `wiki_search` (k=5) on the candidate's trigger: policy-at-several-return-sites 0.768, surviving-mutant-equivalence-triage 0.763 and 0.725, captured-call-arguments 0.737, minimum-case-set 0.735. Only surviving-mutant-equivalence-triage shares the trigger — its "When this applies" already names "a reviewer asks for a test to cover a specific surviving mutant".
+- Whole-wiki search (`/usr/bin/grep` over every page): 46 pages mention mutants; none covers an edit that removes an assertion other mutants depended on. Three pages direct re-running the targeted mutant after adding a case or assertion (tests-that-cannot-fail, expectation-sets-with-one-distinct-value, policy-at-several-return-sites); none of them covers an edit that removes an existing assertion, so step 6 extends them and contradicts none. They are left unchanged to keep this diff small.
+- **Merged, not created**: surviving-mutant-equivalence-triage gains step 6 with a verdict table, 4 edge rows (Stryker incremental reuse by runner, a hand-rolled mutation script, a deliberate replacement, a survivor whose kill does not reproduce on the pre-edit block), 1 Instead-of row, 4 Sources lines, a "When this applies" clause and a step-1 pointer. Body: 115 lines (117 once #226 merges; limit 120 — the next addition to this page needs a split).
+- Related: added testing-quality-mutation-harness-file-custody (its step 6, "re-run the whole matrix" after a custody fix, is the same principle; it already links back, so the link is now two-way). The evaluating-review-feedback ↔ this-page link is already in open PR #226 and is not duplicated here.
+- Conflicts with existing directives: none flagged.
+- `wiki/testing/index.md`: the page's "load when" row now names the new use case (maintenance invariant 1).
+- `last_verified` stays 2026-08-07: open PR #226 bumps that exact line, and a second bump would add a merge conflict; the new claims carry dated sources.
+- Checks on this branch: `node scripts/wiki-structure-checks.js wiki` → `pages: 359, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line, in infrastructure/config/keys-ahead-of-their-consumer.md); no banned vague qualifier in any added line.
 
 ## Open-PR check
 
-Open `knowledge/*` heads diffed (`git diff origin/main...origin/<head> -- wiki/`): #223, #225–#231, #233–#239, #241, #244, #249, #253–#259 (25 heads).
+26 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253–#260), listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`. For each head, the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for the candidate's concepts (removed or replaced assertions, re-running all mutants, reviewer/auditor fixes, "also assert"), and every added line mentioning mutants was read.
 
 | Candidate | Overlapping open PR | Verdict |
 |---|---|---|
-| 1 lock owner PID | #259 `platforms/processes/signalling-a-remembered-pid` is adjacent (verify a remembered PID before signalling) but covers a different trigger | new |
-| 2 reset reused checkout | none | new |
-| 3 FormData CRLF | none (#233 NestJS multer errors, #241 headless upload — different triggers) | new |
-| 4 regex anchors | none | new |
-| 5 zod 4 continuable checks | #259 `schema-rejection-key-coverage` (per-key rejection tests) and #257 `structured-output-schema-from-zod` — different triggers | new |
+| 4614be6ce89cc5c5 | None carries it. #226 edits the same page for a different situation (a survivor reported inside a PASS audit); #258 (additive mutants vs presence checks) and #259 (schema key coverage) are different situations | **new** |
+| 7 × t216 plan-gaps | No open PR body mentions t216 (all 26 bodies searched) | **new** → local layer |
 
-Merge check (`git merge-tree --write-tree` against every head): the only conflicts this branch adds are the shared `log.md` append and `.dev-loop/INGEST_REPORT.md`, which every flush branch already conflicts on. A `wiki/backend/node/index.md` conflict with #233 was removed by placing the zod row above the `runtime-validation` row.
+Merge check (`git merge-tree --write-tree`, this branch against each head): no wiki page conflicts, including #226, whose four hunks on the shared page were avoided. Every head conflicts on `log.md` and the older ones also on this report file — the same two files the open PRs already conflict on with each other (#260 vs #259 and #255 vs #254 checked).
 
 ## Routing decision
 
-| Insight | Target |
-|---|---|
-| 1 | platforms/processes/lock-owner-pid-from-the-holding-process.md (new) — process/PID mechanics, next to background-services |
-| 2 | infrastructure/agent-orchestration/resetting-a-reused-checkout-after-an-interrupted-run.md (new) — automated agent jobs reusing a checkout |
-| 3 | backend/common/api-design/multiline-form-values-arrive-with-crlf.md (new) — HTML-spec behavior, not Node-specific, so `common` |
-| 4 | testing/quality/anchor-cases-for-allowlist-regexes.md (new) |
-| 5 | backend/node/boundaries/zod-4-checks-continue-after-a-failure.md (new) — next to runtime-validation |
+| Candidate | Layer | Target | Action |
+|---|---|---|---|
+| 4614be6ce89cc5c5 | bundled | `testing/quality/surviving-mutant-equivalence-triage.md` | merged as step 6 |
+| 7 × t216 plan-gaps | local (linkly) | see Local-layer candidates | excluded from this PR, retired from the queue |
 
-No new categories. Index rows added in `wiki/platforms/index.md`, `wiki/infrastructure/index.md`, `wiki/backend/index.md`, `wiki/backend/node/index.md`, `wiki/testing/index.md`; 5 `log.md` ingest entries. Lint: `wiki-structure-checks.js wiki --layer bundled` → 0 findings; `wiki-lint-prohibitions.js` → no violations in the new pages (8 pre-existing elsewhere). Adversarial review (feature-dev:code-reviewer): 3 findings (2 HIGH, 1 LOW), all fixed before commit.
+No new category: testing/quality already holds the mutation-testing pages, and the target page's trigger covers this situation.
+
+## Independent review
+
+A fresh-context adversarial reviewer (a separate subagent, read-only on this checkout) re-fetched both sources, rebuilt the reproduction from its description (same matrix observed on Node 26.7.0) and re-ran both lint scripts. Verdict: CHANGES_REQUESTED, resolved before this PR:
+
+| Finding | Resolution |
+|---|---|
+| Step 6 said a "Killed" result is reused "only while its killing test is unchanged", dropping conditions both tools state (Stryker: the culprit test still exists; PIT: the class under test is unchanged too) | Fixed: "With the source untouched, PIT and Stryker apply the same rule: they reuse a "Killed" result only while its killing test still exists unchanged." |
+| The log line understated #226's overlap — it also edits this page's related list, Edge table and Sources, so merging it would need reconciliation in four places | Checked and not reproduced: `git merge-tree --write-tree` of this branch with #226 conflicts only in `log.md` and this report file, and the merged page carries 0 conflict markers. The log line now names #226's other three hunks and records that they merge cleanly |
+| Gap: a flaky mutant reads as lost coverage in step 6's table | Added an edge row: when a previously killed mutant survives while the assertion diff shows nothing removed, re-run it against the pre-edit block first; surviving there too marks a flaky verdict (testing-flaky-diagnosing-flaky-tests) |
+
+Kept: the reviewer's routing note (step 6's hygiene theme also sits near tests-that-cannot-fail) — the merge target stays, because this page's trigger already owns "a reviewer asks for a test to cover a specific surviving mutant" and the step-1 table now points into step 6.
 
 ## Local-layer candidates
 
 | Row | Project | Target |
 |---|---|---|
-| Planning t213: deciding Exact rejection message | linkly (linkly-dartfish worktree) | wiki-local/backend/common/t213-rejection-message.md — run wiki-ingest inside that project |
-| Planning t214: deciding Byte-identity for inputs with no Password-family key | linkly (linkly-dartfish worktree) | wiki-local/backend/common/t214-password-family-byte-identity.md — run wiki-ingest inside that project |
-| Planning t214: deciding Which entities decide Password-family | linkly (linkly-dartfish worktree) | wiki-local/backend/common/t214-password-family-entities.md — run wiki-ingest inside that project |
+| Planning t216: deciding Where the check runs | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-spec-result-reads-input-check-site.md — run wiki-ingest inside that project |
+| Planning t216: deciding Which names an expect line asserts on | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-expect-result-candidate-names.md — run wiki-ingest inside that project |
+| Planning t216: deciding Condition (a): the bare name is a respond field | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-field-condition.md — run wiki-ingest inside that project |
+| Planning t216: deciding Condition (b): a same-name respond term wins | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-term-precedence.md — run wiki-ingest inside that project |
+| Planning t216: deciding Condition (c): given did not set the input | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-given-setter-suppression.md — run wiki-ingest inside that project |
+| Planning t216: deciding Severity, registry position, hint | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-diagnostic-code-registration.md — run wiki-ingest inside that project |
+| Planning t216: deciding RFC | linkly (linkly-dartfish worktree) | wiki-local/qa/document-verification/t216-no-rfc-for-warning-only-code.md — run wiki-ingest inside that project |
 
-All three are wiki-plan Phase B decisions naming one repository's own tasks; excluded from this PR and retired.
+All seven are wiki-plan Phase B decisions naming linkly's own modules; they are excluded from this PR and retired from the queue.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
