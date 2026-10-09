@@ -78,16 +78,25 @@ setup() {
 # (or fail) depending on their shell rather than on the code.
 
 @test "model: DEV_LOOP_WORKER_MODEL reaches the claude command" {
-  run env ORCA_SPAWN_DRYRUN=1 DEV_LOOP_WORKER_MODEL=claude-sonnet-5 \
+  run env ORCA_SPAWN_DRYRUN=1 DEV_LOOP_WORKER_MODEL=claude-sonnet-5 DEV_LOOP_WORKER_EFFORT=high \
       bash "$OS" "r::/wt" bypassPermissions "p"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"claude --permission-mode bypassPermissions --model 'claude-sonnet-5'"* ]]
+  [[ "$output" == *"CLAUDE_CODE_EFFORT_LEVEL=high claude --permission-mode bypassPermissions --model 'claude-sonnet-5'"* ]]
+}
+
+@test "effort: an invalid effort is rejected, nothing is created" {
+  run env ORCA_SPAWN_DRYRUN=1 DEV_LOOP_WORKER_EFFORT='x; rm -rf ~' \
+      bash "$OS" "r::/wt" bypassPermissions "p"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"invalid effort"* ]]
+  [[ "$output" != *"[terminal] [create]"* ]]
 }
 
 @test "model: unset adds no --model flag (boundary — unchanged behavior)" {
-  run env -u DEV_LOOP_WORKER_MODEL ORCA_SPAWN_DRYRUN=1 bash "$OS" "r::/wt" bypassPermissions "p"
+  run env -u DEV_LOOP_WORKER_MODEL -u DEV_LOOP_WORKER_EFFORT ORCA_SPAWN_DRYRUN=1 bash "$OS" "r::/wt" bypassPermissions "p"
   [ "$status" -eq 0 ]
   [[ "$output" != *"--model"* ]]
+  [[ "$output" != *"CLAUDE_CODE_EFFORT_LEVEL"* ]]
 }
 
 @test "model: a shell-metacharacter model is rejected, nothing is created" {

@@ -27,6 +27,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [in-session-tool-exposure](agent-exposure/in-session-tool-exposure.md) | Exposing executable actions to an LLM agent operating inside a user's authenticated session (WebMCP tools, in-page assistant, browser-agent integration); deciding confirmation gating per tool consequence class (`consequentialHint`, `readOnlyHint`); reviewing prompt-injection blast radius of a tool set |
 | [authorization-scope-persistence](agent-exposure/authorization-scope-persistence.md) | Authoring a skill or agent that can take consequential, hard-to-reverse actions against a target (active security scanning, exploitation, destructive ops, spending); authorization depends on the specific target and must be established before acting; keeping a `--force` flag from bypassing the authorization check; scoping network blast radius |
+| [capability-flag-across-adapters](agent-exposure/capability-flag-across-adapters.md) | A restriction flag (`tool_use: false`, write confinement, network off) lives in a config struct shared by several interchangeable adapters/backends (agent harnesses, runners, sandboxes) and only some adapters read it; a caller sets it for every adapter; downstream automation (commit/merge/push) trusts the flag as the confinement guarantee; reviewing a new adapter added to such a struct; choosing the refuse-vs-ignore behaviour for an unsupported restriction |
 
 ## authn
 
