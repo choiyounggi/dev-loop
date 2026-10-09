@@ -5,8 +5,9 @@
 # `effort`; effort lives only in the agent file's frontmatter. So each role in
 # orchestrate's Tier to pipeline profile table has two files: the base
 # `agents/<name>.md` (the R3/R2 profile) and a generated `agents/<name>-r1.md`
-# with the same body, `name: <name>-r1`, and the effort one step lower (R1/R0).
-# Edit only the base file, then re-run this script.
+# with the same body, `name: <name>-r1`, and the effort one step lower (R1/R0),
+# never below high — analysis, design, and QA agents run at claude-opus-5-5
+# high or above at every tier. Edit only the base file, then re-run this script.
 #
 # Usage: gen-agent-tier-variants.sh [--check] [agents-dir]
 #   (default)  write every <name>-r1.md
@@ -16,8 +17,9 @@
 
 set -u
 
-# base agent name -> its R1/R0 effort (one step below the base's own effort)
-VARIANTS="task-analyst:high task-planner:medium test-quality-auditor:medium task-reviewer:medium integration-reviewer:xhigh"
+# base agent name -> its R1/R0 effort (one step below the base's own effort,
+# floored at high)
+VARIANTS="task-analyst:high task-planner:high test-quality-auditor:high task-reviewer:high integration-reviewer:xhigh"
 
 check=0
 if [ "${1:-}" = "--check" ]; then check=1; shift; fi
@@ -33,7 +35,7 @@ render() { # <base file> <base name> <r1 effort>
     }
     fm == 1 && $0 == "name: " base { print "name: " base "-r1"; names++; next }
     fm == 1 && /^effort: / { print "effort: " eff; effs++; next }
-    fm == 1 && /^description: / { sub(/^description: /, "description: R1/R0 tier copy (one effort step lower) of the " base " agent. "); print; next }
+    fm == 1 && /^description: / { sub(/^description: /, "description: R1/R0 tier copy (one effort step lower, never below high) of the " base " agent. "); print; next }
     { print }
     END { if (fm < 2 || names != 1 || effs != 1) exit 3 }
   ' "$1"

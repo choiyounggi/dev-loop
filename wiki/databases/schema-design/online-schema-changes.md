@@ -12,7 +12,7 @@ sources:
   - https://github.com/prisma/orm/issues/14456
   - https://github.com/prisma/prisma-engines/blob/main/schema-engine/ARCHITECTURE.md
 last_verified: 2026-09-06
-related: [databases-schema-design-column-data-types, databases-schema-design-foreign-keys-and-referential-actions, databases-indexing-index-write-cost, databases-schema-design-nullability-and-defaults]
+related: [databases-schema-design-column-data-types, databases-schema-design-foreign-keys-and-referential-actions, databases-indexing-index-write-cost, databases-schema-design-nullability-and-defaults, databases-schema-design-migration-sql-without-a-database]
 ---
 
 # Applying Schema Changes to a Live Table Without Blocking Writes

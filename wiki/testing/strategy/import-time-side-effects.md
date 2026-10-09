@@ -9,7 +9,7 @@ sources:
   - https://docs.pytest.org/en/stable/example/pythoncollection.html
   - https://docs.python.org/3/reference/import.html
 last_verified: 2026-08-05
-related: [testing-strategy-test-level-choice, testing-data-test-data-and-isolation, backend-python-language-mutable-state-traps]
+related: [testing-strategy-test-level-choice, testing-data-test-data-and-isolation, backend-python-language-mutable-state-traps, backend-python-language-circular-imports]
 ---
 
 # Unit-Testing a Pure Function Whose Module Runs I/O at Import
