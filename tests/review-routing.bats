@@ -32,11 +32,21 @@ step7_table_rows() {
   ' "$1" | wc -l | tr -d ' '
 }
 
-# --- normal: AGENTS.md carries step 7 with a 7-row decision table -----------
+# --- normal: AGENTS.md carries step 7 with an 8-row decision table -----------
 
-@test "AGENTS.md: step 7 exists in the routing protocol with a 7-row table" {
+@test "AGENTS.md: step 7 exists in the routing protocol with an 8-row table" {
   [ "$(step7_line_count "$AGENTS")" -eq 1 ]
-  [ "$(step7_table_rows "$AGENTS")" -eq 7 ]
+  [ "$(step7_table_rows "$AGENTS")" -eq 8 ]
+}
+
+# --- normal: a design-token literal in a diff routes to the design lint gate --
+
+@test "AGENTS.md: step 7 routes a raw design value or component restyle to the design lint gate" {
+  row="$(awk '/^7\. \*\*Review entry/{f=1} f && /^[[:space:]]*\|/ && /bg-pink-500/ {print; exit}' "$AGENTS")"
+  [[ "$row" == *"className"* ]]
+  [[ "$row" == *"frontend, design category"* ]]
+  [[ "$row" == *"wiki/frontend/design/design-system-lint-gate-for-agents.md"* ]]
+  [ -f "$REPO_ROOT/wiki/frontend/design/design-system-lint-gate-for-agents.md" ]
 }
 
 # --- normal: INDEX.md preamble names both inputs and cites AGENTS.md --------

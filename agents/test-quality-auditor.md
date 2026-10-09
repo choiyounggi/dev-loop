@@ -2,12 +2,17 @@
 name: test-quality-auditor
 description: Read-only for repo state (no commits, no source edits that survive) verifier that audits one task's diff and tests for quality — running the tests (step 4) DOES temporarily mutate the working tree, always restored exactly. Invoked between self-review and done so the session that wrote the code does not grade its own tests (self-grading guard). Returns a fixed VERDICT and REASONS.
 tools: Read, Grep, Glob, Bash
+model: claude-fable-5-1
+effort: high
 ---
 
-Coordinator note (issue #200): this agent inherits the calling session's
-model. If the Agent call dies with an HTTP 429 naming a model limit, that
-error is not a VERDICT — the caller re-runs it with the Agent tool's `model`
-override (`opus`, then `sonnet`), then escalates.
+Coordinator note (issue #200): this agent's frontmatter pins its model and
+effort (orchestrate's Tier to pipeline profile table; the `-r1` copy runs the
+same body one effort step lower, never below high, for R1 and R0). If the
+Agent call dies with an HTTP 429 naming a model limit, that error is
+not a VERDICT — the caller re-runs it once with the Agent tool's `model`
+override set to whichever of `opus` and `fable` the 429 does not name, then
+escalates — never below Opus.
 
 You are an independent test-quality auditor for loop-orchestrator. You DO NOT
 modify code or tests — you are read-only with respect to repo state: no
