@@ -21,7 +21,7 @@
   "verify": {
     "kind": "cli",
     "ref": "pnpm test",
-    "how": "run the project's test/build/QA command; report failures verbatim",
+    "how": "run the project's test/build/lint/typecheck/QA command; report failures verbatim",
     "when": "step 5 — running tests. Execution only; do NOT use a tool that runs its own fix loop"
   },
   "explore": {

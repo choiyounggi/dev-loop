@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://docs.spring.io/spring-framework/reference/integration/scheduling.html
 last_verified: 2026-07-10
-related: [backend-common-errors-exception-handling, backend-common-jobs-idempotent-handlers, backend-common-orm-transaction-boundaries]
+related: [backend-common-errors-exception-handling, backend-common-jobs-idempotent-handlers, backend-common-orm-transaction-boundaries, backend-common-change-impact-threading-a-parameter-through-executor-hops]
 ---
 
 # Handling Failures in Fire-and-Forget Async Work
@@ -44,6 +44,7 @@ silently never happen (points not accrued, emails not sent) with no error logs.
 | Async annotation on a method called via `this.method()` | Proxy-based async is bypassed by self-invocation — same trap as transactional annotations ([backend-common-orm-transaction-boundaries]); the method runs synchronously and its failures follow sync rules |
 | Async work enqueued inside a DB transaction that later rolls back | The async work still runs against rolled-back state; enqueue after commit or via transactional outbox ([backend-common-orm-transaction-boundaries]) |
 | Future stored but never consumed | Same as void: the exception sits unobserved inside the future. Consuming the future IS the error handling |
+| Collection loop records `result()` only for futures whose `exception()` is `None` | Every failed worker becomes missing work with no log line — record each non-`None` exception against its item; a `NameError` from a parameter that was not threaded through an intermediate helper shows up exactly this way ([backend-common-change-impact-threading-a-parameter-through-executor-hops]) |
 | Executor queue fills up | Bounded queue + explicit rejection policy; an unbounded queue hides the backlog until memory pressure ([backend-common-concurrency-shared-state-and-pools]) |
 
 ## Instead of

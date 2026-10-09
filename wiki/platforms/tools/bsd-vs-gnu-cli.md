@@ -10,7 +10,7 @@ sources:
   - https://man.freebsd.org/cgi/man.cgi?sed(1)
   - https://man.freebsd.org/cgi/man.cgi?seq(1)
 last_verified: 2026-07-10
-related: [platforms-shells-portable-shell-scripts, platforms-environment-unicode-text-matching]
+related: [platforms-shells-portable-shell-scripts, platforms-environment-unicode-text-matching, platforms-filesystems-trailing-separator-under-realpath]
 ---
 
 # Same Command Name, Different Userland: BSD (macOS) vs GNU (Linux) Flags
@@ -50,6 +50,7 @@ General strategy by situation:
 |------|------|
 | `command -v timeout` succeeds on macOS | Someone installed coreutils unprefixed — confirm `timeout --version` reports GNU coreutils before relying on GNU exit-code semantics (124 on timeout) |
 | Any flags passed to `echo` (`-e`, `-n`) | `echo` flag handling differs across shells and userlands — use `printf` for anything beyond a bare literal string |
+| A program (not a script) resolves `file/` through `realpath(3)`/`canonicalize` and the check passes on macOS but fails on Linux with `ENOTDIR` | The libc divergence, not the coreutils one: macOS `realpath` resolves a trailing slash on a regular file, glibc/musl reject it — decide the trailing-separator rule in code ([platforms-filesystems-trailing-separator-under-realpath]) |
 | Script needs bash 4+ features on macOS | Stock `/bin/bash` on macOS is 3.2 — use `#!/usr/bin/env bash` so a brew-installed bash is picked up, and state the required bash version in the script header |
 
 ## Instead of

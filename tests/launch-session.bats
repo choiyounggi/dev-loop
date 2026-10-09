@@ -461,11 +461,30 @@ pane_not_ready() { # matches none of the ready/trust patterns
   pane_ready_submitted > "$sd/pane-1"
   pane_ready_submitted > "$sd/pane-2"
   run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
-      DEV_LOOP_WORKER_MODEL=claude-sonnet-5 \
+      DEV_LOOP_WORKER_MODEL=claude-sonnet-5 DEV_LOOP_WORKER_EFFORT=high \
       LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=4 LO_SUBMIT_INTERVAL=1 \
       sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD p"
   [ "$status" -eq 0 ]
-  grep -q -- "--model 'claude-sonnet-5'" "$sd/keys"
+  [[ "$(cat "$sd/keys")" == *"CLAUDE_CODE_EFFORT_LEVEL=high \"/bin/echo\" --permission-mode bypassPermissions --model 'claude-sonnet-5'"* ]]
+}
+
+@test "EFFORT: an invalid effort is rejected before anything launches (injection guard)" {
+  run env LO_DRY_RUN=1 DEV_LOOP_WORKER_EFFORT='high; rm -rf ~' \
+      bash "$LS" lo-1 "${BATS_TEST_TMPDIR}/wt" bypassPermissions "prompt"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"invalid effort"* ]]
+}
+
+@test "EFFORT: unset adds no CLAUDE_CODE_EFFORT_LEVEL (boundary — unchanged behavior)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane-1"
+  pane_ready_submitted > "$sd/pane-2"
+  run env -u DEV_LOOP_WORKER_EFFORT STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=4 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD p"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$sd/keys")" == *"--permission-mode bypassPermissions"* ]]
+  [[ "$(cat "$sd/keys")" != *"CLAUDE_CODE_EFFORT_LEVEL"* ]]
 }
 
 # --- CONTAMINATION GUARD (issue #100 comment): a leaked real LO_STATUS_DIR

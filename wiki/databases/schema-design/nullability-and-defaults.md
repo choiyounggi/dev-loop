@@ -7,8 +7,12 @@ confidence: verified
 sources:
   - https://www.postgresql.org/docs/current/ddl-constraints.html
   - https://www.postgresql.org/docs/current/functions-comparison.html
-last_verified: 2026-07-10
-related: [databases-schema-design-requirements-to-tables, databases-query-optimization-large-in-lists, databases-data-survey-surveying-live-data-for-a-rule]
+  - https://www.postgresql.org/docs/current/queries-order.html
+  - https://www.sqlite.org/lang_select.html
+  - https://dev.mysql.com/doc/refman/8.4/en/working-with-null.html
+  - https://docs.python.org/3/reference/expressions.html
+last_verified: 2026-10-04
+related: [databases-schema-design-requirements-to-tables, databases-query-optimization-large-in-lists, databases-data-survey-surveying-live-data-for-a-rule, databases-query-optimization-keyset-pagination]
 ---
 
 # Nullability, Defaults, and Three-Valued Logic
@@ -45,10 +49,17 @@ debugging a query that silently drops rows around NULLs.
 | Case | Then |
 |------|------|
 | Adding a `NOT NULL` column to a large live table | Add with a `DEFAULT` (PostgreSQL 11+ / MySQL 8.0 instant DDL fill it without a rewrite — verify your version's behavior), backfill in batches if needed, then add the constraint |
-| Sort order with NULLs | PostgreSQL sorts NULLs last on ASC by default, MySQL first; state `NULLS FIRST/LAST` explicitly when it matters, and match the index definition |
+| Sort order with NULLs | The default position flips with direction on PostgreSQL, SQLite and MySQL alike: PostgreSQL sorts NULL as larger than any value (last on ASC, first on DESC); SQLite and MySQL sort it as smaller (first on ASC, last on DESC). State the position explicitly when it matters, and match the index definition |
+| One missing-value order must hold across PostgreSQL, SQLite and MySQL backends and an in-memory implementation (a Python sort, a Fake repository) | Sort on an explicit leading "is absent" key everywhere: SQL `ORDER BY (col IS NULL), col [DESC]`; Python partitions the records on `r.k is None`, sorts the present part by `(r.k, r.id)` and appends the missing part sorted by `r.id`, passing `reverse=True` to each part for DESC — comparing `None` with a value raises `TypeError`, and `reverse=True` over the whole list would move the missing part first. The SQL form also runs where `NULLS LAST` is missing (SQLite before 3.30.0; MySQL 8.4's `SELECT` grammar lists no `NULLS FIRST/LAST`). Test ASC and DESC on every backend against one shared fixture: on SQLite a DESC-only case already puts NULLs last, so it passes before the fix and hides the ASC bug |
 | Empty string vs NULL for text | Pick one representation of "absent" per column and enforce it (`CHECK (col <> '')` if NULL is the absent form); mixed representations break both filters and uniqueness |
 
 ## Sources
 
 - https://www.postgresql.org/docs/current/ddl-constraints.html — NOT NULL, CHECK, unique constraints
 - https://www.postgresql.org/docs/current/functions-comparison.html — IS DISTINCT FROM, NULL comparison semantics
+- https://www.postgresql.org/docs/current/queries-order.html — "By default, null values sort as if larger than any non-null value; that is, NULLS FIRST is the default for DESC order, and NULLS LAST otherwise"
+- https://www.sqlite.org/lang_select.html — "SQLite considers NULL values to be smaller than any other values for sorting purposes. Hence, NULLs naturally appear at the beginning of an ASC order-by and at the end of a DESC order-by"; `NULLS FIRST/LAST` added in 3.30.0 (https://www.sqlite.org/changes.html)
+- https://dev.mysql.com/doc/refman/8.4/en/working-with-null.html — "NULL values are presented first if you do ORDER BY ... ASC and last if you do ORDER BY ... DESC"
+- https://docs.python.org/3/reference/expressions.html — value comparisons: "A default order comparison (<, >, <=, and >=) is not provided; an attempt raises TypeError"
+- Local reproduction 2026-10-04 (SQLite 3.51.0, rows k = NULL, 5, 1, NULL): `ORDER BY k` put both NULLs first, `ORDER BY k DESC` put them last, `ORDER BY (k IS NULL), k` and `(k IS NULL), k DESC` put them last in both directions; Python 3.14 `sorted([3, None, 1])` raised `TypeError: '<' not supported between instances of 'NoneType' and 'int'`
+- Field evidence 2026-10 (a language runtime with a Fake and a SQLite repository): a DESC-only missing-field ordering test on SQLite stayed green before the fix while the ASC and sorted-query cases failed (`FAILED (failures=2, errors=8)`); after the fix a parity test between the Fake and SQLite agreed in both directions
