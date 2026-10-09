@@ -25,3 +25,4 @@ own the Node mechanics.
 | Page | Load when |
 |------|-----------|
 | [runtime-validation](boundaries/runtime-validation.md) | Typing request bodies/query params/env vars/third-party responses/queue messages in a TypeScript service; an `as` cast on external data; runtime shape errors deep inside code that compiled fine; choosing where schema parse lives (handler, startup config, consumer) and where static types alone suffice |
+| [nestjs-multer-upload-errors](boundaries/nestjs-multer-upload-errors.md) | A NestJS `FileInterceptor`/`FilesInterceptor` route needs its own error body for upload failures (file too large, too many files, unexpected field, malformed multipart); a `@Catch(MulterError)` filter never runs; choosing which exception classes an upload filter catches and how to test it |
