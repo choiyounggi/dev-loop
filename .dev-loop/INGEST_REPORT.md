@@ -1,89 +1,69 @@
-# Knowledge flush — 31 candidate(s): 6 promoted (4 new pages, 1 amended), 25 retired as local-layer
-
-All 31 claimed rows were wiki-plan `plan-gap` rows (decisions a plan made with no owning wiki page) from three projects. Five carried a reusable lesson under their project-specific wording; one more folded into one of those pages. The other 25 are design decisions about one codebase's own files and are listed under Local-layer candidates.
+# Knowledge flush — 12 candidates: 3 ingested as new pages, 1 page amended, 9 plan-gaps retired as local-layer
 
 ## Verified best-practice
 
-| Row | Claim as ingested | Sources checked | Confidence |
-|-----|-------------------|-----------------|------------|
-| b945d6a09e715fed | TanStack Query `invalidateQueries` matches by key **prefix**, so a new key's first segment decides which existing invalidations reach it. Nest a key when parent writes change the data. Give it its own first segment when its lifecycle is independent (polled status). `exact: true` spares children. `setQueryData` takes an exact key. | https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation (prefix + `exact: true` examples, quoted); https://tanstack.com/query/latest/docs/reference/QueryClient (`removeQueries`/`cancelQueries` take filters, `setQueryData` takes a key) | verified |
-| 826966de8ee380ab | A top-level `from x import y` that closes a module cycle fails on a partially initialized module. Pick the fix by case: a function-local import when the name is used in one function or branch, a third module when it is needed at top level, or `import module` plus attribute access. Use `TYPE_CHECKING` only when no annotation is evaluated at run time. Prove the fix by importing each module in the cycle first, one at a time. | https://docs.python.org/3/faq/programming.html (both import FAQ entries, quoted); https://docs.python.org/3/library/typing.html#typing.TYPE_CHECKING (wording re-extracted with curl). Row evidence: the import broke before the fix and worked after, confirmed by running it. | verified |
-| 0a31e356f0392835 (+0726f9fdc05d6353 folded) | Inside a workspace package, import sibling modules by relative path. A self-import by package name resolves through `"exports"`. When `"exports"` points at `dist/`, that copy is absent before the first build and stale under test runners. Moving a module: repoint importers and leave no re-export shim. | https://nodejs.org/api/packages.html#self-referencing-a-package-using-its-name (3 sentences quoted). The `dist/` consequences are labelled field evidence from one pnpm + vitest package. | verified (mechanism) + field-tested (consequences) |
-| a93d54e87f9f4708 | With no reachable database, produce a Prisma migration with `migrate diff` between the previous and current schema files, using `--script`. Flags by major version: 6.x `--from-schema-datamodel`/`--to-schema-datamodel`; 7.x `--from-schema`/`--to-schema`. A shadow DB is needed only for `--from-migrations`. | https://github.com/prisma/prisma/blob/6.19.0/packages/migrate/src/commands/MigrateDiff.ts (help text and branch code read through `gh api` at tag 6.19.0); https://www.prisma.io/docs/orm/reference/prisma-cli-reference#migrate-diff (v7 options + removed-flags note) | verified |
-| 7c71d321f8c54228 | React Native's global `URL` has no `URL.canParse`, and its constructor without a base does not validate. A shared module calling `canParse` therefore throws on device, and `try { new URL() }` is no fallback. Use a WHATWG polyfill or keep the call out of mobile-imported functions. | `facebook/react-native` `Libraries/Blob/URL.js` at v0.86.0 and v0.87.1 (only `createObjectURL`/`revokeObjectURL` statics; no-base branch assigns `this._url = url`); `Libraries/Core/setUpXHR.js:35` `polyfillGlobal('URL', ...)`; `gh search code canParse --repo facebook/react-native` returned 0 hits; MDN browser-compat-data `api/URL.json` `canParse_static` (Chrome 120, Safari 17, Firefox 115, Node 18.17–18.x and 19.9+); charpeni/react-native-url-polyfill README | verified |
+**1. A file-level import cycle under NestJS decorator DI** (session insight `f60900a83428b15e`, plus nothing folded)
+- Claim: when a plain helper exported from one `*.service.ts` is imported by a service that the first one injects, Nest boot fails with `can't resolve dependencies … index [n]` while typecheck and unit tests pass. Fix: move the helper to its own file with no service imports, and keep a root-module compile test.
+- Sources checked: https://docs.nestjs.com/faq/common-errors (source `content/faq/errors.md` grepped verbatim: "A circular file import … two files end up importing each other", "move the constants to a separate file"); https://docs.nestjs.com/fundamentals/circular-dependency ("The order of instantiation is indeterminate", barrel files); https://www.typescriptlang.org/docs/handbook/decorators.html (metadata emitted as `Reflect.metadata("design:type", …)` decorator calls); https://github.com/pahen/madge.
+- Reproduced in a scratch project (`@nestjs/core` 11.2.7, TypeScript 5.9.3, Node 26.7.0, CommonJS): `tsc --noEmit` rc=0, a direct `ResearchService` call worked, boot printed `design:paramtypes [ undefined ]` + `Nest can't resolve dependencies of the ResumeService (?) … index [0]`. **New finding beyond the candidate:** swapping two import lines in `app.module.ts` made it boot, so load order decides it. Moving the helper to its own file booted in both orders. Under SWC (`@swc/core` 1.x, `decoratorMetadata`) the same cycle throws `ReferenceError: Cannot access 'ResearchService' before initialization` during load, so the page lists both symptoms. `madge --circular` exited 1 on the cyclic tree and 0 on the fixed tree (known-bad + known-good); a cycle made only of `import type` lines was reported until `.madgerc` set `skipTypeImports: true` (README example), and the real cycle was still caught with it set. An `import type` injected class compiles to `design:paramtypes [Function]` under tsc 5.9.3.
+- Confidence: **verified**.
 
-A fresh-context adversarial reviewer checked every cited URL against the claims and returned CHANGES with 8 findings. All 8 were fixed (see the last `log.md` entry). The `setQueryData` exact-key point and the Prisma `loadEnvFile` branch were re-verified before the fix.
+**2. `response.json()` on a no-body response** (general kernel of plan-gap `26496c99f792f56c`)
+- Claim: a `fetch` wrapper that always ends with `response.json()` rejects on `204`/`205` and on an empty `200`; guard on status or on empty `text()`. A `304` is not `ok` (200–299), so it must be checked before the `!response.ok` branch.
+- Sources checked: https://fetch.spec.whatwg.org/ (verbatim: "A null body status is a status that is 101, 103, 204, 205, or 304"; "The json() method steps are … parse JSON from bytes. The above method can reject with a SyntaxError."); https://developer.mozilla.org/en-US/docs/Web/API/Response/json ("SyntaxError — The response body cannot be parsed as JSON."); https://www.rfc-editor.org/rfc/rfc9112#section-6.2 ("A sender MUST NOT send a Content-Length header field in any message that contains a Transfer-Encoding header field."); https://www.rfc-editor.org/rfc/rfc7540#section-8.1.2.4 ("HTTP/2 does not define a way to carry the version or reason phrase …" — why the error fallback uses `HTTP ${status}` instead of `statusText`).
+- Reproduced on Node v26.7.0: `new Response(null,{status:204}).json()` → `SyntaxError: Unexpected end of JSON input`; `new Response('',{status:200}).json()` → `SyntaxError`; `new Response(null,{status:304}).ok` → `false`.
+- Confidence: **verified**.
 
-Checks on the final tree:
-- `node scripts/wiki-lint-prohibitions.js` reports `directives: 80`, `violations: 0`. The baseline on `origin/main` is 79, measured in a temp worktree, so the pin in `tests/wiki-lint-prohibitions.bats` moves 79→80.
-- `bats tests/wiki-*.bats tests/bash-version-guard.bats` under bash 5 reports `1..239`, 239 `ok`, 0 `not ok`.
+**3. Unused-code review findings on one slice of dependency-ordered work** (session insight `f3252df541e0b23d`)
+- Claim: a zero-caller / "every caller passes the same value" rule applied per task of a producer-before-consumer plan (or per change of a stacked series) fires on correct seams; exempt elements a later slice consumes, and require 2+ call sites before the same-value observation counts.
+- Sources checked: https://google.github.io/eng-practices/review/developer/small-cls.html (stacked CLs, "shared code or stubs that help isolate changes between layers", tell reviewers about the other CL); https://google.github.io/eng-practices/review/reviewer/looking-for.html (the over-engineering rule being scoped); https://github.com/choiyounggi/dev-loop/pull/246 (merged; lens 6 in `skills/orchestrate/SKILL.md` carries the exemption and the two-call-site rule; `tests/orchestrate-review-pass.bats` 37/37 ok on this branch).
+- No external source states the staged-work exemption itself, so it rests on field evidence. Confidence: **field-tested**.
 
 ## Existing-layer check
 
-Pages read: frontend-data-fetching-query-state-vs-fetch-state, platforms-toolchains-flag-availability-at-the-execution-site, databases-schema-design-online-schema-changes, databases-schema-design-verifying-additive-migrations, testing-strategy-import-time-side-effects, backend-common-change-impact-widening-a-closed-value-table, backend-common-change-impact-call-site-enumeration
+Pages read: qa-process-evaluating-review-feedback, qa-process-llm-review-pipelines, qa-process-adversarial-change-review, testing-quality-cross-task-stub-assertions, backend-node-boundaries-runtime-validation, backend-common-change-impact-call-site-enumeration, backend-common-reliability-timeouts-and-retries, backend-common-api-design-error-responses, testing-strategy-import-time-side-effects
 
-- **Grep for each topic across `wiki/`.**
-  - `invalidateQueries|queryKey`: 0 hits.
-  - `self-referenc|self-import`: 2 unrelated hits (agent-orchestration self-reference, gated document).
-  - `migrate diff|prisma migrate`: 1 hit, online-schema-changes. It covers the CONCURRENTLY-in-a-transaction edge, not producing the SQL.
-  - `circular import|lazy import`: 1 hit, widening-a-closed-value-table. It is an Instead-of row about an inlined copy, not the cycle fix.
-  - `canParse`: 0 hits.
-- **`wiki_search` top-5 per candidate.** No hit described the same trigger. The closest were:
-  - query-state-vs-fetch-state and infinite-scroll for the query key;
-  - import-time-side-effects for circular imports;
-  - online-schema-changes and verifying-additive-migrations for Prisma;
-  - call-site-enumeration for self-import.
-- **Merged rather than created:** the RN `URL.canParse` candidate is the "API method exists locally but not where it runs" case, so it became an edge row plus a trigger sentence on flag-availability-at-the-execution-site, not a new page.
-- **Conflicts:** none.
-- **Back-links added:**
-  - query-state-vs-fetch-state → query-key-prefix-invalidation;
-  - import-time-side-effects → circular-imports;
-  - online-schema-changes → migration-sql-without-a-database;
-  - flag-availability → self-import-inside-a-workspace-package and migration-sql-without-a-database.
+Also read: `INDEX.md`, `wiki/backend/node/index.md`, `wiki/backend/index.md` (integrations + api-design rows), `wiki/qa/index.md`.
+
+- Searches run over all of `wiki/`: `circular|import cycle|forwardRef` (3 hits, all SQL foreign-key or value-table pages, none about module imports); `\b204\b|No Content|response.json()` (no fetch-wrapper page; one Python `response.json()["a"]` row about shape validation); `zero call|no call site|unused code|dead code|call sites` and `per-task review|later task|stacked|dependency-ordered` (no page about unused-code findings on staged work).
+- Overlaps: `qa-process-evaluating-review-feedback` step 4 ("search for actual usage first; when nothing uses the capability, propose removing") would delete a producer slice's seam when applied to one slice. It is not a contradiction: I added an edge-case row that scopes the usage search to the whole series and links the new page. `testing-quality-cross-task-stub-assertions` is the testing-side sibling (stubs a later task replaces) and is linked.
+- Merged vs created: 3 new pages, 1 amended page (`qa-process-evaluating-review-feedback`: edge row + `related:` id). No conflicts with existing directives.
+- Related links added: NestJS page → import-time-side-effects (same "move the pure helper out of the heavy module" fix, Python side), runtime-validation; no-body page → error-responses, timeouts-and-retries, runtime-validation; qa page → evaluating-review-feedback, adversarial-change-review, cross-task-stub-assertions; evaluating-review-feedback → the new qa page.
+- Checks run on this branch: `node scripts/wiki-lint-prohibitions.js wiki` → `directives: 80`, `violations: 0` (same as the untouched-tree baseline, so the bats pin stays 80). `bats tests/wiki-*.bats tests/verify-role-lint.bats` → `1..265`, 265 ok, 0 not ok. `orchestrate-dispatch-contracts.bats` 69/69, `orchestrate-review-pass.bats` 37/37, `send-prompt.bats` 100/100. Body lengths 62 / 57 / 51 lines.
+
+- Independent adversarial review (fresh-context reviewer agent, read-only) returned FIX with 3 blocking findings, all applied: a `304` in a guard placed after `!response.ok` could never run (moved to its own edge row, checked before `!ok`); the `statusText` fallback is empty over HTTP/2/3 (now `HTTP ${status}`); the back-link misattributed a "whole series" rule to step 4 of evaluating-review-feedback (reworded to "widened"). Important findings applied: backend `node` routing row, the helper-file edge row, the step-3 spec condition (first project import is `AppModule`, `.overrideProvider` for connections), the unsourced "third provider" option removed, and the qa page renamed from `…-in-staged-changes` (reads as git staging) to `qa-process-unused-code-findings-in-dependency-ordered-work`. Two reviewer claims were wrong when tested, and the pages follow the tests: an `import type` class records `Function`, not `Object`, under tsc 5.9.3; SWC/CommonJS throws a `ReferenceError` instead of recording `Object`. A second pass by the same reviewer over the revised diff returned **PASS** (all blocking and important findings resolved; the one leftover — citing SWC's observed emit shape — was then added to the reproduction line).
 
 ## Open-PR check
 
-There are 17 open `knowledge/*` heads: #223, #225–#231, #233–#239, #241, #243. `git diff --stat origin/main...origin/<head> -- wiki/` was read for each.
+Listed 17 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244). Fetched each and grepped its `wiki/` diff additions for `nestjs.*(cycle|circular)`, `circular (file )?import`, `import cycle`, `204`, `null body`, `response.json`, `zero call`, `no call sites`, `unused code`, `later task's`, `stacked`, `dependency-ordered`, `toLocaleTimeString`.
 
-| Candidate | Overlapping open PR | Verdict |
-|-----------|--------------------|---------|
-| query-key prefix invalidation | none. #225 adds frontend/state/concurrent-optimistic-updates (different trigger: overlapping PATCHes) | new |
-| circular imports | none. No open head touches backend/python | new |
-| self-import in a workspace package | none. #233 adds platforms/toolchains/typescript-6-global-types (different trigger) | new |
-| Prisma migration SQL without a DB | none. #237 touches databases/schema-design/nullability-and-defaults only | new |
-| RN `URL.canParse` | none. No open head edits flag-availability-at-the-execution-site | new |
-| 25 local-layer rows | not applicable: excluded from the bundled wiki | drop (local-layer) |
-
-Expected merge friction: index files that other open PRs also append rows to (`wiki/platforms/index.md` with #233/#234/#235/#241/#243, `wiki/frontend/index.md` with #225/#243), plus the directive pin in `tests/wiki-lint-prohibitions.bats` if another PR changes the count. Resolve as a union.
+- Only hit: #244 (`knowledge/choiyounggi-20261006-130905`) adds `backend-python-language-circular-imports`. It covers Python's `ImportError … partially initialized module` (fix: function-local import, third module, `TYPE_CHECKING`). It does not cover TypeScript, decorator metadata, or Nest DI, so there is nothing to fold. It is not on `main` yet, so it is not linked here. After both merge, link the two pages to each other.
+- Verdicts: insight 1 (NestJS cycle) → **new**; insight 2 (no-body JSON) → **new**; insight 3 (staged unused-code findings) → **new**. No candidate was folded or dropped as a pending duplicate.
 
 ## Routing decision
 
-| Insight | Target |
-|---------|--------|
-| query-key prefix invalidation | `frontend/data-fetching/query-key-prefix-invalidation.md` (new). data-fetching already holds the TanStack Query pages |
-| circular imports | `backend/python/language/circular-imports.md` (new). language is the existing category for Python semantics traps |
-| self-import in a workspace package | `platforms/toolchains/self-import-inside-a-workspace-package.md` (new). Module resolution is a toolchain concern, and backend/node's categories (runtime, async, boundaries) do not fit |
-| Prisma migration SQL without a DB | `databases/schema-design/migration-sql-without-a-database.md` (new), next to online-schema-changes and verifying-additive-migrations |
-| RN `URL.canParse` | `platforms/toolchains/flag-availability-at-the-execution-site.md` (amended: edge row, trigger sentence, index line) |
+| Candidate | Target | Why |
+|-----------|--------|-----|
+| `f60900a83428b15e` NestJS import cycle | `backend/node/runtime/import-cycle-under-decorator-di.md` (new) | Node stack mechanics of module evaluation at startup; `runtime` is the closest existing node category (event loop, shutdown). A new `modules` category for one page is not justified |
+| `26496c99f792f56c` (general kernel) `response.json()` on no-body | `backend/common/integrations/json-parse-of-a-no-body-response.md` (new) | Consuming another service's HTTP responses is `common/integrations`; it is language-agnostic within the Fetch API (browser, Node, Bun, Deno) |
+| `f3252df541e0b23d` unused-code findings on staged work | `qa/process/unused-code-findings-in-dependency-ordered-work.md` (new) + edge row in `qa/process/evaluating-review-feedback.md` | Review-process rule; `qa/process` already owns review practice (evaluating feedback, adversarial review, LLM review pipelines) |
 
-No new category was created.
+No new category was created. `INDEX.md` route lines for backend (node subtree) and qa were widened to name the new pages' situations.
 
 ## Local-layer candidates
 
-Each of these 25 rows names one repository's own files, symbols, or conventions, so it would be wrong in another codebase. Each is retired from the queue; to keep one, run wiki-ingest inside that project.
+These 9 plan-gap rows are decisions that only make sense inside one repository's plan. They are excluded from this PR and retired from the queue. To keep any of them, run wiki-ingest inside that project.
 
-**dev-loop (plan `excess-lens-and-lint-gate`)**
-- 1be43ea678bd96b1, 11f6761d13238033 → `wiki-local/qa/review/excess-lens-tiers-and-criteria.md`
-- 2636dac86f322f93 → `wiki-local/infrastructure/config/verify-role-covers-lint.md`
-- 0fe4cb95c61e849b → `wiki-local/infrastructure/agent-orchestration/agent-tier-variant-generation.md`
+| Row | Project | Decision | Target |
+|-----|---------|----------|--------|
+| `dbc435945b66cdc4` | linkly-seaslug | reuse `_PORT_COUNTER` for the gateway test port | `wiki-local/testing/data/test-port-allocation.md` |
+| `4d8c8a66275a32b6` | linkly-seaslug | `### Changed` block for the t194 changelog | `wiki-local/infrastructure/process/changelog-section-choice.md` |
+| `d3ec9f1ff0551f33` | linkly-seaslug | final verification order (`check_doc_snippets.py` → full suite → `dev_doctor.sh`) | `wiki-local/qa/process/final-verification-order.md` |
+| `ec44fa217ef02206` | linkly-apply-mate-sunfish | `HH:MM:SS` log timestamp built from components. The general kernel was checked on Node 26.7.0 (`toLocaleTimeString('ko-KR',{hour12:false})` → `"9시 5분 7초"`, `en-US` → `"09:05:07"`), but it is too thin for a bundled page | `wiki-local/backend/observability/log-line-format.md` |
+| `f51af49971c60133` | linkly-apply-mate-sunfish | failure reason cut at the contract's 2000 chars | `wiki-local/backend/api-design/research-failure-reason.md` |
+| `3987b541a0cb513a` | linkly-apply-mate-sunfish | `watch --once` exit code (1 on a transient error) | `wiki-local/backend/cli/watch-once-exit-code.md` |
+| `ce78f7240c2d3484` | linkly-apply-mate-sunfish | `parseArgs` union + `parseWatchArgs` messages | `wiki-local/backend/cli/watch-subcommand-parsing.md` |
+| `060afa16a34aae8f` | linkly-apply-mate-sunfish | `watch` / `prewatch` package scripts | `wiki-local/platforms/toolchains/collector-package-scripts.md` |
+| `e54d4d57077f00f7` | linkly-apply-mate-sunfish | 409 `RESEARCH_ALREADY_READY` treated as done | `wiki-local/backend/api-design/research-already-ready-409.md` |
 
-**linkly apply-mate (plans t4, t1, t2)**
-- ed3d7a82a7fb7506 (`apiFetch` 204 handling) → `wiki-local/frontend/data-fetching/api-client-204-responses.md`
-- d6af686e4e7eefb5, 7066ec589fc2741f, c851d691fdc77ec1 (labels, route guard, entry button) → `wiki-local/mobile/navigation/research-screen-wiring.md`
-- 34e11cda59d7420c, e18abc22b500ee83 (byte-identical module move, importer switch) → `wiki-local/backend/common/change-impact/moving-a-module-into-shared.md`
-- 04c96225f4826a63 (research-status read order) → `wiki-local/backend/common/concurrency/research-status-read-order.md`
-- c6e2539be231730b (controller routing) → `wiki-local/backend/common/api-design/research-routes.md`
-
-**linkly seaslug / lnpl (plans t187, t188)**
-- 1466a1cd9fe36485, e9984f74aba73d27, 9cd42b874b1635ba, ef2d1539f440fdf3, 82a82989dccf175e (LNPL_* env tiers, docs sync, blackboard) → `wiki-local/infrastructure/config/build-app-env-surface.md`
-- eb324849094385ed, c3eb6a5f7976cd37, 53dc27028decd5f1, d3b2a281bb475794, 1999cc86ec62daf0, 37281da0abd1c80e, 861e7f25434d14f7, f92fe637897f0db3 (`cached` read-through clause) → `wiki-local/backend/common/caching/cached-read-clause.md`
+`26496c99f792f56c` (the 204 guard in `createApiClient`) is also project-specific as written. Its general kernel was ingested as candidate 2 above, so it is not listed again here.
