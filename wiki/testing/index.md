@@ -106,6 +106,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [async-testing](async/async-testing.md) | Testing async code — promises, timers, retries, debounce, event-driven flows; the runner warns about assertions after completion or un-awaited promises; an async test intermittently interferes with the next test; deciding between fake timers and condition waits |
+| [transient-state-behind-a-controlled-gate](async/transient-state-behind-a-controlled-gate.md) | A test must assert on a transient mid-run state of an async orchestrator (a shared controls-map entry, an in-flight handshake, a pending approval) that a background finisher/reaper/teardown spawned by the same startup will clear; a condition wait cannot tell "not yet" from "already wiped"; the naive read-after-startup passes by scheduling margin; choosing the park point (unresolved gate, withheld ack) and proving the test by mutating every finisher spawn site |
 
 ## e2e
 
