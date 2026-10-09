@@ -1,177 +1,67 @@
-# Knowledge flush — 5 insight(s)
+# Knowledge flush — 1 insight (+26 plan-gap rows retired as local-layer)
 
-20 queue rows claimed (run `20261002-160812-98532`): 5 session insights ingested
-(2 new pages, 3 amended pages), 15 plan-gap rows routed to the local layer and
-retired. Lint after the edits: `wiki-structure-checks.js` → `pages: 357,
-indexes: 13, findings: 0` (355 before); `wiki-lint-prohibitions.js` →
-`violations: 0` (same as the untouched tree).
+Run id `20261003-220928-9795` (auto-flush; lock inherited from `hooks/auto-flush.sh`). 27 rows claimed: 1 harvested `★ Insight` (`a427206df3949b03`), 26 `plan-gaps.jsonl` rows.
 
 ## Verified best-practice
 
-1. **A multi-kilobyte prompt goes to a pane as a file pointer; check the pointer's
-   first words arrived, then confirm consumption as usual** (queue `2912961001e20146`). Checked
-   https://code.claude.com/docs/en/terminal-config ("Paste large content"): input
-   over 800 characters or more than three lines collapses to a placeholder, "For
-   very large inputs such as entire files or long logs, write the content to a file
-   and ask Claude to read it instead of pasting", and one terminal "can also drop
-   characters from very large pastes". The head-loss itself is a field observation
-   (3,411-byte prompt, wrapper reported "submitted (confirmed)", pane showed the
-   prompt starting mid-word, worker idle; a file pointer was delivered). The page
-   states the loss as observed, not as a documented mechanism.
-   Confidence: page stays `verified` (official recommendation + field observation).
-2. **Hide every lookup source before trusting a "tool absent" reproduction**
-   (queue `cd6eae14addede62`). Checked
-   https://docs.python.org/3/library/shutil.html#shutil.which (`PATH`, falling back
-   to `os.defpath` when unset; a `path=` argument searches other directories) and
-   https://cmake.org/cmake/help/latest/command/find_program.html (search order
-   continues past `PATH` to platform prefixes and hard-coded `PATHS`;
-   `NO_DEFAULT_PATH`, `NO_SYSTEM_ENVIRONMENT_PATH`). Reproduced locally (Python
-   3.14): a resolver with a fixed-prefix fallback still returned the tool with
-   `PATH=/usr/bin:/bin` and the override variable pointed at an empty directory;
-   `None` only after the prefix was replaced too. Also checked: `shutil.which("ls")`
-   returns `/bin/ls` with `PATH` unset and `None` with `PATH=""`. Confidence: `verified`.
-3. **Judge a patched load run against a band fixed from the unpatched arm**
-   (queue `f519c20ea6a97a06`). Checked
-   https://gernot-heiser.org/benchmarking-crimes.html ("Relative numbers only":
-   "Always give complete result, not just ratios (unless the denominator is a
-   standard figure)"; "No indication of significance of data"). Field numbers
-   re-computed: patched worst interval 4.73 ms against its own ~2.3 ms first-window
-   mean is ~2.05×, while it is ~1% of the unpatched 386 ms. Merged into a page that
-   is already `verified`.
-4. **A connection shared across request threads is checked out per request, not
-   locked per call** (queue `ea4f4f5da9707f09`). Checked
-   https://www.psycopg.org/psycopg3/docs/advanced/async.html ("Connection objects
-   are thread-safe…"; "All the cursors that share the same connection will also
-   share the same transaction"). Reproduced locally with `sqlite3`, 8 threads × 40
-   requests: per-call lock → 236 of 320 failed with `cannot start a transaction
-   within a transaction`; whole-request checkout through `queue.Queue` → 0 errors,
-   320 rows. Merged into a page that is already `verified`.
-5. **An extension package installed in the test environment changes results with
-   no diff** (queue `b99fa9830c9d1689`). Checked
-   https://packaging.python.org/en/latest/specifications/entry-points/ ("a mechanism
-   for an installed distribution to advertise components…"; `entry_points.txt` in
-   `*.dist-info`), https://docs.python.org/3/library/importlib.metadata.html#entry-points,
-   and https://docs.pytest.org/en/stable/how-to/plugins.html ("If a plugin is
-   installed, pytest automatically finds and integrates it"; `-p no:NAME`,
-   `PYTEST_DISABLE_PLUGIN_AUTOLOAD`, `--disable-plugin-autoload` added in 8.4).
-   Reproduced locally: `entry_points(group=…)` went `[]` → `['fake']` → `[]` as a
-   metadata-only `dist-info` directory was added and removed; `.load()` raised
-   `ModuleNotFoundError`. Confidence: `verified`.
+**a427206df3949b03 — quote a glob meant for the program; an empty enumeration is unverified until a known-present file appears.**
 
-An independent adversarial review (fresh context, read-only) re-fetched all eight
-source URLs and found every quote present; its 10 findings (CMake search order
-completed, unset-vs-empty `PATH` corrected, skip-count claim narrowed, band must be
-fixed before the patched runs, pointer check ordered before consumption checks,
-return-after-commit, and four wording fixes) are applied. Not verified: the exact
-installer behaviour for a `dist-info` with no install record — the page states it
-as a condition ("when the installer refuses"), not as a fact.
+Claim: an unquoted `--include=*.py` run through zsh is not executed (`no matches found`), and inside a pipeline the result is an empty list that reads as "nothing missing". Quote the pattern; require a positive control before trusting an empty enumeration.
 
-Nothing in this PR is `unverified`. Three pages were re-dated `last_verified:
-2026-10-02` because their Sources sections were re-checked for the new rows only;
-their older rows were not re-verified in this flush.
+Sources checked:
+- https://zsh.sourceforge.io/Doc/Release/Options.html — `NOMATCH` (`<C> <Z>`, on in zsh emulation): "If a pattern for filename generation has no matches, print an error, instead of leaving it unchanged in the argument list." `NULL_GLOB` deletes the pattern instead and overrides `NOMATCH`.
+- https://www.gnu.org/software/bash/manual/html_node/Filename-Expansion.html — bash leaves an unmatched word unchanged unless `nullglob` (word removed) or `failglob` (error, command not executed) is set.
+- https://www.gnu.org/software/grep/manual/grep.html — `--include=glob` / `--exclude=glob`: grep does its own wildcard matching on each file's base name while recursing (so the pattern must reach grep literally).
+
+Reproduction (2026-10-03, macOS, zsh 5.9, bash 5.3.15), in a scratch dir holding `sub/a.py`:
+- zsh unquoted: `zsh:1: no matches found: --include=*.py`, rc 1 — also with a `b.py` in the cwd (the shell matches the whole word, prefix included).
+- zsh quoted and bash unquoted: `./sub/a.py`, rc 0.
+- zsh `… | sort > out.txt`: rc 0, `out.txt` 0 lines (the silent-empty failure from the original session).
+- zsh function: the skipped command is followed by the next line, function returns 0; `$(…)` yields an empty string.
+- bash `failglob`: `no match: --include=*.py`, rest of the `bash -c` line skipped; bash `nullglob`: flag deleted, `sub/b.txt` listed too.
+- A file named `--include=x.py` in the cwd: both shells substitute it, list nothing, exit 0.
+
+One claim in the original candidate was corrected: "when the unquoted glob matches nothing in the cwd" — in practice it essentially never matches (the `--include=` prefix is part of the word), so zsh fails every time.
+
+Confidence: **verified** (official zsh/bash/grep docs + local reproduction of every table row).
 
 ## Existing-layer check
 
-Routed through `INDEX.md` → the infrastructure, platforms, debugging, backend,
-testing and qa domain indexes, a keyword grep over all of `wiki/`, and one
-`wiki_search` (k=5) per candidate plus one for the open-loop plan-gap.
+`wiki_search` top-5 for the trigger: infrastructure-ci-cd-changed-files-only-gates (x3 chunks), testing-quality-checks-that-cannot-pass (x2 chunks). Neither covers unmatched-glob behavior: changed-files-only-gates is about splitting an unquoted `$FILES` list; checks-that-cannot-pass is about a gate never observed passing against a known-good input (adjacent to step 3 of the new page, linked).
 
-Pages read: platforms-processes-driving-a-tui-in-a-tmux-pane, infrastructure-agent-orchestration-pane-delivery-confirmation, debugging-performance-attributing-a-benchmark-speedup, backend-common-concurrency-shared-state-and-pools, platforms-processes-non-interactive-cli-invocation, debugging-methodology-hypothesis-testing, debugging-performance-profile-before-optimizing, backend-common-orm-transaction-boundaries, testing-data-test-data-and-isolation, qa-environments-test-environment-parity, debugging-methodology-reproduce-first, testing-quality-harness-reverse-controls, testing-quality-tests-that-cannot-fail
+`grep -rli 'no matches found|nomatch|unquoted glob|--include' wiki` on main: one unrelated hit (security/authn/retiring-a-replaced-auth-gate.md). The zsh-vs-bash table in portable-shell-scripts covers word splitting, `=word`, and array indexing, not `NOMATCH`.
 
-The first four were read in full; the other nine were read for their trigger
-section and frontmatter only.
+Merge-before-create: the natural merge target, platforms-shells-portable-shell-scripts, is at exactly 120 body lines (measured with awk), so a row there would break the ≤120 limit. escapes-in-shell-string-literals is about backslash escapes inside quoted patterns, a different trigger. → **new page**.
 
-- Insight 1: `driving-a-tui-in-a-tmux-pane` and `pane-delivery-confirmation` cover
-  queued-vs-consumed input and the collapsed-paste placeholder; neither says to
-  send a file pointer for a large payload or to confirm by the prompt's head.
-  **Merged** as one edge case + one Instead-of row on `driving-a-tui-in-a-tmux-pane`.
-  No conflict.
-- Insight 2: `compiler-sysroot-on-macos` has the opposite case (tool off `PATH`
-  → harness takes its absent branch by accident); `reproduce-first` is the generic
-  entry point. No page covers deliberately hiding a tool. **New page.**
-- Insight 3: `attributing-a-benchmark-speedup` step 5 covers run-to-run spread;
-  `profile-before-optimizing` covers distributions. Neither covers a pass rule
-  whose denominator the patch moves. **Merged** as one edge case + one Instead-of row.
-- Insight 4: `shared-state-and-pools` covers pool sizing and nested acquisition;
-  `transaction-boundaries` covers where a transaction starts and ends. Neither
-  covers the unit of exclusivity for one shared connection. **Merged** into
-  `shared-state-and-pools`.
-- Insight 5: `test-data-and-isolation` covers state leaking between tests, not
-  state installed into the environment;
-  `environment-resync-removes-undeclared-packages` is the reverse direction.
-  **New page**, back-link added on the resync page.
-- Conflicts flagged: none.
-- Noticed, not changed: `pane-delivery-confirmation` quotes the paste threshold as
-  "more than two lines"; the vendor page now reads "more than three lines".
-- Back-links deferred because open PRs rewrite those `related:` lines:
-  `reproduce-first` and `tests-that-cannot-fail` (#223), `path-resolution` and
-  `compiler-sysroot-on-macos` (#227), `test-data-and-isolation` (#228).
+Pages read: platforms-shells-portable-shell-scripts, platforms-shells-escapes-in-shell-string-literals, backend-common-change-impact-call-site-enumeration, testing-quality-checks-that-cannot-pass, infrastructure-ci-cd-changed-files-only-gates
+
+Conflicts: none. Related links: new page links to all five. Back-link added on infrastructure-ci-cd-changed-files-only-gates. Back-links on portable-shell-scripts, escapes-in-shell-string-literals, checks-that-cannot-pass (rewritten by #223) and call-site-enumeration (rewritten by #231) **deferred** to avoid merge conflicts on those `related:` lines.
+
+Lint: `node scripts/wiki-structure-checks.js ~/.dev-loop/repo/wiki --layer bundled` → `pages: 356, indexes: 13, findings: 0`, rc 0. `node scripts/wiki-lint-prohibitions.js` → 3 violations, all pre-existing outside `wiki/` (plans/…, skills/graph-setup/…), none on the new page. New page body: 63 lines.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed with `gh pr list --search "head:knowledge/"`:
-#223 (`…20260927-220735`), #225 (`…20260928-082803`), #226 (`…20260928-092831`),
-#227 (`…20260928-103056`), #228 (`…20260928-134840`), #229 (`…20260928-145025`),
-#230 (`…20260928-155239`), #231 (`…20260928-191901`), #233 (`…20261001-150222`).
-Each head was diffed against `origin/main` under `wiki/`; added lines were
-searched for the five candidates' terms (entry point, load test, open-loop, rps,
-file pointer, fallback path, hardcoded, checkout pool, per-call lock, begin/commit,
-own baseline, unpatched). Three lines matched across #233 and #225; all three are
-unrelated uses of the words ("entry-points" in a mobile page id, "hardcoded-defaults
-mutation").
+Open `knowledge/*` heads diffed against main (`git diff origin/main...origin/<head> -- wiki/ INDEX.md`): #223, #225, #226, #227, #228, #229, #230, #231, #233, #234.
 
-| Candidate | Overlapping open PR | Verdict |
-|-----------|---------------------|---------|
-| 1 file pointer for a large prompt | none (#233 touches `non-interactive-cli-invocation` `related:` only) | new |
-| 2 hiding a tool | none (#227 touches `compiler-sysroot-on-macos` and `path-resolution` `related:` only) | new |
-| 3 unpatched-arm band | none (#223 touches `hypothesis-testing` `related:` only) | new |
-| 4 per-request checkout | none | new |
-| 5 installed extensions | none (#228 touches `test-data-and-isolation` `related:` only) | new |
+- Grep of every head's wiki diff for `no matches found|NOMATCH|nullglob|--include=`: one hit, in #223 — a vitest `-t nomatch` filter, unrelated.
+- Shell-category PRs: #223 (redirection-order-for-a-silenced-write), #230 (heredoc-body-expansion-with-backtick-prose), #233 (line-by-line-read-loops) — different triggers.
+- Index placement: #233 inserts after line 18 and #230 after line 19 of `wiki/platforms/index.md`, #223 after line 23; this PR inserts after the `unset-versus-empty-parameters` row (line 21) so no hunk touches theirs. `log.md` appends conflict as in every flush.
 
-No page this PR edits is edited by an open PR, so no merge conflict is expected.
+Verdict for a427206df3949b03: **new**.
 
 ## Routing decision
 
-| Insight | Target | Action |
-|---------|--------|--------|
-| 1 | `platforms/processes/driving-a-tui-in-a-tmux-pane` | amend (+1 edge case, +1 Instead-of, +2 sources) |
-| 2 | `debugging/methodology/hiding-a-tool-to-reproduce-its-absent-branch` | new page in an existing category |
-| 3 | `debugging/performance/attributing-a-benchmark-speedup` | amend (+1 edge case, +1 Instead-of, +2 sources) |
-| 4 | `backend/common/concurrency/shared-state-and-pools` | amend (+1 edge case, +1 Instead-of, +3 sources) |
-| 5 | `testing/data/installed-extensions-discovered-at-test-time` | new page in an existing category |
-
-No new category. Insight 1 arrived with domain hint `infrastructure`; it went to
-`platforms/processes` because the page that owns "what to send into a pane"
-lives there and the infrastructure page links to it. Insight 2 arrived with hint
-`testing`; it went to `debugging/methodology` because the trigger is a
-reproduction, next to `reproduce-first`. Index rows updated in the debugging,
-testing, platforms and backend indexes; three `log.md` entries added.
+- a427206df3949b03 → `platforms/shells`, new page `wiki/platforms/shells/unmatched-glob-in-a-command-argument.md` (id `platforms-shells-unmatched-glob-in-a-command-argument`). Shell expansion behavior is the cause; the candidate's `domain: debugging` hint was overridden because the fix is a shell-quoting rule, and the debugging angle (empty enumeration) is carried by step 3 and the checks-that-cannot-pass link. No new category.
 
 ## Local-layer candidates
 
-All 15 `plan-gaps` rows come from planning sessions in one project (`linkly`).
-Each directive names that repository's files, tests, RFC numbers or changelog
-wording, so each is excluded here; run wiki-ingest inside that project.
+All 26 `plan-gaps.jsonl` rows are wiki-plan Phase B decisions naming linkly's own files (`impl/lnpl/*.py`, `docs/*.md`, RFC-0052, `.orchestration/*`, `examples/deploy/*`). Excluded from this PR and retired; run wiki-ingest inside that project if any is worth keeping.
 
-| Queue row | Topic | Local target |
-|-----------|-------|--------------|
-| `6866747753c7e4aa` | load-generator model for one measurement task (open-loop, copied from a project script) | `wiki-local/debugging/performance/load-generator-model.md` |
-| `b7a8e012231927ce` | two out-of-scope facts about refusal order in `build` vs `diff` | `wiki-local/backend/errors/refusal-order-build-vs-diff.md` |
-| `ac72abe3592e8c3d` | no CHANGELOG change for one task | `wiki-local/qa/deliverables/changelog-scope.md` |
-| `13c4f4667902016e` | placement of three tests in one test class | `wiki-local/testing/strategy/test-placement.md` |
-| `08ba8d8df16ec44c` | keep a mutation anchor byte-for-byte | `wiki-local/testing/quality/mutation-anchors.md` |
-| `c58794fe0de09ccd` | one docstring rewrite | `wiki-local/backend/errors/refusal-order-build-vs-diff.md` |
-| `2fcb01dee7011c39` | wording of one changelog fragment | `wiki-local/qa/deliverables/changelog-scope.md` |
-| `d8c87001c0b7f86e` | where one driver registers a bound row | `wiki-local/databases/transactions/optimistic-version-bookkeeping.md` |
-| `c5b554c95fb311aa` | skip guard for one conformance case | `wiki-local/testing/strategy/test-placement.md` |
-| `cfded4d7fa03a353` | which two test files hold two regression tests | `wiki-local/testing/strategy/test-placement.md` |
-| `3b5049e0069fc012` | leave one method's logic unchanged | `wiki-local/databases/transactions/optimistic-version-bookkeeping.md` |
-| `4bb305dc16e2750a` | text of one code comment | `wiki-local/databases/transactions/optimistic-version-bookkeeping.md` |
-| `64a849b6ce6d90bd` | text of one docstring | `wiki-local/databases/transactions/optimistic-version-bookkeeping.md` |
-| `ef0aa133530bafe9` | text of one docs paragraph | `wiki-local/databases/transactions/optimistic-version-bookkeeping.md` |
-| `cbbc4d9c304207eb` | text of one docs paragraph | `wiki-local/databases/transactions/optimistic-version-bookkeeping.md` |
-
-The first row also points at a real gap in the bundled wiki: no page covers
-open-loop versus closed-loop load generators (`wiki_search` returned no matching
-trigger). The queued row carries no evidence beyond "derived from a project
-script", so it was not promoted; a general page needs its own sourced ingest.
+| Rows | Task | Target | Project |
+|------|------|--------|---------|
+| 9ea52047c7bafed9, 3928ccce3c53eb4a, 5991206585add27b, be69ab1edb95dfdd | t197 doc follow-through, read-miss raise site, RFC-0052 section 4 text (two rows) | wiki-local/backend/persistence/read-miss-without-seeding.md | linkly |
+| 3cf28a54959fc278, b616a55432340048, b38f2fd77dcc7da6, 4380ecedaf5bbf88, e4d9a8942e01a214 | t198 diagnostic codes, guard-scoped binding check, test module, README counts | wiki-local/backend/diagnostics/guard-scoped-binding-escape.md | linkly |
+| 288f108aeeb38a4d, 49979f4c79df2ac8, bdd5affbc97acee9 | t183 `_touch` docstring, TCK list, decomposition | wiki-local/backend/persistence/fake-driver-row-count.md | linkly |
+| 43e1d5e9eed7e9a9, a6d580c96574df05, 041b6a094d03d3ee, b6e268c1a75961c8, 976e2cef3792e62b, fef6f4b3411a68b5 | t190 GHCR image name, RELEASING / deploy README / CI-GATES docs, changelog, blackboard | wiki-local/infrastructure/release/container-image-job.md | linkly |
+| bd277c8bd3a44e1a, 2da8bcb1de354b02, 3595ddece91643f1, 2478b86b1926cae8, 0f85f9561a5c0b41 | t187a docs sync, blackboard, deploy tests, secret-leak scope, suite gate | wiki-local/infrastructure/deploy/serving-env-variables.md | linkly |
+| cc0ee395c0b29f60, eb1f4b4be43f641e, c57db25512ad8340 | t204 textual-order tracking, IR shape, interp runtime path | wiki-local/backend/compiler/derived-field-assignment.md | linkly |
