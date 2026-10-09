@@ -350,27 +350,47 @@ bare_path_without_uv() {
   return 0
 }
 
-@test "normal: serve runs uv with the three exact pins and the adapter, without --python" {
+@test "normal: serve runs uv locked against scripts/wiki-env and the adapter, without --python" {
   PATH="$SHIM:$PATH" run bash "$LAUNCH"
   [ "$status" -eq 0 ]
   [ -f "$SHIM_LOG" ]
   line=$(tail -1 "$SHIM_LOG")
   [[ "$line" == "run "* ]]
-  [[ "$line" == *"--with sqlite-vec==0.1.9"* ]]
-  [[ "$line" == *"--with fastembed==0.9.0"* ]]
-  [[ "$line" == *"--with mcp==2.3.0"* ]]
+  [[ "$line" == *"--locked"* ]]
+  [[ "$line" == *"--isolated"* ]]
+  [[ "$line" == *"--project "*"/scripts/wiki-env "* ]]
+  [[ "$line" != *"--with"* ]]
   [[ "$line" == *"/scripts/wiki-mcp.py" ]]
-  # no interpreter pin: uv resolves one against the packages' own floor
+  # no interpreter pin: requires-python in scripts/wiki-env/pyproject.toml is the constraint
   [[ "$line" != *"--python"* ]]
 
-  # negative control: a copy that pins an interpreter fails that same assertion
-  cp "$LAUNCH" "$BATS_TEST_TMPDIR/pinned.sh"
-  sed 's/uv run --with/uv run --python 3.12 --with/' "$LAUNCH" > "$BATS_TEST_TMPDIR/pinned.sh"
+  # negative control: a copy that drops --locked fails that same assertion
+  sed 's/uv run --locked /uv run /' "$LAUNCH" > "$BATS_TEST_TMPDIR/unlocked.sh"
   : > "$SHIM_LOG"
-  PATH="$SHIM:$PATH" run bash "$BATS_TEST_TMPDIR/pinned.sh"
+  PATH="$SHIM:$PATH" run bash "$BATS_TEST_TMPDIR/unlocked.sh"
   [ "$status" -eq 0 ]
   line=$(tail -1 "$SHIM_LOG")
-  [[ "$line" == *"--python"* ]]
+  [[ "$line" != *"--locked"* ]]
+}
+
+@test "normal: every exact pin in scripts/wiki-env/pyproject.toml is the version uv.lock records" {
+  env_dir="${LAUNCH%/*}/wiki-env"
+  [ -f "$env_dir/pyproject.toml" ]
+  [ -f "$env_dir/uv.lock" ]
+  pins=$(grep -E '^  "[a-z0-9-]+==[0-9.]+",?$' "$env_dir/pyproject.toml" | tr -d ' ",')
+  [ "$(printf '%s\n' "$pins" | grep -c '==')" -eq 3 ]
+  for p in $pins; do
+    name=${p%%==*}; ver=${p##*==}
+    grep -A1 -x "name = \"$name\"" "$env_dir/uv.lock" | grep -qx "version = \"$ver\""
+  done
+}
+
+@test "error: a pyproject pin that disagrees with uv.lock is caught by the pin check" {
+  env_dir="${LAUNCH%/*}/wiki-env"
+  sed 's/"mcp==2.3.0"/"mcp==9.9.9"/' "$env_dir/pyproject.toml" > "$BATS_TEST_TMPDIR/pyproject.toml"
+  pins=$(grep -E '^  "[a-z0-9-]+==[0-9.]+",?$' "$BATS_TEST_TMPDIR/pyproject.toml" | tr -d ' ",')
+  run bash -c 'for p in $1; do name=${p%%==*}; ver=${p##*==}; grep -A1 -x "name = \"$name\"" "$2" | grep -qx "version = \"$ver\"" || exit 1; done' _ "$pins" "$env_dir/uv.lock"
+  [ "$status" -eq 1 ]
 }
 
 @test "normal: the index verb forwards its arguments to the indexer" {
