@@ -4,7 +4,7 @@
 #   wiki-mcp-launch.sh [serve]        the dev-loop-wiki stdio MCP server
 #   wiki-mcp-launch.sh index <flags>  the indexer (--build / --incremental / ...)
 #
-# Runs them through `uv run --with ...` so nothing is installed globally. Every
+# Runs them through `uv run --locked` so nothing is installed globally. Every
 # failure path — no uv, an unresolvable dependency, a crashing server — exits 0
 # silently: a broken index must leave the existing wiki routing untouched.
 # Disable with DEV_LOOP_WIKI_INDEX=0 (also off/false). DEV_LOOP_WIKI_DEBUG=1
@@ -22,17 +22,18 @@ esac
 
 command -v uv >/dev/null 2>&1 || exit 0
 
-# Range pins, not floating latest: an unpinned major bump is a supply-chain
-# change nobody reviewed. No --python — the packages' own Requires-Python
-# floor is the interpreter constraint.
-PINS=(--with 'sqlite-vec>=0.1.6,<0.2' --with 'fastembed>=0.7,<1' --with 'mcp>=2,<3')
-
+# Locked, not floating or ranged: an unpinned dependency is a supply-chain
+# change nobody reviewed. scripts/wiki-env/pyproject.toml pins each package
+# exactly and scripts/wiki-env/uv.lock records the whole resolved tree;
+# --locked refuses to run if the two disagree, and --isolated keeps the
+# environment in uv's cache instead of a .venv inside the plugin. No --python —
+# requires-python in that pyproject is the interpreter constraint.
 case "$verb" in
   serve)
-    uv run "${PINS[@]}" python "$HERE/wiki-mcp.py"
+    uv run --locked --isolated --project "$HERE/wiki-env" python "$HERE/wiki-mcp.py"
     ;;
   index)
-    uv run "${PINS[@]}" python "$HERE/wiki-index.py" "$@"
+    uv run --locked --isolated --project "$HERE/wiki-env" python "$HERE/wiki-index.py" "$@"
     ;;
   *)
     if [ "${DEV_LOOP_WIKI_DEBUG:-0}" = 1 ]; then

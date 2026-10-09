@@ -27,6 +27,14 @@
 #                    /dev-loop:knowledge-flush skill still works.
 set +e
 
+# Literal helper path — no $(dirname)/".." computation (directory-validator
+# UNPINNED_NPX: the executed program must be spellable, not derived at run
+# time). CLAUDE_PLUGIN_ROOT is set by the Claude Code CLI in production; the
+# string-trim fallback covers bats, which invokes this script by its real
+# repo path without exporting it.
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${BASH_SOURCE[0]%/hooks/*}}"
+FLUSH_LOCK="$PLUGIN_ROOT/scripts/flush-lock.sh"
+
 # --- kill switch + recursion guards ---------------------------------------
 [ "${DEV_LOOP_AUTOFLUSH:-1}" = "0" ] && exit 0
 [ -n "${DEV_LOOP_FLUSHING:-}" ] && exit 0
@@ -76,7 +84,7 @@ fi
 # is exported here and inherited by the "(...) &" subshell further down).
 RUNID="${DEV_LOOP_FLUSH_RUN_ID:-$(date +%Y%m%d-%H%M%S)-$$}"
 export DEV_LOOP_FLUSH_RUN_ID="$RUNID"
-sh "$(dirname "$0")/../scripts/flush-lock.sh" acquire >/dev/null 2>&1 || exit 0
+sh "$FLUSH_LOCK" acquire >/dev/null 2>&1 || exit 0
 touch "$STAMP" 2>/dev/null
 
 # --- spawn the detached headless flush ------------------------------------
@@ -87,7 +95,7 @@ PROMPT='Run the dev-loop:knowledge-flush skill now. Drain ~/.dev-loop/queue: for
   DEV_LOOP_FLUSHING=1 nohup "$CLAUDE_BIN" -p "$PROMPT" \
     --permission-mode bypassPermissions \
     > "$DIR/autoflush.log" 2>&1
-  sh "$(dirname "$0")/../scripts/flush-lock.sh" release >/dev/null 2>&1
+  sh "$FLUSH_LOCK" release >/dev/null 2>&1
 ) &
 disown 2>/dev/null
 
