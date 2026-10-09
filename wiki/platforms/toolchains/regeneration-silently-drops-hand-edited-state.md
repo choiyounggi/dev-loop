@@ -10,7 +10,7 @@ sources:
   - https://github.com/yonaskolb/XcodeGen/issues/515
   - https://github.com/yonaskolb/XcodeGen/issues/572
 last_verified: 2026-09-08
-related: [platforms-toolchains-environment-resync-removes-undeclared-packages, platforms-toolchains-version-management]
+related: [platforms-toolchains-environment-resync-removes-undeclared-packages, platforms-toolchains-version-management, platforms-toolchains-nextjs-16-build-output-and-tsconfig-rewrite]
 ---
 
 # Regenerating a Generator-Owned Project File That Is Also Hand-Edited
@@ -54,6 +54,7 @@ about to run the regenerate command to make one small, unrelated change.
 | Case | Then |
 |------|------|
 | Diff shows only additions/reorderings you expect, nothing removed | Regeneration is safe to accept as-is |
+| The generated file is JSON and the new key lands after the last member | Expect one deleted line: the previous member gains the separating comma (RFC 8259 allows none after the last member), so its line is rewritten. Read the deleted line, or compare the parsed documents ([testing-quality-json-manifest-edit-gates]), before treating the deletion as lost state |
 | The lost state is small and easy to redeclare (one scheme, one target) | Add it to the spec, regenerate again, confirm the diff is now clean, then commit |
 | The repo already gitignores the generated project file | This failure mode does not apply — nothing hand-edited exists to lose; skip the diff-before-accept step |
 | A CI job runs the generator on every push | The same undeclared-state loss happens silently there too; add a `git diff --stat` check as a CI gate, not only a local habit |
@@ -72,3 +73,4 @@ about to run the regenerate command to make one small, unrelated change.
 - https://github.com/yonaskolb/XcodeGen/issues/515 — GUI-created shared schemes "will be overwritten the next time they generate"
 - https://github.com/yonaskolb/XcodeGen/issues/572 — "running xcodegen will overwrite that xcscheme file"
 - Field reproduction (an iOS repo with committed `.xcodeproj` + `project.yml`, xcodegen 2.45.4, 2026-09): regenerating to add one localhost ATS exception deleted 118 pbxproj lines including the test target's `PBXNativeTarget` and the shared `.xcscheme` file; `git status`/`git diff --stat` surfaced it before commit
+- https://www.rfc-editor.org/rfc/rfc8259#section-4 — "A single comma separates a value from a following name."; the object grammar `member *( value-separator member )` has no separator after the last member, so appending a member adds a comma to the line before it

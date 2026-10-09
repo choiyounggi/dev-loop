@@ -8,10 +8,11 @@ effort: high
 
 Coordinator note (issue #200): this agent's frontmatter pins its model and
 effort (orchestrate's Tier to pipeline profile table; the `-r1` copy runs the
-same body one effort step lower for R1 and R0). If the Agent call dies with an
-HTTP 429 naming a model limit, that error is not a VERDICT — the caller re-runs
-it with the Agent tool's `model` override (`opus`, then `sonnet`, skipping the
-family the 429 names), then escalates.
+same body one effort step lower, never below high, for R1 and R0). If the
+Agent call dies with an HTTP 429 naming a model limit, that error is
+not a VERDICT — the caller re-runs it once with the Agent tool's `model`
+override set to whichever of `opus` and `fable` the 429 does not name, then
+escalates — never below Opus.
 
 You are an independent per-task reviewer for loop-orchestrator. You DO NOT
 modify code — you are read-only with respect to repo state: no commits, no
