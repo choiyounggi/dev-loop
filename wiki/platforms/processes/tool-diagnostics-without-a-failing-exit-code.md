@@ -87,6 +87,7 @@ OUT=$(tool "$FILE" 2>&1 >/dev/null)
 | The wrapper runs under `set -e` | Command substitution failure inside `OUT=$(…)` is not suppressed by a condition context — assign first, test after, as above |
 | Warnings must not repeat on every run of an unchanged file | Hash `$OUT` per file and forward only on change; an unconditional exit 2 re-feeds the same text each time |
 | The platform warns on valid, intended usage (deprecations, declarations it accepts but does not enforce) and offers **no per-diagnostic severity control** | The promotion switch and that feature are mutually exclusive — every legitimate use fails the gate, so adopting the feature means turning the gate off. Keep warnings non-fatal via stream capture with shape-matching, and record the missing severity tiers as a platform defect in its own right |
+| The status misleads the other way: a tool exits non-zero after doing all the work (`git add` naming a tracked file under an ignored directory stages the named paths, then exits 1) | Judge the result by its artifact — `git diff --cached --name-status` — and restructure the call so the status is clean ([platforms-tools-staging-tracked-files-under-an-ignored-directory]) |
 
 ## Instead of
 

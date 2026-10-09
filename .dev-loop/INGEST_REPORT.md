@@ -1,189 +1,167 @@
-# Knowledge flush — 10 candidates: 3 new pages, 9 plan-gaps retired as local-layer
+# Knowledge flush — 3 insight(s)
 
-One session insight and two general lessons pulled out of plan-gap rows, each checked against official docs and a local reproduction. **3 new pages, 2 back-links, 3 index rows. 9 plan-gap rows → local layer (2 of them also fed a general page). 0 conflicts.**
-
-| Candidate | Verdict | Page |
-|-----------|---------|------|
-| `4de9cb59af64dff8` (session insight) | new | `wiki/frontend/design/two-theme-computed-color-comparison.md` |
-| `61e0efcc16733efe` (plan-gap t1/D8) | general part new, project part local | `wiki/frontend/design/token-mapping-under-scoped-theme-overrides.md` |
-| `4d1ffb7de029e168` (plan-gap t3/D5) | general part new, project part local | `wiki/backend/node/boundaries/structured-output-schema-from-zod.md` |
-| 7 other plan-gap rows | local-layer | — |
+Presence assertions that miss additive mutants on a fixed markup contract, zsh colon modifiers after an unbraced parameter, and `git add` exiting 1 after staging a tracked file under an ignored directory. **3 new pages, 5 pages with back-links, 0 folded, 0 dropped, 0 local-layer.**
 
 ## Verified best-practice
 
-### 1. Known-bad control for a two-theme computed-color check — `4de9cb59af64dff8` → verified
+### 1. Assert a fixed markup contract as exact sets; prove each check with an additive mutant (queue `d9aa7d409982537e`)
 
-Claim: a check that renders one component in two `[data-theme]` wrappers and calls it themed when its computed colors differ cannot be failed by deleting the component's color class. `color` is inherited from the themed wrapper, and the border, outline, text-decoration, caret and column-rule colors resolve to it. The control has to make every compared property equal: the same theme in both wrappers, or inline literals.
+- **Claim:** a presentational component's spec fixes its tags, attributes, class tokens and children, while the test run loads none of its CSS (default Vitest) and jsdom renders nothing. Presence matchers (`toHaveClass('a')`, `toHaveAttribute`) fail only when something is removed, so additions (an extra class, an inline `style`, a sibling node) pass. Assert sorted exact sets, and prove each check with a hand-seeded additive mutant.
+- **Sources checked:**
+  - https://github.com/testing-library/jest-dom#tohaveclass (GitHub main and the installed 7.0.1 README): `toHaveClass` checks "whether the given element has certain classes within its `class` attribute"; `{exact: true}` checks "EXACTLY a set of classes … if it has more than expected it is going to fail".
+  - https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttributeNames: "returns the attribute names of the element as an Array of strings".
+  - https://www.w3.org/TR/SVG2/styling.html#PresentationAttributes: "Presentation attributes contribute to the author level of the cascade, followed by all other author-level style sheets, and have specificity 0."
+  - https://github.com/jsdom/jsdom#unimplemented-parts-of-the-web-platform: layout "as a result of CSS" is unimplemented, and the README states jsdom "does not do any layout or rendering".
+  - https://vitest.dev/config/css: "When excluded, CSS files will be replaced with empty strings to bypass the subsequent processing."
+  - Tailwind: https://tailwindcss.com/docs/detecting-classes-in-source-files covers how classes are detected and turned into CSS; https://tailwindcss.com/docs/display says "Use sr-only to hide an element visually without hiding it from screen readers".
+  - Stryker: https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/ plus the StrykerJS v10.0.0 mutator sources.
+    - No mutator builds a JSX node (all 21 files scanned), and `string-literal-mutator.ts` skips JSX attribute values.
+    - `method-expression-mutator.ts` removes `filter`/`slice`/`charAt`/… calls; `equality-operator-mutator.ts` maps `<` → `<=`; `array-declaration-mutator.ts` fills `[]`.
+    - So a default run changes markup only through code the component already runs: a branch, a dropped call, a loop bound, or a filled empty string or array.
+- **How verified (local, 2026-10-07, Node 26.7.0, jsdom 30.1.2, jest-dom 7.0.1 matchers):**
+  - Contract `<svg class="doodle" fill="none" aria-hidden="true">`: presence checks pass, exact checks pass.
+  - Extra class, `style="fill: red"`, `sr-only` sibling: presence checks pass on each, exact checks fail on each.
+  - Removed class: both fail.
+  - Attribute reorder: `outerHTML` unequal, sorted name sets equal.
+  - `getComputedStyle(…).fill`: `rgb(0, 0, 0)` for `fill="none"` (jsdom ignores the presentation attribute), `rgb(255, 0, 0)` for the style mutant.
+  - With a `<style>` element present, an unlayered `.italic` rule computes as `italic`, but the same rule inside `@layer utilities` computes as `normal`. Tailwind 4.3.3's `index.css` puts its utilities in that layer.
+  - An `sr-only` span with no stylesheet passes `toBeVisible()`.
+  - `toHaveClass('btn btn btn', {exact: true})` passes on three distinct tokens, so the page says to list each token once.
+- **Field evidence (from the queued candidate; not re-run here):** linkly-invitation, two components. Four test-quality-auditor FAILs were all additive mutants. After the switch to exact lists, the 11 surviving mutants per component all failed.
+- **Added to the candidate:**
+  - The page applies only when a spec fixes the markup. A new edge-case row on behavior-not-implementation says so.
+  - The page prefers sorted sets over string/snapshot comparison.
+  - It names what makes CSS invisible: Vitest's default, not jsdom alone.
+- **Confidence:** verified.
 
-Sources checked:
+### 2. zsh: brace a parameter that a colon follows (queue `39b1993baa535992`)
 
-- https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/color — "Inherited yes"
-- https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/color_value — "The currentColor keyword represents the value of an element's color property."
-- https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/border-top-color, https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/text-decoration-color, https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/column-rule-color — "Initial value currentcolor"
-- https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/outline-color, https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/caret-color — "Initial value auto"; Chrome resolved both to the element's `color`
-- https://tailwindcss.com/docs/upgrade-guide — v4 changed the default border color to `currentColor`
+- **Claim:** in native zsh, `$name:X` applies a history-style modifier when `X` is a modifier letter, inside double quotes too. `"+refs/heads/$h:refs/…"` becomes `…xefs/…`. Write `"${h}:refs/…"`.
+- **Sources checked:**
+  - https://zsh.sourceforge.io/Doc/Release/Expansion.html, `${name}`: braces are not required for "a single subscript or any colon modifiers appearing after the name", an exception that applies "only … if the option KSH_ARRAYS is not set". The Modifiers list includes `f`, `F:expr:`, `w`, `W:sep:`, and the `s` entry documents the `g` prefix.
+  - https://zsh.sourceforge.io/Doc/Release/Options.html: `KSH_ARRAYS <K> <S>`, which is on by default in ksh and sh emulation.
+- **How verified (local, 2026-10-07, zsh 5.9 arm64, `zsh -f`; bash for comparison):**
+  - Refspec: unbraced printed `+refs/heads/knowledge/xefs/remotes/origin/knowledge/x`. The braced form printed the intended refspec. bash kept the colon.
+  - Probe with the follower `zz`: `a c e h l q r t u A P Q &` are consumed, `s` fails, and the rest stay literal.
+  - Probe with modifier followers `e h r t`: `f g w F` are consumed too (`"$src:feature/login"` → `ature/login`, `"$svc:grpc"` → `apipc`). `F`/`W` before a delimiter and `g` before `&` are also consumed (`"$v:F:2:h"` → `.`).
+  - A modifier inside the braces is zsh-only: `${v:h}` gives `dir` in zsh, `dir/file.txt` in bash and `/bin/sh`, and `Bad substitution` in dash.
+  - `$img:latest` → `myappatest`; `$svc:http` → `.ttp`; `$var:status` → `dusta`; `$var:sort` → `bad substitution`, exit 1. `$img:focal`, `$host:8080`, `$host:path` and `$a:$b` are unchanged.
+  - `emulate sh`, `emulate ksh` and `setopt KSH_ARRAYS` keep the colon literal. `"$h\:refs"` keeps the backslash. `"$svc[1]x"` → `ax`.
+- **Added to the candidate:** the candidate named `:r :h :t :e` only. The page lists every consumed letter, the `f g w F` prefixes, the `:s` failure mode, the `KSH_ARRAYS`/emulation exception, and why a backslash is not a fix.
+- **Confidence:** verified.
 
-How verified: an 8-case reproduction (playwright-core 1.63.0, Chrome 155.0.8059.39, synthetic tokens), 13 color properties compared per case:
+### 3. `git add` exits 1 after staging a tracked file under an ignored directory (queue `ada5b8ae12cf32dd`)
 
-| Case | Any-differs verdict | Must-theme list (`color`, `background-color`) |
-|------|---------------------|-----------------------------------------------|
-| T1 component as shipped | THEMED | PASS |
-| T2 control: `bg-surface` removed | THEMED — the control cannot fail | FAIL on `background-color` |
-| T3 control: every color class removed | THEMED — `color` inherited from the wrapper | FAIL on `background-color` |
-| T4 control: inline literal `color`, no theme classes | UNTHEMED | FAIL |
-| T5 control: inline literal `color`, `bg-surface` kept | THEMED | FAIL on `color` |
-| T6 control: same theme in both wrappers | UNTHEMED | FAIL |
-| T7 shipped bug: literal background, themed text | THEMED — a false pass | FAIL on `background-color` |
-| T8 control: root pinned, child keeps `text-ink` | THEMED | FAIL on `background-color` |
+- **Claim:** `git add` naming a tracked file under a directory that an ignore rule matches lists that directory as ignored and exits 1. By then it has staged that file and every other named path that is not itself untracked and ignored, so `git add … && git commit` skips the commit. Stage such files with `git add -u`, stage the rest with a plain `git add`, and compare `git diff --cached --name-status` with the intended list.
+- **Sources checked:**
+  - https://git-scm.com/docs/git-add: "If you specify the exact filename of an ignored file, git add will fail with a list of ignored files." `-u` "adds no new files". `-f`: "Allow adding otherwise ignored files".
+  - https://git-scm.com/docs/gitignore: "Files already tracked by Git are not affected". The exit 1 for a tracked file is not documented anywhere.
+  - https://git-scm.com/docs/git-check-ignore: tracked files "are not subject to exclude rules; but see '--no-index'".
+  - https://github.com/microsoft/vscode/issues/160653 and https://github.com/gitextensions/gitextensions/issues/10806 (Git 2.38.1.windows.1, "Exit code: 1"): the same behavior, seen independently.
+- **How verified (local, 2026-10-07, git 2.50.1 Apple Git-155, one scratch repo per case):**
+  - Rule `ign/` or `ign`, also via `.git/info/exclude`: exit 1, both paths staged. `add && commit` left HEAD unchanged.
+  - Rule `ign/*` or `ign/t.txt`: exit 0. Rule `*.txt`: lists the untracked `other.txt`, which is not staged; exit 1.
+  - Exit 0: `git add -u`, `-f` on a file, `git add .`, a bare `git add -A`, and `git commit -- <path>`. `-f ign/` also stages ignored untracked files. With `advice.addIgnoredFile=false`, the list and exit 1 remain.
+  - Deleted tracked file: `git add -u -- <file>` exits 0 and stages `D`, which `--name-only` cannot tell from an update. `-u` on a path the index lacks exits 128 with nothing staged. `-u` on a directory stages deletions.
+  - The split chain `git add -- other.txt && git add -u -- ign/t.txt && git commit` exits 0 and commits both.
+- **Corrected from the candidate:**
+  - Only a rule that matches the directory itself triggers it; `dir/*` does not.
+  - The candidate's directive was "run add as its own step, commit separately". The page uses the `-u` split, which keeps `&&` chaining, plus a `--name-status` check, because `--name-only` hides a staged deletion.
+- **Used in this flush:** step 4 stages the tracked `.dev-loop/INGEST_REPORT.md` (under the ignored `.dev-loop/`) with `git add -u`.
+- **Confidence:** verified.
 
-New beyond the harvested claim: the any-differs verdict itself passes a partly hardcoded component (T7). A per-component must-theme list catches it and also lets the one-class-removed control fail (T2). Both are on the page.
+### Review
 
-### 2. Tailwind v4 token mapping under scoped theme overrides — general part of `61e0efcc16733efe` → verified
+Two fresh-context reviewers checked the diff before commit.
 
-The plan-gap row is a project decision (`src/app/globals.css`). Its general content:
+**General (feature-dev:code-reviewer): PASS with 16 advisories. 12 applied, 4 declined.**
+- Applied: index rows now list every distinct use. jsdom source anchor corrected. Page C's trigger and example use `reports/summary.md` instead of this repo's `.dev-loop/`. Two unclear zsh edge rows rewritten. "The inverse:" given an antecedent. Missing measurements added to each page's reproduction bullet.
+- Declined: the 4 suggestions to add the new ids to the `related:` lines of behavior-not-implementation, tests-that-cannot-fail, portable-shell-scripts and tool-diagnostics. #223 rewrites exactly those lines (Open-PR check), so the back-links went into body rows and inline links instead. Those resolve and give the same navigation.
 
-- use `@theme inline` when theme variables reference token variables;
-- reset the default palette with `--color-*: initial`;
-- give theme variables names distinct from the tokens so no variable references itself.
+**Adversarial (general-purpose, opus): FAIL with 5 blockers and 6 advisories. I reproduced each one before fixing it, and all were applied.**
+- *Stryker can add markup*, through `&&`→`||`, `EmptyStringToFilled` on a `className = ''` default, and StrykerJS `ArrayDeclaration` `[]` → `['Stryker was here']`. Round 1's fix listed those routes; round 2 widened it (below).
+- *Vitest's element snapshot serializer sorts attribute names* (`Array.from(node.attributes, …).sort()` in vitest 5.0.3). The claim that "a snapshot changes on reorder" is gone; the snapshot row now argues incidental values and unread approvals.
+- *jsdom computes inline styles and stylesheet rules.* The page now says the CSS is missing because Vitest drops it by default and jsdom renders nothing, and it adds an edge row for runs that load CSS.
+- *zsh also consumes `f g w F`* before a modifier letter. A table row was added.
+- *A deleted tracked file stages as `D` under `-u` with exit 0*, which `--name-only` cannot distinguish. `--name-status` is now used everywhere, including the tool-diagnostics back-link row.
+- Advisories applied: the `sr-only` source, the Tailwind "maps to a utility" wording, jest-dom's subset-plus-count `exact` (list each token once), "every other named path" qualified, `-u` exit 128 on an unknown path, `-u` directory deletions.
 
-Source: https://tailwindcss.com/docs/theme — "When defining theme variables that reference other variables, use the `inline` option"; the `#parent`/`#child` example of where `var()` resolves; "set the entire namespace to `initial`" … "all of the default utilities that use that namespace (like `bg-red-500`) will be removed".
+**Round 2 (same adversarial reviewer, on the fixed text): FAIL with 2 blockers and 6 advisories. Each was reproduced, then applied.**
+- *My Stryker fix was still too narrow.* Dropped `filter()`/`slice()`/`charAt()` calls and loop bounds (`i < 3` → `i <= 3` adds a child) also change markup. The page now says a default run changes markup only through code the component already runs, and that no operator builds JSX.
+- *jsdom skips `@layer` rules,* where Tailwind v4 emits every utility. So loading the CSS does not make `italic` compute, and the edge row now says so.
+- Advisories applied:
+  - The test does see the sibling's text, and `toBeVisible()` passes on `sr-only`.
+  - `F`/`W` are also consumed before a delimiter.
+  - "shorter" was false.
+  - In-braces modifiers differ by shell.
+  - "Give both file paths" was ambiguous.
+  - The index row said "the test shows nothing".
+- Confirmed OK in round 2: snapshot/serialization claims, every page-C claim (re-run with the `reports/` example), the advisory fixes, and table column counts on all 244 rows.
 
-How verified (tailwindcss and @tailwindcss/cli 4.3.3, Chrome 155): a background agent built the fixtures; I rebuilt every fixture from its `input.css` and re-read the computed styles myself.
-
-| Check | Result |
-|-------|--------|
-| `<p class="text-ink">` in a noir wrapper, plain `@theme` | `rgb(17, 17, 17)`, the `:root` ink: the wrapper's override never reaches the utility |
-| Same with `@theme inline` | `rgb(238, 238, 238)`, the noir ink |
-| `--color-*: initial` plus `bg-pink-500` in the markup | `pink-500` matched 0 times in the output (3 times without the reset) |
-| Same-name mapping `--font-hand: var(--font-hand)`, token sheet unlayered / `layer(theme)` / `layer(base)` | Resolved to the token value in all 3, although the build emits a self-reference into `@layer theme` |
-| Theme on `<html>` itself, plain `@theme` | `rgb(238, 238, 238)`: no gap when the theme sits on the root element |
-| `getPropertyValue('--color-ink')` with `@theme inline`, no scanned file mentioning the name | `""`: not emitted |
-| Same, with a scanned script that mentions `--color-ink` | Emitted on `:root` as `--color-ink: var(--ink)`; read inside the noir wrapper it is `#111111`, the default ink (the utility itself still shows the noir ink) |
-| Token defined only under `[data-theme="noir"]`, `@theme inline`, element outside every wrapper | `rgb(0, 0, 0)` outside (inherited), `rgb(255, 102, 0)` inside; build exit 0 |
-
-The plan's distinct-name rule did not matter in the 3 tested placements, so the page records it as an edge case: either name works there, and distinct names are the rule for any other placement.
-
-### 3. zod schema → Claude structured outputs — general part of `4d1ffb7de029e168` → verified, one claim corrected
-
-The plan-gap row picks `z.toJSONSchema(TraitSpecSchema)` in output mode for a later Claude call. It rejects `io: 'input'` because input mode "drops `required` and `additionalProperties: false`, which Claude structured outputs require on every object".
-
-Sources:
-
-- https://platform.claude.com/docs/en/build-with-claude/structured-outputs (https://docs.claude.com/en/docs/build-with-claude/structured-outputs redirects here) — supported: `enum`, `const`, `default`, "required and additionalProperties (must be set to false for objects)"; not supported: numeric and string length constraints; "required properties appear first, followed by optional properties"; "Wrap a Zod schema in zodOutputFormat() and pass it to client.messages.parse()"
-- https://zod.dev/json-schema — output mode is the default; "When converting to JSON Schema in "input" mode, additionalProperties is not set."
-- `@anthropic-ai/sdk` 0.131.0 source: `src/helpers/zod.ts`, `src/lib/transform-json-schema.ts`, `src/helpers/json-schema.ts`
-
-How verified (zod 4.6.5, SDK 0.131.0, Node 26.7.0, no API calls; agent-run, then re-run by me):
-
-| Check | Result |
-|-------|--------|
-| Output mode | `additionalProperties: false` on the root and nested objects; `.default()` keys in `required` |
-| `io: 'input'` | No `additionalProperties`; `.default()` keys dropped from `required` |
-| `.transform()` in output mode | Throws "Transforms cannot be represented in JSON Schema" |
-| `zodOutputFormat()` | Output mode; forces `additionalProperties: false`; moves `enum`, `const`, `default`, `minimum`/`maximum` and `minLength`/`maxLength` into `description` |
-| `parse()` of a reply with `n: 9` against `.max(8)` | Throws `AnthropicError` "Failed to parse structured output" |
-
-Correction: Claude does not require every key in `required` (optional keys are allowed, up to 24 per request across all strict schemas: "Total optional parameters across all strict tool schemas and JSON output schemas"); it requires `additionalProperties: false`. Hand conversion needs one more step than the plan note says: output mode keeps `minimum`/`maximum`/`minLength`/`maxLength`, which the docs list as unsupported ("If you use an unsupported feature, you'll receive a 400 error with details"), so they must be removed from the sent schema. Found during verification: SDK 0.131.0's helper sends `enum`/`const`/`default` as description text although the docs list them as supported, so the request does not constrain those fields and `parse()` rejects bad values afterwards. Not exercised: sending any schema to the API (no paid calls); the page says so for the `transform: false` path.
-
-### 4. The other 7 plan-gap rows
-
-These are project design records with no general claim to verify. One rationale is contradicted by MDN. `36433307f92e8246` rejects CSS `steps()` animation because it "needs a data-URL PNG built in the browser, which has no zlib". MDN disagrees on both counts:
-
-- https://developer.mozilla.org/en-US/docs/Web/API/CompressionStream/CompressionStream: `"deflate"` "Compresses the stream using the DEFLATE algorithm in ZLIB Compressed Data Format".
-- https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/toDataURL produces `image/png`.
-
-That row is flagged under Local-layer candidates.
+**Round 3 (same reviewer, on the round-2 text): PASS, no findings.** It re-confirmed the StrykerJS scan (21 files; only `string-literal-mutator.ts` mentions JSX, to skip it), the `@layer` behavior, the `toBeVisible` result and every page-B and page-C value. It noted one rare edge: the boolean-literal mutator flips `hidden={false}` to `hidden=""`. That case is now in the page's list, and the claim reads "JSX with no expressions gives it none of these".
 
 ## Existing-layer check
 
-Pages read: frontend-design-theme-swap-propagation-check, testing-quality-tests-that-cannot-fail, backend-common-llm-completion-response-validation, frontend-design-custom-property-values-read-from-script, backend-node-boundaries-runtime-validation
+Pages read: platforms-shells-portable-shell-scripts, testing-quality-behavior-not-implementation, testing-quality-tests-that-cannot-fail, testing-quality-unasserted-return-fields, testing-quality-surviving-mutant-equivalence-triage, testing-quality-expectation-sets-with-one-distinct-value, testing-quality-default-values-under-test, testing-e2e-e2e-stability, frontend-design-custom-property-values-read-from-script, frontend-design-design-system-lint-gate-for-agents, infrastructure-ci-cd-changed-files-only-gates, platforms-shells-unset-versus-empty-parameters, platforms-shells-escapes-in-shell-string-literals, platforms-processes-tool-diagnostics-without-a-failing-exit-code, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-jq-dot-rebinding-in-predicates
 
-How the pages were found. I grepped all of `wiki/`, took the count first, then read every hit:
-
-- `positive control|known-bad|currentcolor|computed colou?r|data-theme` → 10 files. Only theme-swap-propagation-check compares computed colors; the rest use "known-bad" or "positive control" for lint gates, queries and spec gates.
-- `tailwind|@theme` → 4 files (theme-swap-propagation-check, design-system-lint-gate-for-agents, slop-detector-gate, `frontend/index.md`). None covers mapping tokens into `@theme`.
-- `zod|toJSONSchema|additionalProperties|structured output` → 8 files. None covers producing a schema for an LLM; runtime-validation covers zod at process boundaries.
-- Semantic search: the `dev-loop-wiki` MCP server (`wiki_search`) failed to connect this session, so wiki-ingest step 4 ran in its documented no-tool form and there is no top-5 list.
-
-| Candidate | Overlap found | Decision |
-|-----------|---------------|----------|
-| A (`4de9…`) | theme-swap-propagation-check is a different check (swap the accent by value, find hardcoded copies) and its body is at the 120-line limit; tests-that-cannot-fail holds the general "mutate what the check reads" rule | New page; links to both; back-link on theme-swap-propagation-check only (see Open-PR check) |
-| B (`61e0…`) | custom-property-values-read-from-script covers reading alias tokens from script; theme-swap-propagation-check's Sources line notes the `@theme inline` compile output | New page; linked both ways with custom-property-values-read-from-script and with A |
-| C (`4d1f…`) | runtime-validation covers zod at boundaries, and its "encode transforms in the parse schema" row agrees with C's step 3; completion-response-validation covers OpenAI-compatible `finish_reason` gating, a different trigger | New page; links to runtime-validation one way |
-
-Conflicts: none. No existing directive is contradicted.
-
-Lints run on the branch:
-
-- `node scripts/wiki-structure-checks.js wiki/` → `pages: 362, indexes: 13, findings: 0`
-- `node scripts/wiki-lint-prohibitions.js wiki/` → 0 violations (1 info row in keys-ahead-of-their-consumer.md, a page not touched here)
-- `node scripts/wiki-lint-model-era.js wiki/` (report-only) → C is a new candidate ("model-coupled, no verified_model"); 36 other pages were already listed. `verified_model` is left unset on purpose: C is pinned to the API docs, SDK 0.131.0 and zod 4.6.5, and no model was called, so naming a model generation would be false.
-- Body lines after the review fixes: 76 / 69 / 75 (limit 120).
+- **How far each page was read:** the first four in full. For the rest, "When this applies" plus the rows the overlap grep hit. Indexes read: `INDEX.md`, `wiki/testing/index.md` (quality section in full) and `wiki/platforms/index.md` (every section).
+- **`wiki_search` top 5 (k=5) for each candidate's trigger:**
+  - #1: custom-property-values-read-from-script ×3 (jsdom `getComputedStyle` for custom properties), design-system-lint-gate-for-agents, e2e-stability ("styling classes are not contracts", which is about selectors, not asserted output). None has this trigger.
+  - #2: portable-shell-scripts ×3, changed-files-only-gates, unset-versus-empty-parameters. None covers colon modifiers.
+  - #3: worktree-isolated-workers ×3, shared-run-state, checkable-claims-in-an-adopted-plan. None covers `git add`'s exit status.
+- **Grep across `wiki/`:** `modifier|colon` (zsh), `git add|paths are ignored|addIgnoredFile|gitignore` (git), and `toHaveClass|getAttributeNames|mutant|snapshot` (testing). No page states any of the three directives. The adversarial reviewer searched all 375 pages independently and found the same.
+- **Merge vs. new:** all three are new triggers, so all three are new pages.
+  - #2's first choice was a row in portable-shell-scripts' step-4 table of bash→zsh inversions. That page is at the 120-line body limit, so its table intro links the new page instead.
+- **Conflicts:** none contradict. One tension is resolved explicitly. behavior-not-implementation advises against snapshots of whole component trees; the new page applies only when a spec fixes the markup, and a new edge-case row on behavior-not-implementation says so.
+- **Links added:** back-links go in body rows (or `related:` where no open PR edits it).
+  - behavior-not-implementation: edge-case row → markup-contract-assertions.
+  - tests-that-cannot-fail: edge-case row → markup-contract-assertions.
+  - unasserted-return-fields: `related:` += markup-contract-assertions.
+  - portable-shell-scripts: inline link in the step-4 intro → colon-after-an-unbraced-parameter. No new line; the page stays at 120.
+  - tool-diagnostics-without-a-failing-exit-code: edge-case row for the opposite-direction case → staging-tracked-files-under-an-ignored-directory.
 
 ## Open-PR check
 
-22 open `knowledge/*` heads: #223, #225, #226, #227, #228, #229, #230, #231, #233, #234, #235, #236, #237, #238, #239, #241, #244, #249, #253, #254, #255, #256.
+All 23 open `knowledge/*` heads were listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`: #257, #256, #255, #254, #253, #249, #244, #241, #239, #238, #237, #236, #235, #234, #233, #231, #230, #229, #228, #227, #226, #225, #223.
 
-Method: `git diff --name-status origin/main...origin/<head> -- wiki/` for each head, then a count of each candidate's key terms in each head's added lines, reading every hit.
+The added lines of each head's `git diff origin/main...origin/<head> -- wiki/` were searched per candidate:
 
-- No head adds Tailwind or `@theme` text.
-- The C-term hits (#236 golden key order, #233 a `related:` id) and the A-term hits (#223, #225, #233, #235: "positive control" for hooks, timing, a bundle grep, globs) are unrelated.
+- **#1** (`toHaveClass|toHaveAttribute|getAttributeNames|classList|additive|exact (list|set|class)|markup contract|extra class|inline style|toMatchObject|jsdom`): hits in #253 (a theme-swap row naming inline `style=`), #234 (an "exact list of registered names"), #225 (a fake IntersectionObserver under jsdom) and #223 (a jsdom mock socket). None overlaps.
+- **#2** (`zsh` near `modifier|colon`, `\$[a-z_]+:[a-z]`): one false positive, #241's PowerShell `$env:GITHUB_OUTPUT`. The zsh content in #235 (NOMATCH globs), #230 (heredocs), #233 (read loops), #223 (redirection) and #255 (globs) covers other behaviors.
+- **#3** (`git add|paths are ignored|addIgnoredFile|add -f|git commit`): #223's new `platforms/tools/gitignore-directory-reinclusion.md` has the row "The file to keep is already tracked … later modifications are tracked regardless of the rule". Same situation, different point: #223 covers re-including a file, not `git add`'s exit 1. The #233 and #230 hits are unrelated.
 
-Files this PR shares with open heads, and how it keeps its hunks apart:
+| Candidate | Verdict | Note |
+|-----------|---------|------|
+| #1 markup-contract assertions | new | — |
+| #2 zsh colon modifiers | new | — |
+| #3 `git add` exit 1 | new | Same trigger as #223, different directive. #223's page is not on main, so this PR cannot link it yet. Once both merge, cross-link `platforms-tools-gitignore-directory-reinclusion` and `platforms-tools-staging-tracked-files-under-an-ignored-directory` |
 
-| File | Open head's hunk | This PR |
-|------|------------------|---------|
-| `frontend/design/theme-swap-propagation-check.md` | #253: line 121 | Line 14 (`related:`) only |
-| `frontend/index.md` | #253: line 98; #225: after 19 and 92; #244: after 43 | 2 rows inserted between lines 96 and 97 |
-| `testing/quality/tests-that-cannot-fail.md` | #223: line 19 (`related:`) | Not edited; A links to it one way |
-| `backend/node/boundaries/runtime-validation.md` | #233: line 10 (`related:`) | Not edited; C links to it one way |
-| `backend/node/index.md` | #233: after 27; #249: after 15 | 1 row inserted before line 27 |
-| `backend/index.md`, `INDEX.md` | #249: line 10; 5 heads edit `INDEX.md` | Not edited |
-| `log.md`, `.dev-loop/INGEST_REPORT.md` | Every flush PR appends or replaces | Appended / replaced, as every flush does |
-
-Verdicts:
-
-- `4de9cb59af64dff8`: **new**.
-- `61e0efcc16733efe` and `4d1ffb7de029e168`: **new** for the general part, local-layer for the project part.
-- `1d79a3953022f952`, `fdcff6ff49e211a4`, `8ae1f75de4985c8f`, `c1321da32b7a6a5e`, `36433307f92e8246`, `77908e11b9bb56f5`, `a8ddd3142b6e8d24`: **drop** from the bundled layer (project-specific, see Local-layer candidates).
+**Merge-conflict notes:**
+- #223 rewrites the `related:` line of behavior-not-implementation, tests-that-cannot-fail, portable-shell-scripts, tool-diagnostics-without-a-failing-exit-code and worktree-isolated-workers. This PR leaves those lines unchanged, so the two PRs do not conflict there.
+- The new index rows sit at slots no open PR inserts at: after unasserted-return-fields in `wiki/testing/index.md`, and after env-var-off-switches and jq-dot-rebinding-in-predicates in `wiki/platforms/index.md`. A scratch-repo test showed git merges two insertions one line apart cleanly.
+- `log.md` is appended at the end, like every open PR. Whichever merges second resolves that one append.
 
 ## Routing decision
 
-| Page | Why here |
-|------|----------|
-| `frontend/design/two-theme-computed-color-comparison.md` | The mechanism is CSS inheritance and `currentcolor` inside a theming check, next to theme-swap-propagation-check; the general rule stays in testing/quality and is linked |
-| `frontend/design/token-mapping-under-scoped-theme-overrides.md` | `frontend/design` holds the Tailwind and design-token pages |
-| `backend/node/boundaries/structured-output-schema-from-zod.md` | The directive is specific to zod and the TypeScript SDK; AGENTS.md puts stack mechanics in the stack subtree, and `node/index.md` says "common owns the principle, these pages own the Node mechanics"; `boundaries` already owns zod at the process edge |
+| Insight | Layer | Target |
+|---------|-------|--------|
+| #1 markup-contract assertions | general | `wiki/testing/quality/markup-contract-assertions.md` (new); row after unasserted-return-fields in `wiki/testing/index.md` |
+| #2 zsh colon modifiers | general | `wiki/platforms/shells/colon-after-an-unbraced-parameter.md` (new); row after env-var-off-switches in `wiki/platforms/index.md` |
+| #3 `git add` exit 1 | general | `wiki/platforms/tools/staging-tracked-files-under-an-ignored-directory.md` (new); row after jq-dot-rebinding-in-predicates in `wiki/platforms/index.md` |
 
-No new category.
+- **No new categories.** testing/quality holds assertion-strength pages; platforms/shells holds shell-semantics pages; platforms/tools holds CLI-behavior pages (bsd-vs-gnu-cli, jq-dot-rebinding-in-predicates).
+- **Why not frontend for #1:** the directive is about what a test asserts. frontend/design pages are about building UI.
+- **Why not platforms/processes for #3:** tool-diagnostics-without-a-failing-exit-code covers the opposite case (warnings with exit 0). #3 is specific to git staging, so it gets its own page plus a back-link row there.
 
 ## Local-layer candidates
 
-All 9 plan-gap rows come from **linkly-invitation** (`/Users/choeyeong-gi/Desktop/workspace/linkly-invitation`, wiki-plan designs `plans/t1` and `plans/t3`). Each directive names that repository's files, contracts or constants and would be wrong in another codebase. They are excluded from this PR; run wiki-ingest inside that project to keep any of them.
-
-| Row | Decision | Target |
-|-----|----------|--------|
-| `61e0efcc16733efe` | t1 D8: `src/app/globals.css` Tailwind mapping and tilt utilities | `wiki-local/frontend/design/tailwind-token-mapping.md`. General part is now bundled; the distinct-name rule is optional (a same-name mapping resolved in all 3 tested placements) |
-| `1d79a3953022f952` | t1 D16: dev-only `/dev/primitives` preview route | `wiki-local/frontend/structure/dev-primitives-preview-route.md` |
-| `4d1ffb7de029e168` | t3 D5: `TRAIT_SPEC_JSON_SCHEMA` | `wiki-local/backend/boundaries/trait-spec-json-schema.md`. General part is now bundled; fix the rationale (Claude allows optional keys, up to 24 per request), drop `minimum`/`maxLength`-style limits from a hand-converted schema, and record `zodOutputFormat()` as the documented path for t6 |
-| `fdcff6ff49e211a4` | t3 D7: slot model and palettes | `wiki-local/frontend/design/character-slot-palettes.md` |
-| `8ae1f75de4985c8f` | t3 D9: 24×32 frame, layer order, part format | `wiki-local/frontend/design/character-frame-and-layers.md` |
-| `c1321da32b7a6a5e` | t3 D10: art direction as checkable rules | `wiki-local/frontend/design/character-art-rules.md` |
-| `36433307f92e8246` | t3 D11: animation model | `wiki-local/frontend/design/character-animation-frames.md`. Re-check the rejected-alternative rationale first: MDN contradicts "the browser has no zlib" (Verified best-practice §4) |
-| `77908e11b9bb56f5` | t3 D17: variant generation | `wiki-local/frontend/design/character-variant-generation.md` |
-| `a8ddd3142b6e8d24` | t3 D19: couple presets | `wiki-local/frontend/design/couple-presets.md` |
-
-## Review before commit
-
-Two independent reviews ran on the uncommitted pages; every finding below is applied in this commit.
-
-| Review | Result | Applied |
-|--------|--------|---------|
-| Rules + accuracy (read-only reviewer) | 8 should-fix, 6 nits, 0 blockers | All 14. Main ones: A's must-theme control works for `background-color` but not for the inherited `color` (pin `color` inline instead); the 13 compared properties are now listed; B's "When this applies" also covers the palette reset; C's hand conversion must drop unsupported limits (400 error) and `.optional()` is capped at 24 per request; array `minItems` 0/1 is kept by the helper |
-| Adversarial re-test (fresh fixtures, own tokens, same versions) | A1–A4, B2–B4, C1–C3 confirmed; B1 partly refuted; 1 overreach | B1: an `@theme inline` variable IS emitted when a scanned file mentions its name, and a script then reads the `:root`-resolved default inside a wrapper. I re-measured that myself (tailwindcss 4.3.3, `source(none)` plus one `@source` script mentioning `--color-ink`: emitted; `getPropertyValue` inside the noir wrapper = `#111111`) and rewrote B's edge row, table cell, index row and log line. Its new finding, a token with no `:root` default, I also re-measured (`rgb(0, 0, 0)` outside the wrapper) and added as an edge row. Overreach: A now separates `currentcolor` (spec) from `auto` (Chrome-observed) |
-
-After the fixes: `wiki-structure-checks` 0 findings, `wiki-lint-prohibitions` 0 violations (see the lint list above for the exact output).
+none
 
 ## Run notes
 
-- `hooks/auto-flush.sh` started this run. It holds the flush lock under run id `20261007-163924-67550` and exports that id to the session it spawns. Step 0 of `skills/knowledge-flush/SKILL.md` (line 36 on main) generates a fresh id instead, so the first acquire reported this run's own parent as a foreign holder (`held 20261007-163924-67550 11s`). Re-acquiring with the inherited `DEV_LOOP_FLUSH_RUN_ID` returned `already-owned`. This is the failure `infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session` documents; the skill text still contains it.
+- **Lock (same as #257):** `hooks/auto-flush.sh` holds the flush lock as `20261007-205826-82630` and exports that id. Step 0 of `skills/knowledge-flush/SKILL.md` generates a fresh id, so the first acquire printed `held 20261007-205826-82630 15s` (exit 3). The process tree showed the holder is this session's parent. Re-acquiring with the inherited id printed `already-owned`, and the lease was refreshed during the run (TTL 900 s).
+- **Inherited worker identity (new):** the spawned flush also inherited the worker's `TMUX`/`TMUX_PANE` (tmux session `lo-2-inv1`, pane `%263`) and its working directory, the t1b task worktree. So `hooks/loop-gate.sh` gate 1 matched this session to t1b's status record (`phase=implementing`) and blocked a stop with "Finish the loop-implement cycle". The live t1b worker was still running in that pane. This flush did not emit a `status-update` for t1b and ran no tmux command that writes.
+- **Lint after the edits:**
+  - `node scripts/wiki-structure-checks.js wiki` → `pages: 362, indexes: 13, findings: 0` (baseline 359 pages, 0 findings).
+  - `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (baseline 0).
+  - Both checkers flagged a defect injected into a scratch copy of a new page, so they do scan the new pages.
