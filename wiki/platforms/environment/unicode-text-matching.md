@@ -12,7 +12,7 @@ sources:
   - https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/APFS_Guide/FAQ/FAQ.html
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/grep.html
 last_verified: 2026-10-06
-related: [platforms-environment-timezone-and-locale, platforms-filesystems-paths-case-and-line-endings, qa-document-verification-spec-document-gates, platforms-tools-bsd-vs-gnu-cli]
+related: [platforms-environment-timezone-and-locale, platforms-filesystems-paths-case-and-line-endings, qa-document-verification-spec-document-gates, platforms-tools-bsd-vs-gnu-cli, platforms-tools-unicode-escape-in-a-jq-regex]
 ---
 
 # Matching Non-ASCII Text with grep and Regex

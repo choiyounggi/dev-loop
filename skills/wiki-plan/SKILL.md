@@ -221,7 +221,10 @@ path, the requester's original goal text, and the wiki root
 line into `plans/<feature>/review-verdict.md` (gate-B reads that file, not the
 `## Review` section). If `VERDICT: FAIL`, resolve every `blocking` finding and
 re-call — bounded at 3 total calls; a 3rd `FAIL` is STOP + escalate to the
-requester, not a forced PASS.
+requester, not a forced PASS. An HTTP 429 naming a model limit is not a
+verdict and not a call against the bound: re-run once with the Agent tool's
+`model` override set to whichever of `opus` and `fable` the 429 does not name,
+then escalate — never retry on `sonnet`.
 
 **gate-B**:
 ```

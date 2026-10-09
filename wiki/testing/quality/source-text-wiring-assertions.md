@@ -20,6 +20,7 @@ related:
     testing-quality-harness-reverse-controls,
     testing-quality-surviving-mutant-equivalence-triage,
     backend-common-change-impact-call-site-enumeration,
+    testing-quality-ci-workflow-step-behavior-tests,
   ]
 ---
 

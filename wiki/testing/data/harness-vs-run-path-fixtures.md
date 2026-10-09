@@ -9,7 +9,7 @@ sources:
   - https://jqlang.org/manual/
   - https://istqb-glossary.page/branch-coverage/
 last_verified: 2026-08-07
-related: [testing-data-test-data-and-isolation, testing-quality-differential-run-agreement, testing-strategy-differential-testing, qa-exploratory-guard-true-path-coverage, testing-quality-tests-that-cannot-fail]
+related: [testing-data-test-data-and-isolation, testing-quality-differential-run-agreement, testing-strategy-differential-testing, qa-exploratory-guard-true-path-coverage, testing-quality-tests-that-cannot-fail, testing-quality-cross-component-invariant-via-shared-helper]
 ---
 
 # A Harness That Synthesizes Its Own Default Input

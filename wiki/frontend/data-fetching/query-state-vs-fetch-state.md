@@ -16,6 +16,7 @@ related:
     frontend-state-client-vs-server-state,
     frontend-data-fetching-race-conditions,
     testing-mocking-what-to-mock,
+    frontend-data-fetching-query-key-prefix-invalidation,
   ]
 ---
 

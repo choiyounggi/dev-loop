@@ -9,7 +9,7 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
   - https://github.com/choiyounggi/groundwork/blob/main/plugins/guardrails/hooks/bash-guard.sh
 last_verified: 2026-08-06
-related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-shells-escapes-in-shell-string-literals, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-harness-mediated-tool-results, platforms-processes-tool-diagnostics-without-a-failing-exit-code, platforms-tools-agent-permission-classifier-denials, testing-quality-gate-parsing-vs-command-execution]
+related: [platforms-shells-portable-shell-scripts, platforms-environment-path-resolution, platforms-shells-escapes-in-shell-string-literals, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-harness-mediated-tool-results, platforms-processes-tool-diagnostics-without-a-failing-exit-code, platforms-tools-agent-permission-classifier-denials, testing-quality-gate-parsing-vs-command-execution, platforms-shells-heredoc-body-expansion-with-backtick-prose]
 ---
 
 # Commands Read as Text by a Gate Before the Shell Runs Them

@@ -7,8 +7,9 @@ confidence: verified
 sources:
   - https://code.claude.com/docs/en/permission-modes
   - https://code.claude.com/docs/en/permissions
-last_verified: 2026-09-21
-related: [platforms-tools-agent-permission-classifier-denials, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, backend-common-llm-binding-instructions-for-agents, testing-quality-checks-that-cannot-pass]
+  - https://code.claude.com/docs/en/hooks
+last_verified: 2026-10-01
+related: [platforms-tools-agent-permission-classifier-denials, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, backend-common-llm-binding-instructions-for-agents, testing-quality-checks-that-cannot-pass, platforms-tools-hook-config-lookup-from-shell-cwd]
 ---
 
 # Blocking One Command Class for a Worker That Runs With Permissions Bypassed
@@ -72,6 +73,7 @@ prompt or CLAUDE.md is the only thing currently forbidding it. Also when a
 |------|------|
 | The worker must still run the read-only members of the family (`git stash list`) | Deny the mutating subcommands by prefix — `Bash(git stash push:*)`, `Bash(git stash pop:*)`, `Bash(git stash drop:*)`, `Bash(git stash clear:*)` — rather than the whole family |
 | The effect is reachable through a non-Bash tool (an MCP tool that runs git, a file write into `.git/`) | A `Bash(...)` rule covers only the Bash tool; deny that tool's name too, or add a PreToolUse hook that matches it ([infrastructure-agent-orchestration-worktree-isolated-workers]) |
+| A PreToolUse hook installed for these workers returns `permissionDecision: "ask"` for a command it merely wants noted | Treat `ask` as a real stop: the docs define it as "prompts the user to confirm" and state the forced prompt for auto mode; for bypass mode the evidence is field-measured only (Sources) — interactive bypass-mode calls answered `ask` waited a median 33.1 s against 1.6 s. Return `deny` for what must be blocked, and emit no decision (exit 0, no output) for everything else; reserve `ask` for calls a human is present to answer. Measure it on your version: compare tool-call-to-result latency for `ask` calls against calls with no decision |
 | The worker adds its own `allow` entry to get past the boundary | It changes nothing — allow is inert in bypass mode and deny wins at every level; the worker's correct move is to report the denial ([infrastructure-agent-orchestration-control-signals-vs-primary-artifacts]) |
 | The task genuinely needs the denied command | Edit the settings file from outside the worker and re-prompt it; a denial is not a cue to reach the same effect by another command |
 | The rule must survive the session but no settings file is acceptable in the repo | `~/.claude/settings.json` at user scope; a boundary stated only in conversation is lost at compaction ([platforms-tools-agent-permission-classifier-denials]) |
@@ -88,4 +90,6 @@ prompt or CLAUDE.md is the only thing currently forbidding it. Also when a
 
 - https://code.claude.com/docs/en/permission-modes — "Deny rules block in every mode, including `bypassPermissions`. … Allow rules have no effect in `bypassPermissions`"
 - https://code.claude.com/docs/en/permissions — "If a tool is denied at any level, no other level can allow it. For example, a managed settings deny can't be overridden by `--allowedTools`"; deny rules from any scope are evaluated before allow rules; "The recognized command separators are `&&`, `||`, `;`, `|`, `|&`, `&`, and newlines. A rule must match each subcommand independently"; "The stripped wrappers are `timeout`, `time`, `nice`, `nohup`, and `stdbuf`, plus the shell builtins `command` and `builtin`, and zsh's `noglob`"; "also strips a leading assignment of certain known-safe environment variables"; "A deny or ask rule matches past any leading assignment, so `Bash(rm *)` in deny still matches `FOO=bar rm -rf tmp/`"; "Bare `xargs` is also stripped … Stripping applies only when `xargs` has no flags" (re-fetched 2026-09-21)
+- https://code.claude.com/docs/en/hooks — PreToolUse `permissionDecision`: "`"ask"` prompts the user to confirm"; "A hook's `"ask"` also forces a permission prompt in auto mode"; https://code.claude.com/docs/en/permissions — "a matching ask rule still prompts even when the hook returned `"allow"` or `"ask"`" (fetched 2026-10-01). The docs state the auto-mode case explicitly and do not name `bypassPermissions`; the bypass-mode behavior rests on the measurement below
+- Field measurement 2026-09-30 (Claude Code 2.1.285, interactive `bypassPermissions` sessions, a PreToolUse Bash gate's log joined to session transcripts): 252 calls answered `ask` had a median tool-call-to-result gap of 33.1 s, 88 of them over 60 s; 3,708 calls with no hook decision had a median of 1.6 s
 - Field context 2026-09-02 (dev-loop orchestration, workers launched with permissions bypassed): the stash stack shared across worktrees was protected by a prose rule alone; the deny form above was adopted after the docs confirmed deny applies under bypass. The session's first draft listed `env` among the stripped wrappers — the docs' list does not include it, which is why step 4 names it

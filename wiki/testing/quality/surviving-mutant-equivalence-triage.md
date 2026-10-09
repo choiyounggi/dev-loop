@@ -9,7 +9,7 @@ sources:
   - https://pitest.org/quickstart/basic_concepts/
   - https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/
   - https://testing.googleblog.com/2021/04/mutation-testing.html
-last_verified: 2026-08-07
+last_verified: 2026-09-28
 related:
   [
     testing-quality-tests-that-cannot-fail,
@@ -18,6 +18,7 @@ related:
     testing-quality-behavior-not-implementation,
     testing-quality-source-text-wiring-assertions,
     backend-common-change-impact-call-site-enumeration,
+    qa-process-evaluating-review-feedback,
   ]
 ---
 
@@ -89,6 +90,7 @@ Building the mutation harness itself, or citing its score →
 | Several mutants survive in the same function                                                                | Classify each one separately — one verdict covering all of them hides whichever is the other kind                                                                                              |
 | The tool reports a 100% kill rate with no survivors at all                                                  | Read that as a harness signal, not a code signal, and run the no-op control ([testing-quality-harness-reverse-controls])                                                                       |
 | The survivor is on a wiring call asserted by a source-text regex rather than by behavior                    | The count-style assertion is what let it live → [testing-quality-source-text-wiring-assertions]                                                                                                |
+| The survivor was reported inside a review or audit whose verdict is PASS, labelled "secondary"              | The verdict scopes to the reviewer's FAIL list, not to coverage. Classify the survivor against the brief's own requirement list before accepting the label: a guarantee the brief states literally is the missing-test row; add the case, re-run the mutation and the same reviewer ([qa-process-evaluating-review-feedback]) |
 
 ## Instead of
 
@@ -107,3 +109,4 @@ Building the mutation harness itself, or citing its score →
 - https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/ — the mutant state set and `detected / valid` scoring, which is what makes classifying a survivor a prerequisite to reporting the number
 - https://testing.googleblog.com/2021/04/mutation-testing.html — inserting faults and requiring test failure is the measurement; a fault that changes no observable behavior is not one
 - Field measurement 2026-08-07 (rtb-unified, `apps/web` building-detail URL parsing): a mutant that deleted the empty-string guard on `?buildingId=` survived. The domain argument was that the guard's whole input set is strings that `Number()` maps to `0` or `NaN`, both of which the following `parsed > 0` rejects — so no accepted input distinguishes the two. The branch's comment claimed "an empty string is otherwise read as 0", which that argument contradicts. Deleting the branch and rewriting the comment left all 49 tests passing at the same count
+- Field evidence 2026-09 (a Rust `serde` wire-format crate, crew-proto task t5-proto; recorded by the originating session, not re-run in this flush): a test-quality audit returned PASS and recorded that a `deny_unknown_fields` mutant survived all 12 tests as a "secondary" guarantee; the brief stated "unknown fields tolerated" literally, so the survivor was the missing-test row — one added case reddened under the mutant (13 tests, `unknown_entry_fields_are_tolerated ... FAILED`), the suite read 82 passed after restore, and the resumed auditor reproduced the kill
