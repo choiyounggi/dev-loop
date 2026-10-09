@@ -8,7 +8,7 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
   - https://www.gnu.org/software/bash/manual/bash.html#Double-Quotes
 last_verified: 2026-09-17
-related: [platforms-shells-portable-shell-scripts, platforms-shells-command-text-inspected-before-execution, platforms-tools-jq-dot-rebinding-in-predicates]
+related: [platforms-shells-portable-shell-scripts, platforms-shells-command-text-inspected-before-execution, platforms-tools-jq-dot-rebinding-in-predicates, platforms-shells-redirection-order-for-a-silenced-write, platforms-tools-unicode-escape-in-a-jq-regex]
 ---
 
 # Backslash Escapes Inside a Shell String Literal Holding a Regex or Pattern
