@@ -14,6 +14,7 @@ related:
     frontend-state-client-vs-server-state,
     frontend-rendering-rerender-and-memoization,
     qa-deliverables-generated-artifacts-as-deliverable-source,
+    backend-common-realtime-websocket-sse-lifecycle,
   ]
 ---
 

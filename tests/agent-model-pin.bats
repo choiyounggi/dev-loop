@@ -3,10 +3,12 @@
 # died on a model-scoped 429, which a mandatory auditor turned into a hard
 # stop. The pins are back on purpose: each tier-graded agent now pins the model
 # and effort orchestrate's Tier to pipeline profile table names. This file
-# proves those pins, and that the 429-is-not-a-verdict
-# retry rule (re-run with the Agent tool's model override: opus, then sonnet)
-# is documented both where the auditor is invoked (loop-implement step 6.5)
-# and in each agent's own body.
+# proves those pins, the analysis/design/QA floor (claude-opus-5-5 or
+# claude-fable-5-1, effort high or above, on every base, -r1 copy and
+# plan-reviewer), and that the 429-is-not-a-verdict retry rule (re-run once
+# with the Agent tool's model override on whichever of opus and fable the 429
+# does not name, never sonnet) is documented both where the auditor is invoked
+# (loop-implement step 6.5) and in each agent's own body.
 #
 # Each structural assertion is paired with a negative control
 # (wiki/testing/quality/checks-that-cannot-pass.md): a fixture with the
@@ -48,17 +50,69 @@ step65_section() {
   done
 }
 
-@test "plan-reviewer stays unpinned so R3's second call can override its model" {
-  fm="$(frontmatter "${REPO_ROOT}/agents/plan-reviewer.md")"
-  [ -n "$fm" ]
-  [[ "$fm" != *"model:"* ]]
+# meets_floor <agent file>: true when the frontmatter pins claude-opus-5-5 or
+# claude-fable-5-1 and an effort of high, xhigh or max.
+meets_floor() {
+  local fm
+  fm="$(frontmatter "$1")"
+  [[ "$fm" == *$'\n'"model: claude-opus-5-5"$'\n'* || "$fm" == *$'\n'"model: claude-fable-5-1"$'\n'* ]] || return 1
+  [[ "$fm" =~ (^|$'\n')effort:\ (high|xhigh|max)($'\n'|$) ]]
 }
 
-@test "loop-implement step 6.5 documents the model-scoped 429 retry with the opus then sonnet override" {
+@test "plan-reviewer pins claude-opus-5-5 at high effort" {
+  fm="$(frontmatter "${REPO_ROOT}/agents/plan-reviewer.md")"
+  [[ "$fm" == *$'\n'"model: claude-opus-5-5"$'\n'* ]]
+  [[ "$fm" =~ (^|$'\n')effort:\ high($'\n'|$) ]]
+}
+
+@test "plan-reviewer and wiki-plan's review step carry the 429 retry, never sonnet" {
+  agent="$(tr '[:upper:]' '[:lower:]' < "${REPO_ROOT}/agents/plan-reviewer.md" | tr '\n' ' ')"
+  [[ "$agent" == *"not a verdict"* ]]
+  [[ "$agent" == *"whichever of \`opus\` and \`fable\` the 429 does not name"* ]]
+  review="$(awk '/^\*\*Independent review\*\*/{p=1} p && /^\*\*gate-B\*\*/{exit} p' "${REPO_ROOT}/skills/wiki-plan/SKILL.md" | tr '\n' ' ')"
+  [[ "$review" == *"plan-reviewer"* ]]
+  [[ "$review" == *"whichever of \`opus\` and \`fable\` the 429 does not name"* ]]
+  [[ "$review" == *"never retry on \`sonnet\`"* ]]
+}
+
+@test "negative control: a plan-reviewer copy with effort highfoo fails the anchored effort check" {
+  bad="${BATS_TEST_TMPDIR}/plan-reviewer-highfoo.md"
+  sed 's/^effort: .*/effort: highfoo/' "${REPO_ROOT}/agents/plan-reviewer.md" > "$bad"
+  fm="$(frontmatter "$bad")"
+  [[ "$fm" == *"effort: highfoo"* ]]
+  ! [[ "$fm" =~ (^|$'\n')effort:\ high($'\n'|$) ]]
+}
+
+@test "every analysis, design and QA agent, -r1 copies included, meets the opus-5.5-high floor" {
+  checked=0
+  for f in "${REPO_ROOT}"/agents/*.md; do
+    meets_floor "$f"
+    checked=$((checked + 1))
+  done
+  # 5 bases + 5 -r1 copies + plan-reviewer: an empty glob must not pass
+  [ "$checked" -eq 11 ]
+}
+
+@test "negative control: an agent copy dropped to effort medium fails the floor check" {
+  low="${BATS_TEST_TMPDIR}/task-planner-medium.md"
+  sed 's/^effort: .*/effort: medium/' "$AGENT4" > "$low"
+  [ -s "$low" ]
+  ! meets_floor "$low"
+}
+
+@test "negative control: an agent copy moved to a sonnet model fails the floor check" {
+  sonnet="${BATS_TEST_TMPDIR}/task-reviewer-sonnet.md"
+  sed 's/^model: .*/model: claude-sonnet-5-5/' "$AGENT3" > "$sonnet"
+  [ -s "$sonnet" ]
+  ! meets_floor "$sonnet"
+}
+
+@test "loop-implement step 6.5 documents the model-scoped 429 retry on opus or fable, never sonnet" {
   section="$(step65_section "$SKILL" | tr '[:upper:]' '[:lower:]')"
   [[ "$section" == *"429"* ]]
   [[ "$section" == *"not a verdict"* ]]
-  [[ "$section" == *"opus"*"sonnet"* ]]
+  [[ "$section" == *"whichever of \`opus\` and \`fable\` the 429 does not name"* ]]
+  [[ "$section" == *"never retry on \`sonnet\`"* ]]
 }
 
 @test "all five agent bodies carry the Coordinator note about the 429 override" {
@@ -66,7 +120,8 @@ step65_section() {
     content="$(cat "$f" | tr '[:upper:]' '[:lower:]')"
     [[ "$content" == *"429"* ]]
     [[ "$content" == *"not a verdict"* ]]
-    [[ "$content" == *"opus"*"sonnet"* ]]
+    [[ "$content" == *"whichever of \`opus\` and \`fable\` the 429 does not name"* ]]
+    [[ "$content" == *"never below opus"* ]]
   done
 }
 
@@ -97,11 +152,11 @@ step65_section() {
   [[ "$content" != *"429"* ]]
 }
 
-@test "boundary: a plan-reviewer copy pinned to a model fails the unpinned check" {
-  pinned="${BATS_TEST_TMPDIR}/plan-reviewer-pinned.md"
-  awk '/^name:/{print; print "model: fable"; next} {print}' "${REPO_ROOT}/agents/plan-reviewer.md" > "$pinned"
-  fm="$(frontmatter "$pinned")"
-  [[ "$fm" == *"model:"* ]]
+@test "boundary: a plan-reviewer copy with no model or effort pin fails the floor check" {
+  unpinned="${BATS_TEST_TMPDIR}/plan-reviewer-unpinned.md"
+  grep -vE '^(model|effort):' "${REPO_ROOT}/agents/plan-reviewer.md" > "$unpinned"
+  [ -s "$unpinned" ]
+  ! meets_floor "$unpinned"
 }
 
 @test "negative control: a task-analyst copy without its model pin fails the pin check" {

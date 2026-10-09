@@ -10,7 +10,7 @@ sources:
   - https://github.com/yonaskolb/XcodeGen/issues/515
   - https://github.com/yonaskolb/XcodeGen/issues/572
 last_verified: 2026-09-08
-related: [platforms-toolchains-environment-resync-removes-undeclared-packages, platforms-toolchains-version-management]
+related: [platforms-toolchains-environment-resync-removes-undeclared-packages, platforms-toolchains-version-management, platforms-toolchains-nextjs-16-build-output-and-tsconfig-rewrite]
 ---
 
 # Regenerating a Generator-Owned Project File That Is Also Hand-Edited

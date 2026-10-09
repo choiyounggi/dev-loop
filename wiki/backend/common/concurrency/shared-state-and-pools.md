@@ -7,7 +7,8 @@ confidence: verified
 sources:
   - https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing
   - https://docs.oracle.com/javase/tutorial/essential/concurrency/sync.html
-last_verified: 2026-07-10
+  - https://www.psycopg.org/psycopg3/docs/advanced/async.html
+last_verified: 2026-10-02
 related: [databases-transactions-isolation-level-selection, backend-common-caching-invalidation-and-stampede, backend-common-reliability-timeouts-and-retries, databases-query-optimization-n-plus-one-queries, databases-indexing-index-selection, testing-quality-sequential-dispatch-assumption-under-concurrency]
 ---
 
@@ -53,6 +54,7 @@ deadlocks or starves under load.
 |------|------|
 | Read-mostly reference data (config, feature flags) updated occasionally | Publish an immutable snapshot through an atomic reference; the writer builds a new snapshot and swaps it — readers never take a lock |
 | Storage got faster (SSD/NVMe), so the pool "can" grow | Shrink it — faster I/O means less blocking, which warrants fewer connections, not more (HikariCP) |
+| One connection or driver instance is about to be shared by several request threads (a diagnostic patch to remove per-request connect cost, a hand-rolled singleton) | First grep whether the runtime opens a transaction per request (`begin` … `commit` around the handler). When it does, the unit of exclusivity is the request: keep the instances in a blocking queue, take one at request start and return it in a `finally` after the request's commit or rollback. A lock around each driver call is released between one request's `begin` and its `commit`, so another request's `begin` lands inside the open transaction — a nested-begin error, or statements committed under the wrong request. In an experiment, classify nested-begin errors as defects of the patch and keep them out of the hypothesis's error count |
 | Single instance today, autoscaling planned | Apply the multi-instance row of the decision table now — in-process locks/dedupe silently become per-replica the day a second instance starts |
 
 ## Instead of
@@ -61,9 +63,13 @@ deadlocks or starves under load.
 |---------------------|-----------------|-----|
 | Put `synchronized`/a global lock around a hot section as the first fix | Narrow the shared state: atomics, sharded counters, immutable snapshot swap | A global lock serializes every handler — contention slows or suspends threads under exactly the load you tuned for |
 | Raise the connection pool size because requests queue for connections | Hold the pool at DB capacity and fix the slow queries → [databases-query-optimization-n-plus-one-queries], [databases-indexing-index-selection] | Past DB capacity, more connections reduce throughput — the wait moves inside the DB |
+| Make a shared connection "thread-safe" with a lock per method call | Check it out for the whole transaction (pool or queue), one holder at a time | Thread-safe calls do not make a transaction private: every user of the connection is inside the same transaction |
 | Absorb bursts with an unbounded in-memory queue | Bounded queue + fail fast when full → [backend-common-reliability-timeouts-and-retries] | Unbounded queues defer the failure to an out-of-memory crash at peak |
 
 ## Sources
 
 - https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing — `cores × 2` starting formula, more connections ≠ more throughput, SSD warrants fewer connections, deadlock minimum `Tn × (Cm − 1) + 1`
 - https://docs.oracle.com/javase/tutorial/essential/concurrency/sync.html — thread interference and memory-consistency errors from shared access; synchronization's thread-contention cost
+- https://www.psycopg.org/psycopg3/docs/advanced/async.html — "Connection objects are thread-safe: more than one thread at time can use the same connection"; "All the cursors that share the same connection will also share the same transaction. This means that, if a thread starts a transaction, every cursor on the same connection will execute their queries in the same transaction"
+- Local reproduction 2026-10-02 (Python 3.14, `sqlite3`, 8 threads × 40 requests of `BEGIN; INSERT; COMMIT` on one shared connection): a lock per `execute` call → 236 of 320 requests failed with `cannot start a transaction within a transaction`, 84 rows written; the same connection handed out through a `queue.Queue` for the whole request → 0 errors, 320 rows
+- Field evidence 2026-10-02 (an HTTP runtime that wraps each request in `begin` … `commit`, with a PostgreSQL driver that rejects a nested `begin`): a diagnostic patch sharing driver instances through a per-request checkout queue ran a 100-request smoke and three 150 rps × 90 s runs with 0 errors; the runtime's per-request `begin` and the driver's nested-begin rejection were both confirmed in source before choosing the checkout design over a per-call lock
