@@ -8,7 +8,7 @@ sources:
   - https://docs.python.org/3/library/ast.html#ast.get_source_segment
   - https://git-scm.com/docs/git-show
 last_verified: 2026-10-06
-related: [testing-quality-checks-that-cannot-pass, testing-quality-source-text-wiring-assertions, testing-quality-guard-shape-vs-consequence, testing-quality-harness-reverse-controls]
+related: [testing-quality-checks-that-cannot-pass, testing-quality-source-text-wiring-assertions, testing-quality-guard-shape-vs-consequence, testing-quality-harness-reverse-controls, testing-quality-json-manifest-edit-gates]
 ---
 
 # Proving a Named Function Is Unchanged by a Diff

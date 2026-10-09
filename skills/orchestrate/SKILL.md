@@ -380,12 +380,12 @@ revise.
 
 | | R0 trivial | R1 normal | R2 high | R3 critical |
 |---|---|---|---|---|
-| planning | wiki-plan lite | full A/B/C | full A/B/C, plan-reviewer required | R2 plus a second plan-reviewer call with a different Agent model override |
+| planning | wiki-plan lite | full A/B/C | full A/B/C, plan-reviewer required | R2 plus a second plan-reviewer call with the Agent model override `fable` |
 | analysis agent — wiki-plan Phase A, claude-fable-5-1 | `task-analyst-r1` (high) | `task-analyst-r1` (high) | `task-analyst` (xhigh) | `task-analyst` (xhigh) |
-| design agent — wiki-plan Phase B+C, claude-opus-5-5 | `task-planner-r1` (medium) | `task-planner-r1` (medium) | `task-planner` (high) | `task-planner` (high) |
+| design agent — wiki-plan Phase B+C, claude-opus-5-5 | `task-planner-r1` (high) | `task-planner-r1` (high) | `task-planner` (high) | `task-planner` (high) |
 | worker model (DEV_LOOP_WORKER_MODEL) | claude-sonnet-5-5 | claude-sonnet-5-5 | claude-sonnet-5-5 | claude-sonnet-5-5 |
-| worker effort (DEV_LOOP_WORKER_EFFORT) | medium | medium | high | high |
-| QA agents — task review and coordinator auditor cross-call, claude-fable-5-1 | `task-reviewer-r1` (medium) | `task-reviewer-r1`, `test-quality-auditor-r1` (medium) | `task-reviewer`, `test-quality-auditor` (high) | `task-reviewer`, `test-quality-auditor` (high) |
+| worker effort (DEV_LOOP_WORKER_EFFORT) | high | high | high | high |
+| QA agents — task review and coordinator auditor cross-call, claude-fable-5-1 | `task-reviewer-r1` (high) | `task-reviewer-r1`, `test-quality-auditor-r1` (high) | `task-reviewer`, `test-quality-auditor` (high) | `task-reviewer`, `test-quality-auditor` (high) |
 | final review agent — Phase 5, claude-fable-5-1, picked by the run's highest task tier | `integration-reviewer-r1` (xhigh) | `integration-reviewer-r1` (xhigh) | `integration-reviewer` (max) | `integration-reviewer` (max) |
 | brief effort_level | simple | medium | complex | complex |
 | review lenses | 1, 3 and 6 only | 1-4 and 6 | 1-6 | 1-6 plus the adversarial-change-review techniques recorded under lens 5 |
@@ -404,10 +404,14 @@ frontmatter pins, next to the model it pins. Effort lives only in an agent's
 frontmatter — the Agent tool overrides `model` per call, never `effort` — so
 each role has a base file (R3 and R2) and a generated `-r1` copy one effort
 step lower (R1 and R0); edit only the base file and re-run
-`scripts/gen-agent-tier-variants.sh`. The launch scripts hand the worker its
-effort as `CLAUDE_CODE_EFFORT_LEVEL`, not `--effort`, because a skill's
-`effort` frontmatter (loop-implement pins `high`) overrides `--effort` but not
-that variable. The variable also outranks every subagent's frontmatter, so
+`scripts/gen-agent-tier-variants.sh`. **Floor:** every analysis, design, and
+QA agent — `plan-reviewer` included, which pins claude-opus-5-5 at high —
+runs at claude-opus-5-5 or claude-fable-5-1 and at high effort or above at
+every tier, so an `-r1` copy never steps below high and the worker effort
+stays high, the level its step 6.5 self-audit inherits. The launch scripts
+hand the worker its effort as `CLAUDE_CODE_EFFORT_LEVEL`, not `--effort`,
+because a skill's `effort` frontmatter (loop-implement pins `high`) overrides
+`--effort` but not that variable. The variable also outranks every subagent's frontmatter, so
 the worker's own step 6.5 self-audit — the base `test-quality-auditor`, the
 one agent the worker prompt names — runs at the worker's level, which is the
 QA row's level at every tier; the `-r1` auditor is the coordinator's
@@ -415,9 +419,10 @@ cross-call.
 
 **A 429 is not a verdict.** When any of these agent calls fails with an HTTP
 429 naming a model limit (e.g. a Fable limit), re-run the same agent with the
-Agent tool's `model` override — `opus`, then `sonnet`, skipping the family the
-429 names — and escalate to the user after both fail. The override changes the
-model only; the agent file's effort still applies.
+Agent tool's `model` override set to whichever of `opus` and `fable` the 429
+does not name, and escalate to the user when that also fails — never retry on
+`sonnet`, which is below the floor. The override changes the model only; the
+agent file's effort still applies.
 
 For the same reason as the worker's variable, start the coordinator with
 `CLAUDE_CODE_EFFORT_LEVEL` unset: set there, it flattens every agent's pinned
@@ -864,8 +869,8 @@ reasoning-effort flags) that `worker-start` cannot express.
    first, call the profile table's file for that tier (`task-analyst-r1` /
    `task-planner-r1` at R0 and R1), and pass the tier to both agents: when R0,
    they run wiki-plan in lite mode; when R1, full Phase A/B/C; when R2 or R3, full with the
-   plan-reviewer call required (R3: a second call with a different Agent
-   model override, both verdicts recorded). In every full-mode tier the
+   plan-reviewer call required (R3: a second call with the Agent model
+   override `fable`, both verdicts recorded). In every full-mode tier the
    plan-reviewer call is yours, not the agent's — see the two-stage handshake
    below. Then re-check the plan-derived signals (size:large, no-wiki:<n>) and raise the
    tier per the Phase 2 rule before launching. A raise that changes the

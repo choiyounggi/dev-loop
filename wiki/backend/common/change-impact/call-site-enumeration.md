@@ -9,7 +9,7 @@ sources:
   - https://docs.python.org/3/library/ast.html
   - https://peps.python.org/pep-0570/
 last_verified: 2026-08-05
-related: [qa-process-regression-scope, backend-python-language-mutable-state-traps, testing-data-test-data-and-isolation, testing-quality-policy-at-several-return-sites, backend-common-change-impact-widening-a-closed-value-table, backend-common-change-impact-corpus-sweep-before-a-rejection-rule, backend-common-errors-diagnostics-from-a-shared-code-path, backend-common-change-impact-inserting-a-guard-before-an-existing-side-effect, backend-common-change-impact-sibling-validators-on-a-shared-node, security-data-masking-verification]
+related: [qa-process-regression-scope, backend-python-language-mutable-state-traps, testing-data-test-data-and-isolation, testing-quality-policy-at-several-return-sites, backend-common-change-impact-widening-a-closed-value-table, backend-common-change-impact-corpus-sweep-before-a-rejection-rule, backend-common-errors-diagnostics-from-a-shared-code-path, backend-common-change-impact-inserting-a-guard-before-an-existing-side-effect, backend-common-change-impact-sibling-validators-on-a-shared-node, security-data-masking-verification, backend-common-change-impact-threading-a-parameter-through-executor-hops]
 ---
 
 # Enumerating Call Sites Before Changing a Callee's Contract
@@ -67,6 +67,7 @@ the search never listed.
 | A test helper wraps the callee or rebuilds its data shape (a fixture builder feeding it) | Read every helper definition the enumeration surfaces and enumerate the helper's own call sites too — the helper appears once in the callee enumeration while supplying the old contract to every one of its callers ([testing-data-test-data-and-isolation]) |
 | A parameter is renamed but keeps its position and type | Keyword callers break loudly; positional callers keep working silently with the new meaning — the callee enumeration is the only search that lists them |
 | Parameters of the same type are reordered | The most dangerous shape change: every positional caller still type-checks and silently swaps values. Rename the callee or change a parameter type so the mismatch surfaces at every stale site |
+| The new parameter's value must travel through intermediate helpers (a retry wrapper, a dispatcher) before reaching the callee, and one hop is an executor `submit` | The intermediates are not callers of the changed callee — scan each function on the path for a reference to the new name it does not bind, and read an empty parallel result as a possible stored exception ([backend-common-change-impact-threading-a-parameter-through-executor-hops]) |
 | Callers forward through `*args` / `**kwargs` / a dict spread | The call site names nothing the search can match — enumerate the forwarding wrapper's definition and treat its callers as a second enumeration pass |
 | The change adds a parameter with a default | Every caller keeps compiling while silently receiving the default — enumerate and decide per site anyway, or the default becomes permanent behavior nobody chose |
 | The change reshapes a data structure rather than the parameter list | Also enumerate the structure's producers (fixtures, factories, seed files) by its field names — they are call sites of the shape, not of the function |

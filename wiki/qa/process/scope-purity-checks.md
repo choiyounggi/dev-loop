@@ -9,8 +9,13 @@ sources:
   - "Local reproduction, git 2.50.1 (Apple Git-155), 2026-08-05: collapsed `?? qa/` vs -uall per-file expansion"
   - https://bazel.build/reference/test-encyclopedia
   - "Field reproduction 2026-08-14 (dev-loop, reviews/i83-insight-emission-r1.md): a permanent bats test asserting `git status` scope failed on an unrelated uncommitted sibling file; rewritten to commit-diff evidence → 521/521"
-last_verified: 2026-08-14
-related: [testing-quality-checks-that-cannot-pass, testing-quality-harness-reverse-controls, testing-quality-history-dependent-checks-on-shallow-clones, infrastructure-agent-orchestration-worktree-isolated-workers]
+  - https://git-scm.com/docs/gitignore
+  - https://git-scm.com/docs/git-rev-parse
+  - https://git-scm.com/docs/git-check-ignore
+  - "dev-loop skills/loop-implement/SKILL.md, Gates ledger: step 0 writes `.dev-loop/gates/<task-id>.md`, step 7 and the Stop hook read it"
+  - "Local reproduction 2026-10-08 (git 2.50.1, repo + linked worktree): `.dev-loop/` ledger shown as untracked, then hidden via `info/exclude` with no tracked change"
+last_verified: 2026-10-08
+related: [testing-quality-checks-that-cannot-pass, testing-quality-harness-reverse-controls, testing-quality-history-dependent-checks-on-shallow-clones, infrastructure-agent-orchestration-worktree-isolated-workers, platforms-toolchains-agent-files-written-by-next-dev]
 ---
 
 # Proving Scope Purity from `git status` Output
@@ -20,7 +25,7 @@ related: [testing-quality-checks-that-cannot-pass, testing-quality-harness-rever
 You must prove that a change, session, or agent run touched nothing outside an
 allowed path set by filtering `git status --porcelain` lines; a purity gate
 reports a violation on a line like `?? qa/` for a directory that is wholly in
-scope; you are writing such a gate for an orchestration/CI workflow; or a
+scope, or on state the run's own tooling wrote (`?? .dev-loop/`); you are writing such a gate for an orchestration/CI workflow; or a
 purity check that lives in a **permanent test suite** fails on files the
 developer happens to have uncommitted.
 
@@ -68,6 +73,9 @@ developer happens to have uncommitted.
 | Purity must also cover ignored artifacts (build outputs, caches) | `git status` omits ignored files entirely; add `--ignored=matching` to list paths matching ignore patterns |
 | Gate runs in a fresh worktree/clone | Config differences travel with `$HOME`, not the repo — the explicit `-uall` flag is still required |
 | A purity check in a permanent suite went red on a teammate's unrelated WIP file | The failure indicts the runner's tree, not the change under test — move the check to commit-diff evidence (Do #4) or out of the suite into a one-shot workflow gate |
+| The run's own tooling writes untracked state into the tree it gates — dev-loop's `.dev-loop/gates/<task-id>.md` ledger (loop-implement step 0), which step 7 and the Stop hook still read | Before the first gate run, test a file inside it: `git check-ignore -q .dev-loop/gates/<file>` (without `--no-index`, which also reports a tracked file as ignored although `--porcelain` still lists it). Exit 0: it is ignored and stays out of `--porcelain`. Exit 1: add the directory to the gate's allowed set, or append it to the file `git rev-parse --git-path info/exclude` prints — that file is untracked and shared by every worktree of the repository, so the fix adds nothing to the change set. Keep the ledger in place |
+| The gate also lists ignored files (`--ignored=matching`) | Tool state hidden through `info/exclude` comes back as `!! .dev-loop/`; keep that directory in the allowed set as well |
+| A dev server or generator that ran during the session wrote files nobody asked for (`next dev` under an AI agent writes `AGENTS.md`/`CLAUDE.md`) | Attribute each unexpected path to the command that wrote it before you call it a violation or delete it ([platforms-toolchains-agent-files-written-by-next-dev]) |
 
 ## Instead of
 
@@ -77,6 +85,7 @@ developer happens to have uncommitted.
 | Rely on the repo's ambient untracked-files default | Pass `-uall` explicitly in the gate script | `status.showUntrackedFiles=no` in any user config hides untracked files and turns the gate into a rubber stamp |
 | Adopt the gate after seeing it fail once on real output | Run known-in-scope and planted-out-of-scope controls | Every mistyped filter also produces a failing run; only the pass/fail pair shows the gate discriminates |
 | Assert `git status` output in a permanent test suite | Prove scope from the introducing commit's own diff, or skip when the environment cannot answer | The ambient tree is whoever-runs-it's in-progress state — an undeclared dependency that makes results non-reproducible |
+| Delete the tool's ledger directory, or add it to the tracked `.gitignore` inside a scoped task, to turn the gate green | Hide it through `git rev-parse --git-path info/exclude` or allow it for this run; commit the `.gitignore` line as its own change | The ledger is still read for the final verdict, and a `.gitignore` edit is itself a tracked change outside the allowed set |
 
 ## Sources
 
@@ -84,3 +93,9 @@ developer happens to have uncommitted.
 - Local reproduction (git 2.50.1, 2026-08-05): scratch repo with `qa/cases/x/{a,b}.md`; default porcelain printed the single line `?? qa/`, which a `^\?\? qa/…` per-file filter treated as a violation; `-uall` expanded to three file lines and the filter passed
 - https://bazel.build/reference/test-encyclopedia — "Tests should be hermetic: that is, they ought to access only those resources on which they have a declared dependency"; "If tests are not properly hermetic then they do not give historically reproducible results"
 - Field reproduction 2026-08-14 (dev-loop, reviews/i83-insight-emission-r1.md): a permanent bats test asserted working-tree purity via `git status` and failed spuriously on an uncommitted sibling file; rewritten to prove scope from the introducing commit's diff → suite back to 521/521
+- https://git-scm.com/docs/gitignore — patterns "specific to a particular repository but which do not need to be shared with other related repositories (e.g., auxiliary files that live inside the repository but are specific to one user's workflow) should go into the `$GIT_COMMON_DIR/info/exclude` file"
+- https://git-scm.com/docs/git-rev-parse — `--git-path <path>`: "Resolve "$GIT_DIR/<path>" and takes other path relocation variables … into account"
+- dev-loop `skills/loop-implement/SKILL.md`, "Gates ledger": step 0 writes `.dev-loop/gates/<task-id>.md`; step 7 runs `gate-check.sh --run` on it; the Stop hook parses the ledgers and blocks the session from ending while gates are unmet
+- Local reproduction 2026-10-08 (git 2.50.1, a repository plus one linked worktree): a ledger at `.dev-loop/gates/15-x.md` printed `?? .dev-loop/` (default) and `?? .dev-loop/gates/15-x.md` (`-uall`), `check-ignore` exit 1. From the worktree, `git rev-parse --git-path info/exclude` printed the main repository's `.git/info/exclude`; after appending `.dev-loop/` there, `--porcelain -uall` printed 0 lines in the worktree and in the main checkout, `check-ignore -v` named `info/exclude:7` (exit 0), and `--ignored=matching` printed `!! .dev-loop/`
+- https://git-scm.com/docs/git-check-ignore — "By default, tracked files are not shown at all since they are not subject to exclude rules; but see '--no-index'." Reproduced 2026-10-08 (git 2.50.1): a committed `.dev-loop/gates/1.md` under an `info/exclude` rule exited 0 with `--no-index` and 1 without it, and `git status --porcelain` listed it as ` M`; an untracked file in the same directory exited 0 without `--no-index`
+- Field case 2026-10-07 (a dev-loop task worktree in a Next.js project): `git check-ignore -q --no-index .dev-loop/gates/15-zod.md` exited 1, and feeding the line `?? .dev-loop/` through the plan's porcelain filter printed `.dev-loop/` as out of scope

@@ -7,8 +7,9 @@ confidence: verified
 sources:
   - https://use-the-index-luke.com/no-offset
   - https://www.postgresql.org/docs/current/queries-limit.html
-last_verified: 2026-07-10
-related: [databases-indexing-composite-index-column-order, databases-query-optimization-streaming-large-result-sets]
+  - https://www.sqlite.org/rowvalue.html
+last_verified: 2026-10-04
+related: [databases-indexing-composite-index-column-order, databases-query-optimization-streaming-large-result-sets, databases-schema-design-nullability-and-defaults]
 ---
 
 # Paginating Large Result Sets
@@ -41,6 +42,7 @@ Implementation rules for keyset:
 |------|------|
 | Rows inserted/deleted between page fetches | Keyset stays consistent relative to the cursor (no skips/repeats at the boundary); OFFSET shifts silently — another reason deep OFFSET pagination corrupts exports |
 | Descending order | Flip both the comparison and the index direction: `WHERE (k, id) < (...) ORDER BY k DESC, id DESC` |
+| Sort key is nullable | Order by `(k IS NULL), k, id` and encode the cursor as `(k_is_null, k, id)`. Branch the predicate on the cursor: from a present cursor `k IS NULL OR (k, id) > (:k, :id)`, from a missing cursor `k IS NULL AND id > :id`. A row-value comparison whose first element is NULL is NULL, so `(k, id) > (NULL, :id)` returns no rows and pagination stops at the first missing row (reproduced on SQLite 3.51.0: count 0). For DESC (`ORDER BY (k IS NULL), k DESC, id DESC`) flip both branches: `k IS NULL OR (k, id) < (:k, :id)` and `k IS NULL AND id < :id` (both directions walked page by page against the full order on SQLite 3.51.0). Nulls-last order across engines is in [databases-schema-design-nullability-and-defaults] |
 | Sort key is a timestamp with duplicates | The `id` tiebreaker is mandatory, not optional — timestamp-only cursors lose rows created in the same instant |
 | MySQL row-value comparison `(a,b) > (?,?)` | Optimizes poorly on some versions; rewrite as `a > ? OR (a = ? AND b > ?)` and verify the plan uses the index range |
 | Total count display ("Page 1 of 3,514") | Serve counts from an estimate or cached aggregate; an exact `COUNT(*)` per page view costs a full scan of the filtered set |
@@ -50,3 +52,4 @@ Implementation rules for keyset:
 
 - https://use-the-index-luke.com/no-offset — keyset pagination rationale and patterns
 - https://www.postgresql.org/docs/current/queries-limit.html — LIMIT/OFFSET semantics
+- https://www.sqlite.org/rowvalue.html — "The overall result of comparison is NULL if it is possible to make the result either true or false by substituting alternative values in place of the constituent NULLs"

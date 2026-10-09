@@ -285,9 +285,10 @@ REASONS: ...
   weakening tests), increment the attempt count, and loop back to step 3.
 - The Agent call itself fails with an HTTP 429 that names a model limit (e.g.
   "You've reached your <model> limit") -> this is NOT a verdict (issue #200):
-  re-run the identical call with the Agent tool's `model` parameter set to
-  `opus`; if that also 429s, once more with `sonnet`; after those two retries
-  report BLOCKED instead of guessing a verdict.
+  re-run the identical call once with the Agent tool's `model` parameter set
+  to whichever of `opus` and `fable` the 429 does not name; if that also 429s,
+  report BLOCKED instead of guessing a verdict — never retry on `sonnet`, which
+  is below the auditor's claude-opus-5-5 high floor.
 
 Floor passed != quality passed — the auditor still rules on semantic quality
 even when the floor came back clean.

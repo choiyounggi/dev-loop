@@ -11,7 +11,7 @@ sources:
   - https://playwright.dev/docs/api/class-page#page-emulate-media
   - https://tailwindcss.com/docs/theme
 last_verified: 2026-10-06
-related: [frontend-design-design-system-lint-gate-for-agents, frontend-design-custom-property-values-read-from-script]
+related: [frontend-design-design-system-lint-gate-for-agents, frontend-design-custom-property-values-read-from-script, frontend-design-two-theme-computed-color-comparison]
 ---
 
 # A Pass/Fail Theme-Swap Check Instead of Screenshot Eyeballing
@@ -118,7 +118,7 @@ Evidence (playwright-core 1.63.0, Chrome, 2026-10-06; "followed" counts properti
 | Hover, focus, or an open state | A resting-state read does not reach them. Drive the state first (`page.hover()`, `page.focus()`, open the menu) on the touched components, or list them as out of scope in the report |
 | Images, `<canvas>`, `background-image`, shadow DOM | `getComputedStyle` does not read their pixels. List them as out of scope; for a pixel check, have a subagent diff screenshots and return text to the coordinator |
 | A browser other than Chrome/Chromium | Run it on Chrome (`channel: 'chrome'`): enumerating `:root` custom properties through `getComputedStyle(documentElement)` was verified only there |
-| The accent is declared in `oklch()` or another non-sRGB function | Keep the canvas compare: a hex copy of the same color reads back as `rgb()`, never as `oklch()`, so a string compare misses it |
+| The accent is declared in `oklch()` or another non-sRGB function | Keep the canvas compare: a hex copy of the same color reads back as `rgb()`, never as `oklch()`, so a string compare misses it. Keep the `[` `]` around each tuple too: undelimited, `123,23,23,255` (`#7b1717`) contains `23,23,23,255` (`#171717`), so a substring match reports a different color as a hardcoded accent copy (seen as 2 stuck instead of 1 in the real-project run; reproduced with `String.prototype.includes` in node) |
 
 ## Instead of
 
