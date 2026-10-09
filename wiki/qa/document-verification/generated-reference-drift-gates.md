@@ -17,6 +17,7 @@ related:
     backend-common-api-design-unenforced-declarations,
     testing-quality-tests-that-cannot-fail,
     testing-quality-key-order-in-serialized-goldens,
+    platforms-tools-per-call-subagent-effort,
   ]
 ---
 

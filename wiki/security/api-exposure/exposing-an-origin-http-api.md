@@ -10,7 +10,7 @@ sources:
   - https://www.starlette.io/middleware/
   - https://fastapi.tiangolo.com/tutorial/metadata/#docs-urls
 last_verified: 2026-07-11
-related: [security-input-validation-at-trust-boundaries, backend-common-api-design-error-responses]
+related: [security-input-validation-at-trust-boundaries, backend-common-api-design-error-responses, infrastructure-containers-published-ports-bind-all-interfaces]
 ---
 
 # Exposing an Origin HTTP API to the Public Internet

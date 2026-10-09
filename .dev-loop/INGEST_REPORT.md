@@ -1,68 +1,95 @@
-# Knowledge flush — 1 insight (1 new page, 4 back-links, 7 plan-gaps retired as local-layer)
+# Knowledge flush — 1 insight(s)
+
+A review's "also assert X" fix that edits an existing test block can delete the assertion other mutants depended on, and re-running only the named mutant hides that. **1 page amended (new step 6), 0 new pages, 1 back-link. 7 plan-gaps retired as local-layer, 0 dropped.**
+
+Claimed 8 queue rows (run `20261008-124951-26572`): 1 harvested ★ Insight (`4614be6ce89cc5c5`) and 7 wiki-plan `[no-wiki]` plan-gap rows from linkly task t216.
 
 ## Verified best-practice
 
-**Insight `e752ed422e090759`** — when rebuilding a dict that serializes into a committed golden file (JSON/OpenAPI), assign keys in the order the old literal used, then regenerate and byte-compare every golden, not only the ones a test pins.
+**`4614be6ce89cc5c5` — keep the block's assertions, then re-run every mutant it covers** (confidence: **verified**)
 
-Sources checked (each quote extracted from the fetched page on 2026-10-04):
+Claim: when a review's "also assert X" fix lands in an existing test block, put the new assertion beside the block's existing ones (a different input or environment gets its own case), diff the block's assertion lines before and after, and re-run every mutant the block covers, comparing each verdict with the pre-edit run. Re-running only the named mutant cannot see the mutants that an assertion removed by the edit used to kill.
 
-- https://docs.python.org/3/library/stdtypes.html#mapping-types-dict — "Dictionaries compare equal if and only if they have the same (key, value) pairs (regardless of ordering)"; "Dictionaries preserve insertion order"; "Changed in version 3.7: Dictionary order is guaranteed to be insertion order".
-- https://docs.python.org/3/library/json.html — "This module's encoders and decoders preserve input and output order by default"; `sort_keys` "is useful for regression tests to ensure that JSON serializations can be compared on a day-to-day basis".
-- https://www.rfc-editor.org/rfc/rfc8259#section-4 — "An object is an unordered collection"; §9 says parsers differ on whether they expose member order.
-- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify — properties are visited "using the same algorithm as Object.keys()".
+Sources — each quote compared character-for-character against the raw page with `curl` + `/usr/bin/grep` on 2026-10-08:
 
-Reproduction (Python 3 + Node, 2026-10-04): the same keys assigned with `additionalProperties` before `required` gave `old == new` True, `json.dumps` bytes equal **False**, and bytes equal True with `sort_keys=True`. Node gave `JSON.stringify` bytes equal false. `JSON.stringify({b:1,"2":1,a:1,"1":1})` printed `{"1":1,"2":1,"b":1,"a":1}`, which backs the integer-like-key edge row.
+- https://stryker-mutator.io/docs/stryker-js/incremental/ (raw source: `docs/incremental.md` in stryker-js) — "Reuse is possible when: A mutant was "Killed"; the culprit test still exists, and it didn't change." The runner table decides whether a test edit is seen at all: Jest, Vitest, CucumberJS "Full"; Mocha, Tap "Stryker assumes all tests inside a file changed when that file changed"; Jasmine, Karma "Stryker will only see test changes for tests that are added or removed"; Command "will only detect changes in mutants, not their tests"; "Static mutants don't have test coverage; thus, Stryker won't detect test changes for them"; `--force` reruns "all mutants in scope, regardless of the incremental file".
+- https://pitest.org/quickstart/incremental_analysis/ — "If a mutation was killed in the last run and neither the class under test or the killing test has changed, then it can be assumed that this mutation is still killed."; for a changed killing test, "it is likely that the last killing test will still kill it and it should therefore be prioritised above others."
 
-Confidence: **verified**.
+Both tools keep a "Killed" verdict only while its killing test is unchanged. Step 6 applies that rule by hand, and the new edge row covers the Stryker runners that cannot see an in-place edit.
 
-Review round (fresh-context adversarial reviewer, verdict CHANGES, no blockers): I re-checked each finding before applying it.
-- First-insertion position under reassign and `{**a, **b}` merge: reproduced, edge row added.
-- `asdict` field order: reproduced, edge row added.
-- `OrderedDict` equality is order-sensitive: quoted from collections docs, source added.
-- JS array-index rule: the ECMAScript 10.1.11.1 OrdinaryOwnPropertyKeys text was extracted from https://tc39.es/ecma262/. `"4294967295"` / `"01"` / `"-1"` / `"1.5"` keeping insertion order was reproduced in Node. Item 1 and the edge row were rewritten to match.
-- The equal-parsed-objects row now names formatting as a second cause.
-- `git status --porcelain` was added to catch a new untracked golden.
-- RFC §9 and `json.JSONEncoder` anchors were split into their own sources.
-- The trigger was widened to match the index row's sorted-keys clause.
-- The reviewer's PyYAML-sorts-by-default claim could **not** be verified here (PyYAML not installed, no doc fetched). The YAML/TOML row therefore says to read the writer's docs and byte-compare, and states no default.
+Local reproduction (Node 26.7.0, `node:test`; one fresh directory per test variant × mutant; each `sed` mutation checked as applied with `cmp`):
 
-After the fixes: body 73 lines, structure checks 0 findings, prohibition lint 0 violations.
+| Test block | Unmutated | N0 no-op control | N1 `'debug'`→`'info'` | N2 `42`→`0` | A21 `=== 'production'`→`=== 'prod'` (named mutant) |
+|---|---|---|---|---|---|
+| Before the fix | pass | survived | killed | killed | survived |
+| Fix that rewrites the block for `'production'` | pass | survived | **survived** | **survived** | killed |
+| Fix that adds the `'production'` assertions beside the old ones | pass | survived | killed | killed | killed |
+
+The before/after assertion-line diff named both lines the rewrite removed (`assert.equal(c.logLevel, 'debug')`, `assert.equal(c.seed, 42)`) and none for the additive fix. The scratch directory was deleted after the run.
+
+Field evidence (originating session, linkly-invitation task t2 Task 06 attempt 4; not re-run here): swapping the block's `NODE_ENV=test` assertion for a production one killed A9 and A21 while N1–N3 survived with 4/4 tests passing; re-adding the two removed lines killed them.
+
+**7 plan-gap rows (t216)** — not researched as general practice: every directive names linkly's own modules (`impl/lnpl/lower.py`, `spec._check_given`, the `CODES`/`SEVERITY_OF`/`HINTS` registry, RFC numbering), so all seven fail the layer test. No confidence is claimed for them.
 
 ## Existing-layer check
 
-Pages read: testing-quality-value-preserving-refactor-assertions, testing-quality-schema-additions-under-a-golden-gate, qa-document-verification-generated-reference-drift-gates, testing-quality-stale-artifact-baselines, testing-quality-behavior-not-implementation
+Route: `INDEX.md` → testing ("cases/assertions", "verifying tests can actually fail") → `wiki/testing/index.md` → quality; qa ("acting on code-review feedback") checked as well.
 
-- `wiki_search` top-5 for the trigger: `backend-python-language-dict-subclass-attribute-loss-on-copy` (4 chunks) and `backend-python-language-mutable-state-traps`. Neither covers this situation: one is about attribute loss when copying a dict subclass, the other about module-global state.
-- `generated-reference-drift-gates` has one edge row on *unstable* ordering: "churn on every run (timestamps, dict ordering)". This insight is different. The order here is deterministic, but a refactor changed it. The page also covers byte-comparing all outputs vs. only pinned ones. No conflict.
-- `value-preserving-refactor-assertions` covers a literal→config refactor whose rendered output stays byte-identical. Adjacent, but its directive is about choosing a sentinel assertion, not about serialization order. No conflict.
-- `behavior-not-implementation` (snapshot section) and `schema-additions-under-a-golden-gate` / `stale-artifact-baselines` are adjacent golden-file pages. No overlap.
-- Decision: **new page** `testing-quality-key-order-in-serialized-goldens`. Back-links added on value-preserving-refactor-assertions, schema-additions-under-a-golden-gate, stale-artifact-baselines, generated-reference-drift-gates. The behavior-not-implementation back-link is **deferred**, because open PR #223 rewrites that file.
-- Lint: `node scripts/wiki-structure-checks.js wiki/` → `pages: 356, indexes: 13, findings: 0` (355 on origin/main + 1 new). `node scripts/wiki-lint-prohibitions.js wiki/` → `violations: 0`.
+Pages read: testing-quality-surviving-mutant-equivalence-triage, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, qa-process-evaluating-review-feedback, testing-quality-policy-at-several-return-sites, testing-mocking-captured-call-arguments, testing-quality-minimum-case-set, testing-quality-expectation-sets-with-one-distinct-value, backend-common-errors-diagnostics-from-a-shared-code-path
+
+- `wiki_search` (k=5) on the candidate's trigger: policy-at-several-return-sites 0.768, surviving-mutant-equivalence-triage 0.763 and 0.725, captured-call-arguments 0.737, minimum-case-set 0.735. Only surviving-mutant-equivalence-triage shares the trigger — its "When this applies" already names "a reviewer asks for a test to cover a specific surviving mutant".
+- Whole-wiki search (`/usr/bin/grep` over every page): 46 pages mention mutants; none covers an edit that removes an assertion other mutants depended on. Three pages direct re-running the targeted mutant after adding a case or assertion (tests-that-cannot-fail, expectation-sets-with-one-distinct-value, policy-at-several-return-sites); none of them covers an edit that removes an existing assertion, so step 6 extends them and contradicts none. They are left unchanged to keep this diff small.
+- **Merged, not created**: surviving-mutant-equivalence-triage gains step 6 with a verdict table, 4 edge rows (Stryker incremental reuse by runner, a hand-rolled mutation script, a deliberate replacement, a survivor whose kill does not reproduce on the pre-edit block), 1 Instead-of row, 4 Sources lines, a "When this applies" clause and a step-1 pointer. Body: 115 lines (117 once #226 merges; limit 120 — the next addition to this page needs a split).
+- Related: added testing-quality-mutation-harness-file-custody (its step 6, "re-run the whole matrix" after a custody fix, is the same principle; it already links back, so the link is now two-way). The evaluating-review-feedback ↔ this-page link is already in open PR #226 and is not duplicated here.
+- Conflicts with existing directives: none flagged.
+- `wiki/testing/index.md`: the page's "load when" row now names the new use case (maintenance invariant 1).
+- `last_verified` stays 2026-08-07: open PR #226 bumps that exact line, and a second bump would add a merge conflict; the new claims carry dated sources.
+- Checks on this branch: `node scripts/wiki-structure-checks.js wiki` → `pages: 359, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line, in infrastructure/config/keys-ahead-of-their-consumer.md); no banned vague qualifier in any added line.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed: #235 (20261003-220951), #234 (20261002-160836), #233 (20261001-150222), #231 (20260928-191901), #230 (20260928-155239), #229 (20260928-145025), #228 (20260928-134840), #227 (20260928-103056), #226 (20260928-092831), #225 (20260928-082803), #223 (20260927-220735).
+26 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253–#260), listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`. For each head, the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for the candidate's concepts (removed or replaced assertions, re-running all mutants, reviewer/auditor fixes, "also assert"), and every added line mentioning mutants was read.
 
-Each head's `git diff origin/main origin/<head> -- wiki/` added lines were grepped for `golden|insertion order|sort_keys|key order|json.dumps|byte-identical|byte-compare`. Only #225 and #223 matched, one line each, and both matches are `related:` lists that mention `testing-quality-schema-additions-under-a-golden-gate`. Neither adds content about key order or golden regeneration.
+| Candidate | Overlapping open PR | Verdict |
+|---|---|---|
+| 4614be6ce89cc5c5 | None carries it. #226 edits the same page for a different situation (a survivor reported inside a PASS audit); #258 (additive mutants vs presence checks) and #259 (schema key coverage) are different situations | **new** |
+| 7 × t216 plan-gaps | No open PR body mentions t216 (all 26 bodies searched) | **new** → local layer |
 
-Verdict for `e752ed422e090759`: **new**.
-
-The 7 plan-gap rows are project-specific (see Local-layer candidates), so no open-PR check applies to them.
+Merge check (`git merge-tree --write-tree`, this branch against each head): no wiki page conflicts, including #226, whose four hunks on the shared page were avoided. Every head conflicts on `log.md` and the older ones also on this report file — the same two files the open PRs already conflict on with each other (#260 vs #259 and #255 vs #254 checked).
 
 ## Routing decision
 
-- `e752ed422e090759` → `wiki/testing/quality/key-order-in-serialized-goldens.md` (domain testing, category quality — the category that already holds the golden/snapshot assertion pages). No new category. The row is added to the `quality` table in `wiki/testing/index.md`, and a `log.md` entry is appended.
+| Candidate | Layer | Target | Action |
+|---|---|---|---|
+| 4614be6ce89cc5c5 | bundled | `testing/quality/surviving-mutant-equivalence-triage.md` | merged as step 6 |
+| 7 × t216 plan-gaps | local (linkly) | see Local-layer candidates | excluded from this PR, retired from the queue |
+
+No new category: testing/quality already holds the mutation-testing pages, and the target page's trigger covers this situation.
+
+## Independent review
+
+A fresh-context adversarial reviewer (a separate subagent, read-only on this checkout) re-fetched both sources, rebuilt the reproduction from its description (same matrix observed on Node 26.7.0) and re-ran both lint scripts. Verdict: CHANGES_REQUESTED, resolved before this PR:
+
+| Finding | Resolution |
+|---|---|
+| Step 6 said a "Killed" result is reused "only while its killing test is unchanged", dropping conditions both tools state (Stryker: the culprit test still exists; PIT: the class under test is unchanged too) | Fixed: "With the source untouched, PIT and Stryker apply the same rule: they reuse a "Killed" result only while its killing test still exists unchanged." |
+| The log line understated #226's overlap — it also edits this page's related list, Edge table and Sources, so merging it would need reconciliation in four places | Checked and not reproduced: `git merge-tree --write-tree` of this branch with #226 conflicts only in `log.md` and this report file, and the merged page carries 0 conflict markers. The log line now names #226's other three hunks and records that they merge cleanly |
+| Gap: a flaky mutant reads as lost coverage in step 6's table | Added an edge row: when a previously killed mutant survives while the assertion diff shows nothing removed, re-run it against the pre-edit block first; surviving there too marks a flaky verdict (testing-flaky-diagnosing-flaky-tests) |
+
+Kept: the reviewer's routing note (step 6's hygiene theme also sits near tests-that-cannot-fail) — the merge target stays, because this page's trigger already owns "a reviewer asks for a test to cover a specific surviving mutant" and the step-1 table now points into step 6.
 
 ## Local-layer candidates
 
-All 7 rows come from `plan-gaps.jsonl` and are linkly planning decisions (t201, t205). Each names linkly's own files and conventions, so it would be wrong in another codebase. They are excluded from this PR and retired. To keep any of them, run wiki-ingest inside that project.
+| Row | Project | Target |
+|---|---|---|
+| Planning t216: deciding Where the check runs | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-spec-result-reads-input-check-site.md — run wiki-ingest inside that project |
+| Planning t216: deciding Which names an expect line asserts on | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-expect-result-candidate-names.md — run wiki-ingest inside that project |
+| Planning t216: deciding Condition (a): the bare name is a respond field | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-field-condition.md — run wiki-ingest inside that project |
+| Planning t216: deciding Condition (b): a same-name respond term wins | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-term-precedence.md — run wiki-ingest inside that project |
+| Planning t216: deciding Condition (c): given did not set the input | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-given-setter-suppression.md — run wiki-ingest inside that project |
+| Planning t216: deciding Severity, registry position, hint | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-diagnostic-code-registration.md — run wiki-ingest inside that project |
+| Planning t216: deciding RFC | linkly (linkly-dartfish worktree) | wiki-local/qa/document-verification/t216-no-rfc-for-warning-only-code.md — run wiki-ingest inside that project |
 
-| Hash | Decision | Target |
-|------|----------|--------|
-| 1dbdd7273430a837 | t201 `policy retry` effect on a write-conflict | linkly-vendace `wiki-local/backend/reliability/retry-on-write-conflict.md` |
-| 97b558dfdc04da2d | t201 `openapi.py` 409 description + 6 example goldens | linkly-vendace `wiki-local/backend/api-design/openapi-409-description.md` |
-| 4d49fc2224f86910 | t201 deterministic two-run interleaving test via `_OnceStolenDriver` | linkly-vendace `wiki-local/testing/strategy/once-stolen-driver-interleaving.md` |
-| 28ae85b20be137ec | t205 `doctor.sh` digest-mismatch check | linkly-vendace `wiki-local/platforms/tools/doctor-digest-mismatch.md` |
-| d198c2fbe1b3a24d | t205 MCP launcher startup stderr line | linkly-vendace `wiki-local/platforms/tools/mcp-launcher-stderr-line.md` |
-| 6a7226ec3bf50dc0 | t205 `docs/RELEASING.md` post-release dev-version paragraph | linkly-vendace `wiki-local/infrastructure/release/post-release-dev-version.md` |
-| fa92bb280ede406b | t205 `cli-surface.md` capabilities doc update | linkly-vendace `wiki-local/platforms/tools/cli-surface-capabilities-doc.md` |
+All seven are wiki-plan Phase B decisions naming linkly's own modules; they are excluded from this PR and retired from the queue.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

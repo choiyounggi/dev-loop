@@ -102,6 +102,7 @@ suite reported as covered, or you are auditing a suspiciously green suite.
 | Several sessions or agents mutate the same working tree | Each one keeps its own hashed copy and restores before handing the tree on; a shared `git checkout --` discards whichever uncommitted work landed most recently |
 | The change under test moved a literal into config/SSOT without changing the value | No observation of the output can separate the two versions — assert the dependency by substituting the constant with a sentinel ([testing-quality-value-preserving-refactor-assertions]) |
 | The subject returns a composite and the assertions read one field | Diff the returned field list against the fields assertions mention, then mutate each unread field and add the invariant that binds them ([testing-quality-unasserted-return-fields]) |
+| The output is a fixed markup contract and its assertions are presence checks (`toHaveClass('a')`, `toHaveAttribute`) | Presence checks redden only on removal; assert exact sets and prove each with an additive mutant ([testing-quality-markup-contract-assertions]) |
 | The "before" side of a comparison is a previously published output file | Date its generation from its schema fields and compare row by row before citing it; matching totals do not establish matching rows ([testing-quality-stale-artifact-baselines]) |
 
 ## Instead of

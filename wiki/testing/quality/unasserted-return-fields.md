@@ -11,7 +11,7 @@ sources:
   - https://hypothesis.works/articles/what-is-property-based-testing/
   - https://abseil.io/resources/swe-book/html/ch12.html
 last_verified: 2026-09-04
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-harness-reverse-controls, testing-quality-write-path-assertions, testing-quality-value-preserving-refactor-assertions, testing-quality-expectation-sets-with-one-distinct-value, testing-mocking-what-to-mock]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-harness-reverse-controls, testing-quality-write-path-assertions, testing-quality-value-preserving-refactor-assertions, testing-quality-expectation-sets-with-one-distinct-value, testing-mocking-what-to-mock, testing-quality-markup-contract-assertions]
 ---
 
 # Return Fields No Assertion Reads

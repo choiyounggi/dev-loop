@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://attack.mitre.org/techniques/T1036/005/
 last_verified: 2026-08-13
-related: [security-incident-response-verifying-assumed-security-agents]
+related: [security-incident-response-verifying-assumed-security-agents, platforms-processes-signalling-a-remembered-pid]
 ---
 
 # A Suspicious Process Whose Name Matches a Legitimate System Daemon

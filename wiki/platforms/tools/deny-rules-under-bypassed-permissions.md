@@ -9,7 +9,7 @@ sources:
   - https://code.claude.com/docs/en/permissions
   - https://code.claude.com/docs/en/hooks
 last_verified: 2026-10-01
-related: [platforms-tools-agent-permission-classifier-denials, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, backend-common-llm-binding-instructions-for-agents, testing-quality-checks-that-cannot-pass]
+related: [platforms-tools-agent-permission-classifier-denials, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, backend-common-llm-binding-instructions-for-agents, testing-quality-checks-that-cannot-pass, platforms-tools-hook-config-lookup-from-shell-cwd]
 ---
 
 # Blocking One Command Class for a Worker That Runs With Permissions Bypassed
