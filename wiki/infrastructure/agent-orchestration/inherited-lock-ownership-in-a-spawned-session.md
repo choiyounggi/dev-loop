@@ -9,7 +9,7 @@ sources:
   - https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html
   - https://www.gnu.org/software/make/manual/html_node/Job-Slots.html
 last_verified: 2026-09-18
-related: [backend-common-concurrency-distributed-locks, backend-common-jobs-scheduled-job-overlap, infrastructure-agent-orchestration-shared-run-state, testing-data-test-data-and-isolation]
+related: [backend-common-concurrency-distributed-locks, backend-common-jobs-scheduled-job-overlap, infrastructure-agent-orchestration-shared-run-state, testing-data-test-data-and-isolation, platforms-processes-lock-owner-pid-from-the-holding-process]
 ---
 
 # Lock Ownership Inherited by a Spawned Session
