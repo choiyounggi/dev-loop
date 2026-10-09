@@ -9,7 +9,7 @@ sources:
   - https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html
   - https://12factor.net/config
 last_verified: 2026-09-03
-related: [infrastructure-config-environment-config, platforms-processes-background-services, platforms-environment-path-resolution, backend-python-boundaries-runtime-validation, backend-node-boundaries-runtime-validation, infrastructure-agent-orchestration-gate-evidence-exit-code-class]
+related: [infrastructure-config-environment-config, platforms-processes-background-services, platforms-environment-path-resolution, backend-python-boundaries-runtime-validation, backend-node-boundaries-runtime-validation, infrastructure-agent-orchestration-gate-evidence-exit-code-class, platforms-filesystems-trailing-separator-under-realpath]
 ---
 
 # A Config Value That Is a Filesystem Path

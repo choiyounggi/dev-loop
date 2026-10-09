@@ -8,8 +8,11 @@ sources:
   - https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html
   - https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html
   - https://vladmihalcea.com/spring-transaction-best-practices/
-last_verified: 2026-07-10
-related: [backend-java-jpa-raw-jdbc-inside-a-jpa-transaction, backend-common-jobs-idempotent-handlers, backend-common-errors-exception-handling, databases-transactions-isolation-level-selection]
+  - https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/support/TransactionSynchronization.html
+  - https://docs.djangoproject.com/en/5.2/topics/db/transactions/
+  - https://www.postgresql.org/docs/current/sql-commit.html
+last_verified: 2026-10-04
+related: [backend-java-jpa-raw-jdbc-inside-a-jpa-transaction, backend-common-jobs-idempotent-handlers, backend-common-errors-exception-handling, databases-transactions-isolation-level-selection, testing-quality-store-assertions-after-a-rolled-back-run]
 ---
 
 # Transaction Boundaries in Application Code
@@ -19,7 +22,9 @@ related: [backend-java-jpa-raw-jdbc-inside-a-jpa-transaction, backend-common-job
 Deciding where a DB transaction starts and ends in application code — service
 methods, `@Transactional`-style annotations or decorators. Also when debugging
 partial writes, a "transaction silently marked as rollback-only" error, or
-connection-pool exhaustion around open transactions.
+connection-pool exhaustion around open transactions. Also when a response or
+report value is assembled at the end of a run from a function that can raise
+(an average over an empty set, a lookup, a type conversion).
 
 ## Do this
 
@@ -36,6 +41,7 @@ connection-pool exhaustion around open transactions.
 | External HTTP call whose result the writes depend on (validation, price lookup) | Before the transaction |
 | External effect announcing the writes (email, webhook, event) | After commit — record it in a transactional outbox inside the transaction, deliver from a job → [backend-common-jobs-idempotent-handlers] |
 | Slow computation | Compute before; only write inside |
+| Final assembly that can raise (aggregate over possibly-empty rows, conversion, lookup feeding the response) | Inside, before commit — catch its error as an ordinary operation failure so the writes roll back; after commit, only reshape values already computed. When it is also slow, compute what you can from inputs before opening the transaction and keep inside only the part that depends on this operation's writes |
 
 3. Know the annotation/decorator mechanics (framework-agnostic; Spring is the
    documented example):
@@ -57,6 +63,7 @@ connection-pool exhaustion around open transactions.
 | Case | Then |
 |------|------|
 | Connection pool exhausts under load while transactions sit open across an external call | The connection is pinned for the call's full latency; move the call out per the table above — this fixes the exhaustion without growing the pool |
+| Response/report value computed after commit raises | The writes are already durable, so the error either escapes as a 500 or marks the run failed over committed data. Move the evaluation before commit (Spring: a `beforeCommit` exception rolls back; an `afterCommit` exception propagates with the commit already done) |
 | `UnexpectedRollbackException` at the outer commit | An inner joined method failed and marked the shared transaction rollback-only; find the swallowed inner exception rather than catching the rollback error — catch/log placement → [backend-common-errors-exception-handling] |
 
 ## Instead of
@@ -66,6 +73,7 @@ connection-pool exhaustion around open transactions.
 | Let each repository call run in its own transaction | One service-layer transaction per business operation | Per-call commits make partial failure permanent — half the operation's writes survive the crash |
 | Open the transaction in the HTTP controller | Open it at the service/use-case entry method | Response serialization holds the connection and row locks with no DB work left to do |
 | Wrap a batch of thousands of rows in one transaction | Chunked transactions with per-chunk commit and idempotent resume via checkpointing → [backend-common-jobs-idempotent-handlers] | One giant transaction holds locks for the whole run, and a crash at row 9,999 redoes everything |
+| Compute the response's derived values after `commit()` | Compute them before commit, then only format after | Once committed, a raise cannot undo the writes — status and stored state disagree |
 | Call an external API inside the transaction | Call it before (validation) or after commit (outbox delivery) | Locks and the pooled connection are held for the API's latency; an API timeout rolls back finished DB work |
 
 ## Sources
@@ -73,3 +81,7 @@ connection-pool exhaustion around open transactions.
 - https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html — proxy-mode interception, self-invocation bypass, method-visibility rules, `REQUIRED` default settings
 - https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html — inner scope marking the shared transaction rollback-only, `UnexpectedRollbackException`, `REQUIRES_NEW` independent transaction
 - https://vladmihalcea.com/spring-transaction-best-practices/ — service layer as the owner of transaction boundaries; read-only transaction benefits (replica routing)
+- https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/support/TransactionSynchronization.html — `beforeCommit`: "exceptions will get propagated to the commit caller and cause a rollback"; `afterCommit`: "The transaction will have been committed already", errors are "propagated to the caller"
+- https://docs.djangoproject.com/en/5.2/topics/db/transactions/ — `atomic`: "If there is an exception, the changes are rolled back"; `on_commit`: callbacks run "after a successful commit, so a failure in a callback will not cause the transaction to roll back"
+- https://www.postgresql.org/docs/current/sql-commit.html — after `COMMIT`, changes "become visible to others and are guaranteed to be durable"
+- Field evidence 2026-10-04 (a workflow interpreter): a `respond` aggregate term evaluated after `repo.commit()` raised on an empty set; moved before commit and caught as a step failure, a regression test went red without the catch and green with it, asserting the rolled-back row

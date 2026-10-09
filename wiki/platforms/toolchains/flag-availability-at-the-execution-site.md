@@ -9,8 +9,10 @@ sources:
   - https://semver.org/
   - https://protobuf.dev/programming-guides/proto3/
   - https://code.claude.com/docs/en/cli-reference
-last_verified: 2026-09-08
-related: [platforms-toolchains-version-management, platforms-tools-bsd-vs-gnu-cli, backend-common-integrations-externally-owned-defaults, platforms-processes-non-interactive-cli-invocation, qa-deliverables-documented-behavior-of-a-third-party-tool]
+  - https://github.com/facebook/react-native/blob/v0.87.1/packages/react-native/Libraries/Blob/URL.js
+  - https://github.com/mdn/browser-compat-data/blob/main/api/URL.json
+last_verified: 2026-10-06
+related: [platforms-toolchains-version-management, platforms-tools-bsd-vs-gnu-cli, backend-common-integrations-externally-owned-defaults, platforms-processes-non-interactive-cli-invocation, qa-deliverables-documented-behavior-of-a-third-party-tool, platforms-toolchains-self-import-inside-a-workspace-package, databases-schema-design-migration-sql-without-a-database]
 ---
 
 # A CLI Flag, Subcommand, or API Method That Exists Locally but Not Where It Runs
@@ -24,6 +26,8 @@ image — the author's shell proves the flag exists on the author's shell only.
 Also when deciding whether a flag or subcommand is valid at all — before relying
 on it in code or honoring a plan decision that specifies it — and the only check
 performed so far is grepping the tool's own `--help` output for the name.
+Also when a shared JS module calls a newer web-platform global (`URL.canParse`)
+and more than one runtime imports it (Node, browsers, React Native).
 
 ## Do this
 
@@ -49,6 +53,7 @@ one without the other lets them drift.
 | The tool is version-managed, so the authoring shell and the CI shell resolve different binaries | Confirm which binary each shell actually resolves — pin file vs PATH lookup can diverge silently ([platforms-toolchains-version-management]) |
 | The same flag name means something different in the execution site's userland | A flag that exists at both sites is not the same guarantee as a flag that *behaves* the same at both — check the other userland's own docs, not just that the name is present ([platforms-tools-bsd-vs-gnu-cli]) |
 | The tool's official docs site documents the flag but its own `--help` output omits it | Trust the docs site plus one real invocation over `--help`; treat the combination as the flag being valid rather than as a conflict to resolve before using it |
+| A shared JS module (workspace package, isomorphic util) calls a newer web-platform global — `URL.canParse` (Node 18.17–18.x and 19.9+, Chrome 120, Safari 17, Firefox 115) — and a React Native app also imports it | Resolve the global against every runtime that imports the module, not only Node and browsers. React Native installs its own `URL` class as the global (`polyfillGlobal('URL', ...)` in `Libraries/Core/setUpXHR.js`), and that class has no `canParse` (checked at v0.86.0 and v0.87.1) — the call throws `TypeError` on device. Its constructor without a base also stores the string without validating (it throws only by accident, e.g. on a `#` with no `://`), so `try { new URL(s) } catch` is not a replacement there. When mobile needs URL validation, install a WHATWG-conforming polyfill (`react-native-url-polyfill/auto` at the app entry) and check `typeof URL.canParse === 'function'` on device before relying on it; otherwise keep the call in functions mobile does not import and record that restriction beside the export |
 
 ## Instead of
 
@@ -67,3 +72,6 @@ one without the other lets them drift.
 - https://code.claude.com/docs/en/cli-reference — documents `--max-turns`: "Limit the number of agentic turns (print mode only)", example `claude -p --max-turns 3 "query"` — present in the official CLI reference though absent from `claude --help` output (v2.1.263)
 - Reproduction 2026-09-08 (claude 2.1.263): `claude --help` contains zero occurrences of "max-turns"; `claude -p --max-turns 3 --output-format json "reply with exactly: ok"` returned `is_error:false`, `num_turns:1`, `result:"ok"`
 - Field evidence 2026-09 (an orchestrated task in a Rust/CLI repo): a session concluded `--max-turns` was invalid based solely on its absence from `claude --help`, removed it from the implementation, and a review round required restoring it after a real invocation showed it worked
+- https://github.com/facebook/react-native/blob/v0.87.1/packages/react-native/Libraries/Blob/URL.js — `export class URL` declares only `static createObjectURL` and `static revokeObjectURL`; the constructor's no-base branch assigns `this._url = url` without validation (same at v0.86.0); `Libraries/Core/setUpXHR.js` line 35 `polyfillGlobal('URL', () => require('../Blob/URL').URL)`; `gh search code canParse --repo facebook/react-native` returned no hits (2026-10-06)
+- https://github.com/mdn/browser-compat-data/blob/main/api/URL.json — `canParse_static` version_added: chrome 120, safari 17, firefox 115, nodejs 19.9.0, and 18.17.0 with `version_removed: 19.0.0`
+- https://github.com/charpeni/react-native-url-polyfill — README: "A lightweight and trustworthy URL polyfill for React Native, based on the WHATWG URL Standard"; applied with `import 'react-native-url-polyfill/auto'` at the entry point
