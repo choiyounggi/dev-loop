@@ -83,7 +83,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
-| [transaction-boundaries](common/orm/transaction-boundaries.md) | Deciding where a DB transaction starts/ends in application code — service vs controller vs per-repository-call boundaries, what belongs inside, annotation/proxy pitfalls, read-only flags, chunking batch writes; debugging partial writes or connection-pool exhaustion around open transactions |
+| [transaction-boundaries](common/orm/transaction-boundaries.md) | Deciding where a DB transaction starts/ends in application code — service vs controller vs per-repository-call boundaries, what belongs inside, annotation/proxy pitfalls, read-only flags, chunking batch writes, where a fallible response/report computation goes relative to commit; debugging partial writes or connection-pool exhaustion around open transactions |
 
 ### concurrency
 
