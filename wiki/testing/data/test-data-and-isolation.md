@@ -15,7 +15,7 @@ sources:
   - https://docs.python.org/3/library/os.path.html
   - https://nodejs.org/api/os.html
 last_verified: 2026-09-03
-related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-strategy-import-time-side-effects, testing-data-artifact-leakage-from-a-suite, testing-quality-behavior-not-implementation, platforms-filesystems-permissions-and-exec-bits, backend-common-change-impact-call-site-enumeration, testing-data-harness-vs-run-path-fixtures, infrastructure-agent-orchestration-shared-run-state, testing-mocking-autouse-fixture-shadows-function-under-test, testing-data-adjacent-tokens-in-extractor-fixtures, infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session]
+related: [testing-flaky-diagnosing-flaky-tests, testing-strategy-test-level-choice, testing-strategy-import-time-side-effects, testing-data-artifact-leakage-from-a-suite, testing-quality-behavior-not-implementation, platforms-filesystems-permissions-and-exec-bits, backend-common-change-impact-call-site-enumeration, testing-data-harness-vs-run-path-fixtures, infrastructure-agent-orchestration-shared-run-state, testing-mocking-autouse-fixture-shadows-function-under-test, testing-data-adjacent-tokens-in-extractor-fixtures, infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session, testing-async-teardown-after-aborted-tasks]
 ---
 
 # Owning Test Data and Isolating Test State

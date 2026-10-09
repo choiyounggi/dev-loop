@@ -15,6 +15,9 @@ either a repo-relative path `wiki/<domain>/<category>/<page>.md` to a page
 that actually exists, or the literal `[no-wiki]`; the groundings-exist gate
 greps the wiki root for every non-`[no-wiki]` path and fails on any miss.
 `Testability` names the test/gate that would catch this decision being wrong.
+Every row names the analysis.md Rule ids it covers (`covers R1, R3`, ranges
+like `R4-R6` allowed) — the requirements-covered gate fails while any Rule is
+named by no row.
 | # | Decision | Choice | Wiki basis | Rejected alternative | Testability |
 |---|----------|--------|------------|----------------------|-------------|
 

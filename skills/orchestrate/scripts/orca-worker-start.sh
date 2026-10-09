@@ -32,10 +32,11 @@
 #
 # When GROUNDWORK_ESCALATION_DIR is NOT set, worker mode falls back to Orca's
 # composed agent-first `worker-start --agent`, which also accepts new-child /
-# new-top-level and adds no fallback shell. `--model` is inert on that path for
-# the same reason `--permission-mode` is: Orca builds the agent command itself,
-# so there is nothing of ours to append to. Set the escalation dir (which
-# orchestrate always does) to get a model-pinned worker.
+# new-top-level and adds no fallback shell. `--model` and DEV_LOOP_WORKER_EFFORT
+# are inert on that path for the same reason `--permission-mode` is: Orca builds
+# the agent command itself, so there is nothing of ours to append to. Set the
+# escalation dir (which orchestrate always does) to get a model- and
+# effort-pinned worker.
 #
 # usage:
 #   orca-worker-start.sh --task <task_id> --worktree <selector> --agent <agent>
@@ -47,11 +48,13 @@
 #                              escalates instead of blocking (activates worker mode)
 #   GROUNDWORK_TASK_ID         worker task label
 #   DEV_LOOP_WORKER_MODEL      default for --model — the model the WORKER runs
-#                              (e.g. claude-sonnet-5). Unset = omit the flag, so
+#                              (e.g. claude-sonnet-5-5). Unset = omit the flag, so
 #                              the worker inherits the user's configured model.
 #                              Lets the implementer run a cheaper tier than the
 #                              coordinator; the auditor is pinned separately in
 #                              agents/test-quality-auditor.md.
+#   DEV_LOOP_WORKER_EFFORT     effort level the WORKER runs (low|medium|high|
+#                              xhigh|max), as CLAUDE_CODE_EFFORT_LEVEL. Unset = none.
 #   LO_READY_TIMEOUT           seconds to wait for TUI readiness (default 60)
 #   ORCA_BIN                   orca executable (default: orca)
 #   ORCA_WORKER_START_DRYRUN   print the orca commands instead of running them
@@ -120,6 +123,15 @@ if [ -n "$model" ]; then
       echo "orca-worker-start: invalid model '$model'" >&2; exit 2 ;;
   esac
 fi
+# Worker effort, passed as CLAUDE_CODE_EFFORT_LEVEL rather than --effort: a
+# skill's `effort` frontmatter (loop-implement pins high) overrides --effort but
+# not the environment variable, which also reaches the worker's own subagents.
+# Unset = no variable, so the worker keeps the user's configured level.
+effort="${DEV_LOOP_WORKER_EFFORT:-}"
+case "$effort" in
+  ''|low|medium|high|xhigh|max) : ;;
+  *) echo "orca-worker-start: invalid effort '$effort'" >&2; exit 2 ;;
+esac
 case "$perm" in
   bypassPermissions|acceptEdits|plan|default) : ;;
   *) echo "orca-worker-start: invalid permission mode '$perm'" >&2; exit 2 ;;
@@ -237,7 +249,9 @@ if [ "$worker_mode" = 1 ] && [ -z "$reused" ]; then
   esc_sq() { printf '%s' "$1" | sed "s/'/'\\\\''/g"; }
   model_arg=""
   [ -n "$model" ] && model_arg=" --model '$(esc_sq "$model")'"
-  worker_cmd="export GROUNDWORK_ESCALATION_DIR='$(esc_sq "$esc_dir")' && export GROUNDWORK_TASK_ID='$(esc_sq "${GROUNDWORK_TASK_ID:-}")' && claude --permission-mode ${perm}${model_arg}"
+  effort_env=""
+  [ -n "$effort" ] && effort_env="CLAUDE_CODE_EFFORT_LEVEL=$effort "
+  worker_cmd="export GROUNDWORK_ESCALATION_DIR='$(esc_sq "$esc_dir")' && export GROUNDWORK_TASK_ID='$(esc_sq "${GROUNDWORK_TASK_ID:-}")' && ${effort_env}claude --permission-mode ${perm}${model_arg}"
 
   set -- terminal create --worktree "$wt" --command "$worker_cmd" --json
   [ -n "$name" ] && set -- "$@" --title "$name"

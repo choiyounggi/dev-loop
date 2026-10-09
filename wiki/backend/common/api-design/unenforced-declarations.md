@@ -9,7 +9,7 @@ sources:
   - https://kubernetes.io/blog/2023/04/24/openapi-v3-field-validation-ga/
   - https://json-schema.org/draft/2020-12/json-schema-validation
 last_verified: 2026-08-05
-related: [security-input-validation-at-trust-boundaries, infrastructure-config-environment-config, backend-common-api-design-error-responses, qa-process-acceptance-criteria, backend-common-change-impact-widening-a-closed-value-table, platforms-processes-tool-diagnostics-without-a-failing-exit-code, backend-common-errors-diagnostics-from-a-shared-code-path]
+related: [security-input-validation-at-trust-boundaries, infrastructure-config-environment-config, backend-common-api-design-error-responses, qa-process-acceptance-criteria, backend-common-change-impact-widening-a-closed-value-table, platforms-processes-tool-diagnostics-without-a-failing-exit-code, backend-common-errors-diagnostics-from-a-shared-code-path, security-agent-exposure-capability-flag-across-adapters]
 ---
 
 # Accepting a Declaration the System Does Not Enforce
@@ -58,6 +58,7 @@ happened", or a feature was "configured" in an environment where it never ran.
 | Case | Then |
 |------|------|
 | A newer client sends a field this older server has not learned yet | Warn rather than reject on the server, and let the *client's* strict mode catch it at author time; rejecting forward-compatible traffic breaks rolling upgrades |
+| The declaration is a security restriction in a config shared by several adapters, and only some adapters implement it | Refuse it in every adapter that does not enforce it, before the adapter spawns anything — accept-and-warn is too weak when downstream automation trusts the flag ([security-agent-exposure-capability-flag-across-adapters]) |
 | The declaration is enforced on one execution path but not another | Report it as unenforced on the path that ignores it, keyed by path — a single global status makes one of the two paths lie |
 | The vocabulary is generated (parsed from a schema or enum) | Assert the parsed table is non-empty before using it to validate; an empty table accepts everything and turns strict mode into a no-op |
 | Enforcement is measured but not applied (a budget reported, never imposed) | Say so in the diagnostic's wording — "measured, not enforced" — so a reader does not infer a guarantee from the value appearing in output |
