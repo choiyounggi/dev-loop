@@ -89,7 +89,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
-| [shared-state-and-pools](common/concurrency/shared-state-and-pools.md) | Request handlers share in-process mutable state — concurrency-safe structures/confinement vs shared store in multi-instance deployments; sizing thread/connection pools; same-pool nested-acquisition deadlock; bounding queues; debugging deadlock or starvation under load |
+| [shared-state-and-pools](common/concurrency/shared-state-and-pools.md) | Request handlers share in-process mutable state — concurrency-safe structures/confinement vs shared store in multi-instance deployments; sizing thread/connection pools; same-pool nested-acquisition deadlock; bounding queues; debugging deadlock or starvation under load; sharing one connection/driver instance across request threads while each request runs its own transaction |
 | [distributed-locks](common/concurrency/distributed-locks.md) | Only one instance may perform an action at a time — Redis-style lock with owner token and TTL/watchdog, safe release, when a DB constraint/advisory lock suffices instead; debugging locks released by the wrong holder or work done twice despite a lock |
 
 ### llm
