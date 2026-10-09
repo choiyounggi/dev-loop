@@ -11,7 +11,7 @@ sources:
   - https://github.com/rhysd/actionlint
   - https://github.com/choiyounggi/groundwork/pull/16
 last_verified: 2026-09-06
-related: [infrastructure-ci-cd-pipeline-structure, infrastructure-ci-cd-workflow-authored-pull-requests, platforms-shells-portable-shell-scripts]
+related: [infrastructure-ci-cd-pipeline-structure, infrastructure-ci-cd-workflow-authored-pull-requests, platforms-shells-portable-shell-scripts, testing-quality-ci-workflow-step-behavior-tests]
 ---
 
 # A Workflow File That Stops Parsing Registers No Triggers

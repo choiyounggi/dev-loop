@@ -12,7 +12,7 @@ sources:
   - https://code.claude.com/docs/en/sub-agents#choose-a-model
   - https://code.claude.com/docs/en/model-config#fable-and-usage-credits
 last_verified: 2026-09-14
-related: [infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-dispatching-after-a-completion-report, infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-login-expiry-during-unattended-turns]
+related: [infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, infrastructure-agent-orchestration-pane-delivery-confirmation, infrastructure-agent-orchestration-dispatching-after-a-completion-report, infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-login-expiry-during-unattended-turns, platforms-tools-per-call-subagent-effort]
 ---
 
 # Worker Sessions Paused by a Provider Usage Limit

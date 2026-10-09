@@ -11,7 +11,7 @@ sources:
   - https://docs.semgrep.dev/writing-rules/testing-rules
   - https://eslint.org/docs/latest/extend/custom-rule-tutorial
 last_verified: 2026-08-05
-related: [testing-data-test-data-and-isolation, testing-quality-checks-that-cannot-pass, debugging-methodology-hypothesis-testing, debugging-methodology-isolate-by-bisection]
+related: [testing-data-test-data-and-isolation, testing-quality-checks-that-cannot-pass, debugging-methodology-hypothesis-testing, debugging-methodology-isolate-by-bisection, testing-async-teardown-after-aborted-tasks]
 ---
 
 # A Suite That Leaves Working Directories Behind
@@ -79,6 +79,7 @@ ls "$SCRATCH_DIR" | sed 's/-[a-z0-9]*$//' | sort | uniq -c | sort -rn
 | A test legitimately needs its artifact to survive the run (debug bundle, golden output) | Give it a distinct prefix and an explicit retention rule, and exclude that prefix from the check by name so the exception is visible |
 | The runner keeps the last few directories on purpose | `pytest`'s `tmp_path` retains recent runs by design — measure the delta against that policy's steady state rather than requiring an empty root |
 | Cleanup exists but does not run on failure | Move it to the context manager / fixture teardown; a removal statement after the assertions is skipped by the exception that made the test fail ([testing-data-test-data-and-isolation]) |
+| Cleanup runs, yet the directory reappears — the test spawned tasks on an async runtime (tokio) that write there | An aborted task keeps running until its next `.await`; await each `JoinHandle` after `abort()` and delete only then, and count leftovers on forced-failure runs too ([testing-async-teardown-after-aborted-tasks]) |
 | The check cannot see calls made through a project wrapper | Match the wrapper too, and assert the wrapper itself cleans up — one rule per creator, each with its own must-match fixture |
 | A crashed or killed run leaves directories no teardown could remove | Give the suite a session-scoped root it creates and removes wholesale, so one removal reclaims every orphan from prior aborted runs |
 | Cleanup code exists but the directory survives | The path being removed is not the path being created — log both at one failing site before editing; a `cd` or a relative path resolved from a different working directory is the usual gap |

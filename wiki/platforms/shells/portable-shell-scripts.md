@@ -14,7 +14,7 @@ sources:
   - https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
   - https://jqlang.org/manual/
 last_verified: 2026-09-03
-related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution, platforms-shells-escapes-in-shell-string-literals, platforms-shells-env-var-off-switches, platforms-shells-unset-versus-empty-parameters, platforms-shells-option-like-argument-values, platforms-processes-tool-diagnostics-without-a-failing-exit-code, testing-quality-completion-predicates, platforms-processes-driving-a-tui-in-a-tmux-pane, infrastructure-agent-orchestration-shared-run-state, infrastructure-ci-cd-changed-files-only-gates, testing-quality-tests-that-cannot-fail, platforms-tools-jq-dot-rebinding-in-predicates]
+related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution, platforms-shells-escapes-in-shell-string-literals, platforms-shells-env-var-off-switches, platforms-shells-unset-versus-empty-parameters, platforms-shells-option-like-argument-values, platforms-processes-tool-diagnostics-without-a-failing-exit-code, testing-quality-completion-predicates, platforms-processes-driving-a-tui-in-a-tmux-pane, infrastructure-agent-orchestration-shared-run-state, infrastructure-ci-cd-changed-files-only-gates, testing-quality-tests-that-cannot-fail, platforms-tools-jq-dot-rebinding-in-predicates, platforms-shells-redirection-order-for-a-silenced-write]
 ---
 
 # Shell Scripts That Must Run on More Than One Machine or Shell
@@ -45,7 +45,7 @@ non-interactive environment).
    creation), verify the state with an independent command (`test -e`, `git worktree
    list`), not with a following `echo` that prints success unconditionally.
 4. When a script written for bash runs in zsh (or a user pastes it into a zsh
-   terminal), these behaviors invert:
+   terminal), these behaviors invert (a colon right after an unbraced `$name` is another: [platforms-shells-colon-after-an-unbraced-parameter]):
 
 | Behavior | bash/sh | zsh | Portable action |
 |----------|---------|-----|-----------------|
