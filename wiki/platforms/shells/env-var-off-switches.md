@@ -8,7 +8,7 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html
   - https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
 last_verified: 2026-08-05
-related: [platforms-shells-portable-shell-scripts, infrastructure-config-environment-config, platforms-environment-path-resolution, platforms-shells-unset-versus-empty-parameters]
+related: [platforms-shells-portable-shell-scripts, infrastructure-config-environment-config, platforms-environment-path-resolution, platforms-shells-unset-versus-empty-parameters, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan]
 ---
 
 # Turning a Script's Behavior Off Through an Environment Variable

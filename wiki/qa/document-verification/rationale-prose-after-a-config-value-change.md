@@ -10,7 +10,7 @@ sources:
   - https://google.github.io/styleguide/docguide/best_practices.html
   - https://code.claude.com/docs/en/sub-agents
 last_verified: 2026-09-17
-related: [qa-document-verification-retiring-a-provisional-marker, qa-document-verification-editing-a-gated-document, qa-process-defect-class-resweep-after-review, backend-common-llm-binding-instructions-for-agents]
+related: [qa-document-verification-retiring-a-provisional-marker, qa-document-verification-editing-a-gated-document, qa-process-defect-class-resweep-after-review, backend-common-llm-binding-instructions-for-agents, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan]
 ---
 
 # Rationale Prose Left Behind When a Pinned Config Value Is Removed or Changed
