@@ -9,15 +9,10 @@ sources:
   - https://google.github.io/eng-practices/review/reviewer/standard.html
   - https://google.github.io/eng-practices/review/reviewer/looking-for.html
   - https://github.com/choiyounggi/dev-loop/pull/164
-<<<<<<< HEAD
-last_verified: 2026-09-03
-related: [qa-process-defect-class-resweep-after-review, qa-process-adversarial-change-review, qa-process-llm-review-pipelines, qa-process-unused-code-findings-in-dependency-ordered-work]
-=======
   - https://pitest.org/quickstart/basic_concepts/
   - https://mutants.rs/using-results.html
 last_verified: 2026-09-28
-related: [qa-process-defect-class-resweep-after-review, qa-process-adversarial-change-review, qa-process-llm-review-pipelines, testing-quality-surviving-mutant-equivalence-triage, qa-process-fresh-context-code-review]
->>>>>>> origin/main
+related: [qa-process-defect-class-resweep-after-review, qa-process-adversarial-change-review, qa-process-llm-review-pipelines, testing-quality-surviving-mutant-equivalence-triage, qa-process-fresh-context-code-review, qa-process-unused-code-findings-in-dependency-ordered-work]
 ---
 
 # Acting on Code Review Feedback
