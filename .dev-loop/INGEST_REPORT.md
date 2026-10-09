@@ -1,47 +1,41 @@
-# Knowledge flush — 1 insight (1 page amended, 14 plan-gaps retired as local-layer)
+# Knowledge flush — 1 insight (1 page amended, 4 plan-gaps retired as local-layer)
 
 ## Verified best-practice
 
-**Insight 4012a55145c1a945 — fallible final assembly runs before commit.**
-Claim: when a response or report value is computed at the end of a run from a function that can raise (an average over an empty set, a conversion, a lookup), evaluate it inside the transaction before commit and turn its error into an ordinary operation failure that rolls back; after commit, only reshape values already computed.
+**Insight `5c36b7664eecdfca` — choosing the value of a band-checked count on a shared integration branch.**
 
-Sources checked:
-- https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/support/TransactionSynchronization.html — `beforeCommit`: "exceptions will get propagated to the commit caller and cause a rollback of the transaction"; `afterCommit`: "The transaction will have been committed already", a `RuntimeException` "will be propagated to the caller".
-- https://docs.djangoproject.com/en/5.2/topics/db/transactions/ — `atomic`: "If there is an exception, the changes are rolled back"; `on_commit`: "Your callbacks are executed after a successful commit, so a failure in a callback will not cause the transaction to roll back."
-- https://www.postgresql.org/docs/current/sql-commit.html — "All changes made by the transaction become visible to others and are guaranteed to be durable if a crash occurs."
-
-How verified: fetched all three pages and quoted the sentences above. Field reproduction from the originating session: a workflow interpreter's response-term evaluation was moved before `repo.commit()`; the regression test went red when the error catch was removed and green with it, and asserted the rolled-back row.
-
-Confidence: **verified**.
+- Claim: when a repo test checks a README's approximate count ("~N tests") against the real count within a tolerance band, and your branch adds tests to an integration branch other branches also merge into, pick a value inside the overlap of the bands around your branch's count and the integration tip's count, and write it into every copy of the claim (prose line, pasted run output, each language's README).
+- Sources checked:
+  - https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue — fetched 2026-10-05; the merge queue checks a PR's changes "when applied to the latest version of the target branch and any pull requests already in the queue". This backs the mechanism: a branch green on its own is not evidence the target stays green.
+  - A second candidate source (graydon2.dreamwidth.org "not rocket science rule") returned an empty page on fetch and is **not cited**.
+- How verified: re-ran the field evidence in the originating worktree on 2026-10-05. `impl/tests/test_readme_currency.py` defines `SUITE_CLAIM_BAND = 0.05` and checks both the prose claim and the pasted `Ran N tests` line in `README.md` and `README.ko.md` (4 places, all reading 4090 / 4,090). `python -m unittest tests.test_readme_currency` → `Ran 10 tests ... OK`. Band arithmetic: |4108−4090| = 18 ≤ 205.4 and |4075−4090| = 15 ≤ 203.75.
+- Confidence: **field-tested** (page stays `field-tested`; the external doc backs the mechanism, not the band-picking rule itself).
 
 ## Existing-layer check
 
-Pages read: backend-common-orm-transaction-boundaries, testing-quality-store-assertions-after-a-rolled-back-run, backend-common-errors-async-failure-handling
+Pages read: infrastructure-agent-orchestration-ours-resolution-on-a-mixed-content-conflict, qa-deliverables-quantitative-claims-in-a-published-document, infrastructure-agent-orchestration-verify-command-in-a-worker-brief
 
-- `wiki_search` top-5 for the trigger sentence: frontend-data-fetching-query-state-vs-fetch-state, backend-common-integrations-estimate-derived-thresholds, backend-node-boundaries-runtime-validation, backend-common-llm-completion-response-validation, testing-quality-store-assertions-after-a-rolled-back-run. None describes the same situation.
-- Closest owner: backend-common-orm-transaction-boundaries. Its "what goes inside the boundary" table already says "slow computation: compute before; only write inside" and "the controller stays outside (serialization is not DB work)". It did not cover computation that can **fail** and must therefore sit before commit. Same topic, new edge → **merged**, no new page.
-- Added: one row in the Do-this table, one Edge-cases row, one Instead-of row, a trigger sentence in "When this applies", three sources plus a field-evidence line, `last_verified` 2026-10-04.
-- Review: one fresh-context adversarial reviewer (feature-dev:code-reviewer) re-fetched the sources and approved; its one finding (no precedence between the existing "slow computation: compute before" row and the new row) is applied as a final sentence on the new row.
-- Conflicts: none. The new row agrees with "keep only DB work inside": the fallible step goes before commit, not between commit and response.
-- Related links: added testing-quality-store-assertions-after-a-rolled-back-run to the page's `related:`. That page already links back to backend-common-orm-transaction-boundaries.
-- Plumbing: wiki/backend/index.md load-when line extended; log.md ingest line appended. `node scripts/wiki-lint-prohibitions.js wiki/` → violations: 0.
+- `wiki_search` top-5 for the trigger: verify-command-in-a-worker-brief (edge case + instead-of), backend-python-packaging-data-files-and-install-paths, testing-quality-assertion-scanner-false-positive-on-unittest-convention, ours-resolution-on-a-mixed-content-conflict (instead-of).
+- **ours-resolution-on-a-mixed-content-conflict** already owns the trigger "writing the brief for workers who will each change a count a currency test checks" and directs each worker to write its own measured value. It does not cover a tolerance band, where one value can satisfy several merge orders. → **merged** as one Edge-case row + one Instead-of row + two source lines.
+- **quantitative-claims-in-a-published-document** already says to fix every copy of a number (translated README) — consistent with the new row, no conflict; not edited.
+- **verify-command-in-a-worker-brief** (read via grep hits and search snippets only) covers naming currency gates on a task's verify line — different directive, no conflict.
+- Conflicts flagged: none. `related:` already links ours-resolution ↔ quantitative-claims; no new links needed.
+- `last_verified` left at 2026-09-03: only the new rows were re-verified today, not the whole page.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed: #223, #225, #226, #227, #228, #229, #230, #231, #233, #234, #235, #236, #237.
+Open `knowledge/*` heads diffed against `origin/main -- wiki/`: #223, #225, #226, #227, #228, #229, #230, #231, #233, #234, #235, #236, #237, #238.
 
-For each one, ran `git diff origin/main...origin/<head> -- wiki/` and grepped added lines for commit/rollback/transaction. None of them touches wiki/backend/common/orm/transaction-boundaries.md. The only matches were unrelated: #234 is about sharing one connection across request transactions, #231 only adds a `related:` link on async-failure-handling, #225 is about optimistic UI patches, and the rest are git/heredoc prose.
-
-Verdict for 4012a55145c1a945: **new**.
-Verdict for the 14 plan-gap rows: none overlap an open PR; they are retired as local-layer (below).
+- Only #223 touches the target page, and only its `related:` frontmatter line (adds `word-level-union-merge-reassembly`). It carries nothing about tolerance bands or count-value selection. This PR leaves the `related:` line untouched and inserts its new source line two lines above it, with `last_verified` between them as an unchanged separator, so both should merge in either order.
+- Keyword sweep (`README.*count|test count|tolerance band|±N%|merge order|integration tip|currency test`) over every open head's wiki diff: 0 hits except #223 (1, the related-line context). Positive control: the same pattern hits 7 lines in the target page on `main`.
+- Verdict for `5c36b7664eecdfca`: **new**.
 
 ## Routing decision
 
-- 4012a55145c1a945 → backend / common/orm / backend-common-orm-transaction-boundaries (merged into existing page). Reason: the directive is about where a step sits relative to the transaction boundary, which this page owns. No new category needed.
+- `5c36b7664eecdfca` → `infrastructure/agent-orchestration/ours-resolution-on-a-mixed-content-conflict.md` (merge, no new page). The situation arises from integrating parallel branches, which this category owns. `wiki/infrastructure/index.md` load-when for the page is extended with the band-value case. `log.md` has an ingest entry.
+- Layer test: the directive names no repo's files; band checks on approximate doc counts and order-independent merges hold in any codebase. linkly appears only as field evidence → bundled wiki.
+- Lint: `node scripts/wiki-lint-prohibitions.js wiki/` → violations: 0. Page body 59 lines (≤120).
 
 ## Local-layer candidates
 
-14 plan-gap rows from linkly orchestration run qa1002. Each names linkly's own files, RFCs, or decisions (`impl/lnpl/lower.py`, `interp.py`, `RFC-0061`/`RFC-0062`, `RFC_ROUTES`, `VERB_LEXICON`). They are excluded from this PR and retired from the queue. Target if ever wanted: `wiki-local/backend/<category>/<slug>.md` in the linkly repo. Run wiki-ingest inside that project.
-
-- t210 (9): c4d0c28b0fdf9504, fdfc99325ca6b354, b09d09db744c2d54, 23d5ef43080132f9, fcc5792205767081, 22e6c899fa7e772c, d87a8a4bda0cb8a3, 1d7e8d070878d875, e1e40e6b4f3faaf0
-- t211b (5): 545228fe7f18d075, 81220620185427cd, cf8385f12b32b61f, cda72e4bf1eed6ca, 5625140924325116
+Four `plan-gap` rows from linkly task t193's wiki-plan (`ebc151c5f983f079`, `4a00613ab264b2ec`, `1fbbb4c7327deb07`, `282a78f6c9000665`). They cover the task split, which `.lnpl` snippets go in a doc, where a `docs/backends.md` link row goes, and the changelog heading shape. Each one names linkly's own files and conventions (`docs/backends.md` section 5, `.orchestration/changelog/t182.md` precedent, `python -m lnpl`). They are plan decisions, not reusable lessons, so they are excluded from this PR and retired. If a lesson is wanted: `wiki-local/qa/document-verification/<slug>.md` in linkly — run wiki-ingest inside that project.
