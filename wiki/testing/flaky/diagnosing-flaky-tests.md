@@ -8,8 +8,9 @@ sources:
   - https://martinfowler.com/articles/nonDeterminism.html
   - https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html
   - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html
-last_verified: 2026-07-10
-related: [testing-data-test-data-and-isolation, testing-mocking-what-to-mock, debugging-concurrency-intermittent-failures, testing-quality-sequential-dispatch-assumption-under-concurrency]
+  - https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html
+last_verified: 2026-09-27
+related: [testing-data-test-data-and-isolation, testing-mocking-what-to-mock, debugging-concurrency-intermittent-failures, testing-quality-sequential-dispatch-assumption-under-concurrency, testing-async-async-testing, testing-mocking-fake-server-forward-before-reply]
 ---
 
 # Fixing a Test That Fails Intermittently
@@ -33,6 +34,7 @@ wiki/debugging/concurrency/intermittent-failures.md.
 | Symptom → cause | Fix |
 |-----------------|-----|
 | Fails in a loop alone → async wait via `sleep(n)` racing background work | Replace the sleep with an explicit wait on the completion condition or event (poll/callback/framework `waitFor`) with a timeout; the test proceeds the moment the condition holds |
+| Stress loops (single-test loop, random order, parallel) reproduce a race against a background task's intentional state reset rarely or never, and the test already holds that task's completion handle (`JoinHandle`, promise, future) | Use the handle as the forcing point instead of more iterations: await it between the test's setup write and its read to force the bad interleaving (deterministic red), then await it before the setup write as the fix (deterministic green) — the two orderings are the regression's red/green pair and need no instrumentation in product code |
 | Fails only with other tests / only in some orders → order dependence, leftover state | Make each test create and own its state ([testing-data-test-data-and-isolation]); bisect random-order runs to find the polluting test and fix the polluter |
 | Fails only in parallel / only in CI → shared external resource (same DB schema, port, temp dir across runs) | Give each run/worker its own resource: unique schema or database per worker, ephemeral ports, per-test temp dirs |
 | Fails at certain times of day / dates / in CI's timezone → time and timezone dependence | Inject a frozen clock and assert against the injected instant; store and compare in UTC |
@@ -54,6 +56,7 @@ wiki/debugging/concurrency/intermittent-failures.md.
 | Case | Then |
 |------|------|
 | Retry-on-failure is configured at the runner level and masks which tests are flaky | Keep at most one automated retry, and only with flake-reporting that files the pass-on-retry as a defect; a silent retry converts a detector into a suppressor |
+| The reproduction rate under stress varies with core count and load and stays near zero locally | Stop raising the iteration count; look for a completion handle for the racing background work first — awaiting it at the suspected point reproduces on the first run regardless of load (see the handle row above) |
 | The flake reproduces only in CI, never locally | Diff the environments: CPU/parallelism, timezone, locale, dependency versions, resource limits — then reproduce locally by matching the differing factor (e.g. run with CI's timezone and parallelism) |
 | The "flaky test" is actually an intermittent production bug (race in the code under test) | The test is doing its job — fix the code, not the test; deep diagnosis methodology → wiki/debugging/ |
 | A test cannot be de-flaked at its current level (full-stack e2e with inherent variance) | Push the assertions down to unit/integration level and keep only a minimal smoke check at e2e ([testing-strategy-test-level-choice]) |
@@ -72,3 +75,6 @@ wiki/debugging/concurrency/intermittent-failures.md.
 - https://martinfowler.com/articles/nonDeterminism.html — quarantine strategy; isolation; polling/callbacks over bare sleeps; wrapping the clock
 - https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html — flake handling at scale: marking/quarantining flaky tests, retry pitfalls
 - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html — measured flake causes: timing, randomness, threading/async, infra timeouts; larger tests flakier
+- https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html — "It is guaranteed that the destructor of the spawned task has finished before task completion is observed via `JoinHandle` `await`": awaiting the handle is a real ordering point, not a probable one
+- Local reproduction 2026-09-27 (Node 26.7.0; a background timer that resets shared state): no forcing → 0/200 failures; handle awaited between the setup write and the read → 200/200 failures; handle awaited before the setup write → 0/200 failures
+- Field evidence 2026-09 (a Rust `tokio` crate, crew-run #19): stress loops gave 0/120 at 10 `yes` processes and 3/80 at 24 on 12 cores; the forced order failed 10/10 and 25/25, the fixed order passed 0/100, 50/50, and 10/10 under 24 `yes`
