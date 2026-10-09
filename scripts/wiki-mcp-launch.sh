@@ -22,17 +22,17 @@ esac
 
 command -v uv >/dev/null 2>&1 || exit 0
 
-# Range pins, not floating latest: an unpinned major bump is a supply-chain
-# change nobody reviewed. No --python — the packages' own Requires-Python
-# floor is the interpreter constraint.
-PINS=(--with 'sqlite-vec>=0.1.6,<0.2' --with 'fastembed>=0.7,<1' --with 'mcp>=2,<3')
-
+# Exact pins, not floating latest or a range: an unpinned/ranged dependency is
+# a supply-chain change nobody reviewed, and the directory validator checks
+# the pin is literal on the command line (no array/variable expansion). No
+# --python — the packages' own Requires-Python floor is the interpreter
+# constraint.
 case "$verb" in
   serve)
-    uv run "${PINS[@]}" python "$HERE/wiki-mcp.py"
+    uv run --with 'sqlite-vec==0.1.9' --with 'fastembed==0.9.0' --with 'mcp==2.3.0' python "$HERE/wiki-mcp.py"
     ;;
   index)
-    uv run "${PINS[@]}" python "$HERE/wiki-index.py" "$@"
+    uv run --with 'sqlite-vec==0.1.9' --with 'fastembed==0.9.0' --with 'mcp==2.3.0' python "$HERE/wiki-index.py" "$@"
     ;;
   *)
     if [ "${DEV_LOOP_WIKI_DEBUG:-0}" = 1 ]; then

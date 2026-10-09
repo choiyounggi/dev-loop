@@ -350,22 +350,22 @@ bare_path_without_uv() {
   return 0
 }
 
-@test "normal: serve runs uv with the three pins and the adapter, without --python" {
+@test "normal: serve runs uv with the three exact pins and the adapter, without --python" {
   PATH="$SHIM:$PATH" run bash "$LAUNCH"
   [ "$status" -eq 0 ]
   [ -f "$SHIM_LOG" ]
   line=$(tail -1 "$SHIM_LOG")
   [[ "$line" == "run "* ]]
-  [[ "$line" == *"--with sqlite-vec>=0.1.6,<0.2"* ]]
-  [[ "$line" == *"--with fastembed>=0.7,<1"* ]]
-  [[ "$line" == *"--with mcp>=2,<3"* ]]
+  [[ "$line" == *"--with sqlite-vec==0.1.9"* ]]
+  [[ "$line" == *"--with fastembed==0.9.0"* ]]
+  [[ "$line" == *"--with mcp==2.3.0"* ]]
   [[ "$line" == *"/scripts/wiki-mcp.py" ]]
   # no interpreter pin: uv resolves one against the packages' own floor
   [[ "$line" != *"--python"* ]]
 
   # negative control: a copy that pins an interpreter fails that same assertion
   cp "$LAUNCH" "$BATS_TEST_TMPDIR/pinned.sh"
-  sed 's/uv run "${PINS\[@\]}"/uv run --python 3.12 "${PINS[@]}"/' "$LAUNCH" > "$BATS_TEST_TMPDIR/pinned.sh"
+  sed 's/uv run --with/uv run --python 3.12 --with/' "$LAUNCH" > "$BATS_TEST_TMPDIR/pinned.sh"
   : > "$SHIM_LOG"
   PATH="$SHIM:$PATH" run bash "$BATS_TEST_TMPDIR/pinned.sh"
   [ "$status" -eq 0 ]

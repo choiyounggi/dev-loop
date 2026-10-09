@@ -1,11 +1,15 @@
 {
   "name": "dev-loop",
-  "description": "loop-orchestrator's verification loop (TDD / PDCA / Reflexion) with the plan step FIXED to a wiki-grounded planning methodology (wiki-plan): every design decision is routed to a bundled semantic-layer wiki before code is written. Adds a knowledge-capture loop — sessions emit verified insights, and knowledge-flush researches, dedups, routes, and opens a wiki PR for owner review.",
+  "displayName": "dev-loop",
+  "description": "Multi-agent orchestration grounded in an LLM wiki. /dev-loop:orchestrate splits one goal into a dependency graph of parallel Claude Code sessions, each in its own worktree, and supervises them natively on Orca (a tracked Task + Dispatch per phase, pushed worker_done / question / escalation events instead of polling, stall detection; raw tmux fallback). Every plan decision must cite a page in a bundled 391-page, 10-domain best-practice wiki, checked by machine gates and a fresh-context plan reviewer, and verified insights from your sessions return as reviewed wiki PRs.",
   "version": "1.32.12",
   "author": {
     "name": "choiyounggi",
     "url": "https://github.com/choiyounggi"
   },
   "homepage": "https://github.com/choiyounggi/dev-loop",
-  "strict": false
+  "license": "MIT",
+  "repository": "https://github.com/choiyounggi/dev-loop",
+  "icon": "./assets/icon.png",
+  "keywords": ["orchestration", "multi-agent", "parallel-agents", "orca", "tmux", "worktree", "llm-wiki", "planning", "tdd", "knowledge-base"]
 }

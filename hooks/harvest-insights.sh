@@ -8,8 +8,13 @@
 # never waits on network or git.
 set +e
 
-HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HARVEST_JS="$HOOK_DIR/harvest.js"
+# Literal helper path — no $(dirname) computation (directory-validator
+# UNPINNED_NPX: the executed program must be spellable, not derived at run
+# time). CLAUDE_PLUGIN_ROOT is set by the Claude Code CLI in production; the
+# string-trim fallback covers bats, which invokes this script by its real
+# repo path without exporting it.
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${BASH_SOURCE[0]%/hooks/*}}"
+HARVEST_JS="$PLUGIN_ROOT/hooks/harvest.js"
 
 # Read the Stop-hook stdin once and hand it to the node parser.
 INPUT="$(cat)"

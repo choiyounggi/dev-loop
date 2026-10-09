@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "dev-loop",
-      "description": "loop-orchestrator's verification loop with the plan step fixed to a wiki-grounded planning methodology (wiki-plan) over a bundled semantic-layer wiki, plus a knowledge-capture loop that harvests verified insights and opens reviewed wiki PRs via knowledge-flush.",
+      "description": "Multi-agent orchestration grounded in an LLM wiki. /dev-loop:orchestrate splits one goal into a dependency graph of parallel Claude Code sessions, each in its own worktree, and supervises them natively on Orca (a tracked Task + Dispatch per phase, pushed worker_done / question / escalation events instead of polling, stall detection; raw tmux fallback). Every plan decision must cite a page in a bundled 391-page, 10-domain best-practice wiki, checked by machine gates and a fresh-context plan reviewer, and verified insights from your sessions return as reviewed wiki PRs.",
       "category": "development",
       "author": {
         "name": "choiyounggi",

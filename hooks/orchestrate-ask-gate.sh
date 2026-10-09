@@ -88,7 +88,11 @@ ASK_LINES="$(grep -F 'AskUserQuestion' "$TRANSCRIPT" 2>/dev/null | grep -E '"(na
 #    remembered choice). Proven by an AskUserQuestion whose payload names it.
 NEEDS_SUBSTRATE=$IS_ORCA
 if [ "$NEEDS_SUBSTRATE" -eq 0 ]; then
-  DETECT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/skills/orchestrate/scripts/orca-detect.sh"
+  # No $(dirname)/".." computation (directory-validator UNPINNED_NPX: the
+  # executed program must be spellable, not derived at run time). The
+  # string-trim fallback covers bats, which invokes this script by its real
+  # repo path without exporting CLAUDE_PLUGIN_ROOT.
+  DETECT="${CLAUDE_PLUGIN_ROOT:-${BASH_SOURCE[0]%/hooks/*}}/skills/orchestrate/scripts/orca-detect.sh"
   if [ -f "$DETECT" ]; then
     sh "$DETECT" >/dev/null 2>&1
     [ $? -eq 0 ] && NEEDS_SUBSTRATE=1
