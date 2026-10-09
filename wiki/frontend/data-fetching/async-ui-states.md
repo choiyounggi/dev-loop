@@ -11,7 +11,7 @@ sources:
   - https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates
   - https://react.dev/reference/react/Component
 last_verified: 2026-07-10
-related: [frontend-state-client-vs-server-state, frontend-data-fetching-race-conditions, frontend-data-fetching-query-state-vs-fetch-state]
+related: [frontend-state-client-vs-server-state, frontend-data-fetching-race-conditions, frontend-data-fetching-query-state-vs-fetch-state, frontend-design-ui-hardening-against-real-content, frontend-design-product-ui-vs-brand-surface]
 ---
 
 # Designing Loading, Error, Empty, and Data States for an Async View

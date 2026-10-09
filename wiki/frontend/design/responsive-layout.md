@@ -25,7 +25,7 @@ sources:
   - https://www.w3.org/TR/css-text-3/
   - https://developer.mozilla.org/en-US/docs/Web/CSS/flex-shrink
 last_verified: 2026-09-06
-related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements, frontend-performance-bundle-and-assets, frontend-design-design-canvas-workflow]
+related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements, frontend-performance-bundle-and-assets, frontend-design-design-canvas-workflow, frontend-design-ui-hardening-against-real-content, frontend-design-product-ui-vs-brand-surface]
 ---
 
 # Making One Layout Work From 320px Phones to Desktop
@@ -50,7 +50,7 @@ Work through these in order — each later item assumes the earlier ones hold:
 | A grid of cards/tiles must reflow by width | `grid-template-columns: repeat(auto-fit, minmax(<content-min>, 1fr))` — zero media queries; `auto-fit` collapses empty tracks and stretches the rest, `auto-fill` keeps empty tracks |
 | A component must respond to its container, not the viewport (sidebar vs main placement) | `@container` query with `container-type: inline-size` on the ancestor; keep an intrinsic grid/flex layout as the no-support fallback |
 | Sizing interactive targets | ≥24×24 CSS px per WCAG 2.2 AA (SC 2.5.8); 44×44 meets AAA (SC 2.5.5). A smaller target is compliant only when a 24px-diameter circle centered on it intersects no other target's circle — see [frontend-accessibility-interactive-elements] for the rest of the interactive contract |
-| Fluid type | `font-size: clamp(<min-rem>, <vw-based>, <max-rem>)`, then verify at 200% browser zoom before shipping — a clamp ceiling can stop text from reaching 200% of its original size, which fails WCAG 1.4.4 |
+| Fluid type on a brand or content surface | `font-size: clamp(<min-rem>, <vw-based>, <max-rem>)`, then verify at 200% browser zoom before shipping — a clamp ceiling can stop text from reaching 200% of its original size, which fails WCAG 1.4.4. An app / task UI uses fixed rem steps instead ([frontend-design-product-ui-vs-brand-surface]) |
 | Serving images | `srcset` + `sizes` so the browser picks the resource for the slot's layout width; explicit `width`/`height` attributes on every `<img>` so space is reserved pre-load (prevents CLS; matters most on lazy-loaded images) |
 | Final gate before shipping | Render at 320px CSS width: all content and functions present with no horizontal scrolling (WCAG 1.4.10 reflow — 320px equals a 1280px desktop at 400% zoom) |
 
