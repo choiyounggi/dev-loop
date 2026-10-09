@@ -1,113 +1,71 @@
-# Knowledge flush — 2 insight(s)
+# Knowledge flush — 3 insight(s)
 
-Run `20261006-223928-57385` (auto-flush). Claimed 19 queue rows: 2 insights were verified and merged into 2 existing pages, and 17 plan-gap rows were dropped as project-specific (listed under Local-layer candidates). No new pages.
+Claimed 27 queue rows (run id `20261007-004436-74724`): 3 `★ Insight` candidates and 24 `plan-gap` rows. Result: 2 new pages (insights 1 and 2 share one page), 2 back-links, 3 index/log rows; 24 plan-gaps retired as local-layer.
 
 ## Verified best-practice
 
-### 1. Two mutants that change a Python file's size by the same amount reuse each other's bytecode; a fresh `PYTHONPYCACHEPREFIX` per run fixes it (row `c9bfb85cd7820c7e`)
+**Insight 1 — Next.js 16 built CSS lives in `.next/static/chunks/`, not `.next/static/css/`** (row `ef8cd55ff96a447d`)
+- Claim: under Next 16 the default `next build` uses Turbopack and writes CSS chunks beside JS chunks; a webpack-era glob `.next/static/css/*.css` matches nothing, so a verify command built on it can never pass (zsh aborts with `no matches found`).
+- Sources: https://nextjs.org/blog/next-16 (Behavior Changes table: "Turbopack is now the default bundler for all apps; opt out with `next build --webpack`"; build banner `▲ Next.js 16 (Turbopack)`).
+- Reproduction 2026-10-07, next@16.3.8, minimal App Router app with one CSS import, in a project-local scratch dir (deleted afterwards):
+  - Default build: banner `▲ Next.js 16.3.8 (Turbopack)`; `find .next/static -name '*.css'` → `.next/static/chunks/1bb-rre_qc00j.css`; `ls -d .next/static/css` → No such file or directory.
+  - Known-bad/contrast arm: `next build --webpack` → banner `▲ Next.js 16.3.8 (webpack)`, CSS at `.next/static/css/095cf7daa880d79a.css` — so the path is bundler-dependent and `find` covers both.
+  - zsh `grep -l x .next/static/css/*.css` with no CSS there → `zsh:1: no matches found`, rc 1; `/bin/bash` → `grep: ...: No such file or directory`, rc 2.
+- The exact chunk path is not stated in the Next docs; it rests on the reproduction. Confidence: **verified** (official default-bundler statement + reproducible two-arm check).
 
-- **Claim:** a harness that rewrites a `.py` file and imports it in a fresh subprocess each time can load the previous mutant's `.pyc`. This happens when two different mutations land in the same second and have the same size as each other, even if that size differs from the original's. Remedy: give each run its own new `PYTHONPYCACHEPREFIX` directory.
-- **Sources checked:**
-  - https://docs.python.org/3/using/cmdline.html — `PYTHONPYCACHEPREFIX`: "If this is set, Python will write .pyc files in a mirror directory tree at this path, instead of in `__pycache__` directories within the source tree"; "Added in version 3.8". I fetched the live page and grepped it on 2026-10-06.
-  - https://docs.python.org/3/library/sys.html#sys.pycache_prefix — "write bytecode-cache .pyc files to (and read them from) a parallel directory tree … Any `__pycache__` directories in the source code tree will be ignored". I fetched the live page on 2026-10-06.
-  - https://docs.python.org/3/reference/import.html — already cited on the page: validation compares the stored mtime and size.
-- **How verified:** reproduced on Python 3.14.6 / macOS in a scratch dir under `~/.dev-loop/scratch/`, deleted afterwards.
-  - Known-bad: `X = "orig"`, then mutant A `X = "aa"`, then mutant B `X = "zz"`, both pinned to the same mtime. With the default cache, B printed `aa` (stale).
-  - Known-good: B under a fresh prefix printed `zz`, even though the in-tree `__pycache__` still held A.
-  - Reused prefix: mutant C `X = "yy"` under the same prefix printed `zz` (stale again). Under a new prefix it printed `yy`.
-- **Confidence:** verified.
+**Insight 2 — pin the tsconfig that `next build` writes** (row `0e927a3537586109`)
+- Claim: Next 16 treats `jsx: react-jsx` as mandatory and appends `.next/types/**/*.ts` and `.next/dev/types/**/*.ts` to `include`, re-serializing the file; a hand-written `jsx: preserve` config is rewritten on every build; pinning the build's own output makes later builds no-ops.
+- Sources: https://nextjs.org/docs/app/api-reference/config/typescript (v16.3.8: `next dev`/`next build` "add a `tsconfig.json` file with the recommended config options"; `next-env.d.ts` regenerated, belongs in `.gitignore`, must be in `include`); https://nextjs.org/blog/next-16 ("`next dev` and `next build` now use separate output directories" — why `.next/dev/types` appears); create-next-app v16.3.8 `templates/app/ts/tsconfig.json` and `templates/app-tw/ts/tsconfig.json` fetched with curl — both ship `"jsx": "react-jsx"` and the two `.next/**/types` include globs.
+- Reproduction: first build printed "The following mandatory changes were made to your tsconfig.json: … jsx was set to react-jsx (next.js uses the React automatic runtime)" and "include was updated to add '.next/dev/types/**/*.ts'"; sha256 after build 1 and build 2 identical (`243562f4…e233`).
+- Source code: next v16.3.8 `packages/next/src/lib/typescript/writeConfigurationDefaults.ts` (curl) — `jsx` always `value: 'react-jsx'`; `esModuleInterop`/`resolveJsonModule` omitted under `module: preserve` (TS ≥5.4); `isolatedModules` omitted under `verbatimModuleSyntax: true`; include globs from `getTypeDefinitionGlobPatterns(distDir)`. https://nextjs.org/docs/app/api-reference/config/next-config-js/distDir for the `<distDir>` edge row.
+- CI guard checked in a scratch repo: `git diff --exit-code` on an untracked file → rc 0 (so the page pairs it with `git ls-files --error-unmatch`, rc 1 when untracked); tracked + modified → rc 1.
+- Confidence: **verified**.
 
-### 2. A completion gate that identifies the worker by tmux session name also matches processes that are not the worker (row `10454e0809cda9c3`)
-
-- **Claim:** a Stop hook that treats "`cwd` matches and `tmux display-message -p '#S'` equals the recorded session" as "this is the managed worker" also matches other processes:
-  - any process started from the worker's pane, because it inherits `TMUX`/`TMUX_PANE`;
-  - when `TMUX` is unset, whatever the most recently used session is.
-- **Fix, gate side:** bind identity to a per-process id. Launch with `claude --session-id <uuid>`, record that id, and compare it with the hook input's `session_id`.
-- **Fix, receiving side:** before acting on a block, compare the parent command's prompt with the task the status entry names. If they differ, report it and stop.
-- **Sources checked:**
-  - https://man7.org/linux/man-pages/man1/tmux.1.html — "If a session is omitted, the current session is used if available; if no current session is available, the most recently used is chosen"; the pane ID "is passed to the child process of the pane in the TMUX_PANE environment variable".
-  - https://man7.org/linux/man-pages/man7/environ.7.html — "When a child process is created via fork(2), it inherits a copy of its parent's environment".
-  - https://code.claude.com/docs/en/hooks — the common input fields include `session_id` ("Current session identifier"). I fetched the live page.
-  - `claude --help` lists `--session-id <uuid>`.
-- **How verified:**
-  - Isolated `tmux -L kfprobe<pid>` server (tmux 3.7b, killed afterwards), two detached sessions `worker-a` and `worker-b`:
-    - A grandchild `sh -c "sh -c 'tmux display-message -p #S'"` started inside pane `worker-a` printed `worker-a`.
-    - The same query with `TMUX` unset printed `worker-b`, not an error.
-  - On the real server, this flush session itself (parent `hooks/auto-flush.sh`, `TMUX` unset) got `lo-17-oi1002` back from `tmux display-message -p '#S'`.
-  - The candidate's field evidence: `hooks/loop-gate.sh` blocked a knowledge-flush `claude -p` child with phase=implementing for task `tmain`.
-- **Correction to the candidate:** its stated mechanism, that inherited `TMUX` is the only path, is incomplete. The fallback to the most recently used session is a second path. `loop-gate.sh:90` guards on `[ -n "$TMUX" ]`, which closes the second path but not the first.
-- **Confidence:** verified.
+**Insight 3 — per-project hook policy lost when the shell sits in a nested repo** (row `1f8019e5875d72e3`)
+- Claim: a hook that finds its project config by walking from the shell directory up to `git rev-parse --show-toplevel` stops at a nested clone's root, so the stricter global rule decides; keep the persistent shell at the project root and address the nested repo with `git -C` / one-command subshells.
+- Sources: https://code.claude.com/docs/en/hooks (common input field `cwd`: "Current working directory when the hook is invoked"; "`cwd` follows Claude … the new directory after Claude runs `cd`"; `${CLAUDE_PROJECT_DIR}` is "the project root where the session started"); https://git-scm.com/docs/git-rev-parse (`--show-toplevel`: "Show the (by default, absolute) path of the top-level directory of the working tree", read from the local `git rev-parse --help`).
+- Hook source read: guardrails 1.2.2 `hooks/bash-guard.sh` `find_repo_cfg` — starts at `$PWD`, bounds the walk at `git rev-parse --show-toplevel`, falls back to `~/.claude/groundwork/guardrails.json`.
+- Reproduction 2026-10-07: from `outer/.claude/tmp/inner/sub` (inner `git init`) `--show-toplevel` → `…/outer/.claude/tmp/inner`; from `outer/.claude/tmp` → `…/outer`; a linked worktree at `outer/.claude/tmp/wt` → `…/outer/.claude/tmp/wt`.
+- https://code.claude.com/docs/en/tools-reference (Bash tool): a `cd` carries over only inside the project or an additional working directory; outside it resets with `Shell cwd was reset to <dir>`; `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` makes every Bash command start in the project directory — added as Do-this step 2.
+- The escalation itself is the queued field report (allowed at worktree root, escalated `rm_rf` from a nested clone's subdir). Confidence: **verified** (mechanism in docs + source + reproduction).
 
 ## Existing-layer check
 
-Pages read: backend-python-language-bytecode-cache-staleness, testing-quality-mutation-harness-file-custody, infrastructure-agent-orchestration-session-completion-gates, infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session
+Routed via `INDEX.md` → `wiki/platforms/index.md` (toolchains, tools) and `wiki/frontend/index.md` (no build-output/framework-tooling category; bundle-and-assets is about bundle size). `wiki_search` (k=5) per candidate trigger:
+- Insight 1 top-5: backend-common-change-impact-compiler-as-call-site-inventory (×2 chunks), testing-quality-value-preserving-refactor-assertions, debugging-signals-stack-traces, platforms-tools-version-keyed-artifact-cache — none about framework build output paths.
+- Insight 2 top-5: security-secrets-secrets-in-code, platforms-tools-deny-rules-under-bypassed-permissions, testing-data-testcontainers-python-community-namespace, backend-common-change-impact-compiler-as-call-site-inventory, qa-process-scope-purity-checks — none about a build rewriting a tracked config.
+- Insight 3 top-5: platforms-tools-harness-mediated-tool-results, qa-process-scope-purity-checks (×2), platforms-filesystems-paths-case-and-line-endings, backend-common-llm-project-local-layer-over-shared-guidance — none about hook config discovery vs the shell directory.
+- Repo grep: `turbopack|next.js|nextjs|tsconfig` hits only compiler-as-call-site-inventory, backend/index, secrets-in-code (unrelated mentions); `show-toplevel|nested clone|guardrails` hits agent-orchestration pages about brief writing and run state, not config discovery.
 
-- **Insight 1:** `backend-python-language-bytecode-cache-staleness` already covers the timestamp+size collision, `__pycache__` purge, mtime bump, hash-based `.pyc`, `-B`, `copy2`, and fresh-spec imports. Its 2026-08-11 field row even shows consecutive mutants loading the first mutant's value.
-  - What was new: the `PYTHONPYCACHEPREFIX` remedy, and the explicit "same size as each other, not as the original" mutant-to-mutant case.
-  - **Merged, not created:** extended step 2 with the prefix option and added one edge row (including "reusing one prefix brings the collision back"). Also added two source lines plus the reproduction, a `When this applies` clause, and a `related:` link to `testing-quality-mutation-harness-file-custody` (that page is about backup/restore custody, not cache invalidation, so no duplicate).
-  - No conflict with existing directives (body line count after review fixes is below).
-- **Insight 2:** `infrastructure-agent-orchestration-session-completion-gates` owns the Stop/completion-gate topic. It already had a "several workers share one status directory → match by `cwd`" row, but nothing on session identity.
-  - `infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session` covers inherited env used *on purpose* (lock ownership). It does not cover inherited env misread as identity, so it is related, not a duplicate.
-  - **Merged, not created:** two edge rows (gate side, receiving side), one Instead-of row, a `When this applies` clause, and three source lines (tmux man, environ(7), reproduction). No conflict (cap 120; count after review fixes is below).
-- **Index rows extended:** `session-completion-gates` in `wiki/infrastructure/index.md` and `bytecode-cache-staleness` in `wiki/backend/python/index.md`. Two `revise` lines appended to `log.md`.
-- **Lint:**
-  - `node scripts/wiki-structure-checks.js <repo>/wiki --layer bundled` → `pages: 359, indexes: 13, findings: 0`.
-  - `node scripts/wiki-lint-prohibitions.js <repo>` → 3 violations, all already on main and none in the changed files (`plans/harvest-dedupe-processed/...`, `skills/graph-setup/SKILL.md`, `wiki/infrastructure/config/keys-ahead-of-their-consumer.md`).
+Pages read: platforms-toolchains-regeneration-silently-drops-hand-edited-state, platforms-tools-deny-rules-under-bypassed-permissions, testing-quality-checks-that-cannot-pass, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-worktree-isolated-workers
 
-**Independent adversarial review:** `feature-dev:code-reviewer`, read-only, ran before commit and returned FAIL with 7 findings. All were fixed:
+Adversarial review (fresh-context `feature-dev:code-reviewer`, no shell, re-fetched every cited doc) before commit — findings and what changed:
+- Unsupported: `distDir` row, the mandatory-option list, "not configurable", `git diff --exit-code` guard, `.gitignore` "untracks", cd-reset row, submodule row → each now cites source code / docs / a scratch-repo check, or is reworded (`git rm --cached`; submodule marked not reproduced).
+- Wrong in a common case: page 2 said a non-root toplevel means the policy was never loaded — false for a worktree/clone of the same project with a tracked policy file. Scoped the trigger and step 4 to a nested repo without the file; edge row rewritten.
+- Wording: hook start directory is "the shell directory the previous call left behind"; `CLAUDE_PROJECT_DIR` quoted from the docs.
+- All quoted phrases were confirmed faithful; format (frontmatter, positive form, ≤120 lines) passed.
 
-1. The receiving-side `ps -o command= -p $PPID` step was unproven. It is now scoped to headless `claude -p` (interactive workers get their prompt by paste, so argv holds none), backed by this session's own reproduction.
-2. Identity bound to `session_id` alone was incomplete. Added an edge row: subagents share the parent's `session_id`, `agent_id` is "Present only when the hook fires inside a subagent call", and relaunch with `--resume` keeps the id while `--fork-session` mints a new one. Sources: hooks + cli-reference pages.
-3. The `session_id` / `--session-id` claims were moved into their own source bullets, citing hooks and https://code.claude.com/docs/en/cli-reference.
-4. `When this applies` on the gates page is back to 4 lines.
-5. Added the cost trade-off for the prefix option: full recompile including stdlib (the reproduction's prefix held an `opt/` tree) plus one directory per run. It now says when to choose the prefix and to delete each prefix directory.
-6. Step 5 on the bytecode page no longer implies that a length-changing mutant is safe. The index row was reworded to match. A re-check found one more gap (N1: the two-mutant edge row offered only the prefix). It now offers the purge first and refers to step 2 for when to prefer the prefix; the re-check confirmed findings 1–7 resolved.
-7. The tmux reproduction text no longer claims "most recently used" over "most recently created". A second isolated-server try (`send-keys` to `worker-a`) did not update session activity, so that run cannot separate the two; the rule is cited from the man page.
-
-Body lines after the fixes: 85 (bytecode) and 118 (gates). Both lints were re-run: structure 0 findings; prohibitions 3, all already on main, 0 in changed files.
+Outcome: no duplicate, no conflicting directive → 2 new pages.
+- Created `platforms-toolchains-nextjs-16-build-output-and-tsconfig-rewrite` (insights 1+2: same tool, same "what does `next build` write" trigger family; two "When this applies" bullets).
+- Created `platforms-tools-hook-config-lookup-from-shell-cwd` (insight 3).
+- Back-links added: regeneration-silently-drops-hand-edited-state → nextjs page; deny-rules-under-bypassed-permissions → hook-config page.
+- Back-links deferred (forward `related:` only) because an open PR rewrites that file's `related:` line: checks-that-cannot-pass (#223), command-text-inspected-before-execution (#230), harness-mediated-tool-results (#223), worktree-isolated-workers (#223), flag-availability-at-the-execution-site (#244), portable-shell-scripts (#223).
+- Lint: `node scripts/wiki-structure-checks.js wiki/` → `pages: 361, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki/` → `violations: 0`. Known-bad arm: same structure check on a scratch copy with a fabricated related id → rc 3, `bad-related: … resolves to no page`.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed via `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`: #253, #249, #244, #241, #239, #238, #237, #236, #235, #234, #233, #231, #230, #229, #228, #227, #226, #225, #223 (19 heads). I fetched all of them and searched every `+` line of `git diff origin/main...origin/<head> -- wiki/` for `pyc|pycache|bytecode|PYTHONPYCACHEPREFIX|mtime|TMUX|display-message|#S|session name`.
+Listed 20 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253, #254) and diffed each against `origin/main` under `wiki/` for `turbopack|next.js|nextjs|tsconfig|show-toplevel|nested clone|nested git|guardrails|hook.*(config|cwd)|starting directory`. Hits: #254 (session-completion-gates row mentions `cwd` + tmux session name — worker identification, not config discovery), #244 (tsconfig `paths` alias vs Node `exports` — module resolution), #233 (TypeScript 6 `types` default — not Next build rewrites). Adjacent but distinct: #235 adds `unmatched-glob-in-a-command-argument` (zsh NOMATCH on a glob the program matches itself — the new page only cites the symptom and does not restate that guidance; not linked because the id is not on main yet) and #223 adds `hook-input-fields-from-the-reference` (hook stdin field names, not config discovery).
 
-| Candidate | Overlapping open PR | Verdict |
-|-----------|---------------------|---------|
-| c9bfb85cd7820c7e pyc mutant collision | none. No head touches `bytecode-cache-staleness.md`. #244 edits `wiki/backend/python/index.md` but a different row (circular-imports); none of the 19 heads' diffs add or remove a line naming `bytecode-cache-staleness` | new (merged into existing page) |
-| 10454e0809cda9c3 tmux identity in a Stop gate | none. #234 adds `platforms/processes/driving-a-tui-in-a-tmux-pane` (send-keys delivery confirmation, a different trigger). No head touches `session-completion-gates.md`. #223/#225/#239/#241 edit `wiki/infrastructure/index.md` but not the `session-completion-gates` row | new (merged into existing page) |
-
-`log.md` and `.dev-loop/INGEST_REPORT.md` conflict with every open head, as usual for these flushes.
+Verdicts: insight 1 → **new**; insight 2 → **new**; insight 3 → **new**.
 
 ## Routing decision
 
-| Insight | Target | Action |
-|---------|--------|--------|
-| pyc mutant collision / `PYTHONPYCACHEPREFIX` | backend/python/language → `wiki/backend/python/language/bytecode-cache-staleness.md` | amend: step 2 + edge row + sources |
-| tmux session-name identity in a completion gate | infrastructure/agent-orchestration → `wiki/infrastructure/agent-orchestration/session-completion-gates.md` | amend: 2 edge rows + Instead-of row + sources |
-
-No new category. Both insights fit an existing page whose trigger already owns the situation. The tmux lesson was also tested against `platforms/processes`, but its trigger is "a gate deciding which session is the worker", which `session-completion-gates` owns.
+- Insights 1+2 → `platforms/toolchains/nextjs-16-build-output-and-tsconfig-rewrite.md`. platforms/toolchains already holds "generator rewrites a tracked file" and "version-dependent tool behavior" pages; frontend's categories cover UI code, not what a framework build writes to disk. No new category.
+- Insight 3 → `platforms/tools/hook-config-lookup-from-shell-cwd.md`. The queued domain hint was infrastructure/agent-orchestration, but the mechanism applies to any Claude Code session under a cwd-scoped hook, orchestrated or not; platforms/tools already holds the harness/hook pages (deny-rules-under-bypassed-permissions, harness-mediated-tool-results). No new category.
 
 ## Local-layer candidates
 
-All 17 rows come from linkly (`/Users/choeyeong-gi/Desktop/workspace/linkly-seaslug`). They are wiki-plan Phase B "no owning wiki page" decisions for tasks t194 and t188, and each names linkly's own files, RFCs, or test layout. Run wiki-ingest inside that project if any are worth keeping.
-
-| Row | Decision | Target |
-|-----|----------|--------|
-| dbc435945b66cdc4 | t194 gateway port allocation for the new test | wiki-local/testing/data/gateway-test-port-allocation.md |
-| 4d8c8a66275a32b6 | t194 .orchestration/changelog/t194.md | wiki-local/infrastructure/agent-orchestration/task-changelog-entries.md |
-| d3ec9f1ff0551f33 | t194 final verification order (check_doc_snippets, suite, dev_doctor) | wiki-local/qa/process/final-verification-order.md |
-| f596944b2430ea3f | t188 clause keyword and position | wiki-local/backend/common/language-design/cached-clause-syntax.md |
-| fc9097e4cd761b9f | t188 hit and miss mechanics in mode A | wiki-local/backend/common/caching/cached-clause-mode-a.md |
-| c0fb97a87b805464 | t188 a workflow that writes what it reads with cached | wiki-local/backend/common/caching/cached-read-write-workflow.md |
-| 0c882f9626778c78 | t188 trace and metrics | wiki-local/backend/common/observability/cached-clause-trace.md |
-| f611967725ff1bae | t188 spec observation | wiki-local/testing/strategy/spec-observation-of-cache.md |
-| c47f84db67956bd8 | t188 IR schema and validate_ir | wiki-local/backend/common/language-design/ir-schema-validate-ir.md |
-| df5ebd6825225b41 | t188 ENFORCEMENT-MATRIX.md | wiki-local/qa/document-verification/enforcement-matrix.md |
-| 7a2c28929298bb40 | t188 RFC-0062 scope and Updates | wiki-local/qa/document-verification/rfc-updates-chain.md |
-| 625fd9411f9ca01e | t188 mutation anchors | wiki-local/testing/quality/mutation-anchors.md |
-| 120e5d1addd2df5d | t188 idempotency and vocabulary exports | wiki-local/backend/common/language-design/vocabulary-exports.md |
-| 295657db0e29ce85 | t188 interaction with main's new features | wiki-local/backend/common/change-impact/cached-clause-feature-interaction.md |
-| cbf1c446a26683a0 | t188 where the tests live | wiki-local/testing/strategy/test-placement.md |
-| b1d8effce181f9d8 | t188 changelog, blackboard, follow-up | wiki-local/infrastructure/agent-orchestration/task-closeout-artifacts.md |
-| fe85641fd860dd7f | t188 docs/backends.md | wiki-local/qa/document-verification/backends-doc.md |
-
-Separately, for the owner: `hooks/loop-gate.sh:86-95` is the real-world instance of insight 2. A headless child started under a worker's pane gets blocked as that worker. This PR records only the general lesson; the hook fix belongs in its own issue.
+All 24 `plan-gap` rows are per-task design decisions that name one repository's own files, modules and conventions — excluded from this PR. Run wiki-ingest inside that project if any should persist:
+- linkly, task t189 (14 rows: `f68a1de9cb55da66`, `ca6074ccf20b52ce`, `30ef5a67fdc20ae6`, `ff2818c4c12a9039`, `b1330715aaa59008`, `797cbdc6cd089be0`, `5c402b4b5f5ef523`, `b26bda08f4c7bf18`, `2145b5849260e272`, `9a6fec94ecc06f9d`, `0b04e848c404d49a`, `2e1b7c241919e43e`, `7fcdf73748dac079`, `d5bea8aa3c9701a5` — deploy_gen module layout, `--set` option channel, capability→service mapping, YAML escaping, DNS-1035 names, goldens) → `wiki-local/infrastructure/deploy/compose-and-k8s-generators.md` — run wiki-ingest inside that project.
+- linkly, task t192 (8 rows: `2c338f7472d6cca6`, `2138692f31f68a45`, `ce4b609e9fc14a83`, `d92d4cd64d7e65dd`, `e8f481402bb4b4fb`, `6700e0327e928b26`, `2252032edcc09dab`, `9df8879ea515ed17` — secret-file trailing newline, SecretProvider SPI, opener diagnostics, bookkeeping) → `wiki-local/security/secrets/secret-provider-spi.md` — run wiki-ingest inside that project.
+- Next.js 16 invitation scaffold project, task t1 (2 rows: `61e0efcc16733efe`, `1d79a3953022f952` — Tailwind v4 `@theme inline` token mapping, dev-only preview route; the row does not name the repository) → `wiki-local/frontend/design/tailwind-v4-token-mapping.md` — run wiki-ingest inside that project.
