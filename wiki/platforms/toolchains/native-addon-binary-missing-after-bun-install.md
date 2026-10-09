@@ -10,7 +10,7 @@ sources:
   - https://bun.com/docs/guides/install/trusted
   - https://github.com/oven-sh/bun/blob/main/src/install/default-trusted-dependencies.txt
   - https://github.com/nodejs/node-gyp#installation
-  - https://github.com/WiseLibs/better-sqlite3/blob/master/package.json
+  - https://github.com/WiseLibs/better-sqlite3/blob/v12.8.0/package.json
 last_verified: 2026-09-28
 related: [platforms-toolchains-version-management, platforms-toolchains-compiler-sysroot-on-macos, platforms-environment-path-resolution, security-dependencies-supply-chain, platforms-tools-plugin-mcp-server-registration]
 ---
@@ -85,6 +85,6 @@ no `.node`; deciding between `bun pm trust`, `--trust`, and rebuilding by hand.
 - https://bun.com/docs/guides/install/trusted — default allowlist note and the replace-not-extend rule
 - https://github.com/oven-sh/bun/blob/main/src/install/default-trusted-dependencies.txt — better-sqlite3 and sqlite3 are on the default list
 - https://github.com/nodejs/node-gyp#installation — Xcode CLT and supported Python requirements; `--python`, `npm_config_python`, `PYTHON`; `rebuild` = clean + configure + build
-- https://github.com/WiseLibs/better-sqlite3/blob/master/package.json — install script `prebuild-install || node-gyp rebuild --release`
+- https://github.com/WiseLibs/better-sqlite3/blob/v12.8.0/package.json — install script `prebuild-install || node-gyp rebuild --release` at v12.8.0, the version in the field case (13.x removed the install script and ships per-platform prebuilds)
 - Reproduction, bun 1.3.11, 2026-09-28: a trusted `file:` dependency whose install script exits 1 makes `bun install` exit 1 with `error: install script from "failing-dep" exited with 1`, leaves `build/Release/obj`, and writes no lockfile (`bun pm untrusted` then reports `Lockfile not found`); an unlisted dependency yields `Blocked 1 postinstall` with exit 0, and `bun pm trust` runs its script and writes `trustedDependencies`
 - Field case, 2026-09-28: a globally bun-installed MCP server depending on better-sqlite3 12.8.0 launched under Node 26 with only `obj` directories in `build/Release`; better-sqlite3 was on the default list and absent from `bun pm untrusted`; `prebuild-install` had no binary for that ABI and `node-gyp rebuild --release --python=<3.11>` produced `better_sqlite3.node`, after which the server connected

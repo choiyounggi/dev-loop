@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for skills/orchestrate/SKILL.md Phase 4's four-lens review pass and
+# Tests for skills/orchestrate/SKILL.md Phase 4's six-lens review pass and
 # skills/orchestrate/templates/review-report.md (i82-phase4-lenses, issue
 # #82 / #84).
 #
@@ -32,16 +32,17 @@ lens_order() {
   phase4_section "$1" | grep -oE '^[0-9]\. \*\*[^*]+\*\*' | sed -E 's/^([0-9])\..*/\1/' | tr -d '\n'
 }
 
-# --- normal: the five lenses are present, numbered 1-5, in order -----------
+# --- normal: the six lenses are present, numbered 1-6, in order ------------
 
-@test "Phase 4 contains the five lenses, numbered 1-5, in order" {
-  [ "$(lens_order "$SKILL")" = "12345" ]
+@test "Phase 4 contains the six lenses, numbered 1-6, in order" {
+  [ "$(lens_order "$SKILL")" = "123456" ]
   section="$(phase4_section "$SKILL")"
   [[ "$section" == *"Plan conformance"* ]]
   [[ "$section" == *"Wiki re-route from the diff"* ]]
   [[ "$section" == *"Execution-environment reality"* ]]
   [[ "$section" == *"Multi-object write ordering"* ]]
   [[ "$section" == *"AC traceability"* ]]
+  [[ "$section" == *"Excess"* ]]
 }
 
 @test "lens 2 cites AGENTS.md routing protocol step 7 by document and step number only" {
@@ -69,9 +70,10 @@ lens_order() {
 @test "Phase 4 retains the test-quality-auditor obligation as prose alongside the pass, not as a numbered lens" {
   section="$(phase4_section "$SKILL")"
   [[ "$section" == *'test-quality-auditor'* ]]
-  # it must not be a sixth numbered lens — the issue fixes exactly five lenses
-  [[ "$section" != *'6. **'* ]]
+  # it must not be a seventh numbered lens — the lens list is fixed at six
+  [[ "$section" != *'7. **'* ]]
   [[ "$section" == *'5. **AC traceability'* ]]
+  [[ "$section" == *'6. **Excess'* ]]
 }
 
 @test "Phase 4 retains the surrounding mechanics: the agent's diff range, rework budget, escalation, dispatch-loop return" {
@@ -91,8 +93,8 @@ lens_order() {
 
 @test "negative control: a SKILL.md copy with the lens lines removed fails the order check" {
   stripped="${BATS_TEST_TMPDIR}/skill-no-lenses.md"
-  grep -v -E '^[0-9]\. \*\*(Plan conformance|Wiki re-route|Execution-environment|Multi-object|AC traceability)' "$SKILL" > "$stripped"
-  [ "$(lens_order "$stripped")" != "12345" ]
+  grep -v -E '^[0-9]\. \*\*(Plan conformance|Wiki re-route|Execution-environment|Multi-object|AC traceability|Excess)' "$SKILL" > "$stripped"
+  [ "$(lens_order "$stripped")" != "123456" ]
 }
 
 # --- negative control: reordering two lenses breaks the order check --------
@@ -108,7 +110,7 @@ lens_order() {
     }
     { print }
   ' "$SKILL" > "$swapped"
-  [ "$(lens_order "$swapped")" != "12345" ]
+  [ "$(lens_order "$swapped")" != "123456" ]
 }
 
 # --- template structure: three-part finding format + non-blocking section --
@@ -131,12 +133,13 @@ lens_order() {
 
 # --- error/boundary: per-lens table distinguishes clean, findings, not-run -
 
-@test "review-report.md's per-lens table has 5 rows, each distinguishing clean/findings/not-run" {
+@test "review-report.md's per-lens table has 6 rows, each distinguishing clean/findings/not-run" {
   content="$(cat "$TEMPLATE")"
   clean_count="$(grep -c 'clean —' "$TEMPLATE")"
   notrun_count="$(grep -c 'not run —' "$TEMPLATE")"
-  [ "$clean_count" -eq 5 ]
-  [ "$notrun_count" -eq 5 ]
+  [ "$clean_count" -eq 6 ]
+  [ "$notrun_count" -eq 6 ]
+  [[ "$content" == *"| 6. Excess |"* ]]
   [[ "$content" == *"findings: F1, F2"* ]]
 }
 
@@ -256,4 +259,78 @@ lens_order() {
   sed 's/a prefix or substring//' "$SKILL" > "$stripped"
   section="$(phase4_section "$stripped" | tr '\n' ' ' | tr -s ' ')"
   [[ "$section" != *"prefix or substring match is not valid"* ]]
+}
+
+# --- lens 6 Excess (plans/excess-lens-and-lint-gate D4) ----------------------
+
+@test "lens 6 asks for the serving brief/plan line and blocks only on search evidence" {
+  section="$(phase4_section "$SKILL" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$section" == *"name the brief or plan line it serves"* ]]
+  [[ "$section" == *"or a later task's Inputs"* ]]
+  [[ "$section" == *"two or more call sites that all pass the same value"* ]]
+  [[ "$section" == *"zero call sites outside its own tests"* ]]
+  [[ "$section" == *"standard-library/language function"* ]]
+  [[ "$section" == *"exactly one implementation"* ]]
+  [[ "$section" == *"belongs to lens 1"* ]]
+  [[ "$section" == *"goes under Non-blocking"* ]]
+}
+
+@test "negative control: a Phase 4 copy without the lens 6 block fails the Excess check" {
+  stripped="${BATS_TEST_TMPDIR}/skill-no-excess.md"
+  awk '/^6\. \*\*Excess/{skip=1} !skip{print} skip && /Non-blocking\.$/{skip=0}' "$SKILL" > "$stripped"
+  section="$(phase4_section "$stripped" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$section" != *"zero call sites outside its own tests"* ]]
+}
+
+@test "review-report.md states what an Excess finding's failure scenario is" {
+  content="$(tr '\n' ' ' < "$TEMPLATE" | tr -s ' ')"
+  [[ "$content" == *'For a lens 6 (Excess) finding, the failure scenario is the search command, its hit count, and "no brief or plan line needs it".'* ]]
+}
+
+@test "negative control: a review-report.md copy without the Excess row counts 5 clean rows" {
+  stripped="${BATS_TEST_TMPDIR}/review-report-no-excess.md"
+  grep -v '^| 6\. Excess |' "$TEMPLATE" > "$stripped"
+  [ "$(grep -c 'clean —' "$stripped")" -eq 5 ]
+}
+
+# --- task-reviewer agent lens 6 (plans/excess-lens-and-lint-gate task 07) ---
+
+agent_flat() { # <file>
+  tr '\n' ' ' < "$1" | tr -s ' '
+}
+
+@test "task-reviewer carries lens 6 and names it for every tier" {
+  agent="${BATS_TEST_DIRNAME}/../agents/task-reviewer.md"
+  text="$(agent_flat "$agent")"
+  [[ "$text" == *'6. **Excess**'* ]]
+  [[ "$text" == *'zero call sites outside its own tests'* ]]
+  [[ "$text" == *"or a later task's Inputs"* ]]
+  [[ "$text" == *'two or more call sites that all pass the same value'* ]]
+  [[ "$text" == *'| R0 | lenses 1, 3 and 6; write not run — R0 profile in rows 2, 4, 5 |'* ]]
+  [[ "$text" == *'| R1 | lenses 1-4 and 6; write not run — R1 profile in row 5 |'* ]]
+  [[ "$text" == *'| R2 or R3 | lenses 1-6; R3 also applies the adversarial-change-review techniques under lens 5 |'* ]]
+}
+
+@test "the generated task-reviewer-r1 copy carries lens 6 too" {
+  text="$(agent_flat "${BATS_TEST_DIRNAME}/../agents/task-reviewer-r1.md")"
+  [[ "$text" == *'6. **Excess**'* ]]
+  [[ "$text" == *'| R1 | lenses 1-4 and 6; write not run — R1 profile in row 5 |'* ]]
+}
+
+@test "boundary: the agent body has exactly one lens 6 line" {
+  [ "$(grep -c '^6\. \*\*Excess\*\*' "${BATS_TEST_DIRNAME}/../agents/task-reviewer.md")" -eq 1 ]
+}
+
+@test "negative control: an agent copy with the old R1 row fails the R1 check" {
+  old="${BATS_TEST_TMPDIR}/task-reviewer-old-r1.md"
+  sed 's/| R1 | lenses 1-4 and 6;/| R1 | lenses 1-4;/' "${BATS_TEST_DIRNAME}/../agents/task-reviewer.md" > "$old"
+  text="$(agent_flat "$old")"
+  [[ "$text" != *'| R1 | lenses 1-4 and 6; write not run — R1 profile in row 5 |'* ]]
+}
+
+@test "negative control: a Phase 4 copy without the later-task seam exemption fails the lens-6 check" {
+  stripped="${BATS_TEST_TMPDIR}/skill-no-seam.md"
+  sed "s/, or a later task's Inputs//" "$SKILL" > "$stripped"
+  section="$(phase4_section "$stripped" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$section" != *"or a later task's Inputs"* ]]
 }

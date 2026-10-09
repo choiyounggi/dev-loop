@@ -9,7 +9,7 @@ sources:
   - https://html.spec.whatwg.org/multipage/canvas.html
   - https://github.com/jsdom/jsdom/issues/1895
 last_verified: 2026-09-21
-related: [frontend-design-anti-slop-visual-design, frontend-design-html-in-canvas, testing-mocking-what-to-mock]
+related: [frontend-design-anti-slop-visual-design, frontend-design-html-in-canvas, testing-mocking-what-to-mock, frontend-design-theme-swap-propagation-check]
 ---
 
 # Design-Token Values Read from Script When Tokens Alias Other Tokens

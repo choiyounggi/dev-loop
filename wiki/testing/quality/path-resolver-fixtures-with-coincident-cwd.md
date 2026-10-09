@@ -9,7 +9,7 @@ sources:
   - https://en.wikipedia.org/wiki/Mutation_testing
   - https://arxiv.org/abs/2410.21904
 last_verified: 2026-09-17
-related: [testing-quality-default-values-under-test, testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-data-test-data-and-isolation, testing-quality-surviving-mutant-equivalence-triage]
+related: [testing-quality-default-values-under-test, testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-data-test-data-and-isolation, testing-quality-surviving-mutant-equivalence-triage, testing-quality-cross-component-invariant-via-shared-helper]
 ---
 
 # Testing a Root Resolver Whose Fallback Is the Working Directory
