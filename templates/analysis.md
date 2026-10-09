@@ -21,9 +21,16 @@ cite these ids, and gate-B's requirements-covered fails a row without one.
 
 ## Ground truth
 - Baseline: <test command> -> rc=<n>, HEAD <sha>, git status <clean|dirty>
+- Lint: <lint or typecheck command> -> rc=<n>
 
 The baseline-tests-ran gate re-runs the exact `<test command>` above; record
 one command that can be copy-pasted and re-executed as-is.
+
+Add one `- Lint:` bullet per lint or typecheck command the project runs, with
+the rc you got running it now, or a single
+`- Lint: none — checked: <command that confirmed it>` bullet. The
+lint-surveyed gate fails without one; it checks the format only and never
+re-runs the command.
 
 ### Affected files
 Every bullet MUST include an `evidence:` token backed by a real search — the

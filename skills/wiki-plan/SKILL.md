@@ -65,7 +65,9 @@ A quiet skip is never allowed — every abandonment must appear on the ledger an
 in the eventual task report's `GATES:` line. (This is the same abandonment
 mechanism `templates/gates.md` already uses.) gaps-emitted is never abandoned:
 it runs in lite mode too and simply records nothing when the [no-wiki] count
-is the zero the lite verdict assumed.
+is the zero the lite verdict assumed. `lint-surveyed` is never abandoned in
+lite mode either: it is one format check, and Phase C needs the recorded
+command.
 
 ## Phase A — Analyze (produces `plans/<feature>/analysis.md`)
 
@@ -84,6 +86,13 @@ token remains, so leaving a question unresolved is what blocks entry to Phase B
 - `Baseline: <test command> -> rc=<n>, HEAD <sha>, git status <clean|dirty>` —
   record one command that can be copy-pasted and re-run as-is; gate-A re-runs
   this exact command.
+- `Lint: <command> -> rc=<n>` — one bullet per lint or typecheck command the
+  project runs (package.json scripts named lint, typecheck, type-check or
+  check; Makefile lint targets; CI workflow steps that run a linter or type
+  checker; the `verify` role when it names one), run once now to record its
+  rc — or one `Lint: none — checked: <search command>` bullet when there is
+  none. gate-A's `lint-surveyed` checks this format only and never re-runs
+  the command.
 - `### Affected files` — every bullet needs an `evidence:` token backed by a
   real search (`<path> — evidence: <search command> -> <n> hits`). A
   code-graph hit (`explore` = graphify) may be cited only in the same bullet
@@ -115,7 +124,8 @@ sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh emit A plans/<fea
 sh ${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh --run .dev-loop/gates/plan-A-<feature>.md
 ```
 Gate ids: `baseline-tests-ran`, `affected-files-evidenced`,
-`open-questions-resolved`, `constraints-surveyed`, `research-evidenced`. Exit 0
+`open-questions-resolved`, `constraints-surveyed`, `lint-surveyed`,
+`research-evidenced`. Exit 0
 (every gate MET or explicitly ABANDONed) before entering Phase B; a failing
 gate means fixing `analysis.md`, not editing the gate.
 
@@ -211,7 +221,10 @@ path, the requester's original goal text, and the wiki root
 line into `plans/<feature>/review-verdict.md` (gate-B reads that file, not the
 `## Review` section). If `VERDICT: FAIL`, resolve every `blocking` finding and
 re-call — bounded at 3 total calls; a 3rd `FAIL` is STOP + escalate to the
-requester, not a forced PASS.
+requester, not a forced PASS. An HTTP 429 naming a model limit is not a
+verdict and not a call against the bound: re-run once with the Agent tool's
+`model` override set to whichever of `opus` and `fable` the 429 does not name,
+then escalate — never retry on `sonnet`.
 
 **gate-B**:
 ```
@@ -285,12 +298,28 @@ Exit 0 before entering Phase C.
      declaring its update is a plan defect, not a surprise for the implementer.
    ## Verify
    - <command to run and what output means success; or concrete checklist>
+   - lint: <one line per Lint bullet — see the Lint gating table below>
    - covers: R<n> — the `## Requirements` row (from analysis.md's A1) this
      task's verification proves; a task covering no Rule is a scope-creep
      signal, and a Rule covered by no task is a coverage gap.
    ## Out of scope
    - <the adjacent thing the next task does — so the implementer stops at the boundary>
    ```
+
+   **Lint gating in every task's `## Verify`.** For each `- Lint:` bullet in
+   analysis.md's `## Ground truth`, write one lint line into every task's
+   Verify:
+
+   | Ground truth bullet | Task Verify line |
+   |---|---|
+   | `Lint: <command> -> rc=0` | `- lint: <command> && echo LINT_OK` — `<command>` copied verbatim; success = `LINT_OK` printed |
+   | `Lint: <command> -> rc=<non-zero>`, the tool accepts file operands | `- lint: fs=(); for f in <only the Deliverables paths this tool lints>; do [ -f "$f" ] && fs+=("$f"); done; echo "lint files (${#fs[@]}): ${fs[*]-}"; if [ ${#fs[@]} -eq 0 ]; then echo "lint skipped: no lintable Deliverables remain"; else <tool invocation that takes files> "${fs[@]}"; fi && echo LINT_OK` (bash) — the untouched tree already fails, so only this task's files are judged; deleted files and paths with spaces pass through safely, and an empty list is reported, not hidden |
+   | `Lint: <command> -> rc=<non-zero>`, the tool takes no file operands | `- lint: not gated — baseline rc=<n>, <command> takes no file operands`; loop-implement step 0 records it as `ABANDON: <gate id> baseline rc=<n>, <command> takes no file operands` |
+   | `Lint: none — checked: ...` | no lint line |
+
+   Warnings block only when the recorded command already promotes them (a
+   lint script running `eslint --max-warnings 0`); the plan never adds a
+   warning-promotion flag.
 
 6. **Self-check before handing off.** For each task, simulate a Haiku-grade
    implementer: reading ONLY that file + its wiki pages, is there any point where
@@ -303,7 +332,9 @@ Exit 0 before entering Phase C.
    check coverage both directions: every Rule in analysis.md's `## Requirements`
    is named by at least one task's `covers:` line, and every task's `covers:`
    line names a Rule that actually exists — an orphan on either side goes back
-   to Phase A/C for repair before dispatch.
+   to Phase A/C for repair before dispatch. Then check lint: every task's
+   Verify carries one lint line per `- Lint:` bullet, per the Lint gating
+   table.
 
 ## Execution handoff
 

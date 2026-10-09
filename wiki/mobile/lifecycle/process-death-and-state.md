@@ -11,7 +11,7 @@ sources:
   - https://developer.android.com/privacy-and-security/keystore
   - https://developer.apple.com/documentation/security/keychain-services
 last_verified: 2026-07-10
-related: [mobile-offline-offline-first-sync]
+related: [mobile-offline-offline-first-sync, mobile-state-map-marker-state-from-changing-position]
 ---
 
 # Surviving OS Process Death with User State Intact

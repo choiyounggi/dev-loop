@@ -43,8 +43,8 @@ pass executes decisions instead of guessing them. See step 2 below.
 ## Tool profile (pluggable)
 The *other* steps can use environment-specific tools through named **capability
 roles**: `knowledge` (domain facts / policy / code values), `tacit` (past
-incidents, edge cases, danger zones), `verify` (the project's test / build / QA
-command), `explore` (code/symbol search — a fresh graphify graph is the
+incidents, edge cases, danger zones), `verify` (the project's test / build / lint /
+typecheck / QA command), `explore` (code/symbol search — a fresh graphify graph is the
 recommended cli; call the binary directly and never load the graphify skill
 document (1,300+ lines), see `references/tool-profile.md`), `design`
 (visual/UI spec for a UI task, e.g. a Figma link), and `research` (external
@@ -103,6 +103,8 @@ starting the next, so a downstream task always builds on a verified upstream one
                         ledger file `.dev-loop/gates/<task-id>.md` (copy
                         `templates/gates.md`): each machine-checkable criterion
                         gets CHECK:/EXPECT:, manual ones EVIDENCE only.
+                        A `lint: not gated` Verify line becomes an `ABANDON:`
+                        line with its stated reason.
                         (See "Gates ledger" below.)                             [DoD/XP]
 1. Analyze + load refs— read THIS task's "Wiki pages (read these first, only
                         these)" — the pages `wiki-plan` navigated to — and load
@@ -283,9 +285,10 @@ REASONS: ...
   weakening tests), increment the attempt count, and loop back to step 3.
 - The Agent call itself fails with an HTTP 429 that names a model limit (e.g.
   "You've reached your <model> limit") -> this is NOT a verdict (issue #200):
-  re-run the identical call with the Agent tool's `model` parameter set to
-  `opus`; if that also 429s, once more with `sonnet`; after those two retries
-  report BLOCKED instead of guessing a verdict.
+  re-run the identical call once with the Agent tool's `model` parameter set
+  to whichever of `opus` and `fable` the 429 does not name; if that also 429s,
+  report BLOCKED instead of guessing a verdict — never retry on `sonnet`, which
+  is below the auditor's claude-opus-5-5 high floor.
 
 Floor passed != quality passed — the auditor still rules on semantic quality
 even when the floor came back clean.
