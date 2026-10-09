@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html
   - https://git-scm.com/docs/git-check-ignore
-last_verified: 2026-09-27
+last_verified: 2026-09-28
 related: [qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-worker-reported-plan-contradiction, testing-quality-checks-that-cannot-pass, platforms-shells-env-var-off-switches, qa-document-verification-rationale-prose-after-a-config-value-change, backend-common-llm-binding-instructions-for-agents, platforms-tools-gitignore-directory-reinclusion]
 ---
 
@@ -25,7 +25,10 @@ Also applies when the plan lists a multi-task "Task order / Depends on" table
 together with each task's own Steps or Inputs section, before implementing any
 task in it. Also applies when you are the plan's author, about to state a code
 wiring (a value threaded between two call sites, a lookup keyed by an id built
-elsewhere) or a pre-computed number (a contrast ratio) as fact.
+elsewhere) or a pre-computed number (a contrast ratio) as fact. Also applies
+when an adopt-only plan states two execution rules whose joint satisfiability
+depends on the current suite ("do not modify existing test bodies" together
+with "stop on any new failure").
 
 ## Do this
 
@@ -93,6 +96,7 @@ elsewhere) or a pre-computed number (a contrast ratio) as fact.
 | A plan's structural premise (a manifest field's shape, a source type) was copied from a sibling repo's or task's plan rather than read from this target | Read the target's real manifest field once before dispatch; escalate if it differs from the copied premise instead of implementing a gate that would compare nothing |
 | A literal path, binary, or command the plan assumes present is absent on the real machine or lives elsewhere (`/bin/true` on macOS is `/usr/bin/true`) | Confirm the real location first; trace the consumer's branches for the absent case and escalate when it shares an outcome bucket with a case the plan means to keep distinct |
 | An instruction embeds a numeric range from an ad-hoc survey while a reproducible calibration artifact exists or is landing in a sibling task | Replace the number with the artifact path, its command, and its conclusion; keep the qualitative rule the number supported |
+| The plan freezes existing test bodies and also forbids new failures | Apply one production slice, run the whole suite, diff the failing set against the pre-change baseline, revert the probe, and report the delta as a plan defect — reading the plan cannot show whether its rule flips an existing assertion; only a run can |
 
 ## Edge cases
 
@@ -104,6 +108,7 @@ elsewhere) or a pre-computed number (a contrast ratio) as fact.
 | The plan's "binary missing" case and its "binary present, condition false" case both land in the same result (both `skipped`, both `Accepted`) | Escalate as a plan defect — the test cannot separate the two, so neither is proven ([testing-quality-checks-that-cannot-pass]) |
 | You are the plan's author and a step threads a value from one call site to another, or keys a lookup by an id built elsewhere (`sink[step_id]` read against a `step["id"]` written as `step_id + ".net"`) | Grep both ends before dispatch — the write site and the read site — and paste both expressions into the plan so the adopter checks a match rather than a claim; confirm too that the call path meant to carry a new argument reaches the target (a second entry point such as `_do_post → _respond` that bypasses the wrapper leaves the parameter unset). A mismatched key or an unreached path raises nothing — a default value, an unset field — so the plan reads as correct until an output is subtly wrong; have the implementer re-run the same greps against source before writing code |
 | You are the plan's author fixing design-token values (a palette) and pre-computing WCAG contrast for the plan | Open the contract test file and enumerate every (foreground role, background surface) pair it asserts — a role is checked on more surfaces than the visible ones (`muted` on `surfaceSoft` as well as on canvas and card) — then compute all of them; a pair the plan skipped comes back one round later as a worker's plan-gap report or a red contract test |
+| The only way to test a rule's compatibility is a probe that touches production code | Probe production code only, never the frozen tests; revert the probe (`git checkout -- <the probed files>`) and confirm `git status --porcelain` is empty before reporting, so the gap report is not itself a forbidden edit |
 | You are the plan's author, about to write "reuse existing component X" or "token Y supports Z" | Grep the implementation and its consumer count before writing the sentence, and record the command beside the claim (`grep -rn <Symbol> <src> \| wc -l`) so the adopter's check is a re-run rather than a discovery — a file named for the concept can implement something else (a "modal" file that is a bottom sheet with a grabber and one consumer) or have zero consumers |
 
 ## Instead of
@@ -127,4 +132,5 @@ elsewhere) or a pre-computed number (a contrast ratio) as fact.
 - Local reproduction 2026-09-27 (macOS, Darwin 25.1.0, zsh): `ls -l /bin/true /bin/false` → "No such file or directory" for both; `/usr/bin/true` and `/usr/bin/false` present; `command -v true` and `type true` resolve to the shell builtin, so only a check on the literal path detects the absence
 - Field evidence 2026-09 (an agent-orchestration codebase's plan executor, task t3-browser-wiring; recorded by the originating session): a reviewed plan named `/bin/true`/`/bin/false` as test literals; tracing `locate_binary` (which joins even an absolute path against PATH directories) → `BinaryUnavailable` → `judge` → `skipped` → task `Accepted` showed the error case permanently red and the normal case indistinguishable from the boundary case
 - Field evidence 2026-09 (dev-loop `skills/wiki-plan/SKILL.md`, commit 906b2e7): the "never on score alone" sentence carried a parenthetical range `0.69-0.82` from a 22-query manual survey while a sibling task landed a 50-case reproducible calibration set (`tests/fixtures/wiki-retrieval-calibration.json`, run with `wiki-index.py eval --report`) that found no separable floor; the integration review caught the contradiction and the sentence now cites the fixture, command, and verdict with no number
+- Field evidence 2026-09-27 (seagrass, t174-inworkflow-write-state, adopt-only plan): the plan froze existing test bodies and required a stop on any new failure; replacing only the `repo_policy.seeded_entities` body with the plan's order-aware rule and running the whole suite moved failures from 1 to 2, the new one at `test_repo_policy.py:221` inside a class the plan froze. The probe was reverted (`git checkout --`, tree clean) and the contradiction reported as a plan gap before any implementation
 - Field evidence 2026-08-31 (linkly-calendar iOS design review): `LinklyModal.swift`, named in the draft as a reusable modal, was a bottom sheet (`grabber` + `.rect(topLeadingRadius:)`) with one consumer, and `LinklyCalendarRangeLozenge` had zero consumers by `grep -rn`; the design that planned to reuse both was corrected before implementation, and the grep commands were kept in the document

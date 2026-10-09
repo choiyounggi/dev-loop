@@ -18,11 +18,11 @@ setup() {
 
 # --- normal: the real corpus is already compliant ---------------------------
 
-@test "real wiki: exits 0 with 0 violations and 80 directive units" {
+@test "real wiki: exits 0 with 0 violations and 82 directive units" {
   cd "$REPO_ROOT" || return 1
   run node "$CHECKER" wiki
   [ "$status" -eq 0 ]
-  [[ "$output" == *"directives: 80"* ]]
+  [[ "$output" == *"directives: 82"* ]]
   [[ "$output" == *"violations: 0"* ]]
 }
 
