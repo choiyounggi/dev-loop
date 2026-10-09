@@ -1,95 +1,184 @@
-# Knowledge flush — 1 insight(s)
+# Knowledge flush — 8 insight(s)
 
-A review's "also assert X" fix that edits an existing test block can delete the assertion other mutants depended on, and re-running only the named mutant hides that. **1 page amended (new step 6), 0 new pages, 1 back-link. 7 plan-gaps retired as local-layer, 0 dropped.**
+Claimed 10 queue rows (run `20261009-222550-75928`): 8 harvested ★ Insights and 2 wiki-plan plan-gap rows (linkly-invitation t6).
 
-Claimed 8 queue rows (run `20261008-124951-26572`): 1 harvested ★ Insight (`4614be6ce89cc5c5`) and 7 wiki-plan `[no-wiki]` plan-gap rows from linkly task t216.
+- **5 new pages:**
+  - `backend-common-integrations-wrapping-quotes-in-a-frontmatter-value`
+  - `infrastructure-ci-cd-chaining-workflows-past-a-github-token-event`
+  - `qa-process-blind-llm-judgment-of-a-visual-rule`
+  - `platforms-tools-search-evidence-from-a-wrapped-grep`
+  - `infrastructure-agent-orchestration-review-diff-base-after-a-sibling-merge`
+- **4 amended pages:** `platforms-tools-per-call-subagent-effort` (step 5), `qa-process-scope-purity-checks` (Do #3), `backend-common-change-impact-corpus-sweep-before-a-rejection-rule` (edge row) and `infrastructure-ci-cd-workflow-authored-pull-requests` (revised for a GitHub docs change).
+- **2 plan-gap rows** retired as local-layer.
+
+**Recovered work.** A flush on 2026-10-08 13:57 wrote drafts for 4 of these candidates (grep wrapper, diff base, gate token, effort floor) and died before committing. Its staged diff was saved to a patch and re-applied on top of current `main`. The 9 files that conflicted were each a one-line insertion (`related:` id, index phrase, log line), and each was re-inserted by hand. Every claim and URL in the drafts was then re-checked (see below).
+
+The draft said the effort-floor insight had been pushed to #241's branch. It never was: no ref contains it, and #241 merged without it. So it is ingested here.
 
 ## Verified best-practice
 
-**`4614be6ce89cc5c5` — keep the block's assertions, then re-run every mutant it covers** (confidence: **verified**)
+### 1. Search evidence from Claude Code's wrapped `grep` (`1ded49b00eff54c6`)
 
-Claim: when a review's "also assert X" fix lands in an existing test block, put the new assertion beside the block's existing ones (a different input or environment gets its own case), diff the block's assertion lines before and after, and re-run every mutant the block covers, comparing each verdict with the pre-edit run. Re-running only the named mutant cannot see the mutants that an assertion removed by the edit used to kill.
+- **Claim:** in Claude Code's Bash tool, `grep` is a function that runs the bundled ugrep with `--ignore-files`. A recursive search skips gitignored files, and a pattern too complex for ugrep exits 2 with empty stdout. Evidence searches use `/usr/bin/grep -r` or `git grep` and check the exit status.
+- **Sources:** code.claude.com `tools-reference`, Claude Code CHANGELOG 2.1.117, anthropics/claude-code#69736 (open), Genivia/ugrep PR #556, POSIX `grep` and `command`.
+- **How verified:**
+  - An independent agent re-fetched every URL (all HTTP 200) and matched each quote.
+  - It re-ran the probe this session: `type grep` gave a shell function, and in a dir whose `.gitignore` lists `hidden.txt` the wrapper listed only `shown.txt` while `/usr/bin/grep -rl` listed both.
+- **Fixes made this run:**
+  - The #69736 title had been quoted without its last words; the full title is now quoted.
+  - The page said no setting turns the function off. It now adds the maintainer comment of 2026-08-17 on #69736: naming the tools (`--allowedTools Grep,Glob`) brings them back and stops the shadowing.
+  - The "every file" row now passes `--exclude-dir=.git -I`, so `/usr/bin/grep` skips the same `.git/` and binary files the wrapper skips.
+- **Confidence:** verified.
 
-Sources — each quote compared character-for-character against the raw page with `curl` + `/usr/bin/grep` on 2026-10-08:
+### 2. Diff base for reviewing a parallel task after a sibling merged (`d32b7f2d828fa120`)
 
-- https://stryker-mutator.io/docs/stryker-js/incremental/ (raw source: `docs/incremental.md` in stryker-js) — "Reuse is possible when: A mutant was "Killed"; the culprit test still exists, and it didn't change." The runner table decides whether a test edit is seen at all: Jest, Vitest, CucumberJS "Full"; Mocha, Tap "Stryker assumes all tests inside a file changed when that file changed"; Jasmine, Karma "Stryker will only see test changes for tests that are added or removed"; Command "will only detect changes in mutants, not their tests"; "Static mutants don't have test coverage; thus, Stryker won't detect test changes for them"; `--force` reruns "all mutants in scope, regardless of the incremental file".
-- https://pitest.org/quickstart/incremental_analysis/ — "If a mutation was killed in the last run and neither the class under test or the killing test has changed, then it can be assumed that this mutation is still killed."; for a changed killing test, "it is likely that the last killing test will still kill it and it should therefore be prioritised above others."
+- **Claim:** review a task's worktree with `git diff --merge-base <integ>`, not the integration tip.
+- **Sources:** git-scm pages for `git-diff` (`--merge-base`; present in 2.30.0, absent in 2.29.0), `git-merge-tree`, `git-merge` and `git-worktree`, plus RelNotes 2.38.0. Every quote was re-matched.
+- **How verified:** re-run on git 2.50.1. `git diff integ` showed the sibling's `sib.txt` as deleted, while `git diff --merge-base integ` showed only the task's own file.
+- **Confidence:** verified.
 
-Both tools keep a "Killed" verdict only while its killing test is unchanged. Step 6 applies that rule by hand, and the new edge row covers the Stryker runners that cannot see an in-place edit.
+### 3. A multi-condition gate's pass token (`1a7d6c33f7409531`)
 
-Local reproduction (Node 26.7.0, `node:test`; one fresh directory per test variant × mutant; each `sed` mutation checked as applied with `cmp`):
+- **Claim:** the pass token must depend on every condition, and the control must feed the bad input into that same gate.
+- **Sources:** GNU Bash manual, *Lists*. Its three quotes were re-matched.
+- **How verified:** the 2026-10-08 local reproduction. The chained one-liner printed the violating path and `SCOPE_OK` with exit 0; the single script printed `bad=[src/styles/x.css]` with exit 1.
+- **Fixes made this run:**
+  - The new row cited `portable-shell-scripts`, which does not support it; it now points at the Bash manual.
+  - An existing `git-status` quote on the same page was corrected from "Shows" to "Show".
+- **Confidence:** verified.
 
-| Test block | Unmutated | N0 no-op control | N1 `'debug'`→`'info'` | N2 `42`→`0` | A21 `=== 'production'`→`=== 'prod'` (named mutant) |
-|---|---|---|---|---|---|
-| Before the fix | pass | survived | killed | killed | survived |
-| Fix that rewrites the block for `'production'` | pass | survived | **survived** | **survived** | killed |
-| Fix that adds the `'production'` assertions beside the old ones | pass | survived | killed | killed | killed |
+### 4. Paths that bypass an effort/model floor (`dfcdfaaba94e1bad`)
 
-The before/after assertion-line diff named both lines the rewrite removed (`assert.equal(c.logLevel, 'debug')`, `assert.equal(c.seed, 42)`) and none for the additive fix. The scratch directory was deleted after the run.
+- **Claim:** a floor written in agent frontmatter has three bypass paths:
+  - the variant generator's step-down rule;
+  - `CLAUDE_CODE_EFFORT_LEVEL` on the parent session;
+  - a 429/overload retry list (or `fallbackModel`) that names a cheaper model.
+- **Sources:** code.claude.com raw `.md` pages, all re-fetched 2026-10-09:
+  - `env-vars`: "Takes precedence over `--effort`, `/effort`, and the `modelSettings` and `effortLevel` settings";
+  - `sub-agents` `effort` row: "Overrides the session effort level, but not the `CLAUDE_CODE_EFFORT_LEVEL` environment variable". The wording on `main` was older and has been updated;
+  - `settings-reference#fallbackmodel`.
+- **How verified:**
+  - dev-loop PR #262 (`5c9bddb`): read `VARIANTS` and the "never below high" rule in `scripts/gen-agent-tier-variants.sh`, and the "whichever of `opus` and `fable` the 429 does not name … never below Opus" text in `skills/orchestrate/SKILL.md` and `agents/*.md`.
+  - Reproduced in a scratch clone: `tests/agent-model-pin.bats` plus `tests/agent-tier-variants.bats` gave 21 ok / 0 not ok on `main`. With `task-reviewer:medium` regenerated, test 5 "meets the opus-5.5-high floor" failed (rc 1).
+- **Correction to the candidate:** its "429 fallback chain" is a hand-written retry rule. Claude Code's `fallbackModel` is a separate list, so the page names both.
+- **Confidence:** verified.
 
-Field evidence (originating session, linkly-invitation task t2 Task 06 attempt 4; not re-run here): swapping the block's `NODE_ENV=test` assertion for a production one killed A9 and A21 while N1–N3 survived with 4/4 tests passing; re-adding the two removed lines killed them.
+### 5. Removing wrapping quotes from a frontmatter value (`b81d88806614c826`, Korean)
 
-**7 plan-gap rows (t216)** — not researched as general practice: every directive names linkly's own modules (`impl/lnpl/lower.py`, `spec._check_given`, the `CODES`/`SEVERITY_OF`/`HINTS` registry, RFC numbering), so all seven fail the layer test. No confidence is claimed for them.
+- **Claim:** `replace(/^["']|["']$/g, "")` strips each end on its own, so a value quoted at only one end keeps an unpaired quote. Read the value with a YAML parser, or strip a matching pair only.
+- **Sources:**
+  - YAML 1.2.2 §7.3.3: "Plain scalars must not begin with most indicators"; §7.3.2 and §7.3.1 on escapes.
+  - gray-matter README: it uses js-yaml by default.
+- **How verified:** Node 26.7.0, PyYAML 6.0.3 and js-yaml 5.4.3 on nine values. I re-ran the key cells myself.
+- **Extensions beyond the candidate:**
+  - The candidate's own example, `title: "인용구" — 부제`, is invalid YAML: both parsers raise an error, so the page says to fix the source.
+  - The paired regex still mis-strips `"a" and "b"`.
+  - A trailing `# comment` defeats the paired regex.
+- **Confidence:** verified.
+
+### 6. A Release made with `GITHUB_TOKEN` must start another workflow (`c82505cfaeffcc30`)
+
+- **Claim:** events created with `GITHUB_TOKEN` start no new workflow runs. Chain by a same-workflow job or `workflow_call`, by explicit dispatch, or with an App token or PAT.
+- **Sources (raw pages fetched 2026-10-09 and grepped):**
+  - docs.github.com `concepts/security/github_token`;
+  - `reusable-workflows`;
+  - the REST `create-a-workflow-dispatch-event` page: fine-grained "'Actions' repository permissions (write)";
+  - `events-that-trigger-workflows`: the `workflow_run` three-level limit, and the default-branch note on `workflow_run`, `workflow_dispatch` and `repository_dispatch`;
+  - the release-please-action README.
+- **Correction found:** the token page now lists a second exception that the candidate and an existing page both missed. A PR opened or updated with the token gets `pull_request` runs "in an approval-required state".
+  - `workflow-authored-pull-requests` was revised for this; the log records it as `revise`.
+  - Its directive is unchanged (use a PAT or App token). Its 2026-08-25 field record of zero check runs is kept.
+- **Not covered by the docs:** whether `workflow_run` fires after a `GITHUB_TOKEN` event. The page says to prove it with one run.
+- **Confidence:** verified.
+
+### 7. Blind LLM judgment of a measurable visual rule (`11d73c443f7a0fdf`, Korean)
+
+- **Claim:**
+  - brief the judge blind;
+  - ask for reasoning before the verdict;
+  - read every pair line;
+  - use three judges and fail any split;
+  - set per-cue and whole-image thresholds.
+- **Sources:**
+  - Sharma et al. 2023, arXiv 2310.13548 §3.3: "The user suggesting an incorrect answer can reduce accuracy by up to 27%";
+  - Anthropic `develop-tests`: "Use a grader model with thinking on, so that it reasons before it produces an evaluation score";
+  - Zheng et al. 2023, arXiv 2306.05685 (judge biases);
+  - Verga et al. 2024, arXiv 2404.18796 (a panel of judges);
+  - Turpin et al. 2023, arXiv 2305.04388 (stated reasoning can be unfaithful).
+  - Each quote was grepped in the fetched abstract or full text.
+- **Not sourced:** "read every line" (step 3) and the per-cue overstatement (step 5, 76 vs 39 cells) are field-only. No general source was found for step 5.
+- **Confidence:** field-tested.
+
+### 8. Measure a received rule on the named failures before implementing (`5ab0888e4a52c7e6`, Korean)
+
+- **Claim:** score a new rule on the pairs the judges named before implementing it. As worded, the rule would have passed 5 of 6 named pairs.
+- **Sources:** this is the existing page's method (eslint-remote-tester, clippy lintcheck, crater). The new row adds field evidence only.
+- **Confidence:** the page stays `verified`; the new row is field evidence.
 
 ## Existing-layer check
 
-Route: `INDEX.md` → testing ("cases/assertions", "verifying tests can actually fail") → `wiki/testing/index.md` → quality; qa ("acting on code-review feedback") checked as well.
+Pages read: infrastructure-ci-cd-workflow-authored-pull-requests, backend-common-change-impact-corpus-sweep-before-a-rejection-rule, platforms-tools-per-call-subagent-effort, qa-process-llm-review-pipelines, qa-process-fresh-context-code-review, testing-quality-anchor-cases-for-allowlist-regexes, qa-process-scope-purity-checks, platforms-tools-search-evidence-from-a-wrapped-grep, platforms-environment-path-resolution, platforms-tools-harness-mediated-tool-results, debugging-methodology-reproduce-first, testing-quality-checks-that-cannot-pass, platforms-shells-portable-shell-scripts, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, infrastructure-agent-orchestration-ours-resolution-on-a-mixed-content-conflict, infrastructure-agent-orchestration-worktree-isolated-workers
 
-Pages read: testing-quality-surviving-mutant-equivalence-triage, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, qa-process-evaluating-review-feedback, testing-quality-policy-at-several-return-sites, testing-mocking-captured-call-arguments, testing-quality-minimum-case-set, testing-quality-expectation-sets-with-one-distinct-value, backend-common-errors-diagnostics-from-a-shared-code-path
-
-- `wiki_search` (k=5) on the candidate's trigger: policy-at-several-return-sites 0.768, surviving-mutant-equivalence-triage 0.763 and 0.725, captured-call-arguments 0.737, minimum-case-set 0.735. Only surviving-mutant-equivalence-triage shares the trigger — its "When this applies" already names "a reviewer asks for a test to cover a specific surviving mutant".
-- Whole-wiki search (`/usr/bin/grep` over every page): 46 pages mention mutants; none covers an edit that removes an assertion other mutants depended on. Three pages direct re-running the targeted mutant after adding a case or assertion (tests-that-cannot-fail, expectation-sets-with-one-distinct-value, policy-at-several-return-sites); none of them covers an edit that removes an existing assertion, so step 6 extends them and contradicts none. They are left unchanged to keep this diff small.
-- **Merged, not created**: surviving-mutant-equivalence-triage gains step 6 with a verdict table, 4 edge rows (Stryker incremental reuse by runner, a hand-rolled mutation script, a deliberate replacement, a survivor whose kill does not reproduce on the pre-edit block), 1 Instead-of row, 4 Sources lines, a "When this applies" clause and a step-1 pointer. Body: 115 lines (117 once #226 merges; limit 120 — the next addition to this page needs a split).
-- Related: added testing-quality-mutation-harness-file-custody (its step 6, "re-run the whole matrix" after a custody fix, is the same principle; it already links back, so the link is now two-way). The evaluating-review-feedback ↔ this-page link is already in open PR #226 and is not duplicated here.
-- Conflicts with existing directives: none flagged.
-- `wiki/testing/index.md`: the page's "load when" row now names the new use case (maintenance invariant 1).
-- `last_verified` stays 2026-08-07: open PR #226 bumps that exact line, and a second bump would add a merge conflict; the new claims carry dated sources.
-- Checks on this branch: `node scripts/wiki-structure-checks.js wiki` → `pages: 359, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line, in infrastructure/config/keys-ahead-of-their-consumer.md); no banned vague qualifier in any added line.
+- **Searches run:**
+  - Keyword search over all of `wiki/` with `/usr/bin/grep -rliE` for `GITHUB_TOKEN`, `repository_dispatch`, `workflow_run`, `frontmatter`, quote stripping, `blind`, `judge`, `perceptual`, `calibrat`, `EFFORT_LEVEL` and `fallbackModel`.
+  - `wiki_search` (k=5) on each new trigger.
+- **The last seven ids above were read by the 2026-10-08 run that drafted candidates 1–3.** This run re-checked only their `related:` lines and the drafts' claims.
+- **Per candidate:**
+  - **1, 2, 3:** see the draft's original check. No new overlap appeared on `main` since then: the 27 PRs it compared against are now merged, and none adds a page on grep wrappers, review diff bases or gate tokens.
+  - **4:** `per-call-subagent-effort` already covered bypass path 2 as an edge row. Same trigger, compatible directive → merged as step 5 plus one `Instead of` row.
+  - **5:** no page on frontmatter quote handling. The nearest hits were shell quoting pages (`portable-shell-scripts`, `escapes-in-shell-string-literals`), a different trigger → new page. Back-link from `anchor-cases-for-allowlist-regexes`, another regex-anchoring trap.
+  - **6:** `workflow-authored-pull-requests` states the token rule for a bot that opens its own PR. A Release → publish chain is a different trigger → new page, with links both ways. The existing page was revised where the docs change refutes "zero check runs" as a general statement.
+  - **7:** no page on LLM judges for visual criteria. `llm-review-pipelines` and `fresh-context-code-review` cover code review → new page, back-linked from `fresh-context-code-review`.
+  - **8:** `corpus-sweep-before-a-rejection-rule` steps 1–3 are the same practice → merged as one edge row, back-linked to page 7.
+- **Conflicts with existing directives:** none. The `workflow-authored-pull-requests` change is a fact update; its directive is unchanged.
 
 ## Open-PR check
 
-26 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253–#260), listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`. For each head, the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for the candidate's concepts (removed or replaced assertions, re-running all mutants, reviewer/auditor fixes, "also assert"), and every added line mentioning mutants was read.
-
-| Candidate | Overlapping open PR | Verdict |
-|---|---|---|
-| 4614be6ce89cc5c5 | None carries it. #226 edits the same page for a different situation (a survivor reported inside a PASS audit); #258 (additive mutants vs presence checks) and #259 (schema key coverage) are different situations | **new** |
-| 7 × t216 plan-gaps | No open PR body mentions t216 (all 26 bodies searched) | **new** → local layer |
-
-Merge check (`git merge-tree --write-tree`, this branch against each head): no wiki page conflicts, including #226, whose four hunks on the shared page were avoided. Every head conflicts on `log.md` and the older ones also on this report file — the same two files the open PRs already conflict on with each other (#260 vs #259 and #255 vs #254 checked).
+- **Open `knowledge/*` heads:** none.
+  - `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` returned `[]`.
+  - The backlog #223–#261 was merged on 2026-10-09 between 13:02 and 13:21 UTC (`gh pr list --state merged`).
+- **Verdicts:** all 8 candidates are **new** relative to open PRs.
+- **#241:** the earlier draft's "fold into #241" was never pushed, and #241 is merged without it, so candidate 4 is ingested here instead.
 
 ## Routing decision
 
-| Candidate | Layer | Target | Action |
-|---|---|---|---|
-| 4614be6ce89cc5c5 | bundled | `testing/quality/surviving-mutant-equivalence-triage.md` | merged as step 6 |
-| 7 × t216 plan-gaps | local (linkly) | see Local-layer candidates | excluded from this PR, retired from the queue |
-
-No new category: testing/quality already holds the mutation-testing pages, and the target page's trigger covers this situation.
-
-## Independent review
-
-A fresh-context adversarial reviewer (a separate subagent, read-only on this checkout) re-fetched both sources, rebuilt the reproduction from its description (same matrix observed on Node 26.7.0) and re-ran both lint scripts. Verdict: CHANGES_REQUESTED, resolved before this PR:
-
-| Finding | Resolution |
+| Candidate | Target |
 |---|---|
-| Step 6 said a "Killed" result is reused "only while its killing test is unchanged", dropping conditions both tools state (Stryker: the culprit test still exists; PIT: the class under test is unchanged too) | Fixed: "With the source untouched, PIT and Stryker apply the same rule: they reuse a "Killed" result only while its killing test still exists unchanged." |
-| The log line understated #226's overlap — it also edits this page's related list, Edge table and Sources, so merging it would need reconciliation in four places | Checked and not reproduced: `git merge-tree --write-tree` of this branch with #226 conflicts only in `log.md` and this report file, and the merged page carries 0 conflict markers. The log line now names #226's other three hunks and records that they merge cleanly |
-| Gap: a flaky mutant reads as lost coverage in step 6's table | Added an edge row: when a previously killed mutant survives while the assertion diff shows nothing removed, re-run it against the pre-edit block first; surviving there too marks a flaky verdict (testing-flaky-diagnosing-flaky-tests) |
+| 1 | `platforms/tools/search-evidence-from-a-wrapped-grep.md` (new) |
+| 2 | `infrastructure/agent-orchestration/review-diff-base-after-a-sibling-merge.md` (new) |
+| 3 | `qa/process/scope-purity-checks.md` (amend Do #3) |
+| 4 | `platforms/tools/per-call-subagent-effort.md` (amend step 5) |
+| 5 | `backend/common/integrations/wrapping-quotes-in-a-frontmatter-value.md` (new). `integrations` holds the pages on consuming formats other tools write (`json-parse-of-a-no-body-response`, `checksum-restored-identifiers`) |
+| 6 | `infrastructure/ci-cd/chaining-workflows-past-a-github-token-event.md` (new), plus a revision of `workflow-authored-pull-requests.md` |
+| 7 | `qa/process/blind-llm-judgment-of-a-visual-rule.md` (new), next to `llm-review-pipelines` and `fresh-context-code-review` |
+| 8 | `backend/common/change-impact/corpus-sweep-before-a-rejection-rule.md` (edge row) |
 
-Kept: the reviewer's routing note (step 6's hygiene theme also sits near tests-that-cannot-fail) — the merge target stays, because this page's trigger already owns "a reviewer asks for a test to cover a specific surviving mutant" and the step-1 table now points into step 6.
+- No new category.
+- The `INDEX.md` rows gain phrases for: the wrapped `grep`, the review diff base, hand-parsed frontmatter values and blind LLM judgments.
+
+**Review:** an adversarial reviewer (`feature-dev:code-reviewer`) read the staged diff before the commit and reported 3 blockers and 11 minor findings.
+- **Fixed:**
+  - two misquoted lines on the token page;
+  - the approval-path wording on `workflow-authored-pull-requests` and its index row;
+  - a `--effort` remedy that the env var outranks;
+  - the dispatch default-branch rule;
+  - the release-please row;
+  - the Sharma claim, now narrowed;
+  - "several judges", now three;
+  - the grep page's tool-naming escape and its `.git/` and binary-file note;
+  - the scope-purity link;
+  - the YAML `# comment` row;
+  - the generator wording.
+- **Not changed:**
+  - the CHANGELOG 2.1.117 quote: the reviewer's fetch was cut off, and an independent re-fetch matched it exactly;
+  - `last_verified` on `workflow-authored-pull-requests` and `corpus-sweep`: their other claims were not re-verified.
+- **Lint:** `wiki-structure-checks.js` reports 431 pages, 0 findings. `wiki-lint-prohibitions.js` reports no violations in any changed page; its remaining hits are the 3 already on `main` and copies under the ignored `.claude/tmp/`.
 
 ## Local-layer candidates
 
-| Row | Project | Target |
+| Row | Target | Project |
 |---|---|---|
-| Planning t216: deciding Where the check runs | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-spec-result-reads-input-check-site.md — run wiki-ingest inside that project |
-| Planning t216: deciding Which names an expect line asserts on | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-expect-result-candidate-names.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (a): the bare name is a respond field | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-field-condition.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (b): a same-name respond term wins | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-term-precedence.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (c): given did not set the input | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-given-setter-suppression.md — run wiki-ingest inside that project |
-| Planning t216: deciding Severity, registry position, hint | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-diagnostic-code-registration.md — run wiki-ingest inside that project |
-| Planning t216: deciding RFC | linkly (linkly-dartfish worktree) | wiki-local/qa/document-verification/t216-no-rfc-for-warning-only-code.md — run wiki-ingest inside that project |
+| `53963e04e573a487` "Planning t6: deciding Thinking and output budget" | `wiki-local/backend/llm/thinking-and-output-budget.md` | linkly-invitation (run wiki-ingest inside that project) |
+| `b3423a63c28655e7` "Planning t6: deciding Prompt" | `wiki-local/backend/llm/vision-analyze-prompt.md` | linkly-invitation (run wiki-ingest inside that project) |
 
-All seven are wiki-plan Phase B decisions naming linkly's own modules; they are excluded from this PR and retired from the queue.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+Both are wiki-plan Phase B decisions that name that repo's own files (`src/server/vision/prompt.ts`, `plans/t6/design.md`). They were retired, not ingested here.
