@@ -87,8 +87,12 @@ setup() {
   sh "$WG" "$wt"
   ext="$(sh "$WG" --path "$wt")"
   extdir="$(dirname "$ext")"
-  [ "$(stat -f '%Lp' "$extdir" 2>/dev/null || stat -c '%a' "$extdir")" = "700" ]
-  [ "$(stat -f '%Lp' "$ext" 2>/dev/null || stat -c '%a' "$ext")" = "600" ]
+  # GNU `stat -c` first (Linux CI): BSD stat (macOS) has no -c and fails,
+  # falling through to -f. The reverse order is wrong on Linux — GNU `stat -f`
+  # means "filesystem status", not a format string, so it silently returns the
+  # wrong field instead of erring and never reaches the fallback.
+  [ "$(stat -c '%a' "$extdir" 2>/dev/null || stat -f '%Lp' "$extdir")" = "700" ]
+  [ "$(stat -c '%a' "$ext" 2>/dev/null || stat -f '%Lp' "$ext")" = "600" ]
 }
 
 @test "idempotent: the same worktree yields the same external id across runs" {
