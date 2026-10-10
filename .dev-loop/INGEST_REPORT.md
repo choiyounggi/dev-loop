@@ -1,95 +1,229 @@
-# Knowledge flush — 1 insight(s)
+# Knowledge flush — 4 insight(s)
 
-A review's "also assert X" fix that edits an existing test block can delete the assertion other mutants depended on, and re-running only the named mutant hides that. **1 page amended (new step 6), 0 new pages, 1 back-link. 7 plan-gaps retired as local-layer, 0 dropped.**
+Six claimed queue rows became **4 new pages, 0 merges, 0 drops, 2 local-layer rows**:
+- A dead first DNS server that adds about 5 s to every outbound call (`debugging/network`).
+- A Claude Code plugin whose npm dependencies are missing after an update (`platforms/tools`).
+- Done criteria that a task split assigns to the wrong piece (`infrastructure/agent-orchestration`).
+- `reader.cancel()` on a Node-stream request body that never settles (`backend/node/async`).
 
-Claimed 8 queue rows (run `20261008-124951-26572`): 1 harvested ★ Insight (`4614be6ce89cc5c5`) and 7 wiki-plan `[no-wiki]` plan-gap rows from linkly task t216.
+Claimed rows (run `20261010-221818-2974`):
+- `3be5bdead3f07fb5`: DNS
+- `b4f831f51faf06b7`: plugin dependencies
+- `3c75059217baccb5`: split-task DoD
+- `3cf7069fd51c2a57`: request-body reader cancel
+- `a525cd52ad3a644e`, `ac0e8ad633885234`: linkly plan-gaps rows → local layer (see last section)
+
+The first three were drafted by run `20261010-021344-36918`, which stopped before its review and PR. This run kept that work (main had not moved: merge base `f7c865c` = `origin/main`), re-checked the plugin docs claim, added the fourth page, and ran the review.
+
+The four ingested candidates are general. None names one repository's own files or conventions.
 
 ## Verified best-practice
 
-**`4614be6ce89cc5c5` — keep the block's assertions, then re-run every mutant it covers** (confidence: **verified**)
+### 1. `3be5bdead3f07fb5` → `debugging-network-unresponsive-first-nameserver` — **verified**
 
-Claim: when a review's "also assert X" fix lands in an existing test block, put the new assertion beside the block's existing ones (a different input or environment gets its own case), diff the block's assertion lines before and after, and re-run every mutant the block covers, comparing each verdict with the pre-edit run. Re-running only the named mutant cannot see the mutants that an assertion removed by the edit used to kill.
+**Claim.** When every outbound call from one host is about 5 s slow, or a client with a 5 s timeout fails while curl slowly succeeds:
+1. Split the request's time with `curl -w` (`time_namelookup`).
+2. Probe each `/etc/resolv.conf` nameserver on its own.
 
-Sources — each quote compared character-for-character against the raw page with `curl` + `/usr/bin/grep` on 2026-10-08:
+The glibc resolver waits `timeout` (default 5 s) on an unresponsive first server before it tries the next one.
 
-- https://stryker-mutator.io/docs/stryker-js/incremental/ (raw source: `docs/incremental.md` in stryker-js) — "Reuse is possible when: A mutant was "Killed"; the culprit test still exists, and it didn't change." The runner table decides whether a test edit is seen at all: Jest, Vitest, CucumberJS "Full"; Mocha, Tap "Stryker assumes all tests inside a file changed when that file changed"; Jasmine, Karma "Stryker will only see test changes for tests that are added or removed"; Command "will only detect changes in mutants, not their tests"; "Static mutants don't have test coverage; thus, Stryker won't detect test changes for them"; `--force` reruns "all mutants in scope, regardless of the incremental file".
-- https://pitest.org/quickstart/incremental_analysis/ — "If a mutation was killed in the last run and neither the class under test or the killing test has changed, then it can be assumed that this mutation is still killed."; for a changed killing test, "it is likely that the last killing test will still kill it and it should therefore be prioritised above others."
+**Sources checked:**
+- resolv.conf(5): https://man7.org/linux/man-pages/man5/resolv.conf.5.html
+  - Servers are queried "in the order listed".
+  - `timeout` defaults to RES_TIMEOUT (5); `attempts` defaults to 2.
+  - Also covers `rotate` and `RES_OPTIONS`.
+- curl `--write-out` timing variables: https://curl.se/docs/manpage.html
+- libcurl timeouts, which explain why curl succeeds where a 5 s client fails:
+  - https://curl.se/libcurl/c/CURLOPT_CONNECTTIMEOUT.html: the connection phase includes DNS; default 300 s.
+  - https://curl.se/libcurl/c/CURLOPT_TIMEOUT.html: default 0, meaning it never times out.
+- Node: https://nodejs.org/api/dns.html
+  - `dns.lookup()` is `getaddrinfo(3)` and follows `resolv.conf`.
+  - `dns.resolve*()` sends its own DNS queries over the network.
+- systemd-resolved(8): https://man7.org/linux/man-pages/man8/systemd-resolved.service.8.html
+  - The stub is `127.0.0.53`; the real servers are in `/run/systemd/resolve/resolv.conf`.
+  - resolved stays on one server until it sees an error.
+- NetworkManager:
+  - https://networkmanager.dev/docs/api/latest/NetworkManager.conf.html: `rc-manager` writes the file.
+  - https://networkmanager.dev/docs/api/latest/nm-settings-nmcli.html: `ipv4.ignore-auto-dns`.
+  - https://networkmanager.dev/docs/api/latest/nmcli.html: `device reapply`.
+- musl: https://wiki.musl-libc.org/functional-differences-from-glibc.html
+  - musl queries every listed server in parallel, so the cause does not apply there.
+  - Added as an edge-case row.
 
-Both tools keep a "Killed" verdict only while its killing test is unchanged. Step 6 applies that rule by hand, and the new edge row covers the Stryker runners that cannot see an in-place edit.
+**How it was verified.** Reproduced in throwaway containers and on the macOS host, using the TEST-NET-1 address `192.0.2.1` as the dead server:
 
-Local reproduction (Node 26.7.0, `node:test`; one fresh directory per test variant × mutant; each `sed` mutation checked as applied with `cmp`):
+```
+glibc (node:22-bookworm-slim, --dns 192.0.2.1 --dns 1.1.1.1): dns.lookup 5031 ms; fetch(AbortSignal.timeout(4000)) → TimeoutError at 4007 ms
+  + options timeout:1                                         : dns.lookup 1021 ms
+  control (--dns 1.1.1.1)                                     : dns.lookup 12 ms; fetch 200 in 596 ms
+musl (python:3-alpine, same server order)                     : getaddrinfo 54 ms vs 55 ms control
+dig @192.0.2.1 example.com +time=2 +tries=1 → "connection timed out; no servers could be reached" (2 s); live server → NOERROR, 5 ms
+Node Resolver({timeout:2000,tries:1}) single-server probe → 192.0.2.1 ETIMEOUT 2995 ms; 1.1.1.1 ok 5 ms
+```
 
-| Test block | Unmutated | N0 no-op control | N1 `'debug'`→`'info'` | N2 `42`→`0` | A21 `=== 'production'`→`=== 'prod'` (named mutant) |
-|---|---|---|---|---|---|
-| Before the fix | pass | survived | killed | killed | survived |
-| Fix that rewrites the block for `'production'` | pass | survived | **survived** | **survived** | killed |
-| Fix that adds the `'production'` assertions beside the old ones | pass | survived | killed | killed | killed |
+**Changes from the candidate:**
+- The field evidence's real router address is not reproduced on the page.
+- Added edge-case rows for systemd-resolved, macOS, musl, `rotate`, and hosts without `dig`.
 
-The before/after assertion-line diff named both lines the rewrite removed (`assert.equal(c.logLevel, 'debug')`, `assert.equal(c.seed, 42)`) and none for the additive fix. The scratch directory was deleted after the run.
+### 2. `b4f831f51faf06b7` → `platforms-tools-plugin-dependencies-after-an-update` — **verified, directive refined**
 
-Field evidence (originating session, linkly-invitation task t2 Task 06 attempt 4; not re-run here): swapping the block's `NODE_ENV=test` assertion for a production one killed A9 and A21 while N1–N3 survived with 4/4 tests passing; re-adding the two removed lines killed them.
+**Candidate directive.** After a plugin update, check `node_modules` in the `installPath` that `installed_plugins.json` records. Give such plugins a `SessionStart` self-install for when `node_modules` is missing.
 
-**7 plan-gap rows (t216)** — not researched as general practice: every directive names linkly's own modules (`impl/lnpl/lower.py`, `spec._check_given`, the `CODES`/`SEVERITY_OF`/`HINTS` registry, RFC numbering), so all seven fail the layer test. No confidence is claimed for them.
+**What the docs say** (https://code.claude.com/docs/en/plugins/loading):
+- Claude Code already installs a plugin's Node.js dependencies into every new version directory.
+- It does so only when the plugin root has `package.json` **and** a supported lockfile:
+  - `package-lock.json` or `npm-shrinkwrap.json` (lockfile v2 or v3), or
+  - a text `bun.lock`.
+- The "packages … not installed" note in `claude plugin list` also requires a lockfile.
+- Orphaned version directories are removed 14 days after their `.orphaned_at` marker.
+
+**Fallbacks and related limits:**
+- The documented fallback is a `SessionStart` install into `${CLAUDE_PLUGIN_DATA}` (https://code.claude.com/docs/en/plugins/components).
+- `${CLAUDE_PLUGIN_DATA}` is kept across updates (https://code.claude.com/docs/en/plugins/manifest-reference).
+- The two failure notes are explained at https://code.claude.com/docs/en/plugins/troubleshooting.
+- ESM `import` ignores `NODE_PATH` (https://nodejs.org/api/esm.html).
+
+**How it was verified** (local, Claude Code 2.1.295, plugin auto-velog):
+
+```
+installed_plugins.json: installPath …/auto-velog/0.2.2
+0.2.0, 0.2.1: package-lock.json + node_modules/playwright, both with .orphaned_at; lockfile mtime 38 h / 9 min after the
+              directory's other files → a hand-run npm install, not a shipped lockfile
+0.2.2: package.json only — no lockfile, no node_modules
+upstream (GitHub API): 0 commits ever touched package-lock.json; .gitignore has listed it since the first commit (aa17934)
+claude plugin list: auto-velog 0.2.2 "✔ enabled", no dependency note
+import.meta.resolve('playwright'): from 0.2.1/scripts → its own node_modules; from 0.2.2/scripts → ERR_MODULE_NOT_FOUND
+Node 26.7.0: .mjs import + NODE_PATH → ERR_MODULE_NOT_FOUND; CJS require + NODE_PATH → loads; symlinked node_modules → import loads
+```
+
+**Resulting directive:**
+- Commit the lockfile so the built-in install runs on every install, update and new machine.
+- Keep the `${CLAUDE_PLUGIN_DATA}` hook for what that install cannot provide.
+
+The candidate's mechanism holds: each update is a fresh version directory, `node_modules` is not in the source, and old directories hide the gap. Its fix is kept as the fallback rather than the first step.
+
+### 3. `3c75059217baccb5` → `infrastructure-agent-orchestration-done-criteria-in-a-split-task-piece` — **field-tested**
+
+**Claim.** When adopting one piece of a split task whose DoD was rewritten at split time:
+- Map each DoD item to the task and test in your own piece before coding.
+- An item proven only in a sibling piece is a contradiction to report first.
+
+**Sources:**
+- https://www.anthropic.com/engineering/multi-agent-research-system: each subagent needs "clear task boundaries"; "Without detailed task descriptions, agents duplicate work, leave gaps, or fail to find necessary information".
+- https://en.wikipedia.org/wiki/Traceability_matrix: correlates requirements with test cases; "Zero values indicate that no relationship exists".
+
+**Why field-tested, not verified.** The sources support the technique: trace each requirement to the test that proves it, and keep clear boundaries between delegated pieces. The specific failure mode rests on one field case (split piece t6, recorded by the originating session): a split-time DoD restated into function names gave one piece an outcome its sibling's plan proves.
+
+**Also checked.** The "Splitting a task mid-run" section of dev-loop's `skills/orchestrate/SKILL.md` judges a split only by overlap in each piece's `files` and `outputs`. It says nothing about dividing the DoD between pieces, which is the gap this page fills. The skill itself is not changed in this PR.
+
+### 4. `3cf7069fd51c2a57` → `backend-node-async-request-body-reader-cancel` — **verified**
+
+**Claim.** When a handler races `reader.read()` on a Node-stream-backed `Request` body (Next.js Node runtime) against a deadline, call `reader.cancel().catch(() => {})` without awaiting it and run cleanup at once. `await reader.cancel()` can wait until Node's `requestTimeout` on a client that sends nothing.
+
+**Sources checked:**
+- https://streams.spec.whatwg.org/#readable-stream-cancel — cancel closes the stream, then waits on the source's cancel algorithm.
+- https://streams.spec.whatwg.org/#readable-stream-from-iterable — `ReadableStream.from` cancel calls the iterator's `return()` and waits for it.
+- https://github.com/nodejs/undici/blob/main/lib/web/fetch/body.js — an async-iterable body becomes `ReadableStream.from(object)` (read at lines 219–240 of the fetched file).
+- https://github.com/nodejs/node/blob/main/lib/internal/streams/readable.js — the readable async iterator: "Requests received while another is outstanding are queued and processed in order."
+- https://nodejs.org/api/http.html#serverrequesttimeout — default `300000` (anchor and value confirmed in the page and in `doc/api/http.md`).
+- Next.js 16.3.8 `dist/server/web/spec-extension/adapters/next-request.js` `fromNodeNextRequest`: `body = request.body` (the Node `IncomingMessage`) is passed to `new Request`.
+
+**How it was verified** (Node v26.7.0, local script):
+
+```
+Request(body: PassThrough): cancel STILL PENDING after 3000 ms; read resolved done=true
+Readable.toWeb(PassThrough): cancel resolved in 1 ms; read resolved done=true
+new ReadableStream({}) fake: cancel resolved in 1 ms; read resolved done=true
+```
+
+**Changes from the candidate:** added that the pending `read()` itself resolves `{done: true}` (only the cancel promise hangs), and that `Readable.toWeb` does not hang. The real-session field numbers (311 s, 4 stalled POSTs) stay as a field case.
 
 ## Existing-layer check
 
-Route: `INDEX.md` → testing ("cases/assertions", "verifying tests can actually fail") → `wiki/testing/index.md` → quality; qa ("acting on code-review feedback") checked as well.
+Pages read: platforms-processes-non-interactive-cli-invocation, backend-common-reliability-timeouts-and-retries, backend-java-kotlin-coroutines-dispatchers-and-blocking, backend-common-llm-self-hosted-model-load-latency, platforms-tools-version-keyed-artifact-cache, platforms-tools-plugin-mcp-server-registration, platforms-toolchains-agent-files-written-by-next-dev, infrastructure-agent-orchestration-gate-evidence-exit-code-class, platforms-toolchains-native-addon-binary-missing-after-bun-install, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, infrastructure-agent-orchestration-worker-reported-plan-contradiction, infrastructure-agent-orchestration-inbound-validation-ownership-in-task-decomposition, infrastructure-agent-orchestration-verify-command-in-a-worker-brief, infrastructure-agent-orchestration-unattended-worker-questions, testing-quality-cross-task-stub-assertions, qa-document-verification-superseding-a-knowledge-record, databases-query-optimization-repeated-sublinks-in-a-pulled-up-derived-table, backend-node-async-promise-error-handling, backend-node-async-request-body-reader-cancel, backend-java-jpa-raw-jdbc-inside-a-jpa-transaction, testing-async-teardown-after-aborted-tasks
 
-Pages read: testing-quality-surviving-mutant-equivalence-triage, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, qa-process-evaluating-review-feedback, testing-quality-policy-at-several-return-sites, testing-mocking-captured-call-arguments, testing-quality-minimum-case-set, testing-quality-expectation-sets-with-one-distinct-value, backend-common-errors-diagnostics-from-a-shared-code-path
+**Method:**
+1. Read `INDEX.md`, then the domain indexes for debugging, platforms and infrastructure.
+2. Ran `grep -rli` over all 426 pages on `origin/main` for each candidate's key terms:
+   - DNS: `resolv.conf`, `nameserver`, `namelookup`, `getaddrinfo`
+   - Plugin: `CLAUDE_PLUGIN_DATA`, `installed_plugins`, `installPath`, `ERR_MODULE_NOT_FOUND`
+   - Split DoD: `DoD`, `definition of done`, `split`, `traceab`
+3. Ran `wiki_search` (k=5) with each trigger sentence, then read "When this applies" on every hit page.
 
-- `wiki_search` (k=5) on the candidate's trigger: policy-at-several-return-sites 0.768, surviving-mutant-equivalence-triage 0.763 and 0.725, captured-call-arguments 0.737, minimum-case-set 0.735. Only surviving-mutant-equivalence-triage shares the trigger — its "When this applies" already names "a reviewer asks for a test to cover a specific surviving mutant".
-- Whole-wiki search (`/usr/bin/grep` over every page): 46 pages mention mutants; none covers an edit that removes an assertion other mutants depended on. Three pages direct re-running the targeted mutant after adding a case or assertion (tests-that-cannot-fail, expectation-sets-with-one-distinct-value, policy-at-several-return-sites); none of them covers an edit that removes an existing assertion, so step 6 extends them and contradicts none. They are left unchanged to keep this diff small.
-- **Merged, not created**: surviving-mutant-equivalence-triage gains step 6 with a verdict table, 4 edge rows (Stryker incremental reuse by runner, a hand-rolled mutation script, a deliberate replacement, a survivor whose kill does not reproduce on the pre-edit block), 1 Instead-of row, 4 Sources lines, a "When this applies" clause and a step-1 pointer. Body: 115 lines (117 once #226 merges; limit 120 — the next addition to this page needs a split).
-- Related: added testing-quality-mutation-harness-file-custody (its step 6, "re-run the whole matrix" after a custody fix, is the same principle; it already links back, so the link is now two-way). The evaluating-review-feedback ↔ this-page link is already in open PR #226 and is not duplicated here.
-- Conflicts with existing directives: none flagged.
-- `wiki/testing/index.md`: the page's "load when" row now names the new use case (maintenance invariant 1).
-- `last_verified` stays 2026-08-07: open PR #226 bumps that exact line, and a second bump would add a merge conflict; the new claims carry dated sources.
-- Checks on this branch: `node scripts/wiki-structure-checks.js wiki` → `pages: 359, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line, in infrastructure/config/keys-ahead-of-their-consumer.md); no banned vague qualifier in any added line.
+| Candidate | wiki_search top 5 (score) | Overlap verdict |
+|---|---|---|
+| DNS | non-interactive-cli-invocation ×2 (0.763, 0.753), timeouts-and-retries (0.746), coroutines-dispatchers-and-blocking (0.745), self-hosted-model-load-latency (0.745) | No page covers resolver delay; the grep found zero pages for any of the DNS terms → **new page** |
+| Plugin deps | agent-files-written-by-next-dev ×2 (0.793, 0.763), gate-evidence-exit-code-class ×2 (0.773, 0.762), plugin-mcp-server-registration (0.753) | Closest is version-keyed-artifact-cache, which covers the publisher side (unchanged version → stale cache). It says nothing about the dependencies of a correctly bumped version → **new page**, linked both ways |
+| Split DoD | checkable-claims-in-an-adopted-plan ×2 (0.697, 0.694), cross-task-stub-assertions (0.694), superseding-a-knowledge-record (0.692), repeated-sublinks-in-a-pulled-up-derived-table (0.689) | checkable-claims covers numbers, symbol contracts and dependency tables in an adopted plan, not DoD ownership across split pieces. It already has 124 body lines, over the 120 limit, so merging in was not an option → **new page**, linked both ways |
+| Reader cancel | raw-jdbc-inside-a-jpa-transaction (0.786), promise-error-handling ×2 (0.781, 0.774), teardown-after-aborted-tasks ×2 (0.761, 0.750) | promise-error-handling owns "race a deadline, abort the loser" but not a cancel that itself never settles; teardown-after-aborted-tasks is the tokio analogue (cancel returns before it completes); raw-jdbc is a Spring transaction timeout, unrelated. `grep -rliE "reader\.cancel\|getReader\|ReadableStream\|requestTimeout\|duplex"` over `wiki/` hit 14 pages, none on stream cancel → **new page** |
+
+**Conflicts:** none. No new directive contradicts an existing one.
+
+**Related links added both ways:**
+- DNS page ↔ backend-common-reliability-timeouts-and-retries.
+- Plugin page ↔ version-keyed-artifact-cache, plugin-mcp-server-registration, native-addon-binary-missing-after-bun-install.
+- Split-DoD page ↔ checkable-claims-in-an-adopted-plan, worker-reported-plan-contradiction, inbound-validation-ownership-in-task-decomposition, verify-command-in-a-worker-brief.
+- Reader-cancel page ↔ backend-node-async-promise-error-handling, testing-async-teardown-after-aborted-tasks; one way → backend-common-reliability-timeouts-and-retries.
+
+The split-DoD page also links one way to unattended-worker-questions, the channel it reports through. checkable-claims links to that page the same way.
 
 ## Open-PR check
 
-26 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253–#260), listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`. For each head, the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for the candidate's concepts (removed or replaced assertions, re-running all mutants, reviewer/auditor fixes, "also assert"), and every added line mentioning mutants was read.
+`gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` returned one open head: **#265** `knowledge/choiyounggi-20261009-222812`. It covers wrapped grep, review diff base, frontmatter quotes, GITHUB_TOKEN chaining and blind LLM judges.
 
-| Candidate | Overlapping open PR | Verdict |
+`git diff origin/main...origin/knowledge/choiyounggi-20261009-222812 -- wiki/ INDEX.md` touches 22 files. A scan for every candidate's key terms found no overlapping trigger:
+
+| Candidate | Overlapping open head | Verdict |
 |---|---|---|
-| 4614be6ce89cc5c5 | None carries it. #226 edits the same page for a different situation (a survivor reported inside a PASS audit); #258 (additive mutants vs presence checks) and #259 (schema key coverage) are different situations | **new** |
-| 7 × t216 plan-gaps | No open PR body mentions t216 (all 26 bodies searched) | **new** → local layer |
+| `3be5bdead3f07fb5` DNS | none | **new** |
+| `b4f831f51faf06b7` plugin deps | none | **new** |
+| `3c75059217baccb5` split DoD | none | **new** |
+| `3cf7069fd51c2a57` reader cancel | none — `git diff origin/main...origin/knowledge/choiyounggi-20261009-222812 -- wiki/` has 0 lines matching `reader\.cancel\|getReader\|ReadableStream\|requestTimeout\|duplex` (positive control `GITHUB_TOKEN`: 17) | **new** |
 
-Merge check (`git merge-tree --write-tree`, this branch against each head): no wiki page conflicts, including #226, whose four hunks on the shared page were avoided. Every head conflicts on `log.md` and the older ones also on this report file — the same two files the open PRs already conflict on with each other (#260 vs #259 and #255 vs #254 checked).
+**Merge note.** Measured with `git merge-tree --write-tree <this branch> origin/knowledge/choiyounggi-20261009-222812` (merge base `d04462f`). Whichever PR merges second sees two conflicts:
+- `log.md`: both PRs append at the end. Keep both blocks.
+- `.dev-loop/INGEST_REPORT.md`: every flush rewrites it. Keep the later PR's report.
+
+`wiki/infrastructure/index.md` and `wiki/platforms/index.md` merge automatically, and no wiki page conflicts. The root `INDEX.md` is unchanged here because #265 rewrites the qa and platforms rows on either side of the debugging row.
 
 ## Routing decision
 
-| Candidate | Layer | Target | Action |
-|---|---|---|---|
-| 4614be6ce89cc5c5 | bundled | `testing/quality/surviving-mutant-equivalence-triage.md` | merged as step 6 |
-| 7 × t216 plan-gaps | local (linkly) | see Local-layer candidates | excluded from this PR, retired from the queue |
+| Candidate | Target page | Why |
+|---|---|---|
+| DNS | `wiki/debugging/network/unresponsive-first-nameserver.md` | The directive is diagnosis: split the timing, then find the dead server. `debugging/network` already exists (epipe-write-ordering). Fix guidance stays short, per the debugging domain's "fix → owning domain" rule. The root debugging row ("Diagnosing a failure") already routes here |
+| Plugin deps | `wiki/platforms/tools/plugin-dependencies-after-an-update.md` | The other Claude Code plugin pages already live here (version-keyed-artifact-cache, plugin-mcp-server-registration) |
+| Split DoD | `wiki/infrastructure/agent-orchestration/done-criteria-in-a-split-task-piece.md` | Sibling of checkable-claims-in-an-adopted-plan and worker-reported-plan-contradiction. The root row "multi-agent orchestration" routes here |
+| Reader cancel | `wiki/backend/node/async/request-body-reader-cancel.md` | The mechanism is Node's (undici body + readable iterator), so `backend/node`, not `common`; `async` already holds the deadline-race page it extends. Next.js is one caller, not the owner |
 
-No new category: testing/quality already holds the mutation-testing pages, and the target page's trigger covers this situation.
+No new category. Each domain `index.md` gained one row.
 
 ## Independent review
 
-A fresh-context adversarial reviewer (a separate subagent, read-only on this checkout) re-fetched both sources, rebuilt the reproduction from its description (same matrix observed on Node 26.7.0) and re-ran both lint scripts. Verdict: CHANGES_REQUESTED, resolved before this PR:
+A fresh-context adversarial reviewer (read-only, `git status --porcelain` empty afterwards) checked commit `8d8e603`:
+- 19 load-bearing claims across the 4 pages fetched against their cited sources: 19 CONFIRMED, 0 WRONG, 0 UNSUPPORTED. This includes an independent run of the reader-cancel reproduction (`cancel STILL PENDING after 3000 ms; read resolved done=true`) and the Next.js 16.3.8 `fromNodeNextRequest` source (`body = request.body`).
+- Plumbing: 11/11 `related:` ids resolve, 20/20 `Pages read:` ids resolve, 10/10 claimed back-links present, 4 index rows present.
+- Format: body lines 77 / 74 / 64 / 59; all template sections; no vague words in directives.
+
+Findings and resolutions:
 
 | Finding | Resolution |
 |---|---|
-| Step 6 said a "Killed" result is reused "only while its killing test is unchanged", dropping conditions both tools state (Stryker: the culprit test still exists; PIT: the class under test is unchanged too) | Fixed: "With the source untouched, PIT and Stryker apply the same rule: they reuse a "Killed" result only while its killing test still exists unchanged." |
-| The log line understated #226's overlap — it also edits this page's related list, Edge table and Sources, so merging it would need reconciliation in four places | Checked and not reproduced: `git merge-tree --write-tree` of this branch with #226 conflicts only in `log.md` and this report file, and the merged page carries 0 conflict markers. The log line now names #226's other three hunks and records that they merge cleanly |
-| Gap: a flaky mutant reads as lost coverage in step 6's table | Added an edge row: when a previously killed mutant survives while the assertion diff shows nothing removed, re-run it against the pre-edit block first; surviving there too marks a flaky verdict (testing-flaky-diagnosing-flaky-tests) |
+| high: this section still held the placeholder | Filled with this review |
+| low: the two man7.org URLs on the DNS page time out (reviewer and this run both got `curl: (28)`, HTTP 000); DNS resolves | Content re-checked on the Debian copies, both HTTP 200: `manpages.debian.org/bookworm/manpages/resolv.conf.5.en.html` ("the default is RES_TIMEOUT (currently 5)") and `.../systemd-resolved.service.8.en.html` (stub on 127.0.0.53, `/run/systemd/resolve/resolv.conf`). man7.org stays the cited canonical URL; the timeout looks like a site/network outage, not a moved page |
 
-Kept: the reviewer's routing note (step 6's hygiene theme also sits near tests-that-cannot-fail) — the merge target stays, because this page's trigger already owns "a reviewer asks for a test to cover a specific surviving mutant" and the step-1 table now points into step 6.
+Merge note re-measured after the fourth page: `git merge-tree --write-tree --name-only HEAD origin/knowledge/choiyounggi-20261009-222812` still lists only `.dev-loop/INGEST_REPORT.md` and `log.md` as conflicts.
 
 ## Local-layer candidates
 
-| Row | Project | Target |
+Two rows from `plan-gaps.jsonl`, project `linkly` (planning task t1-password-union). Both directives name linkly's compiler internals (`lower.py`, `scope.resolve_field`, `scope.network_bindings`, RFC-0053), so they would be wrong in another codebase. Excluded from this PR and retired from the queue:
+
+| Row | Decision it records | Target |
 |---|---|---|
-| Planning t216: deciding Where the check runs | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-spec-result-reads-input-check-site.md — run wiki-ingest inside that project |
-| Planning t216: deciding Which names an expect line asserts on | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-expect-result-candidate-names.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (a): the bare name is a respond field | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-field-condition.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (b): a same-name respond term wins | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-term-precedence.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (c): given did not set the input | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-given-setter-suppression.md — run wiki-ingest inside that project |
-| Planning t216: deciding Severity, registry position, hint | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-diagnostic-code-registration.md — run wiki-ingest inside that project |
-| Planning t216: deciding RFC | linkly (linkly-dartfish worktree) | wiki-local/qa/document-verification/t216-no-rfc-for-warning-only-code.md — run wiki-ingest inside that project |
+| `a525cd52ad3a644e` | Semantics of the shared Password-family judgement (`_password_family_declarations`) | `wiki-local/backend/compiler/password-family-declarations.md` in linkly — run wiki-ingest inside that project |
+| `ac0e8ad633885234` | Where the `with` check runs | `wiki-local/backend/compiler/with-check-placement.md` in linkly — run wiki-ingest inside that project |
 
-All seven are wiki-plan Phase B decisions naming linkly's own modules; they are excluded from this PR and retired from the queue.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+The four ingested candidates hold outside the projects they came from:
+- the DNS case: a home server
+- the plugin case: the auto-velog plugin
+- the split-DoD case: one piece of an orchestrated run
+- the reader-cancel case: a Next.js app's upload route

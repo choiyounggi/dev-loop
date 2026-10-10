@@ -8,7 +8,7 @@ sources:
   - https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html
   - https://git-scm.com/docs/git-check-ignore
 last_verified: 2026-09-28
-related: [qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-worker-reported-plan-contradiction, testing-quality-checks-that-cannot-pass, platforms-shells-env-var-off-switches, qa-document-verification-rationale-prose-after-a-config-value-change, backend-common-llm-binding-instructions-for-agents, platforms-tools-gitignore-directory-reinclusion]
+related: [qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-unattended-worker-questions, infrastructure-agent-orchestration-worker-reported-plan-contradiction, testing-quality-checks-that-cannot-pass, platforms-shells-env-var-off-switches, qa-document-verification-rationale-prose-after-a-config-value-change, backend-common-llm-binding-instructions-for-agents, platforms-tools-gitignore-directory-reinclusion, infrastructure-agent-orchestration-done-criteria-in-a-split-task-piece]
 ---
 
 # Numeric Claims and Symbol Contracts in a Plan You Did Not Write
