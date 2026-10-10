@@ -21,6 +21,7 @@ own the Node mechanics.
 | Page | Load when |
 |------|-----------|
 | [promise-error-handling](async/promise-error-handling.md) | unhandledRejection crashes/warnings in logs; errors vanishing from async flows; an async function called without await inside a handler; choosing between Promise.all / allSettled / any / race for parallel work; racing a timeout that must actually cancel the loser; deciding `return promise` vs `return await promise` in a try block |
+| [request-body-reader-cancel](async/request-body-reader-cancel.md) | Racing a deadline against `reader.read()` on a request body in a Node server (Next.js route handler in the Node runtime, or `new Request(url, { body: nodeReadable, duplex: 'half' })`) and cancelling the reader when the deadline wins; a slow-upload guard or in-flight cap whose slot is released only after ~300 s (Node `requestTimeout`); `await reader.cancel()` that never returns; a deadline test that passes with a `new ReadableStream({})` fake body |
 
 ## boundaries
 

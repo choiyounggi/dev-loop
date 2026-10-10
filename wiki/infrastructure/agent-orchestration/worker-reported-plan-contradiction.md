@@ -10,7 +10,7 @@ sources:
   - https://www.anthropic.com/engineering/multi-agent-research-system
   - http://principles-wiki.net/principles:don_t_repeat_yourself
 last_verified: 2026-09-10
-related: [infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-shared-run-state, debugging-methodology-hypothesis-testing, qa-process-evaluating-review-feedback, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan]
+related: [infrastructure-agent-orchestration-autonomous-decision-rulings, infrastructure-agent-orchestration-shared-run-state, debugging-methodology-hypothesis-testing, qa-process-evaluating-review-feedback, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, infrastructure-agent-orchestration-done-criteria-in-a-split-task-piece]
 ---
 
 # A Worker Reports the Design Doc and Step Files Disagree
