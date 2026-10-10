@@ -72,7 +72,7 @@ setup() {
   expected="$(HOME="$fakehome" sh "$WG" --path "$realwt")"
   [[ "$output" == *"GROUNDWORK_GUARDRAILS_CONFIG='$expected'"* ]]
   [[ "$expected" != "$realwt"* ]]
-  [[ "$expected" == "$fakehome/.dev-loop/worker-guardrails/"*".json" ]]
+  [[ "$expected" == "$fakehome/.claude/groundwork/overrides/dev-loop-"*".json" ]]
 }
 
 @test "single quote in the escalation dir is shell-escaped (no command break)" {

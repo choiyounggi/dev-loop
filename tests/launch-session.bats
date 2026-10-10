@@ -492,7 +492,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
 # trusts GROUNDWORK_GUARDRAILS_CONFIG when it resolves OUTSIDE every project
 # tree (any command in the worktree could rewrite an in-tree file). The
 # loosened per-worker config must reach the worker as that external, trusted
-# file ($HOME/.dev-loop/worker-guardrails/<id>.json — worker-guardrails.sh
+# file ($HOME/.claude/groundwork/overrides/dev-loop-<id>.json — worker-guardrails.sh
 # owns deriving <id>) via this env var, or an upgraded guardrails ignores the
 # loosening and every sandboxed-off rule (rm_rf, git_discard, tmp writes)
 # becomes an `ask` again inside the worker's own worktree.
@@ -512,7 +512,7 @@ pane_not_ready() { # matches none of the ready/trust patterns
   [[ "$keys" == *"GROUNDWORK_GUARDRAILS_CONFIG='$expected'"* ]]
   # outside every project tree, not inside the worktree
   [[ "$expected" != "$WT"* ]]
-  [[ "$expected" == "$fakehome/.dev-loop/worker-guardrails/"*".json" ]]
+  [[ "$expected" == "$fakehome/.claude/groundwork/overrides/dev-loop-"*".json" ]]
 }
 
 # --- CONTAMINATION GUARD (issue #100 comment): a leaked real LO_STATUS_DIR

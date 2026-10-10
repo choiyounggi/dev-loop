@@ -11,7 +11,7 @@ setup() {
   git -C "$wt" init -q -b main
   git -C "$wt" config user.email t@t; git -C "$wt" config user.name t
   # A temp HOME: the external guardrails config now lives at
-  # $HOME/.dev-loop/worker-guardrails/, so no test ever touches the real one.
+  # $HOME/.claude/groundwork/overrides/, so no test ever touches the real one.
   HOME="${BATS_TEST_TMPDIR}/home"; mkdir -p "$HOME"
   export HOME
 }
@@ -64,14 +64,14 @@ setup() {
 # resolves inside any project tree (current worktree, its main worktree, or
 # $PWD) — any command running in the worktree could rewrite such a file. So
 # the real loosening copy must live outside every repo, at
-# $HOME/.dev-loop/worker-guardrails/<id>.json, keyed off a hash of the
+# $HOME/.claude/groundwork/overrides/dev-loop-<id>.json, keyed off a hash of the
 # worktree's own absolute path. `--path` prints that location without writing
 # anything, so callers (the launch scripts) never re-derive the hash.
 
-@test "--path prints an absolute path under \$HOME/.dev-loop/worker-guardrails/, not inside the worktree" {
+@test "--path prints an absolute path under \$HOME/.claude/groundwork/overrides/, not inside the worktree" {
   run sh "$WG" --path "$wt"
   [ "$status" -eq 0 ]
-  [[ "$output" == "$HOME/.dev-loop/worker-guardrails/"*".json" ]]
+  [[ "$output" == "$HOME/.claude/groundwork/overrides/dev-loop-"*".json" ]]
   [[ "$output" != "$wt"* ]]
 }
 

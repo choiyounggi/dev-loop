@@ -15,8 +15,8 @@
 #   1. `<worktree>/.groundwork/guardrails.json` — the REPO config, read by an
 #      OLDER guardrails. A newer guardrails now only lets a repo config
 #      TIGHTEN rules, so this copy alone no longer loosens anything there.
-#   2. `$HOME/.dev-loop/worker-guardrails/<id>.json` — the EXTERNAL, trusted
-#      copy a newer guardrails actually loosens from, named by env
+#   2. `$HOME/.claude/groundwork/overrides/dev-loop-<id>.json` — the EXTERNAL,
+#      trusted copy a newer guardrails actually loosens from, named by env
 #      `GROUNDWORK_GUARDRAILS_CONFIG` (set by the launching process: every
 #      worker launch path — launch-session.sh, orca-worker-start.sh,
 #      orca-spawn.sh — exports it next to GROUNDWORK_ESCALATION_DIR /
@@ -24,12 +24,14 @@
 #      GROUNDWORK_GUARDRAILS_CONFIG path that resolves inside any project tree
 #      (the current worktree, its main worktree, or $PWD) — any command
 #      running in that worktree could rewrite such a file and loosen its own
-#      sandbox, so the trusted copy must live outside every repo. `<id>` is
-#      the first 16 hex chars of the sha256 of the worktree's own absolute,
-#      symlink-resolved path — stable across repeated calls on the same
-#      worktree (idempotent), distinct per worktree. A caller that needs this
-#      path (the launch scripts) gets it from `--path` instead of
-#      re-deriving the hash in three places.
+#      sandbox, so the trusted copy must live outside every repo, specifically
+#      under guardrails' own allowlisted override directory
+#      (`$HOME/.claude/groundwork/overrides/`) — the only location guardrails
+#      trusts an override from. `<id>` is the first 16 hex chars of the
+#      sha256 of the worktree's own absolute, symlink-resolved path — stable
+#      across repeated calls on the same worktree (idempotent), distinct per
+#      worktree. A caller that needs this path (the launch scripts) gets it
+#      from `--path` instead of re-deriving the hash in three places.
 #
 # worktree_escape stays `ask` — `allowPaths` declares the ONE sanctioned path
 # (`.orchestration`, the coordination dir a worker writes its status and plan into)
@@ -64,10 +66,10 @@ wg_hash16() { # stdin: bytes to hash -> stdout: first 16 hex chars
   fi
 }
 
-wg_external_path() { # <worktree-path> -> stdout: $HOME/.dev-loop/worker-guardrails/<id>.json
+wg_external_path() { # <worktree-path> -> stdout: $HOME/.claude/groundwork/overrides/dev-loop-<id>.json
   wg_abs=$(cd "$1" 2>/dev/null && pwd -P) || return 2
   wg_id=$(printf '%s' "$wg_abs" | wg_hash16) || return 1
-  printf '%s/.dev-loop/worker-guardrails/%s.json\n' "$HOME" "$wg_id"
+  printf '%s/.claude/groundwork/overrides/dev-loop-%s.json\n' "$HOME" "$wg_id"
 }
 
 if [ "${1:-}" = "--path" ]; then

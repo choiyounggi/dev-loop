@@ -49,7 +49,7 @@ flat_skill() {
 # config TIGHTEN rules, and only trusts GROUNDWORK_GUARDRAILS_CONFIG when it
 # resolves OUTSIDE every project tree, so the worker's own loosened config
 # must reach it as that external, trusted file
-# ($HOME/.dev-loop/worker-guardrails/<id>.json) via this env var, derived from
+# ($HOME/.claude/groundwork/overrides/dev-loop-<id>.json) via this env var, derived from
 # the --worktree selector. Needs a worktree that actually exists on disk
 # (worker-guardrails.sh --path resolves it), unlike the other DRYRUN tests'
 # fake "/wt" selector.
@@ -63,7 +63,7 @@ flat_skill() {
   expected="$(HOME="$fakehome" sh "$WG" --path "$realwt")"
   [[ "$output" == *"GROUNDWORK_GUARDRAILS_CONFIG='$expected'"* ]]
   [[ "$expected" != "$realwt"* ]]
-  [[ "$expected" == "$fakehome/.dev-loop/worker-guardrails/"*".json" ]]
+  [[ "$expected" == "$fakehome/.claude/groundwork/overrides/dev-loop-"*".json" ]]
 }
 
 @test "worker mode: binds the Dispatch to the terminal it created, not to --agent" {
