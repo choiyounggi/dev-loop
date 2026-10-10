@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://arxiv.org/abs/2603.12123
 last_verified: 2026-09-04
-related: [qa-process-llm-review-pipelines, qa-process-evaluating-review-feedback, qa-process-adversarial-change-review, infrastructure-agent-orchestration-session-context-token-budget]
+related: [qa-process-llm-review-pipelines, qa-process-evaluating-review-feedback, qa-process-adversarial-change-review, infrastructure-agent-orchestration-session-context-token-budget, qa-process-blind-llm-judgment-of-a-visual-rule]
 ---
 
 # Reviewing LLM-Produced Work From a Session That Did Not Produce It

@@ -9,7 +9,7 @@ sources:
   - https://git-scm.com/docs/git-merge
   - https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue
 last_verified: 2026-09-03
-related: [infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-worktree-isolated-workers, backend-common-change-impact-widening-a-closed-value-table, qa-deliverables-quantitative-claims-in-a-published-document, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, infrastructure-agent-orchestration-word-level-union-merge-reassembly]
+related: [infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-worktree-isolated-workers, backend-common-change-impact-widening-a-closed-value-table, qa-deliverables-quantitative-claims-in-a-published-document, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, infrastructure-agent-orchestration-word-level-union-merge-reassembly, infrastructure-agent-orchestration-review-diff-base-after-a-sibling-merge]
 ---
 
 # Resolving a Parallel-Branch Document Conflict With `--ours` Plus a Count Fix
