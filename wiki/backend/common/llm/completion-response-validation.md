@@ -10,7 +10,7 @@ sources:
   - https://docs.vllm.ai/en/latest/features/reasoning_outputs.html
   - https://docs.litellm.ai/docs/reasoning_content
 last_verified: 2026-07-31
-related: [backend-common-reliability-timeouts-and-retries, backend-common-integrations-externally-owned-defaults, backend-common-llm-context-window-budget]
+related: [backend-common-reliability-timeouts-and-retries, backend-common-integrations-externally-owned-defaults, backend-common-llm-context-window-budget, backend-common-llm-korean-summary-line-dedupe-by-bigram-overlap]
 ---
 
 # Validating an OpenAI-Compatible Completion Response Before Using It

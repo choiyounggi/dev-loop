@@ -11,7 +11,9 @@ sources:
   - https://pitest.org/quickstart/basic_concepts/
   - https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/
   - https://testing.googleblog.com/2021/04/mutation-testing.html
-last_verified: 2026-09-28
+  - https://html.spec.whatwg.org/multipage/form-control-infrastructure.html
+  - https://bugs.webkit.org/show_bug.cgi?id=193758
+last_verified: 2026-10-11
 related:
   [
     testing-quality-tests-that-cannot-fail,
@@ -22,6 +24,7 @@ related:
     testing-quality-source-text-wiring-assertions,
     backend-common-change-impact-call-site-enumeration,
     qa-process-evaluating-review-feedback,
+    frontend-browser-apis-copying-text-from-a-tap,
   ]
 ---
 
@@ -109,6 +112,7 @@ Building the mutation harness itself, or citing its score →
 | The mutated behavior differs only in a dimension the suite is not meant to cover (logging, metrics, timing) | PIT's second undetectable class — exclude that region from the mutation set instead of adding a test to chase it                                                                               |
 | The redundant branch exists for readability at a trust boundary (validating external input twice)           | Keep it and record why in the comment as a deliberate defense-in-depth, not as a correctness claim; the mutant stays a classified survivor                                                     |
 | The equivalence holds only for the current caller set                                                       | Treat it as coverage, not equivalence: enumerate the call sites ([backend-common-change-impact-call-site-enumeration]); when a future caller could pass the absorbed input, the branch is live |
+| The survivor deletes one of two calls the test environment implements identically — under jsdom 30.1.2, `textarea.select()` already sets the range that `setSelectionRange(0, value.length)` sets | Equivalent in that environment only, so keep both calls: each exists for an engine the suite does not run (iOS `select()` moved the caret instead of selecting until WebKit fixed it in 2019, and WebKit's legacy copy example calls `setSelectionRange`). Prove the test with mutants the environment can observe — `setSelectionRange(0, len - 1)`, or deleting both calls — and require red; capture `selectionStart`/`selectionEnd` inside the `execCommand` stub, because the fallback removes its textarea before returning ([frontend-browser-apis-copying-text-from-a-tap]) |
 | Several mutants survive in the same function                                                                | Classify each one separately — one verdict covering all of them hides whichever is the other kind                                                                                              |
 | Step 6's re-run is a Stryker incremental run                                                                | With the source untouched, Stryker re-runs a killed mutant only when it sees the killing test change or disappear. Jest, Vitest and CucumberJS report test locations; Mocha and Tap mark every test in a changed file as changed; Jasmine and Karma see only added or removed tests; the command runner and static mutants see no test change. With Jasmine, Karma, the command runner or a static mutant, run `--force` — otherwise Stryker reuses the "Killed" verdicts recorded before the edit |
 | The mutation run is your own script                                                                         | Save its pre-edit verdict table as the baseline and re-run the whole matrix after the edit — a script that records only pass/fail per mutant cannot tell which assertion each kill depended on ([testing-quality-mutation-harness-file-custody]) |
@@ -141,3 +145,4 @@ Building the mutation harness itself, or citing its score →
 - Field evidence 2026-10-08 (linkly-invitation, task t2 Task 06 attempt 4; recorded by the originating session, not re-run in this flush): an auditor's "also assert" fix was applied by swapping the block's `NODE_ENV=test` assertion for a production one; mutants A9 and A21 were then killed while N1–N3 survived with 4/4 tests passing, and re-adding the two removed lines turned all three red
 - Field measurement 2026-08-07 (rtb-unified, `apps/web` building-detail URL parsing): a mutant that deleted the empty-string guard on `?buildingId=` survived. The domain argument was that the guard's whole input set is strings that `Number()` maps to `0` or `NaN`, both of which the following `parsed > 0` rejects — so no accepted input distinguishes the two. The branch's comment claimed "an empty string is otherwise read as 0", which that argument contradicts. Deleting the branch and rewriting the comment left all 49 tests passing at the same count
 - Field evidence 2026-09 (a Rust `serde` wire-format crate, crew-proto task t5-proto; recorded by the originating session, not re-run in this flush): a test-quality audit returned PASS and recorded that a `deny_unknown_fields` mutant survived all 12 tests as a "secondary" guarantee; the brief stated "unknown fields tolerated" literally, so the survivor was the missing-test row — one added case reddened under the mutant (13 tests, `unknown_entry_fields_are_tolerated ... FAILED`), the suite read 82 passed after restore, and the resumed auditor reproduced the kill
+- Local reproduction 2026-10-11 (jsdom 30.1.2, Node 26.7.0; selection captured inside a `document.execCommand` stub, 19-character value): the original, `setSelectionRange` removed, and `select()` removed all read (0, 19); `setSelectionRange(0, len - 1)` read (0, 18); both removed read (19, 19). jsdom's `lib/jsdom/living/nodes/HTMLTextAreaElement-impl.js` `select()` sets `_selectionStart = 0` and `_selectionEnd = this._getValueLength()`; the HTML `select()` steps end "Set the selection range with 0 and infinity" (https://html.spec.whatwg.org/multipage/form-control-infrastructure.html); https://bugs.webkit.org/show_bug.cgi?id=193758 removed iOS's "We don't want to select all the text on iOS" (committed r240452, 2019-01-24). Field origin 2026-10-10 (linkly-invitation task t5b, vitest 5.0.3 + jsdom 30.1.2; recorded by the originating session): the same outcomes
