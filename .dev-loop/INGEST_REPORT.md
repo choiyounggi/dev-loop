@@ -1,95 +1,128 @@
-# Knowledge flush — 1 insight(s)
+# Knowledge flush — 4 insight(s)
 
-A review's "also assert X" fix that edits an existing test block can delete the assertion other mutants depended on, and re-running only the named mutant hides that. **1 page amended (new step 6), 0 new pages, 1 back-link. 7 plan-gaps retired as local-layer, 0 dropped.**
-
-Claimed 8 queue rows (run `20261008-124951-26572`): 1 harvested ★ Insight (`4614be6ce89cc5c5`) and 7 wiki-plan `[no-wiki]` plan-gap rows from linkly task t216.
+Five queue rows claimed by run `20261011-001850-59042`: four general insights ingested (two merged into existing pages, two new pages, two of the four with a corrected directive), and one project-specific plan gap routed to the local layer. Every claimed row is retired from the queue once this PR is open.
 
 ## Verified best-practice
 
-**`4614be6ce89cc5c5` — keep the block's assertions, then re-run every mutant it covers** (confidence: **verified**)
+### 1. `claude -p --json-schema` fed by zod 4 — verified, directive corrected
 
-Claim: when a review's "also assert X" fix lands in an existing test block, put the new assertion beside the block's existing ones (a different input or environment gets its own case), diff the block's assertion lines before and after, and re-run every mutant the block covers, comparing each verdict with the pre-edit run. Re-running only the named mutant cannot see the mutants that an assertion removed by the edit used to kill.
+- **Row** `147fe4b85ab22a6e` (session in `wreckfish`). Candidate: delete the top-level `$schema` from `z.toJSONSchema()` output before passing it to `--json-schema`.
+- **Result.** The candidate's error and fix both reproduce, but deleting the key is partial: a schema containing `z.tuple()` still fails with `strict mode: unknown keyword: "prefixItems"`. The ingested directive is the documented one, `z.toJSONSchema(schema, { target: 'draft-7' })`.
+- **Sources** (each quote re-fetched and matched on 2026-10-11):
+  - https://code.claude.com/docs/en/agent-sdk/structured-outputs — "The SDK validates schemas with JSON Schema draft-07, so schemas that declare a newer version are rejected. Zod targets draft 2020-12 by default, so pass `target: "draft-7"` when converting your schema."
+  - https://code.claude.com/docs/en/cli-reference — `--json-schema`: "Claude Code exits with an error on an invalid schema"
+  - https://ajv.js.org/json-schema.html — draft-07 "is provided as default export"; "To use draft-2020-12 schemas you need to import a different Ajv class"
+  - https://zod.dev/json-schema — `target`: `"draft-2020-12"` "Default. JSON Schema Draft 2020-12"
+  - https://github.com/anthropics/claude-code/issues/80402 — open: "--json-schema rejects schemas declaring the draft 2020-12 meta-schema (since 2.1.214)"
+- **How verified.** Claude Code 2.1.296 with zod 4.6.5, run as `claude --bare -p … --json-schema …` with a fake `ANTHROPIC_API_KEY`, so an accepted schema stops at "Invalid API key" and nothing is billed. Default output: exit 1, 0 bytes of stdout, the 2020-12 error. `$schema` deleted on a plain object: accepted. `$schema` deleted with a tuple: exit 1 on `prefixItems`. `target: 'draft-7'` with a tuple and a recursive schema: accepted. `target: 'draft-4'`: rejected. Ajv 8.20.0's default class reproduces both messages, and the `claude.exe` binary contains them. One real end-to-end run (`--safe-mode`, Haiku, $0.0032) with the draft-7 tuple-and-recursion schema exited 0 with the expected `structured_output`.
+- **Confidence:** verified.
 
-Sources — each quote compared character-for-character against the raw page with `curl` + `/usr/bin/grep` on 2026-10-08:
+### 2. Cutting scraped page text at a noise marker — field-tested
 
-- https://stryker-mutator.io/docs/stryker-js/incremental/ (raw source: `docs/incremental.md` in stryker-js) — "Reuse is possible when: A mutant was "Killed"; the culprit test still exists, and it didn't change." The runner table decides whether a test edit is seen at all: Jest, Vitest, CucumberJS "Full"; Mocha, Tap "Stryker assumes all tests inside a file changed when that file changed"; Jasmine, Karma "Stryker will only see test changes for tests that are added or removed"; Command "will only detect changes in mutants, not their tests"; "Static mutants don't have test coverage; thus, Stryker won't detect test changes for them"; `--force` reruns "all mutants in scope, regardless of the incremental file".
-- https://pitest.org/quickstart/incremental_analysis/ — "If a mutation was killed in the last run and neither the class under test or the killing test has changed, then it can be assumed that this mutation is still killed."; for a changed killing test, "it is likely that the last killing test will still kill it and it should therefore be prioritised above others."
+- **Row** `08ee50366aeeda10` (session in `wreckfish`). Candidate: cut only at a marker that sits after the last content item.
+- **Sources.** One peer-reviewed source supports the premise, re-fetched and matched: https://doi.org/10.13053/cys-22-2-2959. That is Viveros-Jiménez et al. 2018, *Computación y Sistemas* 22(2), with the full text on SciELO: "Non-relevant content could be placed everywhere in the structure of the document (even in the middle of the text)".
+  - Checked with no statement of the cut rule itself: the Mozilla Readability README, the trafilatura docs, the boilerpipe paper (WSDM 2010) and the CleanEval LREC 2008 paper.
+  - The boilerpipe paper describes single-article pages, where main content "is surrounded by boilerplate". The list-page interleaving this page covers is a different layout.
+- **How verified.** The evidence is the session's measured character offsets on a live third-party site, which this flush did not re-scrape. The page keeps to what those offsets show. One edge case I inferred (removing interleaved blocks as spans) was drafted and then deleted: nothing measured it, and it would delete content when the item anchor closes each item.
+- **Confidence:** field-tested.
 
-Both tools keep a "Killed" verdict only while its killing test is unchanged. Step 6 applies that rule by hand, and the new edge row covers the Stryker runners that cannot see an in-place edit.
+### 3. "No file was written" under a partial `node:fs` mock in Vitest — verified, directive corrected
 
-Local reproduction (Node 26.7.0, `node:test`; one fresh directory per test variant × mutant; each `sed` mutation checked as applied with `cmp`):
+- **Row** `dbb1dc5c25c35cd4` (task `t6b` in `linkly-invitation`). Candidate: widen the spread `importOriginal()` mock to `promises`, `node:fs/promises` `open`, and the `write`/`open` APIs, then prove each channel with a mutant.
+- **Result.** Widening the named keys is not enough. `import fs from 'node:fs'` reads the `default` export, which the spread copies from the real module, so 4 of 6 write channels still wrote real files after widening. The ingested page leads with an empty-directory assertion. For mock-based suites it adds `mocked.default = mocked`, a separate `node:fs/promises` mock (or the Vitest docs' memfs `__mocks__`), and one mutant per channel.
+- **Sources** (quotes re-fetched and matched): https://vitest.dev/guide/mocking/modules ("The factory method accepts an importOriginal function that will execute the original module and return its module object"), https://vitest.dev/guide/mocking/file-system ("we recommend using memfs"; `__mocks__/fs.cjs` and `__mocks__/fs/promises.cjs`; both `vi.mock('node:fs')` and `vi.mock('node:fs/promises')`), and https://nodejs.org/api/fs.html (Promises API history). On Node 26.7.0, `require('node:fs').promises === require('node:fs/promises')` printed `true`.
+- **How verified.** A research agent built a six-channel reproduction (Vitest 5.0.3, Node 26.7.0). I re-ran it myself: `Tests 8 failed | 10 passed (18)`, with real files for every channel the page marks "missed". I then ran my own red/green pairs:
+  - `default` fix: `6 passed`, with no real file; its control without the fix failed 4 (`4 failed | 2 passed`, real files for a, d, e, f).
+  - Call recording under the fix: `6 passed`, every channel reached a recording mock.
+  - memfs `__mocks__`: `6 passed`, every write landed in `vol`; its control without the `node:fs/promises` mock failed 2 (`2 failed | 4 passed`).
+- **Confidence:** verified.
 
-| Test block | Unmutated | N0 no-op control | N1 `'debug'`→`'info'` | N2 `42`→`0` | A21 `=== 'production'`→`=== 'prod'` (named mutant) |
-|---|---|---|---|---|---|
-| Before the fix | pass | survived | killed | killed | survived |
-| Fix that rewrites the block for `'production'` | pass | survived | **survived** | **survived** | killed |
-| Fix that adds the `'production'` assertions beside the old ones | pass | survived | killed | killed | killed |
+### 4. A diff that edits one count in a document — field evidence verified, merged
 
-The before/after assertion-line diff named both lines the rewrite removed (`assert.equal(c.logLevel, 'debug')`, `assert.equal(c.seed, 42)`) and none for the additive fix. The scratch directory was deleted after the run.
+- **Row** `384928a50f467385` (integration run in `linkly`). Candidate: when one count in a section changes, recheck every count, list and number in that section.
+- **Sources.** The page already cites the Write the Docs documentation principles ("prevent any parallel maintenance … of the same information across multiple sources") and Google's docguide.
+  - A research pass found no style guide or tool that checks restated counts for agreement. It checked the Google developer style guide's numbers and timeless-documentation pages, the Microsoft Writing Style Guide's numbers page and its Vale package, Vale's `consistency` check, Python doctest and Sphinx substitutions; all are adjacent, none on point.
+  - The "recheck every number in the section" procedure therefore stands on the field incident.
+- **How verified.** `git -C linkly show 1a68da3 -- README.md` changes the bold line from "64 RFCs" to "65 RFCs" and the Draft paragraph from "seventeen" to "eighteen". Review finding F1 (`.orchestration/archive-20261010-oi1010/reviews/t2-write-miss-not-found-r1.md`) records the stale paragraph (46 + 1 + 17 = 64 against the stated 65), and that `tests.test_readme_currency` pins only the bold line. That paragraph was a spelled-out breakdown, so a search for the old total "64" would not have found it. The merged row says this.
+- **Confidence:** the page stays `verified`. The new rows rest on this field incident, which the page's Sources now records.
 
-Field evidence (originating session, linkly-invitation task t2 Task 06 attempt 4; not re-run here): swapping the block's `NODE_ENV=test` assertion for a production one killed A9 and A21 while N1–N3 survived with 4/4 tests passing; re-adding the two removed lines killed them.
+### 5. Plan gap `9594b5cd202978fb` — not ingested (local layer)
 
-**7 plan-gap rows (t216)** — not researched as general practice: every directive names linkly's own modules (`impl/lnpl/lower.py`, `spec._check_given`, the `CODES`/`SEVERITY_OF`/`HINTS` registry, RFC numbering), so all seven fail the layer test. No confidence is claimed for them.
+Its directive names linkly's own `repo_policy.seeded_entities`, RFC-0064/RFC-0052, `docs/backends.md` and the `lnpl run/spec/serve --backend fake` commands, so it would be wrong in another codebase. See Local-layer candidates.
 
 ## Existing-layer check
 
-Route: `INDEX.md` → testing ("cases/assertions", "verifying tests can actually fail") → `wiki/testing/index.md` → quality; qa ("acting on code-review feedback") checked as well.
+`wiki_search` (k=5) per candidate trigger, then grep and the domain indexes:
 
-Pages read: testing-quality-surviving-mutant-equivalence-triage, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, qa-process-evaluating-review-feedback, testing-quality-policy-at-several-return-sites, testing-mocking-captured-call-arguments, testing-quality-minimum-case-set, testing-quality-expectation-sets-with-one-distinct-value, backend-common-errors-diagnostics-from-a-shared-code-path
+| Candidate | wiki_search top 5 | Overlap found | Decision |
+|---|---|---|---|
+| 1 | structured-output-schema-from-zod (4 chunks), security-input-validation-at-trust-boundaries | structured-output-schema-from-zod owns "converting a zod schema for Claude structured output" for the API and SDK; nothing on the CLI flag | Merge: directive 4 with a five-row table, one Instead-of row, sources, trigger clause, index row extended |
+| 2 | retiring-a-provisional-marker (2), word-level-union-merge-reassembly, validation-timing, completion-response-validation | None. Grep found contact-details-from-scraped-pages (main-content filtering for contact details), a different trigger in the same category | New page in backend/common/integrations; `related` both ways with contact-details-from-scraped-pages |
+| 3 | typescript-6-global-types (2), what-to-mock, extracted-method-this-binding, control-signals-vs-primary-artifacts | what-to-mock covers proving a negative for child processes via DI, not module mocks of `node:fs`. masking-verification's channel sweep is about output masking, not write channels | New page in testing/mocking; `related` both ways with what-to-mock and tests-that-cannot-fail |
+| 4 | json-manifest-edit-gates, cloud-cli-invocation-bounds, retiring-a-provisional-marker (2), ui-hardening-against-real-content | Vector search missed it. The qa index and grep found quantitative-claims-in-a-published-document, which already says "fix every copy" across documents but not same-section breakdowns or a test that pins one line | Merge: trigger clause, one edge-case row, one Instead-of row, field-incident source, index row extended |
+| 5 | differential-run-agreement, audit-columns-as-update-evidence, not-null-check-and-lifecycle-callbacks, persistence-context, online-schema-changes | n/a (local layer) | Not ingested |
 
-- `wiki_search` (k=5) on the candidate's trigger: policy-at-several-return-sites 0.768, surviving-mutant-equivalence-triage 0.763 and 0.725, captured-call-arguments 0.737, minimum-case-set 0.735. Only surviving-mutant-equivalence-triage shares the trigger — its "When this applies" already names "a reviewer asks for a test to cover a specific surviving mutant".
-- Whole-wiki search (`/usr/bin/grep` over every page): 46 pages mention mutants; none covers an edit that removes an assertion other mutants depended on. Three pages direct re-running the targeted mutant after adding a case or assertion (tests-that-cannot-fail, expectation-sets-with-one-distinct-value, policy-at-several-return-sites); none of them covers an edit that removes an existing assertion, so step 6 extends them and contradicts none. They are left unchanged to keep this diff small.
-- **Merged, not created**: surviving-mutant-equivalence-triage gains step 6 with a verdict table, 4 edge rows (Stryker incremental reuse by runner, a hand-rolled mutation script, a deliberate replacement, a survivor whose kill does not reproduce on the pre-edit block), 1 Instead-of row, 4 Sources lines, a "When this applies" clause and a step-1 pointer. Body: 115 lines (117 once #226 merges; limit 120 — the next addition to this page needs a split).
-- Related: added testing-quality-mutation-harness-file-custody (its step 6, "re-run the whole matrix" after a custody fix, is the same principle; it already links back, so the link is now two-way). The evaluating-review-feedback ↔ this-page link is already in open PR #226 and is not duplicated here.
-- Conflicts with existing directives: none flagged.
-- `wiki/testing/index.md`: the page's "load when" row now names the new use case (maintenance invariant 1).
-- `last_verified` stays 2026-08-07: open PR #226 bumps that exact line, and a second bump would add a merge conflict; the new claims carry dated sources.
-- Checks on this branch: `node scripts/wiki-structure-checks.js wiki` → `pages: 359, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line, in infrastructure/config/keys-ahead-of-their-consumer.md); no banned vague qualifier in any added line.
+Conflicts flagged: none; no existing directive is contradicted. Read in full: structured-output-schema-from-zod, contact-details-from-scraped-pages, what-to-mock, quantitative-claims-in-a-published-document. The others were read at trigger and matching-line level.
+
+Pages read: backend-node-boundaries-structured-output-schema-from-zod, platforms-processes-parsing-cli-structured-output, platforms-processes-non-interactive-cli-invocation, backend-node-boundaries-runtime-validation, backend-node-boundaries-zod-4-checks-continue-after-a-failure, backend-common-integrations-contact-details-from-scraped-pages, testing-mocking-what-to-mock, testing-quality-tests-that-cannot-fail, testing-quality-absence-assertions-over-generated-output, testing-data-artifact-leakage-from-a-suite, security-data-masking-verification, qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-rationale-prose-after-a-config-value-change
 
 ## Open-PR check
 
-26 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253–#260), listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`. For each head, the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for the candidate's concepts (removed or replaced assertions, re-running all mutants, reviewer/auditor fixes, "also assert"), and every added line mentioning mutants was read.
+`gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` returned #266 (`knowledge/choiyounggi-20261010-021455`) and #265 (`knowledge/choiyounggi-20261009-222812`). #267 (`fix/autoflush-opt-in`) is not a knowledge head.
 
-| Candidate | Overlapping open PR | Verdict |
-|---|---|---|
-| 4614be6ce89cc5c5 | None carries it. #226 edits the same page for a different situation (a survivor reported inside a PASS audit); #258 (additive mutants vs presence checks) and #259 (schema key coverage) are different situations | **new** |
-| 7 × t216 plan-gaps | No open PR body mentions t216 (all 26 bodies searched) | **new** → local layer |
+`git diff origin/main...origin/<head> -- wiki/` for both:
+- #266 adds request-body-reader-cancel, unresponsive-first-nameserver, done-criteria-in-a-split-task-piece and plugin-dependencies-after-an-update, plus related-link edits.
+- #265 adds wrapping-quotes-in-a-frontmatter-value, review-diff-base-after-a-sibling-merge, chaining-workflows-past-a-github-token-event, search-evidence-from-a-wrapped-grep and blind-llm-judgment-of-a-visual-rule, plus amendments.
 
-Merge check (`git merge-tree --write-tree`, this branch against each head): no wiki page conflicts, including #226, whose four hunks on the shared page were avoided. Every head conflicts on `log.md` and the older ones also on this report file — the same two files the open PRs already conflict on with each other (#260 vs #259 and #255 vs #254 checked).
+Neither shares a trigger with any candidate, and neither touches the four target pages.
+
+| Candidate | Verdict |
+|---|---|
+| 1 zod → `--json-schema` | new |
+| 2 scraped-text noise marker | new |
+| 3 `node:fs` partial mock | new |
+| 4 count restatements | new |
+| 5 plan gap | not ingested (local layer) |
+
+`git merge-tree --write-tree` of this branch against each head conflicts only in `log.md` (both PRs append at its end, as #265 and #266 do to each other). `wiki/backend/index.md`, `wiki/backend/node/index.md` and `wiki/qa/index.md` auto-merge. `.dev-loop/INGEST_REPORT.md` will also conflict, since each flush rewrites it.
 
 ## Routing decision
 
-| Candidate | Layer | Target | Action |
+| Candidate | Layer | Target page | Action |
 |---|---|---|---|
-| 4614be6ce89cc5c5 | bundled | `testing/quality/surviving-mutant-equivalence-triage.md` | merged as step 6 |
-| 7 × t216 plan-gaps | local (linkly) | see Local-layer candidates | excluded from this PR, retired from the queue |
+| 1 `147fe4b85ab22a6e` | bundled | `wiki/backend/node/boundaries/structured-output-schema-from-zod.md` | merge |
+| 2 `08ee50366aeeda10` | bundled | `wiki/backend/common/integrations/cutting-scraped-text-at-a-noise-marker.md` | new page; integrations already holds the scraping pages |
+| 3 `dbb1dc5c25c35cd4` | bundled | `wiki/testing/mocking/proving-no-file-was-written.md` | new page; mocking owns module-mock pitfalls |
+| 4 `384928a50f467385` | bundled | `wiki/qa/deliverables/quantitative-claims-in-a-published-document.md` | merge |
+| 5 `9594b5cd202978fb` | local | see below | excluded |
 
-No new category: testing/quality already holds the mutation-testing pages, and the target page's trigger covers this situation.
+No new category. Gates: `node scripts/wiki-structure-checks.js wiki` gives `pages: 428, indexes: 13, findings: 0` (baseline 426 pages / 0 findings). `node scripts/wiki-lint-prohibitions.js wiki` gives `violations: 0`, the same as baseline. The model-era report is unchanged at 44 candidates. Running the five wiki-related bats files gave `1..78`, all ok.
 
 ## Independent review
 
-A fresh-context adversarial reviewer (a separate subagent, read-only on this checkout) re-fetched both sources, rebuilt the reproduction from its description (same matrix observed on Node 26.7.0) and re-ran both lint scripts. Verdict: CHANGES_REQUESTED, resolved before this PR:
+A fresh-context adversarial reviewer reviewed the diff: a separate subagent, read-only on this checkout, with its own scratch directory. It did the following:
+- Re-fetched every new source and confirmed each quote verbatim.
+- Rebuilt the zod → `--json-schema` matrix on Claude Code 2.1.296 with a fake key. All five table rows reproduced, and default `Ajv` against `Ajv2020` matched the Sources bullet.
+- Rebuilt a two-channel Vitest reproduction. The default-import channel was missed without `default` and caught with it; the named-import channel was caught in both.
+- Read linkly's commit `1a68da3` and review finding F1, and searched the wiki for duplicate triggers.
+- Re-ran both lint scripts on a `git archive` snapshot.
+
+Verdict: APPROVE, with three minor findings, all fixed before this PR:
 
 | Finding | Resolution |
 |---|---|
-| Step 6 said a "Killed" result is reused "only while its killing test is unchanged", dropping conditions both tools state (Stryker: the culprit test still exists; PIT: the class under test is unchanged too) | Fixed: "With the source untouched, PIT and Stryker apply the same rule: they reuse a "Killed" result only while its killing test still exists unchanged." |
-| The log line understated #226's overlap — it also edits this page's related list, Edge table and Sources, so merging it would need reconciliation in four places | Checked and not reproduced: `git merge-tree --write-tree` of this branch with #226 conflicts only in `log.md` and this report file, and the merged page carries 0 conflict markers. The log line now names #226's other three hunks and records that they merge cleanly |
-| Gap: a flaky mutant reads as lost coverage in step 6's table | Added an edge row: when a previously killed mutant survives while the assertion diff shows nothing removed, re-run it against the pre-edit block first; surviving there too marks a flaky verdict (testing-flaky-diagnosing-flaky-tests) |
+| Scraping page: "began at character 300 of 4,103 … a first-occurrence cut left 542 characters" does not reconcile arithmetically | Reworded: 300 is the marker's offset in the scraped text and 542 is the stored result's length. The session recorded both, not the step between them |
+| Count page: `git show 1a68da3` shows the fixed end state, not the stale paragraph the bullet describes | The stale state is now cited to review finding F1 in the run's archived review file. The commit is cited only for the end state, where "64 RFCs" → "65 RFCs" and "seventeen" → "eighteen" change together |
+| `log.md` used "merged (field evidence)" where every other entry puts the page's `confidence` value | Changed to "merged (verified)", matching the page's frontmatter |
 
-Kept: the reviewer's routing note (step 6's hygiene theme also sits near tests-that-cannot-fail) — the merge target stays, because this page's trigger already owns "a reviewer asks for a test to cover a specific surviving mutant" and the step-1 table now points into step 6.
+By design, the reviewer did not reproduce the one real end-to-end `structured_output` run, because paid API calls were out of its scope. Its precondition, the CLI accepting the draft-7 schema, did reproduce.
 
 ## Local-layer candidates
 
 | Row | Project | Target |
 |---|---|---|
-| Planning t216: deciding Where the check runs | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-spec-result-reads-input-check-site.md — run wiki-ingest inside that project |
-| Planning t216: deciding Which names an expect line asserts on | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-expect-result-candidate-names.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (a): the bare name is a respond field | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-field-condition.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (b): a same-name respond term wins | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-term-precedence.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (c): given did not set the input | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-given-setter-suppression.md — run wiki-ingest inside that project |
-| Planning t216: deciding Severity, registry position, hint | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-diagnostic-code-registration.md — run wiki-ingest inside that project |
-| Planning t216: deciding RFC | linkly (linkly-dartfish worktree) | wiki-local/qa/document-verification/t216-no-rfc-for-warning-only-code.md — run wiki-ingest inside that project |
+| `9594b5cd202978fb` — Planning t2-write-miss-not-found: deciding Default seed rule for update-first and delete-first entities | linkly (`/Users/choeyeong-gi/Desktop/workspace/linkly`) | `wiki-local/testing/data/t2-write-miss-not-found-default-seed-rule.md` — run wiki-ingest inside that project |
 
-All seven are wiki-plan Phase B decisions naming linkly's own modules; they are excluded from this PR and retired from the queue.
+It is a wiki-plan Phase B decision that names linkly's own modules, RFCs and commands. It is excluded from this PR and retired from the queue.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
