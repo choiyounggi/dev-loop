@@ -13,6 +13,11 @@
 #   ORCA_BIN                     orca executable (default: orca)
 #   GROUNDWORK_ESCALATION_DIR    exported into the worker so an `ask` escalates
 #   GROUNDWORK_TASK_ID           worker task label
+#   (this script also derives the worktree path from <orca-worktree-id>, asks
+#   worker-guardrails.sh --path for that worktree's EXTERNAL, outside-every-repo
+#   guardrails config path, and exports it as GROUNDWORK_GUARDRAILS_CONFIG into
+#   the worker, so it reads its own loosened guardrails config as a trusted
+#   file a tighten-only guardrails will not refuse as in-tree)
 #   DEV_LOOP_WORKER_MODEL        model the WORKER runs (e.g. claude-sonnet-5-5).
 #                                Unset = omit --model, so the worker inherits the
 #                                user's configured model (unchanged behavior).
@@ -67,6 +72,17 @@ env_prefix=""
 if [ -n "${GROUNDWORK_ESCALATION_DIR:-}" ]; then
   env_prefix="export GROUNDWORK_ESCALATION_DIR='$(esc_sq "$GROUNDWORK_ESCALATION_DIR")' && export GROUNDWORK_TASK_ID='$(esc_sq "${GROUNDWORK_TASK_ID:-}")' && "
 fi
+# Point the worker at ITS OWN loosened guardrails config as a trusted file
+# (the guardrails plugin only lets a repo config tighten rules now, and only
+# trusts GROUNDWORK_GUARDRAILS_CONFIG when it resolves OUTSIDE every project
+# tree — any command in the worktree could rewrite an in-tree file).
+# <orca-worktree-id> is "<repoId>::<path>"; worker-guardrails.sh derives the
+# external path from the worktree's own hash, so ask it (--path) rather than
+# re-deriving the hash here.
+grc_path="${wtid##*::}"
+grc=""
+[ -n "$grc_path" ] && grc=$(sh "$(dirname "$0")/worker-guardrails.sh" --path "$grc_path" 2>/dev/null || echo "")
+[ -n "$grc" ] && env_prefix="${env_prefix}export GROUNDWORK_GUARDRAILS_CONFIG='$(esc_sq "$grc")' && "
 model_arg=""
 [ -n "$model" ] && model_arg=" --model '$(esc_sq "$model")'"
 effort_env=""

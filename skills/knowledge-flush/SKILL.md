@@ -232,11 +232,17 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
 - If the queue is empty, say so and stop — do not open an empty PR.
 - One PR per flush (batched), so review stays a single pass.
 
-## Triggering — manual and automatic
+## Triggering — manual and opt-in automatic
 - **Manual:** invoke this skill (`/dev-loop:knowledge-flush`) any time; it drains
   the shared queue (`~/.dev-loop/queue/`, keyed off `$HOME` so it spans sessions).
-- **Automatic:** the Stop hook `hooks/auto-flush.sh` fires this same pipeline in a
-  detached headless `claude` run when the queue crosses a threshold and the
-  rate-limit window has elapsed — so PRs appear without you running anything. It
-  is guarded (rate-limited, batched, recursion-safe) and opens the same reviewed,
-  gated PR. Disable with `DEV_LOOP_AUTOFLUSH=0`. See that hook for the knobs.
+  This path is unchanged either way.
+- **Automatic (opt-in, OFF by default):** set `DEV_LOOP_AUTOFLUSH=1` and the Stop
+  hook `hooks/auto-flush.sh` fires this same pipeline in a detached headless
+  `claude` run — with the user's normal permission checks (an explicit
+  `--allowedTools` list, never `bypassPermissions`) — when the queue crosses a
+  threshold and the rate-limit window has elapsed, so PRs appear without you
+  running anything. It is guarded (rate-limited, batched, recursion-safe) and
+  opens the same reviewed, gated PR. Left at the default (unset, or anything
+  other than `1`), the hook spawns and opens nothing; it only emits a
+  rate-limited notice telling you how many insights are queued and to run this
+  skill yourself. See that hook for the knobs.

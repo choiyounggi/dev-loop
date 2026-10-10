@@ -487,6 +487,34 @@ pane_not_ready() { # matches none of the ready/trust patterns
   [[ "$(cat "$sd/keys")" != *"CLAUDE_CODE_EFFORT_LEVEL"* ]]
 }
 
+# --- GROUNDWORK_GUARDRAILS_CONFIG (guardrails tighten-only contract) --------
+# The guardrails plugin now only lets a repo config TIGHTEN rules, and only
+# trusts GROUNDWORK_GUARDRAILS_CONFIG when it resolves OUTSIDE every project
+# tree (any command in the worktree could rewrite an in-tree file). The
+# loosened per-worker config must reach the worker as that external, trusted
+# file ($HOME/.claude/groundwork/overrides/dev-loop-<id>.json — worker-guardrails.sh
+# owns deriving <id>) via this env var, or an upgraded guardrails ignores the
+# loosening and every sandboxed-off rule (rm_rf, git_discard, tmp writes)
+# becomes an `ask` again inside the worker's own worktree.
+
+@test "GUARDRAILS: exports GROUNDWORK_GUARDRAILS_CONFIG as the worktree's EXTERNAL (outside-the-worktree) guardrails path" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane-1"
+  pane_ready_submitted > "$sd/pane-2"
+  fakehome="$BATS_TEST_TMPDIR/fakehome"; mkdir -p "$fakehome"
+  run env HOME="$fakehome" STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=4 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD p"
+  [ "$status" -eq 0 ]
+  keys="$(cat "$sd/keys")"
+  WG="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/worker-guardrails.sh"
+  expected="$(HOME="$fakehome" sh "$WG" --path "$WT")"
+  [[ "$keys" == *"GROUNDWORK_GUARDRAILS_CONFIG='$expected'"* ]]
+  # outside every project tree, not inside the worktree
+  [[ "$expected" != "$WT"* ]]
+  [[ "$expected" == "$fakehome/.claude/groundwork/overrides/dev-loop-"*".json" ]]
+}
+
 # --- CONTAMINATION GUARD (issue #100 comment): a leaked real LO_STATUS_DIR
 # once let this suite overwrite a live run's status file. This test plants
 # real-looking decoy dirs as the ambient LO_STATUS_DIR/GROUNDWORK_ESCALATION_DIR
