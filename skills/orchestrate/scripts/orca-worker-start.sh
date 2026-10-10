@@ -47,6 +47,11 @@
 #   GROUNDWORK_ESCALATION_DIR  exported into the worker so a guardrails `ask`
 #                              escalates instead of blocking (activates worker mode)
 #   GROUNDWORK_TASK_ID         worker task label
+#   (this script also derives the worktree path from --worktree, asks
+#   worker-guardrails.sh --path for that worktree's EXTERNAL, outside-every-repo
+#   guardrails config path, and exports it as GROUNDWORK_GUARDRAILS_CONFIG into
+#   the worker, so it reads its own loosened guardrails config as a trusted
+#   file a tighten-only guardrails will not refuse as in-tree)
 #   DEV_LOOP_WORKER_MODEL      default for --model — the model the WORKER runs
 #                              (e.g. claude-sonnet-5-5). Unset = omit the flag, so
 #                              the worker inherits the user's configured model.
@@ -251,7 +256,24 @@ if [ "$worker_mode" = 1 ] && [ -z "$reused" ]; then
   [ -n "$model" ] && model_arg=" --model '$(esc_sq "$model")'"
   effort_env=""
   [ -n "$effort" ] && effort_env="CLAUDE_CODE_EFFORT_LEVEL=$effort "
-  worker_cmd="export GROUNDWORK_ESCALATION_DIR='$(esc_sq "$esc_dir")' && export GROUNDWORK_TASK_ID='$(esc_sq "${GROUNDWORK_TASK_ID:-}")' && ${effort_env}claude --permission-mode ${perm}${model_arg}"
+  # Point the worker at ITS OWN loosened guardrails config as a trusted file
+  # (the guardrails plugin only lets a repo config tighten rules now, and only
+  # trusts GROUNDWORK_GUARDRAILS_CONFIG when it resolves OUTSIDE every project
+  # tree — any command in the worktree could rewrite an in-tree file).
+  # worker-guardrails.sh derives that external path from the worktree's own
+  # hash; ask it (--path) rather than re-deriving the hash here. --worktree is
+  # a selector ("path:<path>" or "<repoId>::<path>"), so extract the
+  # filesystem path the same way the non-worker-mode guard above does.
+  grc_path=""
+  case "$wt" in
+    path:*) grc_path="${wt#path:}" ;;
+    *::*)   grc_path="${wt##*::}" ;;
+  esac
+  grc=""
+  [ -n "$grc_path" ] && grc=$(sh "$(dirname "$0")/worker-guardrails.sh" --path "$grc_path" 2>/dev/null || echo "")
+  grc_env=""
+  [ -n "$grc" ] && grc_env="export GROUNDWORK_GUARDRAILS_CONFIG='$(esc_sq "$grc")' && "
+  worker_cmd="${grc_env}export GROUNDWORK_ESCALATION_DIR='$(esc_sq "$esc_dir")' && export GROUNDWORK_TASK_ID='$(esc_sq "${GROUNDWORK_TASK_ID:-}")' && ${effort_env}claude --permission-mode ${perm}${model_arg}"
 
   set -- terminal create --worktree "$wt" --command "$worker_cmd" --json
   [ -n "$name" ] && set -- "$@" --title "$name"

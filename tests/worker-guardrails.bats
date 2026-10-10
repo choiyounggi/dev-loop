@@ -10,6 +10,10 @@ setup() {
   wt="${BATS_TEST_TMPDIR}/wt"; mkdir -p "$wt"
   git -C "$wt" init -q -b main
   git -C "$wt" config user.email t@t; git -C "$wt" config user.name t
+  # A temp HOME: the external guardrails config now lives at
+  # $HOME/.dev-loop/worker-guardrails/, so no test ever touches the real one.
+  HOME="${BATS_TEST_TMPDIR}/home"; mkdir -p "$HOME"
+  export HOME
 }
 
 @test "writes the worker-scoped guardrails config" {
@@ -53,6 +57,64 @@ setup() {
   run sh "$WG"
   [ "$status" -eq 1 ]
   [[ "$output" == *"usage"* ]]
+}
+
+# --- external, outside-every-repo guardrails config (security review fix) --
+# Guardrails now REFUSES to trust GROUNDWORK_GUARDRAILS_CONFIG when it
+# resolves inside any project tree (current worktree, its main worktree, or
+# $PWD) — any command running in the worktree could rewrite such a file. So
+# the real loosening copy must live outside every repo, at
+# $HOME/.dev-loop/worker-guardrails/<id>.json, keyed off a hash of the
+# worktree's own absolute path. `--path` prints that location without writing
+# anything, so callers (the launch scripts) never re-derive the hash.
+
+@test "--path prints an absolute path under \$HOME/.dev-loop/worker-guardrails/, not inside the worktree" {
+  run sh "$WG" --path "$wt"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "$HOME/.dev-loop/worker-guardrails/"*".json" ]]
+  [[ "$output" != "$wt"* ]]
+}
+
+@test "write mode also writes the SAME json to the external path --path prints" {
+  run sh "$WG" "$wt"
+  [ "$status" -eq 0 ]
+  ext="$(sh "$WG" --path "$wt")"
+  [ -f "$ext" ]
+  diff "$wt/.groundwork/guardrails.json" "$ext"
+}
+
+@test "external config directory is mode 700 and the file is mode 600" {
+  sh "$WG" "$wt"
+  ext="$(sh "$WG" --path "$wt")"
+  extdir="$(dirname "$ext")"
+  [ "$(stat -f '%Lp' "$extdir" 2>/dev/null || stat -c '%a' "$extdir")" = "700" ]
+  [ "$(stat -f '%Lp' "$ext" 2>/dev/null || stat -c '%a' "$ext")" = "600" ]
+}
+
+@test "idempotent: the same worktree yields the same external id across runs" {
+  p1="$(sh "$WG" --path "$wt")"
+  p2="$(sh "$WG" --path "$wt")"
+  [ "$p1" = "$p2" ]
+}
+
+@test "two different worktrees yield two different external ids (boundary)" {
+  wt2="${BATS_TEST_TMPDIR}/wt2"; mkdir -p "$wt2"
+  git -C "$wt2" init -q -b main
+  git -C "$wt2" config user.email t@t; git -C "$wt2" config user.name t
+  p1="$(sh "$WG" --path "$wt")"
+  p2="$(sh "$WG" --path "$wt2")"
+  [ "$p1" != "$p2" ]
+}
+
+@test "--path errors on a missing argument (usage)" {
+  run sh "$WG" --path
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"usage"* ]]
+}
+
+@test "--path errors on a worktree that does not exist (boundary)" {
+  run sh "$WG" --path "${BATS_TEST_TMPDIR}/does-not-exist"
+  [ "$status" -eq 2 ]
 }
 
 @test "errors instead of silently writing when the worktree does not exist" {
