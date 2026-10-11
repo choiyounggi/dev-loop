@@ -1,95 +1,67 @@
-# Knowledge flush — 1 insight(s)
+# Knowledge flush — 4 claimed rows: 2 merged into existing pages, 1 new page, 1 anhinga plan-gap kept local-layer
 
-A review's "also assert X" fix that edits an existing test block can delete the assertion other mutants depended on, and re-running only the named mutant hides that. **1 page amended (new step 6), 0 new pages, 1 back-link. 7 plan-gaps retired as local-layer, 0 dropped.**
-
-Claimed 8 queue rows (run `20261008-124951-26572`): 1 harvested ★ Insight (`4614be6ce89cc5c5`) and 7 wiki-plan `[no-wiki]` plan-gap rows from linkly task t216.
+Run `20261011-213417-11470` (the headless auto-flush child; the lock owner id arrived in `DEV_LOOP_FLUSH_RUN_ID`, so step 0's acquire with a fresh id reported `held … 24s` and the re-run with the inherited id reported `already-owned`). Claimed 4 rows — every row in the queue: `5e9bdfb102f22421` (qa), `eec9adde8f6cf9c3` (infrastructure), `cb99014ed0e30451` (qa), `73c466a4b014e5c2` (anhinga plan-gap). `~/.dev-loop/repo` was clean before the reset (`git status --porcelain` empty; the previous branch's commit is PR #270), so nothing needed salvaging.
 
 ## Verified best-practice
 
-**`4614be6ce89cc5c5` — keep the block's assertions, then re-run every mutant it covers** (confidence: **verified**)
+| Row | Claim | Sources checked (fetched 2026-10-11) | How verified | Confidence |
+|---|---|---|---|---|
+| 5e9bdfb1 | A count taken from an agent's, worker's or script's own summary ("24 of 24 URLs returned 200") is recounted from the raw output that produced it, with the denominator named; when that output is gone or the figure cannot be rebuilt from it, publish the lines and say the count was not reproduced | https://docs.claude.com/en/docs/test-and-evaluate/strengthen-guardrails/reduce-hallucinations (HTTP 200; "Verify with citations: … If it can't find a quote, it must retract the claim.") | The row's own field evidence was recounted from the originating transcript (`~/.claude/projects/…/2af9c97c-….jsonl`): `gh pr view 270` body line 21 reads "24 of 24 distinct source URLs returned HTTP 200" and "the 8 remaining URLs in the diff are … fixture URLs"; `jq` over every Bash `tool_use` found one command containing `http_code` (the loop over `urls-recovered-20261011.txt`) and zero `Agent` calls; its `tool_result` has 32 lines starting with a 3-digit code: 21 `200`, 11 `000`, 0 other; all 11 `000` hosts are `example.com`/`evil.test` fixtures, and `https://example.com/` + `https://evilexample.com/` (both `200`) are fixture rows on #270's `host-disguise-fixtures-for-url-allowlists` page (lines 40, 61, 69) — so the output supports 19 source URLs all `200`, and neither 24 nor 8 is derivable from it; the first "24 of 24" in the transcript (line 424) sits inside the run's own INGEST_REPORT heredoc | **verified** (official doc + the field case recounted here) |
+| eec9adde | Before an automated job's `checkout main` + `reset --hard origin/main` on a reused checkout, inspect the tree and preserve leftovers; new material: inputs leased with a TTL come back on their own (the processing does not), and a leftover draft with cited sources is re-verified by re-fetching its URLs, re-running lint and a sample of its reproductions before adoption | https://git-scm.com/docs/git-reset, https://git-scm.com/docs/git-apply, https://git-scm.com/docs/git-status (all HTTP 200; the page's three quotes re-read verbatim) | Same trigger and directive as the existing page (see Existing-layer check); the candidate's own `git diff HEAD` wording was not imported because the page's Instead-of row already corrects it (untracked files are left out). Field figures recounted here: `~/.dev-loop/salvage/knowledge-20261011-132856.patch` holds 23 `diff --git` headers; `git show --stat e43e647` → 23 files changed, 421 insertions, 95 deletions; "five reproductions re-run" is the 19:29 run's own report (PR #270 body line 28) and is attributed as such on the page | **verified** (merged as Edge rows + a field-case Sources line) |
+| cb99014e | `page.setContent` is `document.write()` on the existing document, not a navigation, so an init script registered on the page is never evaluated for it; serve the fixture through `page.route` + `page.goto`. A `goto('about:blank')` before `setContent` keeps the script's globals but `document.open()` erases its listeners | https://playwright.dev/docs/api/class-page (HTTP 200; `addInitScript` "Whenever the page is navigated … after the document was created but before any of its scripts were run"; `setContent` "This method internally calls document.write(), inheriting all its specific characteristics and behaviors"), https://github.com/microsoft/playwright/issues/13274 (via `gh api`; maintainer pavelfeldman, 2022-04-03: "`page.setContent` does not run the init scripts, because JS world is not re-created, only navigation such as `page.goto` re-creates it"), https://html.spec.whatwg.org/multipage/dynamic-markup-insertion.html (HTTP 200; document open steps: "For each shadow-including inclusive descendant node of document, erase all event listeners and handlers given node") | Local matrix `~/.dev-loop/scratch/flush-20261011-2134/probe-setcontent.js` (playwright-core 1.63.0 from the originating worktree's `node_modules`, Chromium 153.0.8010.12 headless shell): A `page.addInitScript` + `setContent` → `__probe` undefined, inline script saw `undefined`, `__events` undefined; B + `route`/`goto` → `1`, `number`, `["animationstart"]`; C `goto('about:blank')` then `setContent` → `1`, `number`, `[]`; D `context.addInitScript` before `newPage()` then `setContent` → `1`, `number`, `[]`; E no init script + `route`/`goto` (control) → undefined throughout; F `setContent` twice → undefined. Known-good (B) and known-bad (A, E) were both observed, so the probe itself is proven | **verified** |
+| 73c466a4 | anhinga `docs/backends.md` section-8 capability table (Korean text, lnpl outbox/relay rows, lnpl-postgres#8) | n/a — not researched as general practice | Fails the layer test: the directive names one project's document sections, modules and issues | n/a → local layer |
 
-Claim: when a review's "also assert X" fix lands in an existing test block, put the new assertion beside the block's existing ones (a different input or environment gets its own case), diff the block's assertion lines before and after, and re-run every mutant the block covers, comparing each verdict with the pre-edit run. Re-running only the named mutant cannot see the mutants that an assertion removed by the edit used to kill.
-
-Sources — each quote compared character-for-character against the raw page with `curl` + `/usr/bin/grep` on 2026-10-08:
-
-- https://stryker-mutator.io/docs/stryker-js/incremental/ (raw source: `docs/incremental.md` in stryker-js) — "Reuse is possible when: A mutant was "Killed"; the culprit test still exists, and it didn't change." The runner table decides whether a test edit is seen at all: Jest, Vitest, CucumberJS "Full"; Mocha, Tap "Stryker assumes all tests inside a file changed when that file changed"; Jasmine, Karma "Stryker will only see test changes for tests that are added or removed"; Command "will only detect changes in mutants, not their tests"; "Static mutants don't have test coverage; thus, Stryker won't detect test changes for them"; `--force` reruns "all mutants in scope, regardless of the incremental file".
-- https://pitest.org/quickstart/incremental_analysis/ — "If a mutation was killed in the last run and neither the class under test or the killing test has changed, then it can be assumed that this mutation is still killed."; for a changed killing test, "it is likely that the last killing test will still kill it and it should therefore be prioritised above others."
-
-Both tools keep a "Killed" verdict only while its killing test is unchanged. Step 6 applies that rule by hand, and the new edge row covers the Stryker runners that cannot see an in-place edit.
-
-Local reproduction (Node 26.7.0, `node:test`; one fresh directory per test variant × mutant; each `sed` mutation checked as applied with `cmp`):
-
-| Test block | Unmutated | N0 no-op control | N1 `'debug'`→`'info'` | N2 `42`→`0` | A21 `=== 'production'`→`=== 'prod'` (named mutant) |
-|---|---|---|---|---|---|
-| Before the fix | pass | survived | killed | killed | survived |
-| Fix that rewrites the block for `'production'` | pass | survived | **survived** | **survived** | killed |
-| Fix that adds the `'production'` assertions beside the old ones | pass | survived | killed | killed | killed |
-
-The before/after assertion-line diff named both lines the rewrite removed (`assert.equal(c.logLevel, 'debug')`, `assert.equal(c.seed, 42)`) and none for the additive fix. The scratch directory was deleted after the run.
-
-Field evidence (originating session, linkly-invitation task t2 Task 06 attempt 4; not re-run here): swapping the block's `NODE_ENV=test` assertion for a production one killed A9 and A21 while N1–N3 survived with 4/4 tests passing; re-adding the two removed lines killed them.
-
-**7 plan-gap rows (t216)** — not researched as general practice: every directive names linkly's own modules (`impl/lnpl/lower.py`, `spec._check_given`, the `CODES`/`SEVERITY_OF`/`HINTS` registry, RFC numbering), so all seven fail the layer test. No confidence is claimed for them.
+Nothing was upgraded on the originating session's say-so: the two statements the queue rows carried that could not be recounted here ("five reproductions"; the harvester's note that its blog draft omitted the figure) are attributed to their report or left out.
 
 ## Existing-layer check
 
-Route: `INDEX.md` → testing ("cases/assertions", "verifying tests can actually fail") → `wiki/testing/index.md` → quality; qa ("acting on code-review feedback") checked as well.
+Route: `INDEX.md` → qa ("evidence for completion claims", "verifying the quantitative claims in a document before publishing it") and infrastructure ("multi-agent orchestration … shared run state") → `wiki/qa/index.md`, `wiki/infrastructure/index.md`; `wiki/testing/index.md` read for the Playwright candidate (e2e / mocking categories).
 
-Pages read: testing-quality-surviving-mutant-equivalence-triage, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, qa-process-evaluating-review-feedback, testing-quality-policy-at-several-return-sites, testing-mocking-captured-call-arguments, testing-quality-minimum-case-set, testing-quality-expectation-sets-with-one-distinct-value, backend-common-errors-diagnostics-from-a-shared-code-path
+Pages read: qa-process-completion-claims, qa-deliverables-quantitative-claims-in-a-published-document, infrastructure-agent-orchestration-resetting-a-reused-checkout-after-an-interrupted-run, qa-environments-browser-console-capture-gaps, testing-quality-markup-contract-assertions, testing-e2e-e2e-stability, testing-quality-harness-reverse-controls
 
-- `wiki_search` (k=5) on the candidate's trigger: policy-at-several-return-sites 0.768, surviving-mutant-equivalence-triage 0.763 and 0.725, captured-call-arguments 0.737, minimum-case-set 0.735. Only surviving-mutant-equivalence-triage shares the trigger — its "When this applies" already names "a reviewer asks for a test to cover a specific surviving mutant".
-- Whole-wiki search (`/usr/bin/grep` over every page): 46 pages mention mutants; none covers an edit that removes an assertion other mutants depended on. Three pages direct re-running the targeted mutant after adding a case or assertion (tests-that-cannot-fail, expectation-sets-with-one-distinct-value, policy-at-several-return-sites); none of them covers an edit that removes an existing assertion, so step 6 extends them and contradicts none. They are left unchanged to keep this diff small.
-- **Merged, not created**: surviving-mutant-equivalence-triage gains step 6 with a verdict table, 4 edge rows (Stryker incremental reuse by runner, a hand-rolled mutation script, a deliberate replacement, a survivor whose kill does not reproduce on the pre-edit block), 1 Instead-of row, 4 Sources lines, a "When this applies" clause and a step-1 pointer. Body: 115 lines (117 once #226 merges; limit 120 — the next addition to this page needs a split).
-- Related: added testing-quality-mutation-harness-file-custody (its step 6, "re-run the whole matrix" after a custody fix, is the same principle; it already links back, so the link is now two-way). The evaluating-review-feedback ↔ this-page link is already in open PR #226 and is not duplicated here.
-- Conflicts with existing directives: none flagged.
-- `wiki/testing/index.md`: the page's "load when" row now names the new use case (maintenance invariant 1).
-- `last_verified` stays 2026-08-07: open PR #226 bumps that exact line, and a second bump would add a merge conflict; the new claims carry dated sources.
-- Checks on this branch: `node scripts/wiki-structure-checks.js wiki` → `pages: 359, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line, in infrastructure/config/keys-ahead-of-their-consumer.md); no banned vague qualifier in any added line.
+`wiki_search` (k=5) per candidate, plus a whole-wiki `grep` for each candidate's key terms:
+
+| Row | Top-5 `wiki_search` hits | Whole-wiki grep | Result |
+|---|---|---|---|
+| 5e9bdfb1 | qa-process-completion-claims 0.721 (Instead-of row "Relay a subagent's 'task completed successfully'"), qa-deliverables-quantitative-claims-in-a-published-document 0.692, qa-document-verification-model-coupled-guidance-aging-detector 0.688, testing-quality-surviving-mutant-equivalence-triage 0.682, infrastructure-observability-logs-metrics-signals 0.680 | `recount|restat|denominator|pass count`: 19 files, none about a figure relayed from another agent's report (quantitative-claims covers counts a hand-maintained document states about the repository; its Instead-of row "Take a number from … an earlier session's summary → Recompute from the source now" is the nearest line) | **Merged into completion-claims**: a "When this applies" clause, an evidence-table row (claim / required evidence / not evidence), an Edge row (output gone or figure not rebuildable → publish the lines), an Instead-of row, the Anthropic source and the recounted field case; `sources:` and `last_verified` (2026-09-27 → 2026-10-11; the page's three existing URLs re-fetched, all 200). `related:` → quantitative-claims added one-way: that page's frontmatter is rewritten by open PR #268 (its `last_verified` line sits directly above `related:`), so the back-link waits for #268. Conflicts with existing directives: none |
+| eec9adde | infrastructure-agent-orchestration-resetting-a-reused-checkout-after-an-interrupted-run 0.815 (trigger) and 0.786 (edge), infrastructure-agent-orchestration-worktree-isolated-workers 0.777, qa-process-scope-purity-checks 0.769, infrastructure-agent-orchestration-code-graph-as-orientation-layer 0.767 | `reset --hard|--porcelain|salvage|abandoned run|uncommitted`: 12 files; the resetting page's trigger is the candidate's trigger (its field case is the 2026-10-08 flush) and its steps 2–3 already carry the WIP commit, the patch with `apply --check -R`, and "re-check every claim, link and test … the same as a stranger's draft" | **Merged**: two Edge rows (TTL-leased inputs; a sourced draft's step 3 spelled out) and a 2026-10-11 field-case Sources line; `last_verified` 2026-10-08 → 2026-10-11 after re-reading its three git-doc quotes. The candidate's `git diff HEAD` step was not imported (the page's Instead-of row already replaces it with `git add -A` + `git diff --cached`). Conflicts: none |
+| cb99014e | testing-quality-markup-contract-assertions 0.752 (Playwright component tests → computed style; a different trigger), qa-environments-browser-console-capture-gaps 0.751 (trigger) and 0.743 (directive "Register on the page object before calling goto"), platforms-tools-version-keyed-artifact-cache 0.746, platforms-tools-unpacked-extension-source-reload 0.735 | `setContent|addInitScript|route.fulfill|page.route`: 0 files on main | **New page** `qa-environments-init-scripts-skipped-by-setcontent` next to browser-console-capture-gaps (the category's other "the probe silently measured nothing" page). `related:` one-way to browser-console-capture-gaps, testing-e2e-e2e-stability (setup strategy for Playwright tests) and testing-quality-harness-reverse-controls (the control step); all three pages are edited by open PR #270 (frontmatter and body hunks), so their back-links wait for its merge |
+
+Index rows: `wiki/qa/index.md` completion-claims row extended and one environments row added at the end of that table; `wiki/infrastructure/index.md` resetting row extended (maintenance invariant 1). Checks on this branch: `node scripts/wiki-lint-prohibitions.js wiki` → `compliant: 84, violations: 0, info: 1`; `node scripts/wiki-structure-checks.js wiki` → `pages: 427, indexes: 13, findings: 0` (baseline on `origin/main` f7c865c: 84 / 0 / 1 and 426 / 13 / 0); body lines 66 / 63 / 68 (limit 120); no banned qualifier in any added directive (the one hit, "probably fixed", is the page's pre-existing quoted hedge-word example); every `related:` id resolves on main.
 
 ## Open-PR check
 
-26 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253–#260), listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`. For each head, the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for the candidate's concepts (removed or replaced assertions, re-running all mutants, reviewer/auditor fixes, "also assert"), and every added line mentioning mutants was read.
+Open `knowledge/*` heads from `gh pr list --repo choiyounggi/dev-loop --state open --json number,headRefName` filtered on the head prefix: #265 `knowledge/choiyounggi-20261009-222812`, #266 `knowledge/choiyounggi-20261010-021455`, #268 `knowledge/choiyounggi-20261011-002014`, #269 `knowledge/choiyounggi-20261011-022522`, #270 `knowledge/choiyounggi-20261011-193253` (all OPEN, none merged; 6 open PRs in total). Each head was fetched and the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for every candidate's terms (`recount|restat|raw output|denominator|pass count|…`, `reset --hard|porcelain|salvage|abandoned|uncommitted|…`, `setContent|addInitScript|init script|route.fulfill|page.route|…`), and each matching line was read.
 
-| Candidate | Overlapping open PR | Verdict |
+| Row | Overlapping open PR | Verdict |
 |---|---|---|
-| 4614be6ce89cc5c5 | None carries it. #226 edits the same page for a different situation (a survivor reported inside a PASS audit); #258 (additive mutants vs presence checks) and #259 (schema key coverage) are different situations | **new** |
-| 7 × t216 plan-gaps | No open PR body mentions t216 (all 26 bodies searched) | **new** → local layer |
+| 5e9bdfb1 | #268 extends quantitative-claims for a count edited inside one document (a breakdown keeps the old total) — a different situation; #266's done-criteria page matches only on "restated"; no head touches completion-claims | **new** (merged into a page no open PR edits) |
+| eec9adde | #265's review-diff-base page and scope-purity-checks mention uncommitted files for other reasons; no head edits the resetting page; #265/#266 edit `wiki/infrastructure/index.md` at lines 35/49 and 30, not the resetting row (line 28) | **new** (merge) |
+| cb99014e | #270's new `proving-nothing-moves-under-reduced-motion` page serves its fixture "through `page.route` + `page.goto`" and says an init script "re-runs on each navigation", but never states that `setContent` skips the init script, nor the listener erasure — it is the field origin of this candidate, not a carrier of its lesson. No other head mentions `setContent`/`addInitScript` | **new** (a `related:` link to #270's page is deferred: its id does not exist on main yet) |
+| 73c466a4 | no open PR body mentions anhinga or t1-driver-capability-contract | n/a (local layer) |
 
-Merge check (`git merge-tree --write-tree`, this branch against each head): no wiki page conflicts, including #226, whose four hunks on the shared page were avoided. Every head conflicts on `log.md` and the older ones also on this report file — the same two files the open PRs already conflict on with each other (#260 vs #259 and #255 vs #254 checked).
+Nothing folded, nothing dropped as a pending duplicate. `git merge-tree --write-tree` of a temporary commit of this tree against each of the five heads: every wiki page and both indexes merge cleanly; the only conflict with each head is `log.md`, the append-only log every knowledge PR conflicts on with every other.
 
 ## Routing decision
 
-| Candidate | Layer | Target | Action |
-|---|---|---|---|
-| 4614be6ce89cc5c5 | bundled | `testing/quality/surviving-mutant-equivalence-triage.md` | merged as step 6 |
-| 7 × t216 plan-gaps | local (linkly) | see Local-layer candidates | excluded from this PR, retired from the queue |
+| Row | Layer | Domain / category | Page | Kind |
+|---|---|---|---|---|
+| 5e9bdfb1 | bundled | qa / process | `wiki/qa/process/completion-claims.md` | merge (the candidate's domain hint was qa; the page owns "what evidence a completion claim requires" and already has the "relay a subagent's report" row this generalizes) |
+| eec9adde | bundled | infrastructure / agent-orchestration | `wiki/infrastructure/agent-orchestration/resetting-a-reused-checkout-after-an-interrupted-run.md` | merge |
+| cb99014e | bundled | qa / environments | `wiki/qa/environments/init-scripts-skipped-by-setcontent.md` | new page (candidate hint qa; the category already frames "reading a browser tool's measurement as a QA verdict"; testing/e2e was considered and rejected because the page is about a probe's load path, not test structure) |
+| 73c466a4 | local (anhinga) | — | see Local-layer candidates | excluded, retired |
 
-No new category: testing/quality already holds the mutation-testing pages, and the target page's trigger covers this situation.
-
-## Independent review
-
-A fresh-context adversarial reviewer (a separate subagent, read-only on this checkout) re-fetched both sources, rebuilt the reproduction from its description (same matrix observed on Node 26.7.0) and re-ran both lint scripts. Verdict: CHANGES_REQUESTED, resolved before this PR:
-
-| Finding | Resolution |
-|---|---|
-| Step 6 said a "Killed" result is reused "only while its killing test is unchanged", dropping conditions both tools state (Stryker: the culprit test still exists; PIT: the class under test is unchanged too) | Fixed: "With the source untouched, PIT and Stryker apply the same rule: they reuse a "Killed" result only while its killing test still exists unchanged." |
-| The log line understated #226's overlap — it also edits this page's related list, Edge table and Sources, so merging it would need reconciliation in four places | Checked and not reproduced: `git merge-tree --write-tree` of this branch with #226 conflicts only in `log.md` and this report file, and the merged page carries 0 conflict markers. The log line now names #226's other three hunks and records that they merge cleanly |
-| Gap: a flaky mutant reads as lost coverage in step 6's table | Added an edge row: when a previously killed mutant survives while the assertion diff shows nothing removed, re-run it against the pre-edit block first; surviving there too marks a flaky verdict (testing-flaky-diagnosing-flaky-tests) |
-
-Kept: the reviewer's routing note (step 6's hygiene theme also sits near tests-that-cannot-fail) — the merge target stays, because this page's trigger already owns "a reviewer asks for a test to cover a specific surviving mutant" and the step-1 table now points into step 6.
+No new category.
 
 ## Local-layer candidates
 
 | Row | Project | Target |
 |---|---|---|
-| Planning t216: deciding Where the check runs | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-spec-result-reads-input-check-site.md — run wiki-ingest inside that project |
-| Planning t216: deciding Which names an expect line asserts on | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-expect-result-candidate-names.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (a): the bare name is a respond field | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-field-condition.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (b): a same-name respond term wins | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-term-precedence.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (c): given did not set the input | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-given-setter-suppression.md — run wiki-ingest inside that project |
-| Planning t216: deciding Severity, registry position, hint | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-diagnostic-code-registration.md — run wiki-ingest inside that project |
-| Planning t216: deciding RFC | linkly (linkly-dartfish worktree) | wiki-local/qa/document-verification/t216-no-rfc-for-warning-only-code.md — run wiki-ingest inside that project |
+| 73c466a4 — Planning t1-driver-capability-contract: the `docs/backends.md` contract table | anhinga (`/Users/choeyeong-gi/Desktop/workspace/linkly/anhinga`) | `wiki-local/backend/common/api-design/t1-driver-capability-contract-table.md` — run wiki-ingest inside that project. Its research notes (JDBC `DatabaseMetaData.supportsXxx`, PEP 544 `runtime_checkable`, the transactional-outbox relay, the IETF Idempotency-Key draft) carry a general kernel — a driver contract self-reports optional capabilities through predicates, and a conformance kit reports declared-unsupported rather than skip — that no bundled page owns (the row's own semantic search found none); it was not harvested as a candidate and is noted here as a gap, not ingested |
 
-All seven are wiki-plan Phase B decisions naming linkly's own modules; they are excluded from this PR and retired from the queue.
+## Notes for the reviewer
+
+- Step 0 of the skill generates a fresh run id; inside the auto-flush child the lock is already held under the inherited `DEV_LOOP_FLUSH_RUN_ID`, so the fresh-id acquire reports `held` (the bundled page `inherited-lock-ownership-in-a-spawned-session` covers this). This run re-acquired with the inherited id and releases with it.
+- Separately: PR #270's body line "24 of 24 distinct source URLs returned HTTP 200" is the figure this flush's first candidate recounts as 19 source URLs (all 200) plus 13 fixtures. That body is not edited here.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
