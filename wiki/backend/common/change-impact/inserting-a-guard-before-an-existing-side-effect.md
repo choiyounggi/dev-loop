@@ -8,7 +8,7 @@ sources:
   - https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_(tm)%2C_Assertions_and_Exceptions
   - "Field reproduction (dev-loop t106, 2026-08-17): status-update.sh:19 unconditionally created a default status file for every phase; the plan's proposed guard placement sat after that line, so the guard could never observe the missing file it checked for"
 last_verified: 2026-08-17
-related: [backend-common-change-impact-call-site-enumeration, qa-exploratory-guard-true-path-coverage]
+related: [backend-common-change-impact-call-site-enumeration, qa-exploratory-guard-true-path-coverage, backend-common-errors-refusing-a-backend-without-the-needed-capability]
 ---
 
 # A New Precondition Guard Inserted Into Code That Already Mutates the Checked State
