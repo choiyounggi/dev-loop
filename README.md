@@ -238,7 +238,33 @@ The wiki is meant to grow from what you actually learn. Three moving parts:
      has elapsed, so PRs appear without you doing anything. That run keeps your
      normal permission checks — it passes an explicit `--allowedTools` list
      scoped to exactly what the flush pipeline calls, never
-     `--permission-mode bypassPermissions`. Left at the default (unset, or
+     `--permission-mode bypassPermissions`. Each entry and why it's there:
+
+     | Entry | Why |
+     |---|---|
+     | `Bash(export DEV_LOOP_FLUSH_RUN_ID=*)` | Sets the flush-lock run id before each `flush-lock.sh` call; carries no exec/write risk on its own. |
+     | `Bash(sh <plugin root>/scripts/flush-lock.sh:*)` | The single-flight lock script, pinned to its exact installed path — not a bare `sh:*`, which would run any script or `sh -c '<anything>'`. |
+     | `Bash(node <plugin root>/hooks/queue-claim.js:*)` | Claims/releases queue rows, pinned to its exact path — not a bare `node:*`, which would run `node -e '<anything>'`. |
+     | `Bash(mkdir -p <~/.dev-loop>:*)` | Creates the checkout's parent dir on a fresh machine, scoped to that one directory. |
+     | `Bash(git -C <~/.dev-loop/repo>:*)` | Every git operation the pipeline runs (fetch/checkout/reset/config/add/commit/push/diff), scoped to the one checkout the flush owns — not `git:*`, which would run `git -C` against any repo on disk. |
+     | `Bash(git clone https://github.com/choiyounggi/dev-loop.git:*)` | The one-time bootstrap clone, pinned to this repo's URL. |
+     | `Bash(gh api user:*)` | Reads the logged-in gh login to set the checkout's git identity — not `gh api:*`, which would allow any GitHub API call. |
+     | `Bash(gh pr list --repo choiyounggi/dev-loop:*)` | Lists open `knowledge/*` PRs for the dedup check, scoped to this repo. |
+     | `Bash(gh pr create --repo choiyounggi/dev-loop:*)` | Opens the one reviewed PR, scoped to this repo. |
+     | `Read` | Reads the wiki, templates, and queue files; left unscoped since nothing here is sensitive to read. |
+     | `Edit(//<~/.dev-loop>/**)` | Covers both the Edit and Write tools (Claude Code only checks `Edit` path rules), scoped to the checkout plus the queue dir it also retires rows in — not a bare `Edit`/`Write`, which would write anywhere. |
+     | `Skill` | Runs the `wiki-ingest` sub-skill. |
+     | `WebSearch` | Verifies each candidate against real sources before ingesting it. |
+     | `mcp__plugin_dev-loop_dev-loop-wiki__wiki_search` | Semantic dedup against the existing wiki before creating a new page. |
+
+     Claude Code's Bash permission matcher is a static, literal-text prefix
+     match: it can't auto-approve a command containing an unresolved shell
+     variable (so `${CLAUDE_PLUGIN_ROOT}`/`$HOME`/`$REPO` must be the
+     already-resolved literal path), an `if`/`else` conditional, or a `||`
+     fallback. The prompt this hook builds hands the nested run those literal
+     paths and tells it to avoid both constructs; `skills/knowledge-flush/SKILL.md`
+     keeps its portable, human-readable form for the manual, approved-by-you
+     path. Left at the default (unset, or
      anything other than `1`), the hook never spawns a session or opens a PR;
      instead it emits one rate-limited notice telling you how many insights are
      queued and to run the manual flush below.

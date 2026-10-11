@@ -104,6 +104,48 @@ run_hook() { # extra env already exported by caller
   [[ "$argv" != *"dangerously-skip-permissions"* ]]
 }
 
+@test "DEV_LOOP_AUTOFLUSH=1: allowedTools has no unscoped sh/node/git/gh-api/Write/Edit" {
+  seed_pending 3
+  run env DEV_LOOP_AUTOFLUSH=1 HOME="$HOME" PATH="$PATH" STUB_CLAUDE_LOG="$STUB_CLAUDE_LOG" \
+      bash "$AF" <<< '{"cwd":"/tmp"}'
+  [ "$status" -eq 0 ]
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -f "$STUB_CLAUDE_LOG" ] && break; sleep 0.2; done
+  [ -f "$STUB_CLAUDE_LOG" ]
+  argv="$(cat "$STUB_CLAUDE_LOG")"
+  # arbitrary-code-execution escapes must be gone
+  [[ "$argv" != *"Bash(sh:*)"* ]]
+  [[ "$argv" != *"Bash(node:*)"* ]]
+  # unscoped git / gh api must be gone
+  [[ "$argv" != *"Bash(git:*)"* ]]
+  [[ "$argv" != *"Bash(gh api:*)"* ]]
+  # bare, path-unscoped Write/Edit must be gone (Edit must be path-scoped instead)
+  [[ "$argv" != *",Write,"* ]]
+  [[ "$argv" != *",Edit,"* ]]
+  [[ "$argv" != *"--allowedTools Edit "* ]]
+}
+
+@test "DEV_LOOP_AUTOFLUSH=1: allowedTools has the exact scoped replacements" {
+  seed_pending 3
+  run env DEV_LOOP_AUTOFLUSH=1 HOME="$HOME" PATH="$PATH" STUB_CLAUDE_LOG="$STUB_CLAUDE_LOG" \
+      bash "$AF" <<< '{"cwd":"/tmp"}'
+  [ "$status" -eq 0 ]
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -f "$STUB_CLAUDE_LOG" ] && break; sleep 0.2; done
+  [ -f "$STUB_CLAUDE_LOG" ]
+  argv="$(cat "$STUB_CLAUDE_LOG")"
+  [[ "$argv" == *"Bash(gh api user:*)"* ]]
+  [[ "$argv" == *"Bash(gh pr list --repo choiyounggi/dev-loop:*)"* ]]
+  [[ "$argv" == *"Bash(gh pr create --repo choiyounggi/dev-loop:*)"* ]]
+  [[ "$argv" == *"Bash(git -C $HOME/.dev-loop/repo:*)"* ]]
+  [[ "$argv" == *"Bash(git clone https://github.com/choiyounggi/dev-loop.git:*)"* ]]
+  [[ "$argv" == *"Bash(mkdir -p $HOME/.dev-loop:*)"* ]]
+  [[ "$argv" == *"Bash(export DEV_LOOP_FLUSH_RUN_ID=*)"* ]]
+  # Edit must be path-scoped with a filesystem-root-absolute (//) anchor to
+  # the dev-loop dir, never a bare tool name or a settings-source-relative (/) one.
+  [[ "$argv" == *"Edit(//"*".dev-loop/**)"* ]]
+  [[ "$argv" == *"scripts/flush-lock.sh:*)"* ]]
+  [[ "$argv" == *"hooks/queue-claim.js:*)"* ]]
+}
+
 @test "DEV_LOOP_AUTOFLUSH=1 with pending BELOW min: no spawn (threshold still applies)" {
   seed_pending 2
   run env DEV_LOOP_AUTOFLUSH=1 HOME="$HOME" PATH="$PATH" STUB_CLAUDE_LOG="$STUB_CLAUDE_LOG" \

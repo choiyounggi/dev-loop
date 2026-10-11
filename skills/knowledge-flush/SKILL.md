@@ -35,8 +35,15 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
    ```sh
    RUNID="flush-$(date +%Y%m%d-%H%M%S)-$$"
    echo "$RUNID"          # record this — every later flush-lock.sh call needs it
-   DEV_LOOP_FLUSH_RUN_ID="$RUNID" sh "${CLAUDE_PLUGIN_ROOT}/scripts/flush-lock.sh" acquire
+   export DEV_LOOP_FLUSH_RUN_ID="$RUNID"
+   sh "${CLAUDE_PLUGIN_ROOT}/scripts/flush-lock.sh" acquire
    ```
+   Always set the run id with `export` on its own line immediately before the
+   `flush-lock.sh` call, in the SAME shell invocation — never as an inline
+   `DEV_LOOP_FLUSH_RUN_ID=... sh ...` prefix. A headless run (see
+   `hooks/auto-flush.sh`) auto-approves this call against a fixed allowlist
+   that can match a literal `sh .../flush-lock.sh acquire|release` command but
+   can never auto-approve an unscoped env-var-prefixed command.
    - Exit 0 → proceed to step 1.
    - Non-zero exit → **do not touch `~/.dev-loop/repo`.** Read the failure
      line (`held <holder-runid> <age>s` on stderr) and tell the user: "a
@@ -47,20 +54,25 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
    acquiring it, release it before stopping — **prefixed with the same
    `$RUNID`** recorded above — so the next run does not wait out the TTL:
    ```sh
-   DEV_LOOP_FLUSH_RUN_ID="<the run id you recorded above>" \
-     sh "${CLAUDE_PLUGIN_ROOT}/scripts/flush-lock.sh" release
+   export DEV_LOOP_FLUSH_RUN_ID="<the run id you recorded above>"
+   sh "${CLAUDE_PLUGIN_ROOT}/scripts/flush-lock.sh" release
    ```
 
 1. **Prepare a writable checkout** of the dev-loop repo (never edit the installed
    plugin dir — it is read-only and untracked):
    ```sh
    REPO="$HOME/.dev-loop/repo"
-   if [ -d "$REPO/.git" ]; then
-     git -C "$REPO" fetch origin && git -C "$REPO" checkout main && git -C "$REPO" reset --hard origin/main
-   else
-     mkdir -p "$HOME/.dev-loop"
-     git clone https://github.com/choiyounggi/dev-loop.git "$REPO"
-   fi
+   git -C "$REPO" fetch origin && git -C "$REPO" checkout main && git -C "$REPO" reset --hard origin/main
+   ```
+   If that command's result is an error (fresh machine, nothing cloned yet),
+   run a **separate** follow-up command instead of wrapping both in one
+   `if`/`else`, then continue below either way:
+   ```sh
+   mkdir -p "$HOME/.dev-loop"
+   git clone https://github.com/choiyounggi/dev-loop.git "$HOME/.dev-loop/repo"
+   ```
+   ```sh
+   REPO="$HOME/.dev-loop/repo"
    # Commit under THIS user's own identity — each contributor's PR carries their
    # own account; the owner reviews and approves/rejects. Do NOT hardcode an
    # identity, and NEVER commit as an assistant or add a Co-Authored-By trailer.

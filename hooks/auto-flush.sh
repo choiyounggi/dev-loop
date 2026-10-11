@@ -114,11 +114,36 @@ sh "$FLUSH_LOCK" acquire >/dev/null 2>&1 || exit 0
 # No bypassPermissions: the reviewer finding is that this must keep the
 # user's normal permission checks, so the flush gets ONLY the tools its own
 # pipeline (skills/knowledge-flush/SKILL.md + the wiki-ingest skill it calls)
-# actually uses, each Bash entry scoped to one command prefix. See the PR
-# body / README for the one-line reason behind each entry.
+# actually uses, each Bash entry scoped to an exact script/repo/endpoint
+# prefix (never a bare `sh`/`node`/`git`/`gh api`). See the README for the
+# one-line reason behind each entry.
+#
+# Claude Code's Bash permission matcher is a static, literal-text prefix
+# match — it never expands a shell variable it hasn't seen assigned earlier
+# IN THE SAME tool call, and it refuses to auto-approve (falls back to
+# "requires approval", fatal in this headless, no-TTY run) any command
+# containing an `if`/`else` conditional or a `||` fallback, even when every
+# variable in it is otherwise resolvable (verified empirically: see the PR —
+# `${CLAUDE_PLUGIN_ROOT}` and a bare `$VAR` are both refused outright, an
+# `if [ -d ... ]; then ... fi` wrapper is refused, and a `... || true` guard
+# is refused, while a flat `cmd1 "$x" && cmd2 "$x"` with `$x` assigned two
+# lines above in the SAME call is resolved and matched correctly). So this
+# prompt hands the nested run already-resolved, literal concrete paths and
+# tells it to avoid both constructs, rather than relying on SKILL.md's
+# portable `${CLAUDE_PLUGIN_ROOT}` / `$HOME` / `if`-guarded checkout — those
+# stay as-is for the manual, human-approved `/dev-loop:knowledge-flush` path.
+REPO="$DIR/repo"
 CLAUDE_BIN="$(command -v claude)"
-PROMPT='Run the dev-loop:knowledge-flush skill now. Drain ~/.dev-loop/queue: for each pending insight research and verify the best-practice against real sources, check existing wiki layers for duplicates/links, ALSO check open knowledge/* PRs for overlapping candidates (fold into that branch or drop as pending-duplicate — never open a sibling duplicate PR), decide the target layer/category, run wiki-ingest, write the 4-section INGEST_REPORT (Verified best-practice / Existing-layer check with a "Pages read:" id list / Open-PR check / Routing decision), then open exactly ONE reviewed PR (label dev-loop:knowledge) under my own gh identity, passing --body-file with a LITERAL absolute path (never --body). Do NOT merge. If the queue is empty, do nothing.'
-ALLOWED_TOOLS='Bash(git:*),Bash(gh api:*),Bash(gh pr list:*),Bash(gh pr create:*),Bash(node:*),Bash(sh:*),Bash(mkdir:*),Read,Write,Edit,Skill,WebSearch,mcp__plugin_dev-loop_dev-loop-wiki__wiki_search'
+PROMPT="Run the dev-loop:knowledge-flush skill now. Drain ~/.dev-loop/queue: for each pending insight research and verify the best-practice against real sources, check existing wiki layers for duplicates/links, ALSO check open knowledge/* PRs for overlapping candidates (fold into that branch or drop as pending-duplicate — never open a sibling duplicate PR), decide the target layer/category, run wiki-ingest, write the 4-section INGEST_REPORT (Verified best-practice / Existing-layer check with a \"Pages read:\" id list / Open-PR check / Routing decision), then open exactly ONE reviewed PR (label dev-loop:knowledge) under my own gh identity, passing --body-file with a LITERAL absolute path (never --body). Do NOT merge. If the queue is empty, do nothing.
+
+This run has no human to approve permission prompts, so every Bash command must exactly match the scoped --allowedTools list below. That list is written with literal concrete paths because the permission matcher cannot auto-approve a command containing an unresolved shell variable, an if/then/else conditional, or a || fallback. Follow these exactly, overriding SKILL.md's portable placeholders:
+- Plugin root is literally: $PLUGIN_ROOT — use this exact path, never \${CLAUDE_PLUGIN_ROOT} or any variable, when running scripts/flush-lock.sh or hooks/queue-claim.js.
+- The dev-loop dir is literally: $DIR — use this exact path, never \$HOME/.dev-loop, as the mkdir -p target.
+- The wiki checkout is literally: $REPO — use this exact path, never \$REPO or \$HOME/.dev-loop/repo as a variable, in every git -C command and as the --body-file directory.
+- Before every scripts/flush-lock.sh acquire or release call, put export DEV_LOOP_FLUSH_RUN_ID=\"<id>\" on its own line directly above it, in the SAME tool call — never as an inline VAR=val prefix on the sh line itself.
+- For the checkout step, first run one command chaining only && between the three git calls (no if, no ||): git -C $REPO fetch origin && git -C $REPO checkout main && git -C $REPO reset --hard origin/main — only if that command's result is an error (fresh machine, nothing cloned yet), run a separate follow-up command: mkdir -p $DIR && git clone https://github.com/choiyounggi/dev-loop.git $REPO
+- For the git-identity check in that same step, do not use SKILL.md's if-block as one command. Instead run git -C $REPO config user.email on its own (flat, no if); only if that prints nothing, follow up with two more flat commands: gh api user -q .login, then git -C $REPO config user.name \"<that login>\" && git -C $REPO config user.email \"<that login>@users.noreply.github.com\"."
+ALLOWED_TOOLS="Bash(export DEV_LOOP_FLUSH_RUN_ID=*),Bash(sh $PLUGIN_ROOT/scripts/flush-lock.sh:*),Bash(node $PLUGIN_ROOT/hooks/queue-claim.js:*),Bash(mkdir -p $DIR:*),Bash(git -C $REPO:*),Bash(git clone https://github.com/choiyounggi/dev-loop.git:*),Bash(gh api user:*),Bash(gh pr list --repo choiyounggi/dev-loop:*),Bash(gh pr create --repo choiyounggi/dev-loop:*),Read,Edit(/$DIR/**),Skill,WebSearch,mcp__plugin_dev-loop_dev-loop-wiki__wiki_search"
 
 (
   DEV_LOOP_FLUSHING=1 nohup "$CLAUDE_BIN" -p "$PROMPT" \
