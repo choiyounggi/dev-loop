@@ -15,7 +15,7 @@ sources:
   - "Installed source, next 16.3.8: dist/server/lib/start-server.js, app-info-log.js, generate-agent-files.js, dist/compiled/@vercel/detect-agent/index.js"
   - "Field case 2026-10-07 (agent-driven next dev in a dev-loop task worktree): both files created, untracked, not in .gitignore"
 last_verified: 2026-10-08
-related: [qa-process-scope-purity-checks]
+related: [qa-process-scope-purity-checks, platforms-processes-spawning-an-agent-cli-from-a-server]
 ---
 
 # AGENTS.md and CLAUDE.md Written by `next dev`
