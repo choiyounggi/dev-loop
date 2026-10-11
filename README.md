@@ -221,8 +221,12 @@ The wiki is meant to grow from what you actually learn. Three moving parts:
    - **check existing layers** for duplicates to merge into and pages to link
      (naming the page ids it actually read),
    - **check open `knowledge/*` PRs** so sibling flushes don't pile up duplicate
-     PRs — each candidate is folded into an in-flight PR, dropped as a pending
-     duplicate, or ingested as new,
+     PRs — the **manual** path can `git diff` an in-flight PR's branch, so it
+     folds a genuine overlap into that branch, drops a pure duplicate, or
+     ingests as new. The **automatic headless** path has no git at all (see
+     below) and so cannot diff those PRs' content; it only lists them, and
+     drops any candidate whose domain/trigger plausibly overlaps as a pending
+     duplicate — it never folds into another branch,
    - **decide the target layer/category** (or justify a new category),
    - then run `wiki-ingest` and write an `INGEST_REPORT.md`.
 
@@ -236,35 +240,49 @@ The wiki is meant to grow from what you actually learn. Three moving parts:
      `hooks/auto-flush.sh` Stop hook fires the pipeline in a detached, headless
      `claude` run when the queue crosses a threshold and the rate-limit window
      has elapsed, so PRs appear without you doing anything. That run keeps your
-     normal permission checks — it passes an explicit `--allowedTools` list
-     scoped to exactly what the flush pipeline calls, never
-     `--permission-mode bypassPermissions`. Each entry and why it's there:
+     normal permission checks — it passes an explicit `--allowedTools`/
+     `--disallowedTools` pair scoped to exactly what the flush pipeline calls,
+     never `--permission-mode bypassPermissions`.
+
+     **The nested session gets no git tool at all, and no `gh pr create`.**
+     Scoping git by *subcommand* (`Bash(git -C <repo>:*)`) still let a
+     prompt-injected session run arbitrary code through an allowed-looking
+     `git` prefix — `git -C <repo> -c alias.x='!sh -c evil' x`,
+     `fetch --upload-pack=<cmd>` / `push --receive-pack=<cmd>`,
+     `log --output=<any path>`, `rebase --exec`, `submodule foreach`,
+     `bisect run` all execute a program, and a subcommand denylist/allowlist
+     never closes (the same lesson as the regex shell lexer). So the boundary
+     moved: `hooks/auto-flush.sh` itself — never inside any Claude session's
+     permission system — does the checkout, branch, commit, push, and
+     `gh pr create`, each with fixed arguments. The nested session only edits
+     files (research, dedup, wiki-ingest's edits, and a small
+     `autoflush-result.json` naming the PR title and report path), and even
+     its Edit/Write access is explicitly denied inside the checkout's own
+     `.git/` (so it can't plant a hook there), with an independent checksum
+     comparison of `.git/hooks/*` + `.git/config` before/after the session as
+     a second, trusted-side check that doesn't rely on the deny rule holding.
+     Each allowed/denied entry and why it's there:
 
      | Entry | Why |
      |---|---|
-     | `Bash(export DEV_LOOP_FLUSH_RUN_ID=*)` | Sets the flush-lock run id before each `flush-lock.sh` call; carries no exec/write risk on its own. |
-     | `Bash(sh <plugin root>/scripts/flush-lock.sh:*)` | The single-flight lock script, pinned to its exact installed path — not a bare `sh:*`, which would run any script or `sh -c '<anything>'`. |
+     | `Bash(export DEV_LOOP_FLUSH_RUN_ID=*)` | Kept for parity with the manual skill path; this headless run doesn't need to call it (the hook holds the flush lock for the whole run). |
+     | `Bash(sh <plugin root>/scripts/flush-lock.sh:*)` | Kept for parity, unused this run — not a bare `sh:*`, which would run any script or `sh -c '<anything>'`. |
      | `Bash(node <plugin root>/hooks/queue-claim.js:*)` | Claims/releases queue rows, pinned to its exact path — not a bare `node:*`, which would run `node -e '<anything>'`. |
-     | `Bash(mkdir -p <~/.dev-loop>:*)` | Creates the checkout's parent dir on a fresh machine, scoped to that one directory. |
-     | `Bash(git -C <~/.dev-loop/repo>:*)` | Every git operation the pipeline runs (fetch/checkout/reset/config/add/commit/push/diff), scoped to the one checkout the flush owns — not `git:*`, which would run `git -C` against any repo on disk. |
-     | `Bash(git clone https://github.com/choiyounggi/dev-loop.git:*)` | The one-time bootstrap clone, pinned to this repo's URL. |
-     | `Bash(gh api user:*)` | Reads the logged-in gh login to set the checkout's git identity — not `gh api:*`, which would allow any GitHub API call. |
-     | `Bash(gh pr list --repo choiyounggi/dev-loop:*)` | Lists open `knowledge/*` PRs for the dedup check, scoped to this repo. |
-     | `Bash(gh pr create --repo choiyounggi/dev-loop:*)` | Opens the one reviewed PR, scoped to this repo. |
+     | `Bash(gh api user:*)` | Kept for parity — not `gh api:*`, which would allow any GitHub API call. |
+     | `Bash(gh pr list --repo choiyounggi/dev-loop:*)` | Lists open `knowledge/*` PRs for the (read-only, drop-on-overlap) dedup check, scoped to this repo. |
      | `Read` | Reads the wiki, templates, and queue files; left unscoped since nothing here is sensitive to read. |
      | `Edit(//<~/.dev-loop>/**)` | Covers both the Edit and Write tools (Claude Code only checks `Edit` path rules), scoped to the checkout plus the queue dir it also retires rows in — not a bare `Edit`/`Write`, which would write anywhere. |
      | `Skill` | Runs the `wiki-ingest` sub-skill. |
      | `WebSearch` | Verifies each candidate against real sources before ingesting it. |
      | `mcp__plugin_dev-loop_dev-loop-wiki__wiki_search` | Semantic dedup against the existing wiki before creating a new page. |
+     | **disallowed:** `Edit(//<~/.dev-loop>/repo/.git/**)` | Carves the checkout's own `.git/` back out of the Edit allow rule above — a deny rule wins over a matching allow rule — so the session can't plant a `.git/hooks/*` script or rewrite `.git/config`. |
 
      Claude Code's Bash permission matcher is a static, literal-text prefix
      match: it can't auto-approve a command containing an unresolved shell
-     variable (so `${CLAUDE_PLUGIN_ROOT}`/`$HOME`/`$REPO` must be the
-     already-resolved literal path), an `if`/`else` conditional, or a `||`
-     fallback. The prompt this hook builds hands the nested run those literal
-     paths and tells it to avoid both constructs; `skills/knowledge-flush/SKILL.md`
-     keeps its portable, human-readable form for the manual, approved-by-you
-     path. Left at the default (unset, or
+     variable (so `${CLAUDE_PLUGIN_ROOT}` must be the already-resolved literal
+     path), an `if`/`else` conditional, or a `||` fallback.
+     `skills/knowledge-flush/SKILL.md` keeps its portable, human-readable form
+     for the manual, approved-by-you path. Left at the default (unset, or
      anything other than `1`), the hook never spawns a session or opens a PR;
      instead it emits one rate-limited notice telling you how many insights are
      queued and to run the manual flush below.
