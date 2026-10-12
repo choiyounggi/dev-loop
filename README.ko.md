@@ -154,9 +154,10 @@ loop-orchestrator처럼 dev-loop은 설정 **없이도** 완전히 범용으로 
   아니라 구분되는 exit로 드러납니다.
 - **환경변수를 실어 나르는 워커 기동** — `orca-worker-start.sh`가 워크트리,
   guardrails 에스컬레이션 규약(`GROUNDWORK_ESCALATION_DIR` /
-  `GROUNDWORK_TASK_ID`)을 실은 에이전트 터미널, Dispatch 바인딩을 한 번에
-  구성합니다. 재진입 시에는 살아 있는 에이전트를 먼저 탐침하므로 하나의
-  워크트리에 에이전트가 둘 생기지 않습니다.
+  `GROUNDWORK_TASK_ID`)과 워커 전용 guardrails 설정
+  (`GROUNDWORK_GUARDRAILS_CONFIG`)을 실은 에이전트 터미널, Dispatch 바인딩을
+  한 번에 구성합니다. 재진입 시에는 살아 있는 에이전트를 먼저 탐침하므로
+  하나의 워크트리에 에이전트가 둘 생기지 않습니다.
 - **생존 감지는 두 가지 질문** — `orca-worktree-alive.sh`(터미널이 있는가?)
   **그리고** `orca-worker-stalled.sh`(pane이 실제로 움직이는가?) — 멈춘 워커는
   첫 번째 검사를 몇 시간이고 통과하기 때문입니다.
@@ -168,6 +169,17 @@ Orca가 없어도 같은 런이 **raw tmux** 위에서 같은 보호를 파일 �
 이벤트(`send-prompt.sh keys`)로 응답하고, 모든 런치가 status 레코드를 선기록해
 플래닝 중에 죽은 워커도 기다리지 않고 잡습니다. guardrails 에스컬레이션 규약은
 두 기판에서 동일합니다.
+
+**워커 guardrails 완화는 옵트인입니다.** 기본값에서는 워커의 파괴적 규칙
+(`rm_rf`, `git_discard`, `system_tmp_write`)도 여러분 자신의 세션과 같은 `ask`로
+유지됩니다 — `.orchestration` status/plan 경로만 미리 허용되어 있어 이 프로토콜은
+묻지 않고도 그대로 동작합니다. `DEV_LOOP_WORKER_RELAX=1`을 설정하면(예:
+`~/.claude/settings.json`에 `"env": {"DEV_LOOP_WORKER_RELAX": "1"}`) 기존처럼
+느슨한 기본값(이 세 규칙을 `off`로)으로 돌아가, 일상적인 워크트리 정리 작업에서
+마찰 대신 속도를 택할 수 있습니다. guardrails는 실수를 막는 안전벨트일 뿐
+샌드박스가 아닙니다: 여러분 계정으로 돌아가는 세션은 워커를 포함해 자신의
+guardrails 설정 파일을 직접 고칠 수 있으므로, 옵트인은 워커를 그만큼 신뢰하기로
+하는 선택입니다.
 
 **auto 모드 코디네이터를 위한 셋업 노트 (tmux):** 런처는 각 워커를
 `claude --permission-mode bypassPermissions`로 띄우는데, auto 모드 권한
@@ -218,12 +230,18 @@ deny-net을 분류기는 볼 수 없기 때문입니다. 코디네이터 세션�
    리뷰해 각각 머지하거나 반려합니다.
 
    실행되는 두 가지 경로:
-   - **자동** — `hooks/auto-flush.sh` Stop 훅이 큐가 임계치를 넘고 rate-limit
-     윈도우가 지났을 때 분리된 headless `claude` 실행으로 파이프라인을
-     발화합니다. 아무것도 하지 않아도 PR이 나타납니다. 가드:
-     킬 스위치 `DEV_LOOP_AUTOFLUSH=0`, `DEV_LOOP_AUTOFLUSH_INTERVAL`(기본
-     3600초)당 1회, 대기 항목 `DEV_LOOP_AUTOFLUSH_MIN`(기본 3)개 이상일 때만,
-     아래 수동 플러시와 공유하는 owner-token single-flight 잠금
+   - **자동, 옵트인 (기본값은 꺼짐)** — `DEV_LOOP_AUTOFLUSH=1`을 설정하면
+     `hooks/auto-flush.sh` Stop 훅이 큐가 임계치를 넘고 rate-limit 윈도우가
+     지났을 때 분리된 headless `claude` 실행으로 파이프라인을 발화합니다.
+     아무것도 하지 않아도 PR이 나타납니다. 이 실행도 평소의 권한 검사를
+     그대로 유지합니다 — 플러시 파이프라인이 실제로 쓰는 것만 담은 명시적
+     `--allowedTools` 목록을 넘기며, 절대 `--permission-mode
+     bypassPermissions`를 쓰지 않습니다. 기본값(미설정, 또는 `1`이 아닌 값)
+     에서는 훅이 세션을 띄우지도 PR을 열지도 않고, 대기 중인 인사이트 개수와
+     수동 플러시를 실행하라는 안내를 rate-limit된 알림으로 한 번만 띄웁니다.
+     가드(둘 다 공통): `DEV_LOOP_AUTOFLUSH_INTERVAL`(기본 3600초)당 1회,
+     대기 항목 `DEV_LOOP_AUTOFLUSH_MIN`(기본 3)개 이상일 때만, 아래 수동
+     플러시와 공유하는 owner-token single-flight 잠금
      (`DEV_LOOP_FLUSH_LOCK_TTL`, 기본 900초 — 이 시간이 지나면 죽은 홀더의
      잠금을 재점유 가능), 그리고 두 진입점이 같은 후보를 동시에 인제스트하지
      않도록 하는 런당 큐 클레임(`DEV_LOOP_CLAIM_TTL`, 기본 3600초), 재귀
@@ -275,7 +293,7 @@ dev-loop/
 │   ├── graph-nudge.sh                # SessionStart: 워크스페이스 그래프가 온보딩 필요 시 /dev-loop:graph-setup 넛지 (주간)
 │   ├── loop-gate.sh                  # Stop: 검증 루프 무결성 게이트
 │   ├── harvest-insights.sh + harvest.js  # Stop: 인사이트 하베스트 → 큐
-│   ├── auto-flush.sh                 # Stop: knowledge-flush 자동 실행 (가드됨) → PR
+│   ├── auto-flush.sh                 # Stop: 옵트인(DEV_LOOP_AUTOFLUSH=1) knowledge-flush → PR; 기본값(꺼짐)은 알림만
 │   ├── pre-flush-pr-gate.sh          # PreToolUse: 플러시 사전 PR 파이프라인 강제
 │   └── orchestrate-ask-gate.sh       # PreToolUse: Gate 1을 AskUserQuestion으로 묻기 전에는 워커 실행 차단
 ├── scripts/resolve-tools.sh          # capability-role 프로파일 리졸버 (`plan` role 없음)
