@@ -9,8 +9,9 @@ sources:
   - https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html
   - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html
   - https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html
-last_verified: 2026-09-27
-related: [testing-data-test-data-and-isolation, testing-mocking-what-to-mock, debugging-concurrency-intermittent-failures, testing-quality-sequential-dispatch-assumption-under-concurrency, testing-async-async-testing, testing-mocking-fake-server-forward-before-reply]
+  - https://vitest.dev/config/maxworkers
+last_verified: 2026-10-12
+related: [testing-data-test-data-and-isolation, testing-mocking-what-to-mock, debugging-concurrency-intermittent-failures, testing-quality-sequential-dispatch-assumption-under-concurrency, testing-async-async-testing, testing-mocking-fake-server-forward-before-reply, testing-data-testcontainers-reaper-on-docker-desktop-macos]
 ---
 
 # Fixing a Test That Fails Intermittently
@@ -23,7 +24,9 @@ hunting its test-level cause (order dependence, shared fixture state,
 time/timezone, async waits) or setting quarantine-vs-retry policy for it. If
 the same intermittency also appears outside the suite, or the test-level
 causes are exhausted and it still will not reproduce on demand, see
-wiki/debugging/concurrency/intermittent-failures.md.
+wiki/debugging/concurrency/intermittent-failures.md. A different subset of
+container- or DB-backed files failing each run also routes here, though its
+cause is the Docker VM's memory ceiling, not the test itself.
 
 ## Do this
 
@@ -40,6 +43,7 @@ wiki/debugging/concurrency/intermittent-failures.md.
 | Fails at certain times of day / dates / in CI's timezone → time and timezone dependence | Inject a frozen clock and assert against the injected instant; store and compare in UTC |
 | Fails on network errors/timeouts to a real external service → infra flake | Move the dependency behind an owned boundary and stub it ([testing-mocking-what-to-mock]); keep real-service calls in a separate non-blocking suite |
 | Fails on differing float/collection ordering → nondeterministic iteration or randomness | Seed the randomness; sort before asserting or assert order-independently |
+| A different subset of container- or DB-backed files fails each run → too many service containers (Testcontainers, docker-compose) start at once for the Docker VM's memory, so the VM kills some mid-run | Cap the runner's workers to what the VM can hold (`vitest run --maxWorkers=N`, Jest `--maxWorkers`, Playwright `--workers`), and run every full-suite gate with the same cap; the file set and counts are unchanged, only how many containers start at once drops |
 
 2. The moment a test is identified as flaky, **quarantine it and file a
    ticket**: move it out of the blocking CI path (skip-with-annotation or a
@@ -60,6 +64,7 @@ wiki/debugging/concurrency/intermittent-failures.md.
 | The flake reproduces only in CI, never locally | Diff the environments: CPU/parallelism, timezone, locale, dependency versions, resource limits — then reproduce locally by matching the differing factor (e.g. run with CI's timezone and parallelism) |
 | The "flaky test" is actually an intermittent production bug (race in the code under test) | The test is doing its job — fix the code, not the test; deep diagnosis methodology → wiki/debugging/ |
 | A test cannot be de-flaked at its current level (full-stack e2e with inherent variance) | Push the assertions down to unit/integration level and keep only a minimal smoke check at e2e ([testing-strategy-test-level-choice]) |
+| Each run fails on different container/DB files with a container error (`409 ... is not running`, a start/connect timeout) rather than an assertion | Read it as a resource ceiling, not a test defect: compare `docker info` memory against (worker count x per-container memory) and lower `--maxWorkers` until the whole suite is green on repeated runs, then pin that cap in the gate command. The separate macOS Docker Desktop socket failure (0 tests, a Ryuk mount error) is [testing-data-testcontainers-reaper-on-docker-desktop-macos] |
 
 ## Instead of
 
@@ -69,6 +74,7 @@ wiki/debugging/concurrency/intermittent-failures.md.
 | Normalize retry-until-green as the standing fix | Quarantine + ticket + root-cause fix; retries only as monitored, reported stopgap | Retries hide real races in test and production code and erode trust in red |
 | Delete the flaky test to unblock CI | Quarantine it and fix from the ticket | Deletion silently drops the regression coverage the test provided |
 | Mark the test "known flaky" in a comment and leave it blocking | Move it out of the blocking path via quarantine mechanism | A blocking flaky test teaches the team to ignore failures, including real ones |
+| Retry or quarantine a DB/container test that fails on a different file each run | Cap the runner's worker count to the Docker VM's memory and re-run the whole suite | The tests are correct; the VM was oversubscribed, so a retry just reshuffles which files lose their container |
 
 ## Sources
 
@@ -78,3 +84,5 @@ wiki/debugging/concurrency/intermittent-failures.md.
 - https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html — "It is guaranteed that the destructor of the spawned task has finished before task completion is observed via `JoinHandle` `await`": awaiting the handle is a real ordering point, not a probable one
 - Local reproduction 2026-09-27 (Node 26.7.0; a background timer that resets shared state): no forcing → 0/200 failures; handle awaited between the setup write and the read → 200/200 failures; handle awaited before the setup write → 0/200 failures
 - Field evidence 2026-09 (a Rust `tokio` crate, crew-run #19): stress loops gave 0/120 at 10 `yes` processes and 3/80 at 24 on 12 cores; the forced order failed 10/10 and 25/25, the fixed order passed 0/100, 50/50, and 10/10 under 24 `yes`
+- https://vitest.dev/config/maxworkers — `maxWorkers` caps the concurrent worker processes; with watch mode off it defaults to the host's available parallelism (`os.availableParallelism()`) and is halved in watch mode, so a many-core host runs many test files — and the per-file containers they start — at once; it accepts a number or a percentage string
+- Field reproduction 2026-10-12 (linkly-invitation, Vitest 5 + `@testcontainers/postgresql` on macOS Docker Desktop, `docker info` 8 CPUs / 4 GB): three `pnpm test` runs at one commit each failed only on DB-backed files, a different subset each time (2, then 1, then 4), with `HTTP code 409 ... is not running` and a 120 s `startTestDatabase` timeout; `pnpm test --maxWorkers=4` passed 126/126 files (1077 passed, 2 skipped) and every later full-suite gate passed with the same cap
