@@ -215,7 +215,8 @@ pushed_autoflush_branch() {
   [ -n "$prcall" ]
   [[ "$prcall" == *"--repo choiyounggi/dev-loop"* ]]
   [[ "$prcall" == *"--title t1"* ]]
-  [[ "$prcall" == *"--body-file $REPO/.dev-loop/INGEST_REPORT.md"* ]]
+  # the script passes the realpath it validated, not the raw result-file value
+  [[ "$prcall" == *"--body-file $(realpath "$REPO/.dev-loop/INGEST_REPORT.md")"* ]]
   [[ "$prcall" == *"--label dev-loop:knowledge"* ]]
   [[ "$prcall" == *"--head knowledge/autoflush-"* ]]
   git -C "$REPO" log -1 --format=%s | grep -q "knowledge: ingest"
@@ -257,6 +258,18 @@ pushed_autoflush_branch() {
   seed_pending 3
   DEVLOOP="$HOME/.dev-loop"
   STUB_CLAUDE_ACTION="echo page > '$REPO/wiki/x.md'; echo evil > '$REPO/.git/hooks/pre-commit'; mkdir -p '$REPO/.dev-loop'; echo report > '$REPO/.dev-loop/INGEST_REPORT.md'; printf '{\"title\":\"t\",\"body_file\":\"%s\"}' '$REPO/.dev-loop/INGEST_REPORT.md' > '$DEVLOOP/autoflush-result.json'"
+  export STUB_CLAUDE_ACTION
+  run_hook_opted_in
+  wait_for_lock_release
+  [ -z "$(grep 'pr create' "$STUB_GH_LOG" 2>/dev/null || true)" ]
+  [ -z "$(pushed_autoflush_branch)" ]
+  grep -qi "hooks" "$DEVLOOP/autoflush.log"
+}
+
+@test "nested session writes .git/info/attributes: aborts without committing" {
+  seed_pending 3
+  DEVLOOP="$HOME/.dev-loop"
+  STUB_CLAUDE_ACTION="echo page > '$REPO/wiki/x.md'; mkdir -p '$REPO/.git/info'; echo '* filter=evil' > '$REPO/.git/info/attributes'; mkdir -p '$REPO/.dev-loop'; echo report > '$REPO/.dev-loop/INGEST_REPORT.md'; printf '{\"title\":\"t\",\"body_file\":\"%s\"}' '$REPO/.dev-loop/INGEST_REPORT.md' > '$DEVLOOP/autoflush-result.json'"
   export STUB_CLAUDE_ACTION
   run_hook_opted_in
   wait_for_lock_release

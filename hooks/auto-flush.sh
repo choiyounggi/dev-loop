@@ -120,7 +120,9 @@ sh "$FLUSH_LOCK" acquire >/dev/null 2>&1 || exit 0
 #     the former ships with macOS, the latter needs homebrew coreutils. -----
 git_integrity_hash() { # $1 = repo path
   { for f in "$1"/.git/hooks/*; do [ -f "$f" ] && shasum -a 256 "$f"; done
-    [ -f "$1/.git/config" ] && shasum -a 256 "$1/.git/config"
+    for f in "$1/.git/config" "$1/.git/config.worktree" "$1/.git/info/attributes"; do
+      [ -f "$f" ] && shasum -a 256 "$f"
+    done
   } 2>/dev/null | sort | shasum -a 256 | awk '{print $1}'
 }
 
@@ -252,7 +254,7 @@ Plugin root is literally: $PLUGIN_ROOT — use this exact path, never \${CLAUDE_
   git -C "$REPO" add -A -- . \
     && git -C "$REPO" commit -m "knowledge: ingest insight(s) via autoflush ($RUNID)" >/dev/null 2>&1 \
     && git -C "$REPO" push -u origin "$BR" >/dev/null 2>&1 \
-    && "$GH_BIN" pr create --repo choiyounggi/dev-loop --head "$BR" --title "$TITLE" --body-file "$BODY_FILE" --label dev-loop:knowledge >/dev/null 2>&1 \
+    && "$GH_BIN" pr create --repo choiyounggi/dev-loop --head "$BR" --title "$TITLE" --body-file "$RESOLVED_BODY" --label dev-loop:knowledge >/dev/null 2>&1 \
     || printf 'autoflush: add/commit/push/pr-create step failed\n' >> "$DIR/autoflush.log" 2>/dev/null
 
   sh "$FLUSH_LOCK" release >/dev/null 2>&1
