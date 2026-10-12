@@ -154,7 +154,7 @@ loop-orchestrator처럼 dev-loop은 설정 **없이도** 완전히 범용으로 
   아니라 구분되는 exit로 드러납니다.
 - **환경변수를 실어 나르는 워커 기동** — `orca-worker-start.sh`가 워크트리,
   guardrails 에스컬레이션 규약(`GROUNDWORK_ESCALATION_DIR` /
-  `GROUNDWORK_TASK_ID`)과 워커 전용으로 완화된 guardrails 설정
+  `GROUNDWORK_TASK_ID`)과 워커 전용 guardrails 설정
   (`GROUNDWORK_GUARDRAILS_CONFIG`)을 실은 에이전트 터미널, Dispatch 바인딩을
   한 번에 구성합니다. 재진입 시에는 살아 있는 에이전트를 먼저 탐침하므로
   하나의 워크트리에 에이전트가 둘 생기지 않습니다.
@@ -169,6 +169,17 @@ Orca가 없어도 같은 런이 **raw tmux** 위에서 같은 보호를 파일 �
 이벤트(`send-prompt.sh keys`)로 응답하고, 모든 런치가 status 레코드를 선기록해
 플래닝 중에 죽은 워커도 기다리지 않고 잡습니다. guardrails 에스컬레이션 규약은
 두 기판에서 동일합니다.
+
+**워커 guardrails 완화는 옵트인입니다.** 기본값에서는 워커의 파괴적 규칙
+(`rm_rf`, `git_discard`, `system_tmp_write`)도 여러분 자신의 세션과 같은 `ask`로
+유지됩니다 — `.orchestration` status/plan 경로만 미리 허용되어 있어 이 프로토콜은
+묻지 않고도 그대로 동작합니다. `DEV_LOOP_WORKER_RELAX=1`을 설정하면(예:
+`~/.claude/settings.json`에 `"env": {"DEV_LOOP_WORKER_RELAX": "1"}`) 기존처럼
+느슨한 기본값(이 세 규칙을 `off`로)으로 돌아가, 일상적인 워크트리 정리 작업에서
+마찰 대신 속도를 택할 수 있습니다. guardrails는 실수를 막는 안전벨트일 뿐
+샌드박스가 아닙니다: 여러분 계정으로 돌아가는 세션은 워커를 포함해 자신의
+guardrails 설정 파일을 직접 고칠 수 있으므로, 옵트인은 워커를 그만큼 신뢰하기로
+하는 선택입니다.
 
 **auto 모드 코디네이터를 위한 셋업 노트 (tmux):** 런처는 각 워커를
 `claude --permission-mode bypassPermissions`로 띄우는데, auto 모드 권한
