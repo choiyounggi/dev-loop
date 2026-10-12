@@ -11,7 +11,7 @@ sources:
   - https://raw.githubusercontent.com/vercel/next.js/v16.3.8/packages/next/src/lib/typescript/writeConfigurationDefaults.ts
   - https://nextjs.org/docs/app/api-reference/config/next-config-js/distDir
 last_verified: 2026-10-07
-related: [testing-quality-checks-that-cannot-pass, platforms-toolchains-regeneration-silently-drops-hand-edited-state, platforms-shells-portable-shell-scripts, platforms-toolchains-flag-availability-at-the-execution-site]
+related: [testing-quality-checks-that-cannot-pass, platforms-toolchains-regeneration-silently-drops-hand-edited-state, platforms-shells-portable-shell-scripts, platforms-toolchains-flag-availability-at-the-execution-site, platforms-toolchains-no-html-link-for-pages-misses-app-router-routes]
 ---
 
 # Next.js 16 Build Output Paths and the tsconfig the Build Rewrites

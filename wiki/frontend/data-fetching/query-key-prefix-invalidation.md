@@ -8,7 +8,7 @@ sources:
   - https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation
   - https://tanstack.com/query/latest/docs/reference/QueryClient
 last_verified: 2026-10-06
-related: [frontend-data-fetching-query-state-vs-fetch-state, frontend-state-client-vs-server-state, frontend-data-fetching-race-conditions]
+related: [frontend-data-fetching-query-state-vs-fetch-state, frontend-state-client-vs-server-state, frontend-data-fetching-race-conditions, frontend-data-fetching-server-action-refresh-of-the-current-route]
 ---
 
 # Placing a New Query Key Under an Existing Key Prefix

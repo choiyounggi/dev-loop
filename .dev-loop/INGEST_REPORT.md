@@ -1,95 +1,82 @@
-# Knowledge flush — 1 insight(s)
+# Knowledge flush — 4 insight(s) (3 pages; two queue rows were the same lesson)
 
-A review's "also assert X" fix that edits an existing test block can delete the assertion other mutants depended on, and re-running only the named mutant hides that. **1 page amended (new step 6), 0 new pages, 1 back-link. 7 plan-gaps retired as local-layer, 0 dropped.**
-
-Claimed 8 queue rows (run `20261008-124951-26572`): 1 harvested ★ Insight (`4614be6ce89cc5c5`) and 7 wiki-plan `[no-wiki]` plan-gap rows from linkly task t216.
+Queue rows claimed by this run: `c84a501fdfc4637c` (eslint rule), `7a9afd1eae7809f1` + `65299b5a2504f128` (tsx top-level await, English + Korean duplicate), `1366b511a1affcc5` (Next.js Server Action refresh). All harvested 2026-10-12 from linkly-invitation task worktrees (t4c / t4d / t4e).
 
 ## Verified best-practice
 
-**`4614be6ce89cc5c5` — keep the block's assertions, then re-run every mutant it covers** (confidence: **verified**)
+### 1. `@next/next/no-html-link-for-pages` misses static App Router routes → `verified`
 
-Claim: when a review's "also assert X" fix lands in an existing test block, put the new assertion beside the block's existing ones (a different input or environment gets its own case), diff the block's assertion lines before and after, and re-run every mutant the block covers, comparing each verdict with the pre-edit run. Re-running only the named mutant cannot see the mutants that an assertion removed by the edit used to kill.
+Claim: on `@next/eslint-plugin-next` 16.3.8 (and earlier) the rule flags `<a href="/">` and dynamic app routes only; a static app route such as `/admin` is never reported, because the app-route patterns are built with `normalizeAppPath` (no trailing slash, `^/admin$`) while every href is passed through `normalizeURL`, which appends a slash (`/admin/`).
 
-Sources — each quote compared character-for-character against the raw page with `curl` + `/usr/bin/grep` on 2026-10-08:
+Sources checked:
+- `packages/eslint-plugin-next/src/utils/url.ts` at tag v16.3.8 (read through `gh api …?ref=v16.3.8`): L69–L80 `normalizeURL` (`url.endsWith('/') ? url : url + '/'`), L148 Pages list `^${normalizeURL(url)}$`, L169 App list `^${normalizeAppPath(url)}$`.
+- `src/rules/no-html-link-for-pages.ts` at v16.3.8: L149 `normalizeURL(href.value.value)`, L156 `foundUrl.test(normalizeURL(hrefPath))`.
+- Canary `url.ts` still has the same two wrappers (L148 / L169), so the gap is unfixed upstream.
+- Open upstream PRs https://github.com/vercel/next.js/pull/97557 (2026-08-19, "flag `<a>` links to static App Router routes", describes exactly this mismatch) and https://github.com/vercel/next.js/pull/94556 (2026-06-08, names "`normalizeAppPath` omitted trailing slashes for static app routes"); issue #53473 for the `pageExtensions` gap.
+- https://nextjs.org/docs/messages/no-html-link-for-pages resolves (HTTP 200).
 
-- https://stryker-mutator.io/docs/stryker-js/incremental/ (raw source: `docs/incremental.md` in stryker-js) — "Reuse is possible when: A mutant was "Killed"; the culprit test still exists, and it didn't change." The runner table decides whether a test edit is seen at all: Jest, Vitest, CucumberJS "Full"; Mocha, Tap "Stryker assumes all tests inside a file changed when that file changed"; Jasmine, Karma "Stryker will only see test changes for tests that are added or removed"; Command "will only detect changes in mutants, not their tests"; "Static mutants don't have test coverage; thus, Stryker won't detect test changes for them"; `--force` reruns "all mutants in scope, regardless of the incremental file".
-- https://pitest.org/quickstart/incremental_analysis/ — "If a mutation was killed in the last run and neither the class under test or the killing test has changed, then it can be assumed that this mutation is still killed."; for a changed killing test, "it is likely that the last killing test will still kill it and it should therefore be prioritised above others."
+How verified: downloaded the published `@next/eslint-plugin-next@16.3.8` tarball into the project scratch dir and called `getUrlFromAppDirectory` + `normalizeURL` from `dist/utils/url.js` directly against a synthetic `app/` tree (`/`, `/admin`, `/admin/login`, `/guestbook`, `/post/[slug]`, `/(group)/about`, `/docs/[...rest]`). Result: only `/`, `/post/abc`, `/docs/a/b` match; `/admin`, `/admin/login`, `/guestbook`, `/about` do not (static routes), including `/admin/` written with a slash. The harvested session's own probe (`eslint-config-next` 16.3.8: `href="/"` exit 1, the three static routes pass) agrees. The replacement grep gate on the page was run against a known-bad file (4 of 4 lines reported) and a known-good file (0 of 5 reported) before being written down.
 
-Both tools keep a "Killed" verdict only while its killing test is unchanged. Step 6 applies that rule by hand, and the new edge row covers the Stryker runners that cannot see an in-place edit.
+### 2. tsx + top-level `await` in a package without `"type": "module"` → `verified`
 
-Local reproduction (Node 26.7.0, `node:test`; one fresh directory per test variant × mutant; each `sed` mutation checked as applied with `cmp`):
+Claim: tsx compiles `.ts` as CommonJS when the nearest `package.json` has no `"type"`, and esbuild refuses top-level `await` in `cjs` output; save the script as `.mts`, wrap the body in `async function main()`, or set `"type": "module"`. tsconfig `module` does not change the decision.
 
-| Test block | Unmutated | N0 no-op control | N1 `'debug'`→`'info'` | N2 `42`→`0` | A21 `=== 'production'`→`=== 'prod'` (named mutant) |
-|---|---|---|---|---|---|
-| Before the fix | pass | survived | killed | killed | survived |
-| Fix that rewrites the block for `'production'` | pass | survived | **survived** | **survived** | killed |
-| Fix that adds the `'production'` assertions beside the old ones | pass | survived | killed | killed | killed |
+Sources checked:
+- https://esbuild.github.io/content-types/#javascript — "bundling code containing top-level await is only supported when the output format is set to esm" (fetched, quote confirmed).
+- https://nodejs.org/api/typescript.html — ".mts files will always be run as ES modules", ".cts … CommonJS", `.ts` follows `package.json` `"type"` (read from `nodejs/node` `doc/api/typescript.md` L129–L132; page HTTP 200).
+- tsx docs `docs/typescript.md` "Compiler limitations" — "tsx uses esbuild to compile TypeScript and ESM, so it shares some of the same limitations" (raw file read).
+- https://github.com/privatenumber/tsx/issues/488 (closed; maintainer answer points to the README and esbuild's JavaScript caveats), #552 (closed, node_modules variant), #849 (open, `tsx -e` variant, mentioned only as an edge).
 
-The before/after assertion-line diff named both lines the rewrite removed (`assert.equal(c.logLevel, 'debug')`, `assert.equal(c.seed, 42)`) and none for the additive fix. The scratch directory was deleted after the run.
+How verified: reproduction in linkly-invitation (tsx 4.23.15, Node 26.7.0, no `"type"`, tsconfig `"module": "esnext"` / `"moduleResolution": "bundler"`): `tla.ts` → exit 1 with `ERROR: Top-level await is currently not supported with the "cjs" output format`; identical `tla.mts` → `TLA_OK 2`, exit 0; `.ts` with `async function main()` → `MAIN_OK 3`, exit 0. Scratch files removed in the same step.
 
-Field evidence (originating session, linkly-invitation task t2 Task 06 attempt 4; not re-run here): swapping the block's `NODE_ENV=test` assertion for a production one killed A9 and A21 while N1–N3 survived with 4/4 tests passing; re-adding the two removed lines killed them.
+### 3. Next.js Server Action: current-route refresh vs `revalidatePath` of another path → `verified`
 
-**7 plan-gap rows (t216)** — not researched as general practice: every directive names linkly's own modules (`impl/lnpl/lower.py`, `spec._check_given`, the `CODES`/`SEVERITY_OF`/`HINTS` registry, RFC numbering), so all seven fail the layer test. No confidence is claimed for them.
+Claim: on Next.js 16.3.8 any `revalidatePath`/`revalidateTag` without a cache-life profile sets `pathWasRevalidated = ActionDidRevalidateStaticAndDynamic` regardless of path, so the action response re-renders the current route; the docs call this temporary and the source carries `// TODO: only revalidate if the path matches`. When the current page must refresh no matter what was revalidated, call `refresh()` from `next/cache` (16.0.0+), and pin the behaviour with a browser check that reads the DOM before any reload.
+
+Sources checked:
+- https://nextjs.org/docs/app/api-reference/functions/revalidatePath (docs version 16.3.8) — Good to know: "Updates the UI immediately (if viewing the affected path). Currently, it also causes all previously visited pages to refresh … This behavior is temporary and will be updated in the future to apply only to the specific path."
+- https://nextjs.org/docs/app/api-reference/functions/refresh — "refresh allows you to refresh the client router from within a Server Action"; only callable in Server Actions.
+- `revalidate.ts` at v16.3.8: L73–L91 `refresh()` (throws outside the action phase, sets `ActionDidRevalidateDynamicOnly`), L255–L256 the TODO and `ActionDidRevalidate` assignment; at v15.5.0 the site sets a boolean and no `refresh` export exists; at v16.0.0 `export function refresh()` is at L60.
+- `action-handler.ts` at v16.3.8 L1410–L1412 (`skipPageRendering ||= … undefined || ActionDidNotRevalidate`), L197–L202 (header `x-action-revalidated`).
+- `server-action-reducer.ts` at v16.3.8 L206–L207 (both kinds accepted), L364–L365 (`invalidateEntirePrefetchCache` only for static-and-dynamic).
+
+How verified: the same lines were read from the installed `node_modules/next/dist` (16.3.8) in linkly-invitation — `revalidate.js:70-84`, `:221-222`; `action-handler.js:990`; `server-action-reducer.js:129`, `:233` — and the tag-pinned GitHub sources above were fetched with `gh api …?ref=v16.3.8|v16.0.0|v15.5.0` to confirm line numbers and the version the export appeared in. The harvested session's field case (`/admin/photos` refreshed after `revalidatePath('/')`) matches the mechanism.
 
 ## Existing-layer check
 
-Route: `INDEX.md` → testing ("cases/assertions", "verifying tests can actually fail") → `wiki/testing/index.md` → quality; qa ("acting on code-review feedback") checked as well.
+Pages read: platforms-toolchains-typescript-6-global-types, platforms-toolchains-nextjs-16-build-output-and-tsconfig-rewrite, platforms-toolchains-flag-availability-at-the-execution-site, platforms-toolchains-self-import-inside-a-workspace-package, platforms-toolchains-agent-files-written-by-next-dev, platforms-processes-sentinel-driven-repl-payloads, infrastructure-ci-cd-changed-files-only-gates, frontend-design-design-system-lint-gate-for-agents, testing-quality-checks-that-cannot-pass, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-gate-parsing-vs-command-execution, frontend-data-fetching-query-key-prefix-invalidation, frontend-data-fetching-async-ui-states
 
-Pages read: testing-quality-surviving-mutant-equivalence-triage, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, qa-process-evaluating-review-feedback, testing-quality-policy-at-several-return-sites, testing-mocking-captured-call-arguments, testing-quality-minimum-case-set, testing-quality-expectation-sets-with-one-distinct-value, backend-common-errors-diagnostics-from-a-shared-code-path
+Also read: `INDEX.md`, `wiki/frontend/index.md`, `wiki/platforms/index.md`, `wiki/infrastructure/index.md`, `wiki/backend/index.md`, `wiki/backend/node/index.md`, `templates/page.md`, `AGENTS.md` (category rules).
 
-- `wiki_search` (k=5) on the candidate's trigger: policy-at-several-return-sites 0.768, surviving-mutant-equivalence-triage 0.763 and 0.725, captured-call-arguments 0.737, minimum-case-set 0.735. Only surviving-mutant-equivalence-triage shares the trigger — its "When this applies" already names "a reviewer asks for a test to cover a specific surviving mutant".
-- Whole-wiki search (`/usr/bin/grep` over every page): 46 pages mention mutants; none covers an edit that removes an assertion other mutants depended on. Three pages direct re-running the targeted mutant after adding a case or assertion (tests-that-cannot-fail, expectation-sets-with-one-distinct-value, policy-at-several-return-sites); none of them covers an edit that removes an existing assertion, so step 6 extends them and contradicts none. They are left unchanged to keep this diff small.
-- **Merged, not created**: surviving-mutant-equivalence-triage gains step 6 with a verdict table, 4 edge rows (Stryker incremental reuse by runner, a hand-rolled mutation script, a deliberate replacement, a survivor whose kill does not reproduce on the pre-edit block), 1 Instead-of row, 4 Sources lines, a "When this applies" clause and a step-1 pointer. Body: 115 lines (117 once #226 merges; limit 120 — the next addition to this page needs a split).
-- Related: added testing-quality-mutation-harness-file-custody (its step 6, "re-run the whole matrix" after a custody fix, is the same principle; it already links back, so the link is now two-way). The evaluating-review-feedback ↔ this-page link is already in open PR #226 and is not duplicated here.
-- Conflicts with existing directives: none flagged.
-- `wiki/testing/index.md`: the page's "load when" row now names the new use case (maintenance invariant 1).
-- `last_verified` stays 2026-08-07: open PR #226 bumps that exact line, and a second bump would add a merge conflict; the new claims carry dated sources.
-- Checks on this branch: `node scripts/wiki-structure-checks.js wiki` → `pages: 359, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line, in infrastructure/config/keys-ahead-of-their-consumer.md); no banned vague qualifier in any added line.
+Keyword sweep over `wiki/` (`no-html-link-for-pages|top-level await|top-level-await|\.mts\b|revalidatePath|pathWasRevalidated`): 1 file, `platforms-processes-sentinel-driven-repl-payloads` (mentions top-level `await` inside a REPL payload — a different mechanism; linked as related, not merged). `wiki_search` (k=5) for each of the three trigger sentences returned no page describing the same situation (top hits: mobile-navigation-test-files-in-expo-router-app-directory, platforms-toolchains-self-import-inside-a-workspace-package, platforms-toolchains-agent-files-written-by-next-dev).
+
+Overlaps / merges: none of the three triggers exists → 3 new pages. The two tsx rows (`7a9afd1eae7809f1`, `65299b5a2504f128`) describe the same situation and directive in two languages; merged into one page. No conflicts with an existing directive.
+
+Related links added both ways:
+- A (eslint) ↔ infrastructure-ci-cd-changed-files-only-gates, testing-quality-checks-that-cannot-pass, platforms-toolchains-flag-availability-at-the-execution-site, frontend-design-design-system-lint-gate-for-agents, platforms-toolchains-nextjs-16-build-output-and-tsconfig-rewrite
+- B (tsx) ↔ platforms-toolchains-typescript-6-global-types, platforms-processes-sentinel-driven-repl-payloads, platforms-toolchains-self-import-inside-a-workspace-package
+- C (refresh) ↔ frontend-data-fetching-query-key-prefix-invalidation, frontend-data-fetching-async-ui-states, platforms-toolchains-flag-availability-at-the-execution-site
 
 ## Open-PR check
 
-26 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253–#260), listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`. For each head, the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for the candidate's concepts (removed or replaced assertions, re-running all mutants, reviewer/auditor fixes, "also assert"), and every added line mentioning mutants was read.
+Open `knowledge/*` heads listed with `gh pr list --search "head:knowledge/"`: #273 (`…-20261011-235540`), #272 (`…-223623`), #271 (`…-213648`), #270 (`…-193253`), #269 (`…-022522`), #268 (`…-002014`), #266 (`…-20261010-021455`), #265 (`…-20261009-222812`). Each head was fetched and `git diff origin/main origin/<head> -- wiki/` grepped for the same keyword set plus `server action|next/link|eslint-config-next|tsx `.
 
-| Candidate | Overlapping open PR | Verdict |
-|---|---|---|
-| 4614be6ce89cc5c5 | None carries it. #226 edits the same page for a different situation (a survivor reported inside a PASS audit); #258 (additive mutants vs presence checks) and #259 (schema key coverage) are different situations | **new** |
-| 7 × t216 plan-gaps | No open PR body mentions t216 (all 26 bodies searched) | **new** → local layer |
+- #269 adds `wiki/frontend/rendering/request-time-data-in-a-nextjs-page.md` (route-segment `revalidate`/`dynamic` config under Cache Components). Different trigger from candidate 3 (that page is about request-time reads in a page; this one is about the action response after a write). Verdict for candidate 3: **new**. A related-link to that page is deferred until #269 merges (linking to a page absent from `main` would be a broken link in this PR).
+- #270 adds `wiki/platforms/toolchains/agent-files-written-by-next-dev.md` — already on `main` (merged content); no overlap with any candidate.
+- No other open head touches these triggers.
 
-Merge check (`git merge-tree --write-tree`, this branch against each head): no wiki page conflicts, including #226, whose four hunks on the shared page were avoided. Every head conflicts on `log.md` and the older ones also on this report file — the same two files the open PRs already conflict on with each other (#260 vs #259 and #255 vs #254 checked).
+Per-candidate verdicts: `c84a501fdfc4637c` **new**; `7a9afd1eae7809f1` **new** (merged with its sibling row below); `65299b5a2504f128` **drop as in-run duplicate** (same lesson as `7a9afd1eae7809f1`, folded into the same page, not a separate page); `1366b511a1affcc5` **new**.
 
 ## Routing decision
 
-| Candidate | Layer | Target | Action |
-|---|---|---|---|
-| 4614be6ce89cc5c5 | bundled | `testing/quality/surviving-mutant-equivalence-triage.md` | merged as step 6 |
-| 7 × t216 plan-gaps | local (linkly) | see Local-layer candidates | excluded from this PR, retired from the queue |
+| Candidate | Target | Why this category |
+|-----------|--------|-------------------|
+| `c84a501fdfc4637c` eslint rule | `platforms/toolchains/no-html-link-for-pages-misses-app-router-routes.md` | The lesson is about what a pinned lint toolchain actually checks, not about UI code; the other Next.js tooling pages (`nextjs-16-build-output-and-tsconfig-rewrite`, `agent-files-written-by-next-dev`) already live in `platforms/toolchains`. `frontend` has no lint/routing category, and `frontend/design`'s lint page is design-system specific |
+| `7a9afd1eae7809f1` + `65299b5a2504f128` tsx | `platforms/toolchains/tsx-top-level-await-without-type-module.md` | Script-runner module-format behaviour across a toolchain (tsx + esbuild + Node's extension rule), next to `typescript-6-global-types` and `self-import-inside-a-workspace-package`. The rows were harvested under `infrastructure` and `backend`; neither index has a script-runner category and `backend/node` is for service code |
+| `1366b511a1affcc5` Server Action refresh | `frontend/data-fetching/server-action-refresh-of-the-current-route.md` | In-UI data refresh after a mutation is this category's subject (`query-key-prefix-invalidation`, `async-ui-states`); the directive governs what the page does after a write, with Next.js mechanics as the evidence |
 
-No new category: testing/quality already holds the mutation-testing pages, and the target page's trigger covers this situation.
-
-## Independent review
-
-A fresh-context adversarial reviewer (a separate subagent, read-only on this checkout) re-fetched both sources, rebuilt the reproduction from its description (same matrix observed on Node 26.7.0) and re-ran both lint scripts. Verdict: CHANGES_REQUESTED, resolved before this PR:
-
-| Finding | Resolution |
-|---|---|
-| Step 6 said a "Killed" result is reused "only while its killing test is unchanged", dropping conditions both tools state (Stryker: the culprit test still exists; PIT: the class under test is unchanged too) | Fixed: "With the source untouched, PIT and Stryker apply the same rule: they reuse a "Killed" result only while its killing test still exists unchanged." |
-| The log line understated #226's overlap — it also edits this page's related list, Edge table and Sources, so merging it would need reconciliation in four places | Checked and not reproduced: `git merge-tree --write-tree` of this branch with #226 conflicts only in `log.md` and this report file, and the merged page carries 0 conflict markers. The log line now names #226's other three hunks and records that they merge cleanly |
-| Gap: a flaky mutant reads as lost coverage in step 6's table | Added an edge row: when a previously killed mutant survives while the assertion diff shows nothing removed, re-run it against the pre-edit block first; surviving there too marks a flaky verdict (testing-flaky-diagnosing-flaky-tests) |
-
-Kept: the reviewer's routing note (step 6's hygiene theme also sits near tests-that-cannot-fail) — the merge target stays, because this page's trigger already owns "a reviewer asks for a test to cover a specific surviving mutant" and the step-1 table now points into step 6.
+No new category. `INDEX.md` frontend and platforms rows were extended with one routing phrase each; domain `index.md` rows and `log.md` entries added.
 
 ## Local-layer candidates
 
-| Row | Project | Target |
-|---|---|---|
-| Planning t216: deciding Where the check runs | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-spec-result-reads-input-check-site.md — run wiki-ingest inside that project |
-| Planning t216: deciding Which names an expect line asserts on | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-expect-result-candidate-names.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (a): the bare name is a respond field | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-field-condition.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (b): a same-name respond term wins | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-term-precedence.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (c): given did not set the input | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-given-setter-suppression.md — run wiki-ingest inside that project |
-| Planning t216: deciding Severity, registry position, hint | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-diagnostic-code-registration.md — run wiki-ingest inside that project |
-| Planning t216: deciding RFC | linkly (linkly-dartfish worktree) | wiki-local/qa/document-verification/t216-no-rfc-for-warning-only-code.md — run wiki-ingest inside that project |
-
-All seven are wiki-plan Phase B decisions naming linkly's own modules; they are excluded from this PR and retired from the queue.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+none — every candidate's directive holds for any Next.js / tsx project; the harvested field evidence (linkly-invitation routes, `/admin/photos`) appears only as a dated reproduction note, not as a directive.

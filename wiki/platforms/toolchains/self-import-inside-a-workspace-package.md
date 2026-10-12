@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://nodejs.org/api/packages.html#self-referencing-a-package-using-its-name
 last_verified: 2026-10-06
-related: [platforms-toolchains-flag-availability-at-the-execution-site, backend-common-change-impact-call-site-enumeration]
+related: [platforms-toolchains-flag-availability-at-the-execution-site, backend-common-change-impact-call-site-enumeration, platforms-toolchains-tsx-top-level-await-without-type-module]
 ---
 
 # Importing a Sibling Module Inside a Workspace Package

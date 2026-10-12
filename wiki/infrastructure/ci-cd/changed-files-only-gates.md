@@ -21,6 +21,7 @@ related:
     testing-quality-history-dependent-checks-on-shallow-clones,
     infrastructure-ci-cd-write-time-limit-guards,
     platforms-shells-unmatched-glob-in-a-command-argument,
+    platforms-toolchains-no-html-link-for-pages-misses-app-router-routes
   ]
 ---
 
