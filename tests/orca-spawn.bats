@@ -65,14 +65,27 @@ setup() {
 @test "exports GROUNDWORK_GUARDRAILS_CONFIG as the EXTERNAL guardrails path, even with no escalation dir set" {
   realwt="$BATS_TEST_TMPDIR/realwt"; mkdir -p "$realwt"
   fakehome="$BATS_TEST_TMPDIR/fakehome"; mkdir -p "$fakehome"
+  WG="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/worker-guardrails.sh"
+  # write-mode must have already run (as it does in real use, before the
+  # worker is launched) for the file the export now checks to exist.
+  HOME="$fakehome" sh "$WG" "$realwt" >/dev/null
   run env -u GROUNDWORK_ESCALATION_DIR -u GROUNDWORK_TASK_ID HOME="$fakehome" ORCA_SPAWN_DRYRUN=1 \
       bash "$OS" "repo1::$realwt" bypassPermissions "do the task"
   [ "$status" -eq 0 ]
-  WG="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/worker-guardrails.sh"
   expected="$(HOME="$fakehome" sh "$WG" --path "$realwt")"
   [[ "$output" == *"GROUNDWORK_GUARDRAILS_CONFIG='$expected'"* ]]
   [[ "$expected" != "$realwt"* ]]
   [[ "$expected" == "$fakehome/.claude/groundwork/overrides/dev-loop-"*".json" ]]
+}
+
+@test "does NOT export GROUNDWORK_GUARDRAILS_CONFIG when worker-guardrails.sh never wrote the file" {
+  realwt="$BATS_TEST_TMPDIR/realwt_nowrite"; mkdir -p "$realwt"
+  fakehome="$BATS_TEST_TMPDIR/fakehome_nowrite"; mkdir -p "$fakehome"
+  # No write-mode call here — only --path's computed name exists, no file.
+  run env -u GROUNDWORK_ESCALATION_DIR -u GROUNDWORK_TASK_ID HOME="$fakehome" ORCA_SPAWN_DRYRUN=1 \
+      bash "$OS" "repo1::$realwt" bypassPermissions "do the task"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"GROUNDWORK_GUARDRAILS_CONFIG"* ]]
 }
 
 @test "single quote in the escalation dir is shell-escaped (no command break)" {

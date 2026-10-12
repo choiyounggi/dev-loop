@@ -196,15 +196,18 @@ if [ -n "$esc" ]; then
   # metacharacters can't break or inject into the launched command
   launchcmd="$launchcmd && export GROUNDWORK_ESCALATION_DIR='$esc' && export GROUNDWORK_TASK_ID='$session'"
 fi
-# Point the worker at ITS OWN loosened guardrails config as a trusted file
-# (the guardrails plugin only lets a repo config tighten rules now — loosening
-# comes only from the user's global file or from GROUNDWORK_GUARDRAILS_CONFIG,
-# and ONLY when that path resolves outside every project tree — guardrails
-# refuses an in-worktree path, since any command in the worktree could rewrite
-# it). worker-guardrails.sh owns deriving that external path from the
-# worktree's own hash; ask it rather than re-deriving the hash here.
+# Point the worker at ITS OWN guardrails config (scoped by worker-guardrails.sh —
+# loosened only when DEV_LOOP_WORKER_RELAX=1) as a trusted file (the guardrails
+# plugin only lets a repo config tighten rules now — loosening comes only from
+# the user's global file or from GROUNDWORK_GUARDRAILS_CONFIG, and ONLY when
+# that path resolves outside every project tree — guardrails refuses an
+# in-worktree path, since any command in the worktree could rewrite it).
+# worker-guardrails.sh owns deriving that external path from the worktree's
+# own hash; ask it rather than re-deriving the hash here. `-f` guards against
+# exporting a path to a file that was never actually written (`--path` only
+# computes the name; it does not check the file exists).
 grc=$(sh "$(dirname "$0")/worker-guardrails.sh" --path "$wt_physical" 2>/dev/null || echo "")
-[ -n "$grc" ] && launchcmd="$launchcmd && export GROUNDWORK_GUARDRAILS_CONFIG='$grc'"
+[ -n "$grc" ] && [ -f "$grc" ] && launchcmd="$launchcmd && export GROUNDWORK_GUARDRAILS_CONFIG='$grc'"
 effort_env=""
 [ -n "$effort" ] && effort_env="CLAUDE_CODE_EFFORT_LEVEL=$effort "
 launchcmd="$launchcmd && ${effort_env}\"$CLAUDE\" --permission-mode $perm"

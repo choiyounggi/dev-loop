@@ -14,10 +14,39 @@ setup() {
   # $HOME/.claude/groundwork/overrides/, so no test ever touches the real one.
   HOME="${BATS_TEST_TMPDIR}/home"; mkdir -p "$HOME"
   export HOME
+  # Isolate from an ambient DEV_LOOP_WORKER_RELAX=1 (this suite may itself be
+  # running inside a relaxed worker) so "default" tests see the real default.
+  unset DEV_LOOP_WORKER_RELAX
 }
 
-@test "writes the worker-scoped guardrails config" {
+# --- opt-in loosening (DEV_LOOP_WORKER_RELAX) -------------------------------
+# A worker can rewrite both config files this script writes (same user,
+# inside a tree the worker itself controls), so the DEFAULT must never hand
+# it a loosened destructive-command sandbox — loosening is opt-in, like
+# DEV_LOOP_AUTOFLUSH.
+
+@test "default (DEV_LOOP_WORKER_RELAX unset): no rule is 'off', in either file" {
   run sh "$WG" "$wt"
+  [ "$status" -eq 0 ]
+  cfg="$wt/.groundwork/guardrails.json"
+  ext="$(sh "$WG" --path "$wt")"
+  [ -f "$cfg" ]; [ -f "$ext" ]
+  run jq -e '[.rules[] | select(.mode == "off")] | length == 0' "$cfg"
+  [ "$status" -eq 0 ]
+  run jq -e '[.rules[] | select(.mode == "off")] | length == 0' "$ext"
+  [ "$status" -eq 0 ]
+  # the orchestration protocol's one sanctioned path still works without a prompt
+  run jq -r '.rules.worktree_escape.mode' "$cfg"
+  [ "$output" = "ask" ]
+  run jq -r '.rules.worktree_escape.allowPaths[0]' "$cfg"
+  [ "$output" = ".orchestration" ]
+  # and nothing else is declared — this is the minimal default, not a trimmed copy
+  run jq -r '.rules | keys_unsorted | join(",")' "$cfg"
+  [ "$output" = "worktree_escape" ]
+}
+
+@test "relax=1: keeps today's full loosened content" {
+  run env DEV_LOOP_WORKER_RELAX=1 sh "$WG" "$wt"
   [ "$status" -eq 0 ]
   cfg="$wt/.groundwork/guardrails.json"
   [ -f "$cfg" ]
@@ -27,6 +56,29 @@ setup() {
   [ "$output" = "ask" ]
   run jq -r '.rules.worktree_escape.mode' "$cfg"
   [ "$output" = "ask" ]
+}
+
+@test "relax=0 / relax=true: neither loosens (only the exact string \"1\" opts in)" {
+  for v in 0 true; do
+    run env DEV_LOOP_WORKER_RELAX="$v" sh "$WG" "$wt"
+    [ "$status" -eq 0 ]
+    cfg="$wt/.groundwork/guardrails.json"
+    run jq -e '[.rules[] | select(.mode == "off")] | length == 0' "$cfg"
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "a stale loosened external file from an earlier relax=1 run is overwritten once relax is off" {
+  env DEV_LOOP_WORKER_RELAX=1 sh "$WG" "$wt"
+  ext="$(sh "$WG" --path "$wt")"
+  run jq -r '.rules.rm_rf.mode' "$ext"
+  [ "$output" = "off" ]          # sanity: it really is the loosened file first
+  run sh "$WG" "$wt"             # relax off now — same worktree, re-run
+  [ "$status" -eq 0 ]
+  run jq -e '[.rules[] | select(.mode == "off")] | length == 0' "$ext"
+  [ "$status" -eq 0 ]
+  run jq -r '.rules | keys_unsorted | join(",")' "$ext"
+  [ "$output" = "worktree_escape" ]
 }
 
 @test "the config is git-excluded, so a worker cannot commit its sandbox" {
@@ -147,8 +199,8 @@ setup() {
   [ "$output" = "ask" ]
 }
 
-@test "coverage: the emitted config still holds exactly the nine known rule ids" {
-  sh "$WG" "$wt"
+@test "coverage (relax=1): the emitted config still holds exactly the nine known rule ids" {
+  env DEV_LOOP_WORKER_RELAX=1 sh "$WG" "$wt"
   cfg="$wt/.groundwork/guardrails.json"
   run jq -r '.rules | length' "$cfg"
   [ "$status" -eq 0 ]
@@ -157,8 +209,8 @@ setup() {
   [ "$output" = "rm_rf,git_discard,system_tmp_write,cloud_delete,sql_drop,git_force_push,secret_export,curl_pipe_shell,worktree_escape" ]
 }
 
-@test "validity: every pre-existing rule keeps its mode, and only worktree_escape gains a key" {
-  sh "$WG" "$wt"
+@test "validity (relax=1): every pre-existing rule keeps its mode, and only worktree_escape gains a key" {
+  env DEV_LOOP_WORKER_RELAX=1 sh "$WG" "$wt"
   cfg="$wt/.groundwork/guardrails.json"
   for pair in rm_rf:off git_discard:off system_tmp_write:off cloud_delete:ask \
               sql_drop:ask git_force_push:ask secret_export:ask \

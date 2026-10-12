@@ -165,7 +165,7 @@ gate, and from then on the whole run flows through Orca orchestration:
 - **Env-carrying worker start** — `orca-worker-start.sh` composes the worktree,
   an agent terminal that carries the guardrails escalation contract
   (`GROUNDWORK_ESCALATION_DIR` / `GROUNDWORK_TASK_ID`) and the worker's own
-  loosened guardrails config (`GROUNDWORK_GUARDRAILS_CONFIG`), and the Dispatch
+  guardrails config (`GROUNDWORK_GUARDRAILS_CONFIG`), and the Dispatch
   binding; on re-entry it probes for a live agent first, so one worktree never
   ends up with two agents.
 - **Liveness is two questions** — `orca-worktree-alive.sh` (is the terminal
@@ -180,6 +180,17 @@ on-screen chooser is answered with allowlisted key events
 (`send-prompt.sh keys`); and every launch pre-seeds the status record, so a
 worker that dies during planning is caught instead of waited out. The
 guardrails escalation contract is identical on both substrates.
+
+**Worker guardrails loosening is opt-in.** By default a worker's destructive
+rules (`rm_rf`, `git_discard`, `system_tmp_write`) stay `ask`, same as your own
+session — only the `.orchestration` status/plan path is pre-allowed, so that
+protocol still works without a prompt. Set `DEV_LOOP_WORKER_RELAX=1` (e.g.
+`"env": {"DEV_LOOP_WORKER_RELAX": "1"}` in `~/.claude/settings.json`) to get
+today's looser default (those three rules set to `off`) back, trading
+friction for speed on routine in-worktree cleanup. Guardrails is a seatbelt
+against mistakes, not a sandbox: any session running as your user, including
+a worker, can edit its own guardrails config files, so opting in means
+trusting workers with that.
 
 **One setup note for auto-mode coordinators (tmux):** the launcher starts each
 worker as `claude --permission-mode bypassPermissions`, which an auto-mode

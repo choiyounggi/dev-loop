@@ -256,10 +256,11 @@ if [ "$worker_mode" = 1 ] && [ -z "$reused" ]; then
   [ -n "$model" ] && model_arg=" --model '$(esc_sq "$model")'"
   effort_env=""
   [ -n "$effort" ] && effort_env="CLAUDE_CODE_EFFORT_LEVEL=$effort "
-  # Point the worker at ITS OWN loosened guardrails config as a trusted file
-  # (the guardrails plugin only lets a repo config tighten rules now, and only
-  # trusts GROUNDWORK_GUARDRAILS_CONFIG when it resolves OUTSIDE every project
-  # tree — any command in the worktree could rewrite an in-tree file).
+  # Point the worker at ITS OWN guardrails config (scoped by worker-guardrails.sh —
+  # loosened only when DEV_LOOP_WORKER_RELAX=1) as a trusted file (the guardrails
+  # plugin only lets a repo config tighten rules now, and only trusts
+  # GROUNDWORK_GUARDRAILS_CONFIG when it resolves OUTSIDE every project tree —
+  # any command in the worktree could rewrite an in-tree file).
   # worker-guardrails.sh derives that external path from the worktree's own
   # hash; ask it (--path) rather than re-deriving the hash here. --worktree is
   # a selector ("path:<path>" or "<repoId>::<path>"), so extract the
@@ -272,7 +273,9 @@ if [ "$worker_mode" = 1 ] && [ -z "$reused" ]; then
   grc=""
   [ -n "$grc_path" ] && grc=$(sh "$(dirname "$0")/worker-guardrails.sh" --path "$grc_path" 2>/dev/null || echo "")
   grc_env=""
-  [ -n "$grc" ] && grc_env="export GROUNDWORK_GUARDRAILS_CONFIG='$(esc_sq "$grc")' && "
+  # `-f` guards against exporting a path to a file that was never actually
+  # written (`--path` only computes the name; it does not check the file exists).
+  [ -n "$grc" ] && [ -f "$grc" ] && grc_env="export GROUNDWORK_GUARDRAILS_CONFIG='$(esc_sq "$grc")' && "
   worker_cmd="${grc_env}export GROUNDWORK_ESCALATION_DIR='$(esc_sq "$esc_dir")' && export GROUNDWORK_TASK_ID='$(esc_sq "${GROUNDWORK_TASK_ID:-}")' && ${effort_env}claude --permission-mode ${perm}${model_arg}"
 
   set -- terminal create --worktree "$wt" --command "$worker_cmd" --json
