@@ -12,7 +12,7 @@ sources:
   - https://github.com/nodejs/node-gyp#installation
   - https://github.com/WiseLibs/better-sqlite3/blob/v12.8.0/package.json
 last_verified: 2026-09-28
-related: [platforms-toolchains-version-management, platforms-toolchains-compiler-sysroot-on-macos, platforms-environment-path-resolution, security-dependencies-supply-chain, platforms-tools-plugin-mcp-server-registration]
+related: [platforms-toolchains-version-management, platforms-toolchains-compiler-sysroot-on-macos, platforms-environment-path-resolution, security-dependencies-supply-chain, platforms-tools-plugin-mcp-server-registration, platforms-tools-plugin-dependencies-after-an-update]
 ---
 
 # A Native Addon Has No `.node` Binary After `bun install`
