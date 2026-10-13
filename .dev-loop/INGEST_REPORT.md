@@ -1,95 +1,133 @@
-# Knowledge flush — 1 insight(s)
+# Knowledge flush — 3 insight(s)
 
-A review's "also assert X" fix that edits an existing test block can delete the assertion other mutants depended on, and re-running only the named mutant hides that. **1 page amended (new step 6), 0 new pages, 1 back-link. 7 plan-gaps retired as local-layer, 0 dropped.**
+Run id `20261011-223512-82499` (auto-flush child; lock inherited from `hooks/auto-flush.sh`). Branch `knowledge/choiyounggi-20261011-223623`. Claimed queue rows: `810ec34bbd09d936`, `391c39d1757da4ce`, `f1035fb812caa17f` — all three are `plan-gaps` rows from the anhinga `t3-cli-outbox-drain-guard` plan (wiki-plan Phase B decisions D4, D5, D11 that had no owning wiki page).
 
-Claimed 8 queue rows (run `20261008-124951-26572`): 1 harvested ★ Insight (`4614be6ce89cc5c5`) and 7 wiki-plan `[no-wiki]` plan-gap rows from linkly task t216.
+Outcome: **1 new bundled page** carrying the general kernel shared by rows 1 and 2; the project-specific residue of all three rows is excluded from this PR and listed under *Local-layer candidates*. No merge into an existing page; no conflicts. The change set passed an independent adversarial review before commit (section at the end).
 
 ## Verified best-practice
 
-**`4614be6ce89cc5c5` — keep the block's assertions, then re-run every mutant it covers** (confidence: **verified**)
+**Page:** `wiki/backend/common/errors/refusing-a-backend-without-the-needed-capability.md` (id `backend-common-errors-refusing-a-backend-without-the-needed-capability`), `confidence: verified`, 101 body lines.
 
-Claim: when a review's "also assert X" fix lands in an existing test block, put the new assertion beside the block's existing ones (a different input or environment gets its own case), diff the block's assertion lines before and after, and re-run every mutant the block covers, comparing each verdict with the pre-edit run. Re-running only the named mutant cannot see the mutants that an assertion removed by the edit used to kill.
+**Claim (general kernel):** when a CLI subcommand must refuse because the operator-selected backend (`--backend <scheme>:<dsn>`, `--store`, `DATABASE_URL`) lacks an optional capability the command calls: (1) evaluate one capability predicate on entry, before any work and before any stdout; (2) print one stderr line from one shared template, naming the backend by its scheme only (`value.partition(":")[0]`) — the full value is a connection string that can carry `user:password@` or a `password=` option; (3) exit with the usage/configuration class the CLI already uses for "operator chose something this command cannot serve" and keep the mid-run failure code separate, reusing a documented code rather than minting one; (4) end the line with a pointer to the doc that lists capable backends; (5) prove it with a fixture driver whose predicate is false, selected by a value with a DSN tail carrying an obviously fake password, asserting exit code, one stderr line without the tail, empty stdout, and no driver call.
 
-Sources — each quote compared character-for-character against the raw page with `curl` + `/usr/bin/grep` on 2026-10-08:
+**Stated limit of the sources (written into step 3 of the page):** the man page and the Python docs define the exit-code classes; filing a capability refusal under the *usage* class is this page's field decision — a reading of `EX_USAGE`'s "the command was used incorrectly … or whatever" — not a sentence any cited document states.
 
-- https://stryker-mutator.io/docs/stryker-js/incremental/ (raw source: `docs/incremental.md` in stryker-js) — "Reuse is possible when: A mutant was "Killed"; the culprit test still exists, and it didn't change." The runner table decides whether a test edit is seen at all: Jest, Vitest, CucumberJS "Full"; Mocha, Tap "Stryker assumes all tests inside a file changed when that file changed"; Jasmine, Karma "Stryker will only see test changes for tests that are added or removed"; Command "will only detect changes in mutants, not their tests"; "Static mutants don't have test coverage; thus, Stryker won't detect test changes for them"; `--force` reruns "all mutants in scope, regardless of the incremental file".
-- https://pitest.org/quickstart/incremental_analysis/ — "If a mutation was killed in the last run and neither the class under test or the killing test has changed, then it can be assumed that this mutation is still killed."; for a changed killing test, "it is likely that the last killing test will still kill it and it should therefore be prioritised above others."
+**Sources checked (all fetched with curl on 2026-10-11; quoted sentence located in the page text, anchor id confirmed present in the raw HTML):**
 
-Both tools keep a "Killed" verdict only while its killing test is unchanged. Step 6 applies that rule by hand, and the new edge row covers the Stryker runners that cannot see an in-place edit.
+| Claim | Source | Verification |
+|-------|--------|--------------|
+| Usage errors exit 2 in argparse | https://docs.python.org/3/library/argparse.html#argparse.ArgumentParser.error | `error(message)` "prints a usage message, including the message, to sys.stderr and terminates the program with a status code of 2"; anchor present |
+| One-line refusal without the usage block | https://docs.python.org/3/library/argparse.html#argparse.ArgumentParser.exit | `exit(status=0, message=None)` "terminates the program, exiting with the specified status and, if given, it prints a message to sys.stderr before that"; anchor present |
+| 2 for command-line errors, 1 for all other errors | https://docs.python.org/3/library/sys.html#sys.exit | "Unix programs generally use 2 for command line syntax errors and 1 for all other kinds of errors."; anchor present |
+| An unhandled exception exits 1 in CPython | https://docs.python.org/3/c-api/interp-lifecycle.html#c.Py_RunMain | return value "0 if the interpreter exits normally (that is, without raising an exception), the exit status of an unhandled SystemExit, or 1 for any other unhandled exception"; anchor present |
+| sysexits classes for the table | https://man.freebsd.org/cgi/man.cgi?query=sysexits&sektion=3 | EX_USAGE (64) "The command was used incorrectly, e.g., with the wrong number of arguments, a bad flag, a bad syntax in a parameter, or whatever."; EX_CONFIG (78) "Something was found in an unconfigured or misconfigured state."; EX_UNAVAILABLE (69) "A service is unavailable. This can occur if a support program or file does not exist. This can also be used as a catchall message when something you wanted to do does not work, but you do not know why."; EX_SOFTWARE (70) "An internal software error has been detected." |
+| Exit codes map to failure modes; messaging to stderr; machine-readable output to stdout | https://clig.dev/ | lines 284–292 of the stripped page: "Return zero exit code on success, non-zero on failure."; "Map the non-zero exit codes to the most important failure modes."; "Send messaging to stderr."; "Anything that is machine readable should also go to stdout" |
+| Connection strings and passwords are excluded from logs | https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html | "Data to exclude" list contains "Authentication passwords" and "Database connection strings", introduced by "should usually not be recorded directly in the logs, but instead should be removed, masked, sanitized, hashed, or encrypted" |
+| A DSN carries `user[:password]@`; a `?password=` option is a second place | https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS | `postgresql://[userspec@][hostspec][/dbname][?paramspec]`, "where userspec is: user[:password]"; "Values that would normally appear in the hierarchical part of the URI can alternatively be given as named parameters."; anchor present |
+| A colon-free connection string can carry a password | https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-KEYWORD-VALUE | "In the keyword/value format, each parameter setting is in the form keyword = value, with space(s) between settings."; anchors `LIBPQ-CONNSTRING-KEYWORD-VALUE` and `LIBPQ-CONNECT-PASSWORD` present |
+| Library precedent for hiding the password; query options printed as-is | https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.engine.URL.render_as_string | `render_as_string(hide_password: bool = True)`, "hide_password – Defaults to True. The password is not shown in the string unless this is set to False."; "The method directly includes additional options."; anchor present |
+| A runtime-checkable Protocol checks only attribute presence (edge case: stub method) | https://docs.python.org/3/library/typing.html#typing.runtime_checkable | the decorator's note: "@runtime_checkable will check only the presence of the required methods or attributes, not their type signatures or types."; anchor present |
+| Field case | anhinga `t3-cli-outbox-drain-guard` plan D4/D5 (the queue rows' own `evidence` fields) | recorded as a field case in the page's Sources with generic wording; the project-specific values stay out of the bundled page |
 
-Local reproduction (Node 26.7.0, `node:test`; one fresh directory per test variant × mutant; each `sed` mutation checked as applied with `cmp`):
+**Not cited:** the harvested rows also cited https://microservices.io/patterns/data/transactional-outbox.html — it supports the outbox pattern itself, not the refusal contract, so it was left out.
 
-| Test block | Unmutated | N0 no-op control | N1 `'debug'`→`'info'` | N2 `42`→`0` | A21 `=== 'production'`→`=== 'prod'` (named mutant) |
-|---|---|---|---|---|---|
-| Before the fix | pass | survived | killed | killed | survived |
-| Fix that rewrites the block for `'production'` | pass | survived | **survived** | **survived** | killed |
-| Fix that adds the `'production'` assertions beside the old ones | pass | survived | killed | killed | killed |
+**Confidence:** `verified` — every directive is backed by one of the official sources above, with the one interpretive step (usage class for a capability refusal) labelled as the field decision inside the page.
 
-The before/after assertion-line diff named both lines the rewrite removed (`assert.equal(c.logLevel, 'debug')`, `assert.equal(c.seed, 42)`) and none for the additive fix. The scratch directory was deleted after the run.
+**Lint evidence (run in the checkout, `node scripts/…`):**
 
-Field evidence (originating session, linkly-invitation task t2 Task 06 attempt 4; not re-run here): swapping the block's `NODE_ENV=test` assertion for a production one killed A9 and A21 while N1–N3 survived with 4/4 tests passing; re-adding the two removed lines killed them.
+```
+# untouched tree (baseline)
+wiki-lint-prohibitions.js      → directives: 84, compliant: 84, violations: 0, info: 1
+wiki-structure-checks.js wiki  → pages: 426, indexes: 13, findings: 0
+# after the first draft
+wiki-lint-prohibitions.js      → directives: 84, compliant: 84, violations: 0, info: 1
+wiki-structure-checks.js wiki  → pages: 427, indexes: 13, findings: 0
+# after the review fixes (final)
+wiki-lint-prohibitions.js      → directives: 84, compliant: 84, violations: 0, info: 1
+wiki-structure-checks.js wiki  → pages: 427, indexes: 13, findings: 0
+```
 
-**7 plan-gap rows (t216)** — not researched as general practice: every directive names linkly's own modules (`impl/lnpl/lower.py`, `spec._check_given`, the `CODES`/`SEVERITY_OF`/`HINTS` registry, RFC numbering), so all seven fail the layer test. No confidence is claimed for them.
+Banned qualifiers (`usually|consider|might want to|generally|as appropriate`) outside `## Sources`: none; prohibition words outside `## Sources`: none; project literals (`docs/backends.md`, `cli.py`, `DriverError`, `SupportsDrain`, the `fake` backend name): none.
 
 ## Existing-layer check
 
-Route: `INDEX.md` → testing ("cases/assertions", "verifying tests can actually fail") → `wiki/testing/index.md` → quality; qa ("acting on code-review feedback") checked as well.
+Pages read: platforms-processes-tool-diagnostics-without-a-failing-exit-code, infrastructure-agent-orchestration-gate-evidence-exit-code-class, security-secrets-secrets-in-code, infrastructure-observability-logs-metrics-signals, databases-schema-design-migration-sql-without-a-database, platforms-processes-non-interactive-cli-invocation, security-agent-exposure-capability-flag-across-adapters, backend-common-change-impact-inserting-a-guard-before-an-existing-side-effect, backend-common-errors-diagnostics-from-a-shared-code-path, backend-common-errors-exception-handling, security-data-masking-verification, debugging-signals-reading-error-messages, backend-common-api-design-unenforced-declarations, backend-common-errors-async-failure-handling
 
-Pages read: testing-quality-surviving-mutant-equivalence-triage, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, qa-process-evaluating-review-feedback, testing-quality-policy-at-several-return-sites, testing-mocking-captured-call-arguments, testing-quality-minimum-case-set, testing-quality-expectation-sets-with-one-distinct-value, backend-common-errors-diagnostics-from-a-shared-code-path
+**How the set was chosen:** `INDEX.md` → backend (errors), platforms (processes), security (secrets, data); then every page in `wiki/` matching `DSN|connection string` (1 file), `exit code|exit status|argparse|sysexits` (62 files, triaged by path), `stderr` (18), `capabilit|precondition|fail closed|unsupported backend` (41) — the pages above are the ones whose "When this applies" was opened after triage.
 
-- `wiki_search` (k=5) on the candidate's trigger: policy-at-several-return-sites 0.768, surviving-mutant-equivalence-triage 0.763 and 0.725, captured-call-arguments 0.737, minimum-case-set 0.735. Only surviving-mutant-equivalence-triage shares the trigger — its "When this applies" already names "a reviewer asks for a test to cover a specific surviving mutant".
-- Whole-wiki search (`/usr/bin/grep` over every page): 46 pages mention mutants; none covers an edit that removes an assertion other mutants depended on. Three pages direct re-running the targeted mutant after adding a case or assertion (tests-that-cannot-fail, expectation-sets-with-one-distinct-value, policy-at-several-return-sites); none of them covers an edit that removes an existing assertion, so step 6 extends them and contradicts none. They are left unchanged to keep this diff small.
-- **Merged, not created**: surviving-mutant-equivalence-triage gains step 6 with a verdict table, 4 edge rows (Stryker incremental reuse by runner, a hand-rolled mutation script, a deliberate replacement, a survivor whose kill does not reproduce on the pre-edit block), 1 Instead-of row, 4 Sources lines, a "When this applies" clause and a step-1 pointer. Body: 115 lines (117 once #226 merges; limit 120 — the next addition to this page needs a split).
-- Related: added testing-quality-mutation-harness-file-custody (its step 6, "re-run the whole matrix" after a custody fix, is the same principle; it already links back, so the link is now two-way). The evaluating-review-feedback ↔ this-page link is already in open PR #226 and is not duplicated here.
-- Conflicts with existing directives: none flagged.
-- `wiki/testing/index.md`: the page's "load when" row now names the new use case (maintenance invariant 1).
-- `last_verified` stays 2026-08-07: open PR #226 bumps that exact line, and a second bump would add a merge conflict; the new claims carry dated sources.
-- Checks on this branch: `node scripts/wiki-structure-checks.js wiki` → `pages: 359, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line, in infrastructure/config/keys-ahead-of-their-consumer.md); no banned vague qualifier in any added line.
+**Semantic dedupe (`wiki_search`, k=5, three queries):**
+- trigger sentence → `platforms-toolchains-flag-availability-at-the-execution-site`, `infrastructure-ci-cd-review-bot-adopted-as-a-blocking-gate`, `infrastructure-agent-orchestration-gate-evidence-exit-code-class`, `testing-mocking-captured-call-arguments` (×2 chunks) — none describes a CLI refusing an incapable backend.
+- DSN/scheme redaction → `platforms-tools-bsd-vs-gnu-cli`, `infrastructure-config-config-values-emitted-as-source-text`, `backend-common-integrations-robots-txt-and-source-selection`, `testing-quality-captured-log-message-assertions`, `infrastructure-containers-published-ports-bind-all-interfaces` — no match.
+- exit-code class for a pre-work refusal → `infrastructure-agent-orchestration-gate-evidence-exit-code-class` (reading a runner's recorded codes, not choosing a CLI's own), `infrastructure-agent-orchestration-dispatching-after-a-completion-report`, `backend-common-change-impact-inserting-a-guard-before-an-existing-side-effect` (guard placement — adjacent, linked), `testing-mocking-captured-call-arguments`, `infrastructure-ci-cd-review-bot-adopted-as-a-blocking-gate` — no match.
+
+**Overlaps and what was done:**
+
+| Existing page | Relation | Action |
+|---------------|----------|--------|
+| `security-secrets-secrets-in-code` | Owns leak response and secret hygiene; has an edge case for an API key in a logged URL | **Linked both ways**, **one edge-case row added** ("an error message is about to echo a connection string the operator passed → scheme only; when host/db must appear, render a copy with the query string removed and the password hidden") with **three sources** appended to that page's frontmatter `sources:` and `## Sources` (OWASP Logging Cheat Sheet, SQLAlchemy `render_as_string`, libpq URI syntax — the last one sources the `user[:password]@` claim on that page). Its `last_verified` stays 2026-07-12: only the new row was verified. Its load-when row in `wiki/security/index.md` gained the new use case |
+| `infrastructure-observability-logs-metrics-signals` | "Never log secrets… mask at the logger" | Linked both ways |
+| `security-agent-exposure-capability-flag-across-adapters` | Refuse at spawn time when an adapter does not enforce a flag — same fail-closed arm, opposite direction (restriction vs capability) | Linked both ways |
+| `backend-common-change-impact-inserting-a-guard-before-an-existing-side-effect` | Precondition guard must sit before the first mutation; test the negative path against the side effect | Linked both ways; cited inline in step 1 |
+| `backend-common-errors-diagnostics-from-a-shared-code-path` | Sibling in the same category: wording of a rejection message reached from several callers | Linked both ways |
+| `platforms-processes-tool-diagnostics-without-a-failing-exit-code` | Consumer side of exit code + stderr contracts | Linked both ways; cited inline in the `--json` edge case |
+| `infrastructure-agent-orchestration-gate-evidence-exit-code-class` | Classifying a runner's recorded exit codes (127/126/124) | Read; not linked — different direction (reading codes vs. choosing them) |
+| others read (`non-interactive-cli-invocation`, `exception-handling`, `masking-verification`, `reading-error-messages`, `unenforced-declarations`, `async-failure-handling`, `migration-sql-without-a-database`) | Triggers do not overlap | Read only |
+
+**Conflicts:** none — no existing page prescribes echoing the full backend value or a different exit-code class.
 
 ## Open-PR check
 
-26 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253–#260), listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`. For each head, the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for the candidate's concepts (removed or replaced assertions, re-running all mutants, reviewer/auditor fixes, "also assert"), and every added line mentioning mutants was read.
+`gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` → 6 heads: #265 `knowledge/choiyounggi-20261009-222812`, #266 `…-20261010-021455`, #268 `…-20261011-002014`, #269 `…-20261011-022522`, #270 `…-20261011-193253`, #271 `…-20261011-213648` (plus non-knowledge #267 `fix/autoflush-opt-in`, which touches no wiki page of this case). Each head was fetched and diffed: `git diff origin/main origin/<head> -- wiki/ INDEX.md`, then the added lines were grepped for `DSN|connection string|exit code|exit status|argparse|sysexits|password|redact|capabilit|precondition|unsupported backend|does not implement|scheme`.
 
-| Candidate | Overlapping open PR | Verdict |
-|---|---|---|
-| 4614be6ce89cc5c5 | None carries it. #226 edits the same page for a different situation (a survivor reported inside a PASS audit); #258 (additive mutants vs presence checks) and #259 (schema key coverage) are different situations | **new** |
-| 7 × t216 plan-gaps | No open PR body mentions t216 (all 26 bodies searched) | **new** → local layer |
+| Head | Overlapping added lines | Overlap with this case? |
+|------|-------------------------|-------------------------|
+| #265 | grep / `git merge-tree` exit-status quotes (search-evidence page, gate page) | No — reading another tool's exit status, not designing a CLI's refusal |
+| #266 | none | No |
+| #268 | "check the exit code and stderr before…" in the fs-mock page | No — a test-side note |
+| #269 | "Firefox does not implement the property" (canvas) | No |
+| #270 | URL scheme/host allowlist fixtures (`host-disguise-fixtures-for-url-allowlists`) | No — "scheme" of an allowlisted URL, not a backend selector |
+| #271 | none | No |
 
-Merge check (`git merge-tree --write-tree`, this branch against each head): no wiki page conflicts, including #226, whose four hunks on the shared page were avoided. Every head conflicts on `log.md` and the older ones also on this report file — the same two files the open PRs already conflict on with each other (#260 vs #259 and #255 vs #254 checked).
+None of the six heads touches `wiki/backend/common/errors/`, `wiki/backend/index.md` (errors section), `wiki/security/secrets/secrets-in-code.md`, or the `secrets-in-code` row of `wiki/security/index.md`.
+
+**Per-candidate verdict:**
+- `810ec34bbd09d936` (refusal text / scheme derivation) — **new** (general kernel ingested into the new page; project residue → local layer)
+- `391c39d1757da4ce` (exit code class) — **new** (general kernel ingested into the new page; project residue → local layer)
+- `f1035fb812caa17f` (which project docs to edit) — **not ingested here**: no general kernel beyond "document the refusal where the command's existing refusals are documented"; local layer only (see below). Not a duplicate of any open PR.
 
 ## Routing decision
 
-| Candidate | Layer | Target | Action |
-|---|---|---|---|
-| 4614be6ce89cc5c5 | bundled | `testing/quality/surviving-mutant-equivalence-triage.md` | merged as step 6 |
-| 7 × t216 plan-gaps | local (linkly) | see Local-layer candidates | excluded from this PR, retired from the queue |
+**Target:** `backend / errors` → new page `wiki/backend/common/errors/refusing-a-backend-without-the-needed-capability.md`; row added to `wiki/backend/index.md` under `### errors`; `log.md` entry appended. No new category, no `INDEX.md` change (the backend row already routes "errors").
 
-No new category: testing/quality already holds the mutation-testing pages, and the target page's trigger covers this situation.
+**Why this category:** the decision is an error-contract decision in application code — what a rejection prints, where, with which status, and when — and the category already owns the sibling case "writing a rejection/validation message" (`diagnostics-from-a-shared-code-path`). Alternatives considered: `platforms/processes` owns *invoking and consuming* CLIs (non-interactive invocation, parsing `--json`, reading a tool's diagnostics), not authoring a CLI's own refusal; `security/secrets` owns the redaction aspect, which is one directive here rather than the trigger — handled by the both-ways link plus the one edge-case row.
 
-## Independent review
-
-A fresh-context adversarial reviewer (a separate subagent, read-only on this checkout) re-fetched both sources, rebuilt the reproduction from its description (same matrix observed on Node 26.7.0) and re-ran both lint scripts. Verdict: CHANGES_REQUESTED, resolved before this PR:
-
-| Finding | Resolution |
-|---|---|
-| Step 6 said a "Killed" result is reused "only while its killing test is unchanged", dropping conditions both tools state (Stryker: the culprit test still exists; PIT: the class under test is unchanged too) | Fixed: "With the source untouched, PIT and Stryker apply the same rule: they reuse a "Killed" result only while its killing test still exists unchanged." |
-| The log line understated #226's overlap — it also edits this page's related list, Edge table and Sources, so merging it would need reconciliation in four places | Checked and not reproduced: `git merge-tree --write-tree` of this branch with #226 conflicts only in `log.md` and this report file, and the merged page carries 0 conflict markers. The log line now names #226's other three hunks and records that they merge cleanly |
-| Gap: a flaky mutant reads as lost coverage in step 6's table | Added an edge row: when a previously killed mutant survives while the assertion diff shows nothing removed, re-run it against the pre-edit block first; surviving there too marks a flaky verdict (testing-flaky-diagnosing-flaky-tests) |
-
-Kept: the reviewer's routing note (step 6's hygiene theme also sits near tests-that-cannot-fail) — the merge target stays, because this page's trigger already owns "a reviewer asks for a test to cover a specific surviving mutant" and the step-1 table now points into step 6.
+**Layer test (wiki-ingest step 3):** after the review fixes the bundled page names no anhinga file, module, or convention; every example is a placeholder (`--backend <scheme>:<dsn>`, `Supports<Capability>`, `see <backends doc> §<capability table>`, "a test double, an in-memory store"). Everything that names anhinga's own files or rules is below.
 
 ## Local-layer candidates
 
-| Row | Project | Target |
-|---|---|---|
-| Planning t216: deciding Where the check runs | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-spec-result-reads-input-check-site.md — run wiki-ingest inside that project |
-| Planning t216: deciding Which names an expect line asserts on | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-expect-result-candidate-names.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (a): the bare name is a respond field | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-field-condition.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (b): a same-name respond term wins | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-term-precedence.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (c): given did not set the input | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-given-setter-suppression.md — run wiki-ingest inside that project |
-| Planning t216: deciding Severity, registry position, hint | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-diagnostic-code-registration.md — run wiki-ingest inside that project |
-| Planning t216: deciding RFC | linkly (linkly-dartfish worktree) | wiki-local/qa/document-verification/t216-no-rfc-for-warning-only-code.md — run wiki-ingest inside that project |
+All three claimed rows carry project-specific residue that would be wrong in another codebase. Target for all three (one task, one local page): project **anhinga** (`/Users/choeyeong-gi/Desktop/workspace/linkly/anhinga`, which has no `wiki-local/` yet) → `wiki-local/backend/errors/outbox-drain-guard-refusal.md` (id `local-backend-errors-outbox-drain-guard-refusal`, `reference_impl: [cli.py, docs/backends.md]`) — run wiki-ingest inside that project.
 
-All seven are wiki-plan Phase B decisions naming linkly's own modules; they are excluded from this PR and retired from the queue.
+| Row | Project-specific content excluded from this PR |
+|-----|-----------------------------------------------|
+| `810ec34bbd09d936` | The exact literal `error: backend <scheme> does not implement the outbox drain contract (drain_outbox/ack_outbox) — see docs/backends.md §3` (U+2014), `<scheme>` via the `cli.py:876` idiom `args.backend.split(":", 1)[0]`, and the literal written inline in each of the three command bodies because rule R6 / the brief forbid a hunk outside those bodies |
+| `391c39d1757da4ce` | rc 2 shared with the existing `fake` refusal and `_REJECTED`; rc 1 reserved for a run-time `DriverError`; rc 4 (`cli-surface.md` 종료 코드 "백엔드/차등 검사 에러") rejected because the outbox commands never used it and `docs/backends.md §8` (t1) already contracts rc 2 |
+| `f1035fb812caa17f` | No edit to `docs/compatibility.md §5` (no rc table there; success rc 0 and unchanged subcommands/flags still hold) nor to the `## 종료 코드` table (its rc 2 row lists examples and omits the existing `fake` refusal too) |
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+## Independent review before commit
+
+The change set touches 10 files, so it went through a read-only adversarial review (`feature-dev:code-reviewer`, no shell or write tools; it fetched all cited URLs itself) before any commit. First verdict: CHANGES REQUIRED, 12 findings; all applied, then lints re-run (table above) and the reviewer re-checked the result: **VERDICT: APPROVE** — all 12 resolved, no new blocker or should-fix, 7 wording nits (scheme-only consistency in step 2, the assertion's wording, the libpq named-parameter rule quoted, "or log line" in secrets-in-code and its trigger, "when the CLI documents one", a connector in the secrets-in-code OWASP source line, "no driver call" in the index row) — folded in before the final lint run and the commit.
+
+| # | Finding | Applied as |
+|---|---------|-----------|
+| 1 | "A traceback's status is not a code the CLI documents" was unsafe — CPython exits 1 on an unhandled exception, the same code the argparse row documents for a mid-run failure | Instead-of row reworded; `Py_RunMain` cited |
+| 2 | `render_as_string()` masks only `user:password@`; a `?password=` named parameter prints as-is | Step 2 and the secrets-in-code row now say "masks the `user:password@` slot only, includes query options as they are — render a copy with the query string removed"; libpq named-parameter sentence cited; libpq URI source added to secrets-in-code |
+| 3 | `see docs/backends.md §3`, `fake`, `memory`, `SupportsDrain` leaked the originating repo | Replaced with placeholders (`see <backends doc> §<capability table>`, "a test double, an in-memory store", `Supports<Capability>`) |
+| 4 | "the literal" had no referent; a bare-name fixture cannot distinguish echo-the-value from print-the-scheme | Step 2 defines one shared template; step 5 selects the fixture by `<scheme>:<dsn with an obviously fake password>` and asserts the tail is absent |
+| 5 | Bare "`EX_SOFTWARE` or `EX_UNAVAILABLE`" left the reader to pick; `EX_USAGE` quote omitted "or whatever"; the usage-class mapping is a field decision | Deciding condition written into the cell; quotes completed; step 3 states that the sources define the codes and the mapping is the field decision |
+| 6 | `parser.error()` prints the usage block too, breaking "exactly one line" | Row now says emit the one-line refusal with `parser.exit(2, line + "\n")`; `ArgumentParser.exit` cited |
+| 7 | "machine-readable output goes to stdout only on success" was unsourced | Replaced by the consequence: a JSON consumer sees an empty stream and a non-zero status, not a partial document |
+| 8 | Quote fidelity: OWASP "usually" elided, sys.exit "generally" dropped, typing quote under the wrong anchor | Quotes restored whole in `## Sources` (outside the directive-only qualifier check); the decorator's own note is quoted under `#typing.runtime_checkable` |
+| 9 | "text before the first `:`" and `urlsplit().scheme` differ (`my_store:foo` → `''`); a colon-free `key=value` string can carry a password | Single rule `value.partition(":")[0]`; edge case prints a bare value only when it equals a registered name, else a fixed placeholder; libpq keyword/value format cited |
+| 10 | No row for a CLI documenting only 0 and 1; "(1)" assumed the argparse row | Row added (2, documented in the same change); Instead-of row says "the mid-run code from step 3" |
+| 11 | "It is in their own shell history" is false for a CI secret store | Edge case now: name where the value came from plus the scheme |
+| 12 | Index row missing `--store` and the test use case; link style `→ [id]`; log line silent on `last_verified`; driver/backend terms undefined; secrets-in-code load-when row | All applied, including the optional `wiki/security/index.md` load-when extension |

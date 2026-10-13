@@ -9,8 +9,11 @@ sources:
   - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository
   - https://nextjs.org/docs/pages/building-your-application/configuring/environment-variables
   - https://vite.dev/guide/env-and-mode
+  - https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+  - https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.engine.URL.render_as_string
+  - https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS
 last_verified: 2026-07-12
-related: [infrastructure-ci-cd-secrets-handling, security-secrets-ciphertext-orphaned-by-a-regenerated-key]
+related: [infrastructure-ci-cd-secrets-handling, security-secrets-ciphertext-orphaned-by-a-regenerated-key, backend-common-errors-refusing-a-backend-without-the-needed-capability]
 ---
 
 # Keeping Secrets Out of Code and Responding to a Leak
@@ -18,7 +21,8 @@ related: [infrastructure-ci-cd-secrets-handling, security-secrets-ciphertext-orp
 ## When this applies
 
 Code needs an API key, password, or private key; a secret was just committed,
-pasted, or logged; or you are setting up secret hygiene for a repository.
+pasted, or logged; an error message or log line is about to echo a connection
+string; or you are setting up secret hygiene for a repository.
 
 ## Do this
 
@@ -54,6 +58,7 @@ pasted, or logged; or you are setting up secret hygiene for a repository.
 | Rotation needs coordination (shared prod credential, third party) | Treat the interval as a live incident: cut the credential's permissions/IP scope now, and schedule the rotation with an owner and a date |
 | Secret must reach a config file at runtime (library only reads files) | Render the file at deploy/start from the secret store into a non-repo path; the template in the repo holds placeholders |
 | A third-party API takes its key in a URL query param and your HTTP client logs requests | The client (httpx/requests/axios) logs the full URL — key included — at its INFO level, so enabling root/DEBUG logging leaks it into log files. Keep the client's logger above INFO (or redact the URL), and confine any redaction/proxy to your own log calls — app-level redaction never sees the client library's own log lines |
+| A CLI or service error message or log line is about to echo a connection string the operator passed (`--backend`, `DATABASE_URL`) | Print its scheme only (the text before the first `:`); when host or database must appear, render a copy with its query string removed and the password hidden (SQLAlchemy `URL.render_as_string()` hides the password by default, but masks the `user:password@` slot only and includes query options as they are); a DSN carries `user[:password]@` and OWASP lists database connection strings among the data to remove or mask before recording → [backend-common-errors-refusing-a-backend-without-the-needed-capability] |
 
 ## Instead of
 
@@ -69,3 +74,6 @@ pasted, or logged; or you are setting up secret hygiene for a repository.
 - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository — "rotate first"; history scrubbing does not un-leak distributed copies
 - https://nextjs.org/docs/pages/building-your-application/configuring/environment-variables — `NEXT_PUBLIC_` inlines values into the browser bundle
 - https://vite.dev/guide/env-and-mode — `VITE_`-prefixed vars are exposed to client source
+- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html — Data to exclude: "Database connection strings" and "Authentication passwords" are among the data that "should usually not be recorded directly in the logs, but instead should be removed, masked, sanitized, hashed, or encrypted"
+- https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.engine.URL.render_as_string — `hide_password` "Defaults to True. The password is not shown in the string unless this is set to False."; "The method directly includes additional options."
+- https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS — `postgresql://[userspec@][hostspec][/dbname][?paramspec]` where userspec is `user[:password]`: the password rides inside the connection string
