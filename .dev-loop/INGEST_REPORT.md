@@ -1,95 +1,111 @@
-# Knowledge flush — 1 insight(s)
+# Knowledge flush — 4 insight(s) + 7 plan-gap rows
 
-A review's "also assert X" fix that edits an existing test block can delete the assertion other mutants depended on, and re-running only the named mutant hides that. **1 page amended (new step 6), 0 new pages, 1 back-link. 7 plan-gaps retired as local-layer, 0 dropped.**
+**5 new pages, 2 amended pages, 3 domain indexes, 5 back-links, 1 new category (`frontend/browser-apis`).** All 4 harvested insights were verified and ingested (2 new pages, 2 merges). The 7 wiki-plan `[no-wiki]` plan-gap rows from linkly-invitation (t5, t7) are retired as local-layer; 3 of them also carried a platform gotcha with primary sources, which became the 3 other new pages.
 
-Claimed 8 queue rows (run `20261008-124951-26572`): 1 harvested ★ Insight (`4614be6ce89cc5c5`) and 7 wiki-plan `[no-wiki]` plan-gap rows from linkly task t216.
+Claimed 11 queue rows (run `20261011-022327-727`): `01498dcaf854bc1a`, `1cca7f010c2aa001`, `d9102368d6df90ca`, `ba95e8579459d1b4` (session insights) and `f7b02fb55879f640`, `2fa46092b7786876`, `d1ca050e2a6d0dc0`, `5312101035ca2b92`, `12c2385107e9bc19`, `3a3a0047f000d3a0`, `ef33a29c5e6a7713` (plan gaps).
 
 ## Verified best-practice
 
-**`4614be6ce89cc5c5` — keep the block's assertions, then re-run every mutant it covers** (confidence: **verified**)
+Every quote below was re-fetched by the coordinator, and every reproduction was re-run by the coordinator after the research agents reported.
 
-Claim: when a review's "also assert X" fix lands in an existing test block, put the new assertion beside the block's existing ones (a different input or environment gets its own case), diff the block's assertion lines before and after, and re-run every mutant the block covers, comparing each verdict with the pre-edit run. Re-running only the named mutant cannot see the mutants that an assertion removed by the edit used to kill.
+| # | Claim | Sources checked | How verified | Confidence |
+|---|---|---|---|---|
+| `01498dcaf854bc1a` | A `pull`-flag probe on a request body needs `{ highWaterMark: 0 }` or `type: 'bytes'`; a stream with no strategy pulls once after construction | Streams Standard (constructor `ExtractHighWaterMark(strategy, 1)` / bytes `0`, `SetUpReadableStreamDefaultController`, `ReadableStreamDefaultControllerShouldCallPull`, `ReadableStreamFromIterable` with 0, `ReadableStreamDefaultTee`), Fetch Standard (`bodyUsed`) | Node 26.7.0 scripts: unread `Request` body no strategy `pulled=true`, `highWaterMark: 0` and bytes `false`; positive controls true. New edge findings: `clone()`, `tee()`, `pipeThrough()` pull; `cancel()` sets `bodyUsed` without a pull | verified |
+| `1cca7f010c2aa001` | Positive control for a pooled DB limit counter: seed to limit − 1 and assert exactly 1 success | node-postgres pool docs (`max` 10, FIFO queue "until a client becomes available"), PostgreSQL Read Committed, `pg_advisory_xact_lock` | `postgres:18.6-alpine` in Docker, 13 concurrent reservations, pool 10, limit 10. Seeded: locked 1 in 20/20, unlocked 5–10 in 20/20. **Correction:** the candidate said the empty-store race is invisible; measured, it is timing-dependent — unlocked read exactly 10 in 2 of 30 runs locally and in 10 of 10 originating runs. A `pg_sleep(0.05)` between count and insert did not help (exactly 10 in 19 of 30). The page states the measured mechanism | verified |
+| `d9102368d6df90ca` | Under jsdom, deleting `setSelectionRange` after `select()` is an environment-equivalent mutant; mutate the argument or delete both, and capture the selection inside the `execCommand` stub | jsdom 30.1.2 `HTMLTextAreaElement-impl.js` `select()`; HTML `select()` steps ("Set the selection range with 0 and infinity"); WebKit bug 193758; WebKit Async Clipboard post (legacy example uses `setSelectionRange`) | jsdom 30.1.2 script, 5 variants: (0,19) ×3, (0,18), (19,19); jsdom has no `document.execCommand` (TypeError) and no `navigator.clipboard` | verified |
+| `ba95e8579459d1b4` | Korean bigram dedupe: scope by section polarity, negation markers present on one side only mean different lines, short lines exact match only | QAGS (Wang et al., ACL 2020) negation example; 표준국어대사전 entries for 안2, 못4, 없다, 않다, 불-12, 비-30, 무-10, 미-11 and 7 non-negating look-alikes | Computed: 0.6 and 0.8 come only from the overlap coefficient with whitespace removed; `가능` vs `유연근무 가능` = 1.0 (why short lines need exact match); NFC vs NFD of identical text = 0. Added: at threshold 0.6 a 3-bigram line still merges after one changed bigram (0.67) | verified |
+| `d1ca050e2a6d0dc0` (general part) | Clipboard copy from a tap: `writeText` before any `await`, a synchronous `execCommand` fallback, failure UI | WebKit Async Clipboard post; MDN Clipboard API and `execCommand`; W3C clipboard-apis IDL `[SecureContext]`; HTML transient activation; WebKit bug 193758 and changeset 251387; CSS-Tricks (secondary, 16px zoom) | Playwright 1.64.0 + Chromium 156: `http://127.0.0.1` has `navigator.clipboard`, `http://<LAN IP>` does not (`isSecureContext` false) | verified (16px and readonly-textarea rows labeled secondary / input-only) |
+| `f7b02fb55879f640` (general part) | Next.js page reading a DB: `connection()` or `force-dynamic`; under Cache Components, `<Suspense>`, plus `await io()` when the read can throw before its first `await` (`connection()` only when rendering must wait for a real request); keep module scope free of env throws | next 16.3.8 bundled docs (glossary:177, caching-without-cache-components:97, connection:6/82, io:83/87/109, migrating-to-cache-components:76, route-segment-config version history, building:59/61, unstable_noStore:7/46, caching:99/439, cacheLife:73/266/270, use-cache:144); nextjs.org pages | 12 `next build` variants. Run twice (agent and coordinator), identical: no config → prerender error; force-dynamic and `connection()` → `ƒ /`; module-scope throw → "Failed to collect configuration"; Cache Components + `dynamic` → build error; Suspense + `connection()` → `◐ /`; Cache Components alone → prerender error. Run once (coordinator, after review): Suspense + `await io()` → `◐ /`; Suspense with a read that throws before any I/O → prerender error; Suspense with a read that awaits a 50 ms timer first → `◐ /`; a `"use cache"` read that throws on the missing variable → prerender error with `cacheLife('hours')` and also with `cacheLife('seconds')` | verified |
+| `12c2385107e9bc19` (general part) | Photo downscale: EXIF via `from-image`, target from the Claude tier's edge and visual-token limits, check `blob.type` | HTML spec (ImageBitmapOptions, toBlob serialization); MDN createImageBitmap, toBlob, ImageBitmap.close, imageSmoothingQuality; BCD JSON; Anthropic vision and vision-coordinates docs (fetched 2026-10-11) with their reference implementation; WebKit CanvasBase.cpp and bug 271002; shkspr.mobi (secondary, HEIC) | Ran Anthropic's reference `resized_size`: 4032×3024 → 1270×952 standard, 2212×1659 high-res; a 1568×1176 upload is resized again to 1270×952 on standard-tier models. Chromium 156: `toBlob('image/heic')` → PNG, 0×0 canvas → null | verified (`verified_model: claude-opus-5-5`) |
 
-Sources — each quote compared character-for-character against the raw page with `curl` + `/usr/bin/grep` on 2026-10-08:
-
-- https://stryker-mutator.io/docs/stryker-js/incremental/ (raw source: `docs/incremental.md` in stryker-js) — "Reuse is possible when: A mutant was "Killed"; the culprit test still exists, and it didn't change." The runner table decides whether a test edit is seen at all: Jest, Vitest, CucumberJS "Full"; Mocha, Tap "Stryker assumes all tests inside a file changed when that file changed"; Jasmine, Karma "Stryker will only see test changes for tests that are added or removed"; Command "will only detect changes in mutants, not their tests"; "Static mutants don't have test coverage; thus, Stryker won't detect test changes for them"; `--force` reruns "all mutants in scope, regardless of the incremental file".
-- https://pitest.org/quickstart/incremental_analysis/ — "If a mutation was killed in the last run and neither the class under test or the killing test has changed, then it can be assumed that this mutation is still killed."; for a changed killing test, "it is likely that the last killing test will still kill it and it should therefore be prioritised above others."
-
-Both tools keep a "Killed" verdict only while its killing test is unchanged. Step 6 applies that rule by hand, and the new edge row covers the Stryker runners that cannot see an in-place edit.
-
-Local reproduction (Node 26.7.0, `node:test`; one fresh directory per test variant × mutant; each `sed` mutation checked as applied with `cmp`):
-
-| Test block | Unmutated | N0 no-op control | N1 `'debug'`→`'info'` | N2 `42`→`0` | A21 `=== 'production'`→`=== 'prod'` (named mutant) |
-|---|---|---|---|---|---|
-| Before the fix | pass | survived | killed | killed | survived |
-| Fix that rewrites the block for `'production'` | pass | survived | **survived** | **survived** | killed |
-| Fix that adds the `'production'` assertions beside the old ones | pass | survived | killed | killed | killed |
-
-The before/after assertion-line diff named both lines the rewrite removed (`assert.equal(c.logLevel, 'debug')`, `assert.equal(c.seed, 42)`) and none for the additive fix. The scratch directory was deleted after the run.
-
-Field evidence (originating session, linkly-invitation task t2 Task 06 attempt 4; not re-run here): swapping the block's `NODE_ENV=test` assertion for a production one killed A9 and A21 while N1–N3 survived with 4/4 tests passing; re-adding the two removed lines killed them.
-
-**7 plan-gap rows (t216)** — not researched as general practice: every directive names linkly's own modules (`impl/lnpl/lower.py`, `spec._check_given`, the `CODES`/`SEVERITY_OF`/`HINTS` registry, RFC numbering), so all seven fail the layer test. No confidence is claimed for them.
+Not ingested anywhere in the bundled wiki: `2fa46092b7786876` (the `supertoss://send` link has no Toss-published spec; the plan's own research found only community sources), `5312101035ca2b92`, `3a3a0047f000d3a0`, `ef33a29c5e6a7713` (design choices with no transferable directive).
 
 ## Existing-layer check
 
-Route: `INDEX.md` → testing ("cases/assertions", "verifying tests can actually fail") → `wiki/testing/index.md` → quality; qa ("acting on code-review feedback") checked as well.
+`wiki_search` (k=5) per trigger; the page bodies listed below were opened ("When this applies" for every hit):
 
-Pages read: testing-quality-surviving-mutant-equivalence-triage, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, qa-process-evaluating-review-feedback, testing-quality-policy-at-several-return-sites, testing-mocking-captured-call-arguments, testing-quality-minimum-case-set, testing-quality-expectation-sets-with-one-distinct-value, backend-common-errors-diagnostics-from-a-shared-code-path
+| Candidate | Top-5 hits | Same situation? |
+|---|---|---|
+| pull probe | tests-that-cannot-fail, write-time-limit-guards, masking-verification, coerced-enum-defaults-in-kotlinx-serialization, write-path-assertions | No → new page |
+| lock counter | proving-a-critical-section-is-lock-protected, distributed-locks (×2), isolation-level-selection, shared-run-state | Yes, the first → merged as step 6 |
+| jsdom select | custom-property-values-read-from-script, dynamic-file-input-uploads-in-headless-chromium (×2), spec-artifact-checks, fake-intersection-observer-for-viewport-animations | No → merged as an edge row into surviving-mutant-equivalence-triage (the triage owner for a surviving mutant) |
+| Korean dedupe | quantitative-claims-in-a-published-document, model-coupled-guidance-aging-detector, exploratory-sessions, unicode-text-matching, word-level-union-merge-reassembly | No → new page |
+| clipboard | dropzone-copy-without-drop-handlers, hook-input-fields-from-the-reference, suppression-state-and-delivery-failure, heredoc-body-expansion-with-backtick-prose, non-interactive-cli-invocation | No → new page |
+| Next.js | agent-files-written-by-next-dev, prisma-7-config-env-and-generated-client, context-window-budget, test-files-in-expo-router-app-directory, call-counts-under-render-retries | No → new page |
+| downscale | bundle-and-assets, html-in-canvas, element-crop-screenshots, responsive-layout (×2) | No → new page |
 
-- `wiki_search` (k=5) on the candidate's trigger: policy-at-several-return-sites 0.768, surviving-mutant-equivalence-triage 0.763 and 0.725, captured-call-arguments 0.737, minimum-case-set 0.735. Only surviving-mutant-equivalence-triage shares the trigger — its "When this applies" already names "a reviewer asks for a test to cover a specific surviving mutant".
-- Whole-wiki search (`/usr/bin/grep` over every page): 46 pages mention mutants; none covers an edit that removes an assertion other mutants depended on. Three pages direct re-running the targeted mutant after adding a case or assertion (tests-that-cannot-fail, expectation-sets-with-one-distinct-value, policy-at-several-return-sites); none of them covers an edit that removes an existing assertion, so step 6 extends them and contradicts none. They are left unchanged to keep this diff small.
-- **Merged, not created**: surviving-mutant-equivalence-triage gains step 6 with a verdict table, 4 edge rows (Stryker incremental reuse by runner, a hand-rolled mutation script, a deliberate replacement, a survivor whose kill does not reproduce on the pre-edit block), 1 Instead-of row, 4 Sources lines, a "When this applies" clause and a step-1 pointer. Body: 115 lines (117 once #226 merges; limit 120 — the next addition to this page needs a split).
-- Related: added testing-quality-mutation-harness-file-custody (its step 6, "re-run the whole matrix" after a custody fix, is the same principle; it already links back, so the link is now two-way). The evaluating-review-feedback ↔ this-page link is already in open PR #226 and is not duplicated here.
-- Conflicts with existing directives: none flagged.
-- `wiki/testing/index.md`: the page's "load when" row now names the new use case (maintenance invariant 1).
-- `last_verified` stays 2026-08-07: open PR #226 bumps that exact line, and a second bump would add a merge conflict; the new claims carry dated sources.
-- Checks on this branch: `node scripts/wiki-structure-checks.js wiki` → `pages: 359, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line, in infrastructure/config/keys-ahead-of-their-consumer.md); no banned vague qualifier in any added line.
+Pages read: testing-quality-proving-a-critical-section-is-lock-protected, testing-quality-surviving-mutant-equivalence-triage, infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal, testing-quality-tests-that-cannot-fail, infrastructure-ci-cd-write-time-limit-guards, security-data-masking-verification, backend-java-kotlin-coerced-enum-defaults-in-kotlinx-serialization, testing-quality-write-path-assertions, backend-common-concurrency-distributed-locks, databases-transactions-isolation-level-selection, infrastructure-agent-orchestration-shared-run-state, frontend-design-custom-property-values-read-from-script, testing-e2e-dynamic-file-input-uploads-in-headless-chromium, testing-quality-spec-artifact-checks, testing-mocking-fake-intersection-observer-for-viewport-animations, qa-deliverables-quantitative-claims-in-a-published-document, qa-document-verification-model-coupled-guidance-aging-detector, qa-exploratory-exploratory-sessions, platforms-environment-unicode-text-matching, infrastructure-agent-orchestration-word-level-union-merge-reassembly, frontend-forms-dropzone-copy-without-drop-handlers, platforms-tools-hook-input-fields-from-the-reference, infrastructure-observability-suppression-state-and-delivery-failure, platforms-shells-heredoc-body-expansion-with-backtick-prose, platforms-processes-non-interactive-cli-invocation, platforms-toolchains-agent-files-written-by-next-dev, backend-common-orm-prisma-7-config-env-and-generated-client, backend-common-llm-context-window-budget, mobile-navigation-test-files-in-expo-router-app-directory, testing-mocking-call-counts-under-render-retries, frontend-performance-bundle-and-assets, frontend-design-html-in-canvas, qa-environments-element-crop-screenshots, frontend-design-responsive-layout, testing-mocking-what-to-mock, backend-common-llm-completion-response-validation, mobile-security-sensitive-data-on-device, infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session
+
+- **Merged:** `testing-quality-proving-a-critical-section-is-lock-protected` (trigger widened; step 6 with the measured table; 2 edge rows; 1 Instead-of row; 5 sources; `applies_to` + postgresql; `last_verified` 2026-10-11; 71 → 98 body lines). `testing-quality-surviving-mutant-equivalence-triage` (1 edge row + 1 source line; the page sits at 119 of 120 body lines, so the trigger text stayed unchanged and the index row carries the jsdom trigger).
+- **Conflicts:** none flagged. Step 2 of the lock page (an injected delay widens the window) is about in-memory read-modify-write; step 6 records that for a pooled database counter the delay did not substitute for seeding — condition-scoped, stated in step 6, not a contradiction.
+- **Related links both ways:** lock page ↔ isolation-level-selection; Korean dedupe ↔ unicode-text-matching and completion-response-validation; Next.js page ↔ prisma-7-config-env-and-generated-client; downscale ↔ dropzone-copy-without-drop-handlers; clipboard ↔ surviving-mutant-equivalence-triage. One way only: pull probe → tests-that-cannot-fail and what-to-mock, because open PR #268 rewrites both pages' `related:` lines.
+- **Checks on this branch:** `node scripts/wiki-structure-checks.js wiki` → `pages: 431, indexes: 13, findings: 0` (baseline on the untouched branch: 426 pages, 0 findings); `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (baseline 0); every inline `[page-id]` link in the changed wiki files resolves to one of the 431 page ids; every changed page is at or under 120 body lines. `scripts/wiki-lint-model-era.js` (report-only) lists the downscale page because its default current set is `opus-4`/`fable-5` and the page carries `verified_model: claude-opus-5-5`.
 
 ## Open-PR check
 
-26 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253–#260), listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`. For each head, the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for the candidate's concepts (removed or replaced assertions, re-running all mutants, reviewer/auditor fixes, "also assert"), and every added line mentioning mutants was read.
+Open heads listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`; each fetched and diffed against `origin/main` on `wiki/`, `INDEX.md` and `log.md`:
 
-| Candidate | Overlapping open PR | Verdict |
-|---|---|---|
-| 4614be6ce89cc5c5 | None carries it. #226 edits the same page for a different situation (a survivor reported inside a PASS audit); #258 (additive mutants vs presence checks) and #259 (schema key coverage) are different situations | **new** |
-| 7 × t216 plan-gaps | No open PR body mentions t216 (all 26 bodies searched) | **new** → local layer |
+| PR / head | What it changes | Overlap with this flush | Verdict |
+|---|---|---|---|
+| #268 `knowledge/choiyounggi-20261011-002014` | New `testing/mocking/proving-no-file-was-written`, `backend/common/integrations/cutting-scraped-text-at-a-noise-marker`; related lines of tests-that-cannot-fail and what-to-mock; a testing-index row after line 106 | Sibling of the pull probe (proving a negative), but a different mechanism (fs mocks vs stream pull timing); scraped-text noise cut is a different trigger from the Korean dedupe | new (all candidates) |
+| #266 `knowledge/choiyounggi-20261010-021455` | New `backend/node/async/request-body-reader-cancel` (cancel hangs when a deadline wins) and 3 other pages | Same object (a request body) but a different trigger — cancelling under a deadline vs probing whether a read happened | new |
+| #265 `knowledge/choiyounggi-20261009-222812` | Wrapped grep, review diff base, frontmatter quotes, GITHUB_TOKEN chaining, blind LLM judges; INDEX.md rows 15/17/19/22 | No trigger overlap | new |
 
-Merge check (`git merge-tree --write-tree`, this branch against each head): no wiki page conflicts, including #226, whose four hunks on the shared page were avoided. Every head conflicts on `log.md` and the older ones also on this report file — the same two files the open PRs already conflict on with each other (#260 vs #259 and #255 vs #254 checked).
+No fold and no drop. Avoided collisions: `INDEX.md` is unchanged (#265 rewrites the rows next to frontend and testing); the new testing-index row sits after `captured-call-arguments`, away from #268's insertion; no page edited here is edited by an open PR. Expected textual conflicts: `log.md`, where every flush appends at the end — keep both entries; and `.dev-loop/INGEST_REPORT.md`, which #265, #266 and #268 also rewrite — keep the report of the PR being merged. After #266 and #268 merge, link the pull-probe page with `backend-node-async-request-body-reader-cancel` and `testing-mocking-proving-no-file-was-written`.
 
 ## Routing decision
 
-| Candidate | Layer | Target | Action |
-|---|---|---|---|
-| 4614be6ce89cc5c5 | bundled | `testing/quality/surviving-mutant-equivalence-triage.md` | merged as step 6 |
-| 7 × t216 plan-gaps | local (linkly) | see Local-layer candidates | excluded from this PR, retired from the queue |
+| Candidate | Layer | Target |
+|---|---|---|
+| `01498dcaf854bc1a` | bundled | new `testing/mocking/pull-probe-for-an-unread-request-body` — the probe stream is a test double |
+| `1cca7f010c2aa001` | bundled | merged into `testing/quality/proving-a-critical-section-is-lock-protected` |
+| `d9102368d6df90ca` | bundled | edge row in `testing/quality/surviving-mutant-equivalence-triage`, plus a testing row in the clipboard page that links to it |
+| `ba95e8579459d1b4` | bundled | new `backend/common/llm/korean-summary-line-dedupe-by-bigram-overlap` — post-processing of model-written summaries |
+| `d1ca050e2a6d0dc0` | local + bundled | general part → new `frontend/browser-apis/copying-text-from-a-tap` |
+| `f7b02fb55879f640` | local + bundled | general part → new `frontend/rendering/request-time-data-in-a-nextjs-page` (server render mode belongs to rendering; the category so far held client render cost only) |
+| `12c2385107e9bc19` | local + bundled | general part → new `frontend/browser-apis/downscaling-a-photo-before-upload` |
+| `2fa46092b7786876`, `5312101035ca2b92`, `3a3a0047f000d3a0`, `ef33a29c5e6a7713` | local only | see Local-layer candidates |
 
-No new category: testing/quality already holds the mutation-testing pages, and the target page's trigger covers this situation.
+**New category `frontend/browser-apis`:** the existing frontend categories cover state, structure, rendering, data fetching, performance, forms (validation and upload controls), security (XSS-safe output), auth, agent interfaces, accessibility and design. None covers calling Web APIs whose availability depends on a secure context, user activation, or the engine's encoder support. Both pages in it are about that.
 
 ## Independent review
 
-A fresh-context adversarial reviewer (a separate subagent, read-only on this checkout) re-fetched both sources, rebuilt the reproduction from its description (same matrix observed on Node 26.7.0) and re-ran both lint scripts. Verdict: CHANGES_REQUESTED, resolved before this PR:
+Two fresh-context reviewers ran on the whole change set before the commit. The adversarial one re-ran every script, the Next.js builds and a Postgres batch, and checked every quote against the saved and the live sources; the format one checked AGENTS.md "Page format", the template, the indexes and this report. Both returned PASS-WITH-FIXES, and every finding was applied:
 
-| Finding | Resolution |
-|---|---|
-| Step 6 said a "Killed" result is reused "only while its killing test is unchanged", dropping conditions both tools state (Stryker: the culprit test still exists; PIT: the class under test is unchanged too) | Fixed: "With the source untouched, PIT and Stryker apply the same rule: they reuse a "Killed" result only while its killing test still exists unchanged." |
-| The log line understated #226's overlap — it also edits this page's related list, Edge table and Sources, so merging it would need reconciliation in four places | Checked and not reproduced: `git merge-tree --write-tree` of this branch with #226 conflicts only in `log.md` and this report file, and the merged page carries 0 conflict markers. The log line now names #226's other three hunks and records that they merge cleanly |
-| Gap: a flaky mutant reads as lost coverage in step 6's table | Added an edge row: when a previously killed mutant survives while the assertion diff shows nothing removed, re-run it against the pre-edit block first; surviving there too marks a flaky verdict (testing-flaky-diagnosing-flaky-tests) |
+| Reviewer | Finding | Resolution |
+|---|---|---|
+| Format (major) | Next.js page: the `io()` and `"use cache"` edge rows named no API and pulled against step 1 | Read the bundled `io.md` ("Prefer `io()` over `connection()`", added in 16.3.0), built 3 more variants (Suspense + `io()` → `◐ /`; a read that throws before any I/O → prerender error; a read that awaits I/O first → `◐ /`), rewrote step 1's Cache Components row around `io()` with `connection()` for request-bound rendering, and named `cacheLife` in the `"use cache"` row |
+| Adversarial | Lock page: the locked column's 20/20 and 10/10 had no per-run list | The sources state the batches ("all 20 runs of two batches", "all 10 runs of one batch") |
+| Adversarial | Korean page: the NFC/NFD number named no script, and 6 of 7 look-alike words were not in the saved dictionary pages | The source names the one-off `node -e` computation; 불꽃, 불가리아, 비용, 미래, 못자리, 어처구니없다 were each fetched from 표준국어대사전 (none negates) |
+| Adversarial | The QAGS quote reads "nn-gram" in ar5iv's HTML | A note on the rendering was added |
+| Both | "24 inline links" was not reproducible (the two reviewers counted 24 and 21 by different methods) | The count was dropped; the report states only that every link resolves |
+| Format | Pull probe: the "only the clone is read" row ended in a limit with no action | It now says to assert on the response and side effects |
+| Format | Clipboard: decision row 3 contradicted step 3 and predicted `false` | Step 3 names the rejection-callback path; row 3 handles both `true` and `false` |
+| Format | Korean: the step-4 example sat outside its own floor; `없다` "at the end of a word" still matched 어처구니없다 | The example now sits in the 3-bigram case that the first edge row covers; `없다` matches as a separate word or through the word list |
+| Format | Downscale: a hedge in a directive cell, a limits row with no action, an off-case computer-use row, `verified_model` key order | Rewritten, given an action, removed, and moved after `last_verified` |
+| Format | "When this applies" over 4 lines on five pages; "kill-test" wording | All five are 4 lines; "prove the test with mutants … and require red" |
+| Format | This section was pending; the `INGEST_REPORT.md` conflict was not named | Filled in; the Open-PR check names it |
+| Format (major, re-review of the fixes) | Next.js page: the `"use cache"` edge row did not say the cached read runs during `next build` | Built 2 more variants: a throwing `"use cache"` read failed the build with `cacheLife('hours')` and also with `cacheLife('seconds')`, the preset the docs exclude from prerenders. The row now says the read runs at build and needs the database, and cites 08-caching.md:439, use-cache.md:144 and cacheLife.md:266/270. These two builds were run by the coordinator only; no reviewer re-ran them |
+| Adversarial (major, re-review of the fixes) | Next.js page: step 1 made `await io()` unconditional, while io.md's "When you don't need `io()`" list covers an awaited async query in `<Suspense>`, and the no-`io()` build with an await before the check passed | Step 1 now calls for `io()` only when the read path can check the environment or throw before its first `await`; that build is a row in the measured table. The reviewer re-ran the three `<Suspense>` builds and got the same results |
 
-Kept: the reviewer's routing note (step 6's hygiene theme also sits near tests-that-cannot-fail) — the merge target stays, because this page's trigger already owns "a reviewer asks for a test to cover a specific surviving mutant" and the step-1 table now points into step 6.
+Before the fixes, `git status`, `git diff` and the new files were byte-identical to a backup taken before the reviewers started. After the fixes: structure check 0 findings, prohibitions 0 violations, every changed page at or under 120 body lines.
 
 ## Local-layer candidates
 
 | Row | Project | Target |
 |---|---|---|
-| Planning t216: deciding Where the check runs | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-spec-result-reads-input-check-site.md — run wiki-ingest inside that project |
-| Planning t216: deciding Which names an expect line asserts on | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-expect-result-candidate-names.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (a): the bare name is a respond field | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-field-condition.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (b): a same-name respond term wins | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-term-precedence.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (c): given did not set the input | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-given-setter-suppression.md — run wiki-ingest inside that project |
-| Planning t216: deciding Severity, registry position, hint | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-diagnostic-code-registration.md — run wiki-ingest inside that project |
-| Planning t216: deciding RFC | linkly (linkly-dartfish worktree) | wiki-local/qa/document-verification/t216-no-rfc-for-warning-only-code.md — run wiki-ingest inside that project |
+| `f7b02fb55879f640` Planning t5: How `/` reads the wedding | linkly-invitation | `wiki-local/frontend/rendering/t5-home-page-request-time-read.md` — run wiki-ingest inside that project |
+| `2fa46092b7786876` Planning t5: Toss transfer link | linkly-invitation | `wiki-local/frontend/browser-apis/t5-toss-transfer-link.md` — run wiki-ingest inside that project |
+| `d1ca050e2a6d0dc0` Planning t5: Copy routine | linkly-invitation | `wiki-local/frontend/browser-apis/t5-copy-text-routine.md` — run wiki-ingest inside that project |
+| `5312101035ca2b92` Planning t5: Parents line | linkly-invitation | `wiki-local/frontend/design/t5-parents-line.md` — run wiki-ingest inside that project |
+| `12c2385107e9bc19` Planning t7: Client downscale before upload | linkly-invitation | `wiki-local/frontend/browser-apis/t7-client-downscale.md` — run wiki-ingest inside that project |
+| `3a3a0047f000d3a0` Planning t7: Speech-bubble schedule | linkly-invitation | `wiki-local/frontend/rendering/t7-speech-bubble-scheduler.md` — run wiki-ingest inside that project |
+| `ef33a29c5e6a7713` Planning t7: Numbers for about 200 guests | linkly-invitation | `wiki-local/frontend/design/t7-plaza-guest-numbers.md` — run wiki-ingest inside that project |
 
-All seven are wiki-plan Phase B decisions naming linkly's own modules; they are excluded from this PR and retired from the queue.
+All seven name linkly-invitation's own files (`src/app/page.tsx`, `copy-text.ts`, `downscale.ts`, `bubbles.ts`); they are excluded from this PR and retired from the queue. For the project owner: the t7 decision's 1568 px long edge is resized again to 1270×952 for a 4:3 photo on standard-tier Claude models and uses 2352 of 4784 tokens on high-resolution models (see the downscale page).
+
+## Run notes
+
+- **Lock:** this headless run was spawned by `hooks/auto-flush.sh` with `DEV_LOOP_FLUSH_RUN_ID=20261011-022327-727` in its environment. The skill's step-0 snippet (`skills/knowledge-flush/SKILL.md:36`) generates a fresh id, so the first acquire was refused by the run's own parent (`held 20261011-022327-727 11s`). The run re-acquired under the inherited id (`already-owned`, the re-entrant path `scripts/flush-lock.sh` documents) — the failure `infrastructure-agent-orchestration-inherited-lock-ownership-in-a-spawned-session` describes. A background keeper refreshed the lock every 4 minutes while research ran.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

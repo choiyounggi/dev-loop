@@ -1,7 +1,10 @@
 # frontend — Domain Index
 
 Route here for: web UI code — component state placement, effect usage, rendering
-performance, component structure/composition, in-UI data fetching, async
+performance, build-time vs request-time rendering of a Next.js page that reads a
+database, browser APIs gated by secure context, user activation or engine
+support (clipboard writes, in-browser image decode/encode before upload),
+component structure/composition, in-UI data fetching, async
 loading/error/empty UI states, bundle/asset load performance, form validation UX,
 XSS-safe output, client-side auth token handling, interactive-element accessibility,
 any new or changed user action (this wiki's development standard adds a WebMCP tool per action), visual design decisions
@@ -33,6 +36,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [rerender-and-memoization](rendering/rerender-and-memoization.md) | UI is measurably sluggish on an interaction; deciding whether to add memo/useMemo/useCallback to new or reviewed code |
 | [long-lists](rendering/long-lists.md) | Rendering a list that can reach hundreds+ rows (feed, table, dropdown, log view); list scroll jank or slow mount; choosing row keys for reorderable/filterable lists |
+| [request-time-data-in-a-nextjs-page](rendering/request-time-data-in-a-nextjs-page.md) | A Next.js App Router page or layout reads a database or other non-`fetch` source (Prisma, `pg`) with no request-time API; `next build` fails with "Error occurred prerendering page" where `DATABASE_URL` is unset, or "Failed to collect configuration" from a module-scope check; the page serves data read at build time; choosing between `connection()`, `io()`, `dynamic = 'force-dynamic'`, `unstable_noStore` and the Cache Components model (`<Suspense>`, the `dynamic` export rejected) |
 
 ## data-fetching
 
@@ -56,6 +60,13 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [validation-timing](forms/validation-timing.md) | Implementing form validation and deciding when to validate / when errors show; reworking a form abandoned over premature, late, or unexplained errors; mapping server validation errors to fields |
 | [dropzone-copy-without-drop-handlers](forms/dropzone-copy-without-drop-handlers.md) | Building or restyling a file-upload control whose `<input type=file>` is visually hidden and whose label/wrapper is styled as a dropzone; deciding whether the copy may say "drag and drop"; adding real drag-and-drop to such a control; reviewing a restyle diff for an advertised affordance with no `dragover`/`drop` handlers |
+
+## browser-apis
+
+| Page | Load when |
+|------|-----------|
+| [copying-text-from-a-tap](browser-apis/copying-text-from-a-tap.md) | A button copies text (account number, invite code, link) with `navigator.clipboard.writeText`; the page is also served over http on a LAN IP or opened in an in-app browser; `navigator.clipboard` is undefined or the write rejects; choosing the `execCommand('copy')` textarea fallback and the copy-failed UI; awaiting something before the write; stubbing the clipboard under jsdom |
+| [downscaling-a-photo-before-upload](browser-apis/downscaling-a-photo-before-upload.md) | Resizing a phone photo in the browser before upload with `createImageBitmap` and a canvas; choosing the target size for a Claude vision request (standard vs high-resolution tier, edge and visual-token limits); EXIF orientation; `toBlob` returning PNG or `null`; Safari/iOS canvas size limits; HEIC files from an iPhone |
 
 ## security
 

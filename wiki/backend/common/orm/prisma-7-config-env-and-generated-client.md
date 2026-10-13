@@ -24,7 +24,7 @@ sources:
   - https://github.com/prisma/orm/blob/6.19.2/packages/internals/src/utils/loadEnvFile.ts
   - "Local reproduction 2026-10-08 (pnpm 10.30.2): `pnpm install --frozen-lockfile` ran the root package's own `postinstall`; `--lockfile-only` did not"
 last_verified: 2026-10-08
-related: [backend-node-runtime-env-files-with-process-loadenvfile, infrastructure-config-environment-config, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, security-secrets-secrets-in-code]
+related: [backend-node-runtime-env-files-with-process-loadenvfile, infrastructure-config-environment-config, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, security-secrets-secrets-in-code, frontend-rendering-request-time-data-in-a-nextjs-page]
 ---
 
 # Prisma 7 Config, Environment Loading and the Generated Client
