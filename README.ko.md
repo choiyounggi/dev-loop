@@ -209,20 +209,22 @@ mod 는 이 파일들을 읽어 코디네이터 자신의 Claude Code 세션 pan
   <img src="https://raw.githubusercontent.com/choiyounggi/groundwork/v0.3.1/plugins/session-progress/assets/screenshot-ko.png" alt="코디네이터 세션의 session-progress: 전체 48%, 워커 4개의 단계·게이트·경과 시간" width="560">
 </p>
 
-- **워커별:** 단계(`planning` → `implementing` → `done`, 그리고 `rework`·`failed`),
-  구현 중에는 통과한 게이트만큼 함께 움직이는 진행률, `게이트 1/2`, 두 번 이상
-  `rework` 로 돌아간 경우의 시도 횟수, 마지막 오류, 세션 이름, 마지막 보고 뒤
-  지난 시간. 워커 워크트리 안의 상태 사본이 더 새것이면 그것을 읽습니다
-  (`collect-status.sh` 와 같은 기준).
+- **워커별:** 실행이 기록한 단계(`pending` → `plan_ready` → `impl_done` → `done`,
+  그리고 `rework`·`failed`), 게이트 원장의 `게이트 n/m`, 두 번째 재작업부터 붙는
+  `시도 N`, 마지막 보고 뒤 지난 시간. 워커를 펼치면 세션 이름, 마지막 오류, 게이트
+  목록이 보입니다. 워커 워크트리 안의 상태 사본이 더 새것이면 그 사본을 씁니다
+  (`collect-status.sh` 와 같은 「더 새 `updatedAt`」 기준).
 - **전체:** 실행의 진행률과 워커 수. pane 이 닫혀 있고 실행이 진행 중이면 요약과
   워커 목록이 프롬프트 위에 대신 나타납니다.
-- **보이는 곳:** 코디네이터 체크아웃에서만 보입니다. `.worktrees/` 안의 워커 세션에는
-  나타나지 않습니다(`loop-gate.sh` 와 같은 구분). 읽기만 하고 실행에는 아무것도 쓰지
-  않습니다. Orca 와 raw tmux 어느 쪽에서도 똑같이 동작합니다 — 워커가 둘 다에서
-  `status-update.sh` 를 부르기 때문입니다.
+- **보이는 곳:** 코디네이터 체크아웃에서만 보이고, `.worktrees/` 안의 워커 세션에는
+  나타나지 않습니다. 읽기만 하고 실행에는 아무것도 쓰지 않습니다. 워커는 Orca 와
+  raw tmux 양쪽에서 `status-update.sh` 를 부르므로 어느 쪽에서도 동작합니다. 단 Orca
+  에서는 코디네이터의 `collect-status.sh` 가 워커 기록을 가져온 뒤부터 그 워커가
+  나타납니다.
 - **호환 유지:** groundwork 의 CI 가 고정된 dev-loop 릴리스의 `graph-add.sh`,
   `status-update.sh`, `gate-check.sh` 로 mod 의 픽스처를 다시 만들어 비교하므로,
-  상태 형식이 바뀌면 거기서 드러납니다.
+  파일 형식이 바뀌면 거기서 드러납니다(형식을 고정할 뿐, 실행이 어떤 단계를 쓰는지는
+  고정하지 않습니다).
 
 ```
 /plugin marketplace add choiyounggi/groundwork

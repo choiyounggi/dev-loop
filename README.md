@@ -222,21 +222,23 @@ without opening a terminal per worker or running `collect-status.sh`.
   <img src="https://raw.githubusercontent.com/choiyounggi/groundwork/v0.3.1/plugins/session-progress/assets/screenshot-en.png" alt="session-progress in a coordinator session: a dev-loop run with four workers at 48% overall, each with its phase, gates and age" width="560">
 </p>
 
-- **Per worker:** its phase (`planning` → `implementing` → `done`, with
-  `rework` and `failed`), a percent that also moves with the gates passed
-  while it builds, `gates 1/2`, the try number once a task has gone back to
-  `rework` more than once, its last error, its session, and how long ago it
-  last reported. It reads the worker's own status copy in its worktree when that
-  is newer, as `collect-status.sh` does.
+- **Per worker:** its phase as the run records it (`pending` → `plan_ready` →
+  `impl_done` → `done`, plus `rework` and `failed`), `gates n/m` from its
+  ledger, `try N` after a second rework, and how long ago it last reported;
+  expand a worker for its session, last error and gate list. When the worker's
+  own status copy in its worktree is newer, that copy wins (the same
+  newer-`updatedAt` rule `collect-status.sh` uses).
 - **Overall:** the run's percent and worker count; while the pane is closed and
   the run is active, the summary and its workers sit above the prompt instead.
-- **Where it shows:** only in the coordinator's checkout. Worker sessions inside
-  `.worktrees/` show nothing, the same split `loop-gate.sh` uses. It reads; it
-  never writes to the run. It works the same over Orca and raw tmux: workers
-  call `status-update.sh` on both.
+- **Where it shows:** only in the coordinator's checkout; worker sessions inside
+  `.worktrees/` show nothing. It reads; it never writes to the run. Workers call
+  `status-update.sh` on both Orca and raw tmux, so it works on either. On Orca a
+  worker first appears once the coordinator's `collect-status.sh` has picked up
+  its record.
 - **Kept compatible:** groundwork's CI regenerates the mod's fixture with this
   repo's own `graph-add.sh`, `status-update.sh` and `gate-check.sh` at the
-  pinned dev-loop release, so a status-format change shows up there.
+  pinned dev-loop release, so a change to the file format shows up there (it
+  pins the format, not which phases a run writes).
 
 ```
 /plugin marketplace add choiyounggi/groundwork
