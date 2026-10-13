@@ -16,7 +16,9 @@
 **멀티 세션 오케스트레이터**입니다 — 목표를 의존 그래프로 분해하고, ready-set
 스케줄러로 병렬 워커들을 스케줄하며, Orca CLI가 설치돼 있으면 **Orca
 네이티브**로 감독합니다(없으면 raw tmux).
-[Orca 연동](#orca-연동--스폰이-아니라-감독) 참고.
+[Orca 연동](#orca-연동--스폰이-아니라-감독) 참고. 실행 상황은
+[session-progress](#실행을-실시간으로-보기--session-progress-mod) mod 로 코디네이터
+세션 안에서 바로 볼 수 있습니다.
 
 **업스트림 loop-orchestrator에서 바뀐 단 한 가지:** 계획 단계가 더 이상
 선택적·플러거블 role이 아닙니다. **번들된 `wiki-plan` 방법론에 고정**되어 —
@@ -193,6 +195,43 @@ deny-net을 분류기는 볼 수 없기 때문입니다. 코디네이터 세션�
 스니펫을 보여줍니다. `safe-cleanup.sh`는 파괴적 verb가 일반 검토를 계속 받도록
 의도적으로 제외했고, 차단당한 코디네이터는 분류기를 우회하는 대신 멈추고 다시
 묻습니다.
+
+### 실행을 실시간으로 보기 — session-progress mod
+
+`orchestrate` 는 실행의 모든 상태를 평범한 파일로 남깁니다.
+`.orchestration/graph.json`, 워커마다 `.orchestration/status/<task>.json`, 그리고
+각 워커의 `.dev-loop/gates/<task>.md` 게이트 원장입니다. groundwork 마켓플레이스의
+**[session-progress](https://github.com/choiyounggi/groundwork/tree/main/plugins/session-progress)**
+mod 는 이 파일들을 읽어 코디네이터 자신의 Claude Code 세션 pane 에 실행 상황을
+그립니다. 워커마다 터미널을 열거나 `collect-status.sh` 를 돌리지 않아도 됩니다.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/choiyounggi/groundwork/v0.3.1/plugins/session-progress/assets/screenshot-ko.png" alt="코디네이터 세션의 session-progress: 전체 48%, 워커 4개의 단계·게이트·경과 시간" width="560">
+</p>
+
+- **워커별:** 단계(`planning` → `implementing` → `done`, 그리고 `rework`·`failed`),
+  구현 중에는 통과한 게이트만큼 함께 움직이는 진행률, `게이트 1/2`, 두 번 이상
+  `rework` 로 돌아간 경우의 시도 횟수, 마지막 오류, 세션 이름, 마지막 보고 뒤
+  지난 시간. 워커 워크트리 안의 상태 사본이 더 새것이면 그것을 읽습니다
+  (`collect-status.sh` 와 같은 기준).
+- **전체:** 실행의 진행률과 워커 수. pane 이 닫혀 있고 실행이 진행 중이면 요약과
+  워커 목록이 프롬프트 위에 대신 나타납니다.
+- **보이는 곳:** 코디네이터 체크아웃에서만 보입니다. `.worktrees/` 안의 워커 세션에는
+  나타나지 않습니다(`loop-gate.sh` 와 같은 구분). 읽기만 하고 실행에는 아무것도 쓰지
+  않습니다. Orca 와 raw tmux 어느 쪽에서도 똑같이 동작합니다 — 워커가 둘 다에서
+  `status-update.sh` 를 부르기 때문입니다.
+- **호환 유지:** groundwork 의 CI 가 고정된 dev-loop 릴리스의 `graph-add.sh`,
+  `status-update.sh`, `gate-check.sh` 로 mod 의 픽스처를 다시 만들어 비교하므로,
+  상태 형식이 바뀌면 거기서 드러납니다.
+
+```
+/plugin marketplace add choiyounggi/groundwork
+/plugin install session-progress@groundwork
+```
+
+*mod* 는 프로세스 안에서 도는 함수 훅으로 자기 pane 을 그릴 수 있는 Claude Code
+플러그인입니다. mod 를 지원하는 빌드가 필요합니다(2.1.296 에서 확인). 같은 pane 에
+지금 요청의 계획, 작업 이력, 컨텍스트 게이지도 함께 나옵니다.
 
 ---
 

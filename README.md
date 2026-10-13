@@ -16,7 +16,9 @@ And it scales past one session: the `orchestrate` skill is a **multi-session
 orchestrator** over the same loop — it decomposes a goal into a dependency
 graph, schedules parallel workers with a ready-set scheduler, and supervises
 them **Orca-natively** when the Orca CLI is installed (raw tmux otherwise).
-See [Orca integration](#orca-integration--supervision-not-just-spawning).
+See [Orca integration](#orca-integration--supervision-not-just-spawning), and
+watch a run live from the coordinator's own session with the
+[session-progress](#watch-a-run-live--the-session-progress-mod) mod.
 
 **The one change from upstream loop-orchestrator:** the plan step is no longer an
 optional, pluggable role. It is **fixed to the bundled `wiki-plan` methodology** —
@@ -205,6 +207,45 @@ backed-up, atomic; never silent), otherwise it shows you the snippet to paste
 yourself. `safe-cleanup.sh` is deliberately excluded so destructive verbs keep
 their normal review, and a blocked coordinator stops and re-asks rather than
 working around the classifier.
+
+### Watch a run live — the session-progress mod
+
+`orchestrate` already records everything a run does in plain files:
+`.orchestration/graph.json`, one `.orchestration/status/<task>.json` per worker,
+and each worker's `.dev-loop/gates/<task>.md` ledger. The
+**[session-progress](https://github.com/choiyounggi/groundwork/tree/main/plugins/session-progress)**
+mod (in the groundwork marketplace) reads those files and draws the run into a
+pane of the coordinator's own Claude Code session, so you check on the workers
+without opening a terminal per worker or running `collect-status.sh`.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/choiyounggi/groundwork/v0.3.1/plugins/session-progress/assets/screenshot-en.png" alt="session-progress in a coordinator session: a dev-loop run with four workers at 48% overall, each with its phase, gates and age" width="560">
+</p>
+
+- **Per worker:** its phase (`planning` → `implementing` → `done`, with
+  `rework` and `failed`), a percent that also moves with the gates passed
+  while it builds, `gates 1/2`, the try number once a task has gone back to
+  `rework` more than once, its last error, its session, and how long ago it
+  last reported. It reads the worker's own status copy in its worktree when that
+  is newer, as `collect-status.sh` does.
+- **Overall:** the run's percent and worker count; while the pane is closed and
+  the run is active, the summary and its workers sit above the prompt instead.
+- **Where it shows:** only in the coordinator's checkout. Worker sessions inside
+  `.worktrees/` show nothing, the same split `loop-gate.sh` uses. It reads; it
+  never writes to the run. It works the same over Orca and raw tmux: workers
+  call `status-update.sh` on both.
+- **Kept compatible:** groundwork's CI regenerates the mod's fixture with this
+  repo's own `graph-add.sh`, `status-update.sh` and `gate-check.sh` at the
+  pinned dev-loop release, so a status-format change shows up there.
+
+```
+/plugin marketplace add choiyounggi/groundwork
+/plugin install session-progress@groundwork
+```
+
+A *mod* is a Claude Code plugin of in-process function hooks that can draw its
+own pane; it needs a build with mod support (verified on 2.1.296). The same pane
+also shows the current request's plan, the task history and a context gauge.
 
 ---
 
