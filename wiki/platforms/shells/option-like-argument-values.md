@@ -8,7 +8,7 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html
   - https://man7.org/linux/man-pages/man1/tmux.1.html
 last_verified: 2026-08-05
-related: [platforms-shells-portable-shell-scripts, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-pane-delivery-confirmation]
+related: [platforms-shells-portable-shell-scripts, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-pane-delivery-confirmation, platforms-shells-echo-of-text-you-did-not-write]
 ---
 
 # Passing Text You Did Not Author as a Command Operand
