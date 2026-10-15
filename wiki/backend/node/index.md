@@ -30,3 +30,9 @@ own the Node mechanics.
 | [zod-4-checks-continue-after-a-failure](boundaries/zod-4-checks-continue-after-a-failure.md) | A zod 4 schema chains `.regex()`/`.min()`/other checks and then a `.refine()`/`.superRefine()` whose function throws or misjudges input the earlier check should have excluded (`BigInt`, `new URL`, `JSON.parse`) |
 | [runtime-validation](boundaries/runtime-validation.md) | Typing request bodies/query params/env vars/third-party responses/queue messages in a TypeScript service; an `as` cast on external data; runtime shape errors deep inside code that compiled fine; choosing where schema parse lives (handler, startup config, consumer) and where static types alone suffice |
 | [nestjs-multer-upload-errors](boundaries/nestjs-multer-upload-errors.md) | A NestJS `FileInterceptor`/`FilesInterceptor` route needs its own error body for upload failures (file too large, too many files, unexpected field, malformed multipart); a `@Catch(MulterError)` filter never runs; choosing which exception classes an upload filter catches and how to test it |
+
+## language
+
+| Page | Load when |
+|------|-----------|
+| [string-replace-replacement-patterns](language/string-replace-replacement-patterns.md) | A JS/TS script (codemod, fixture or snippet paster, template filler, build step) inserts text it did not write — SQL, shell, a fixture, user input, file contents — with `replace`/`replaceAll` or a regex; a pasted plpgsql `$$` body arrives as `$` (Postgres 42601 `syntax error at or near "$"`) or a `$&`/`` $` ``/`$'` in the inserted text turns into other text; choosing between a replacer function, `split/join`, and escaping `$` as `$$` |
