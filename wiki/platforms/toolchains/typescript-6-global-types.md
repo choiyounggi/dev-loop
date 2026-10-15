@@ -8,7 +8,7 @@ sources:
   - https://devblogs.microsoft.com/typescript/announcing-typescript-6-0/
   - https://www.typescriptlang.org/tsconfig/#types
 last_verified: 2026-10-01
-related: [platforms-toolchains-version-management, platforms-toolchains-flag-availability-at-the-execution-site, backend-node-boundaries-runtime-validation]
+related: [platforms-toolchains-version-management, platforms-toolchains-flag-availability-at-the-execution-site, backend-node-boundaries-runtime-validation, platforms-toolchains-tsx-top-level-await-without-type-module]
 ---
 
 # Global Type Packages After the TypeScript 6 `types` Default Change
