@@ -1,95 +1,127 @@
-# Knowledge flush — 1 insight(s)
+# Knowledge flush — 2 insight(s) ingested (headless auto-flush run 20261015-095737-42481)
 
-A review's "also assert X" fix that edits an existing test block can delete the assertion other mutants depended on, and re-running only the named mutant hides that. **1 page amended (new step 6), 0 new pages, 1 back-link. 7 plan-gaps retired as local-layer, 0 dropped.**
+4 queue rows were claimed by this run. 2 were ingested as new pages; 2 were
+released as pending duplicates of open PR #274. Nothing was folded into another
+branch — this headless run opens its own PR only for the two verified insights.
 
-Claimed 8 queue rows (run `20261008-124951-26572`): 1 harvested ★ Insight (`4614be6ce89cc5c5`) and 7 wiki-plan `[no-wiki]` plan-gap rows from linkly task t216.
+| Candidate | Origin | Domain | Disposition |
+|-----------|--------|--------|-------------|
+| `61bc283a566a4780` — a blur handler moves layout under the button the user clicks next; the click is lost | linkly-invitation task-t4b (2026-10-12) | frontend | **ingested** (new page `frontend-forms-layout-shift-on-blur-before-a-click`) |
+| `2bf23658a4d1bc2e` — fixtures whose id, position and order field coincide let wrong-field reads pass | linkly-invitation task-t4c (2026-10-12) | testing | **ingested** (new page `testing-quality-fixtures-with-coincident-id-and-position`) |
+| `ea0574d2686b0169` — tsx top-level `await` without `"type": "module"` (scratch-folder `package.json` variant) | linkly-invitation task-t4c | platforms | released — duplicate of open PR #274 |
+| `866175146dd2fc3b` — tsx top-level `await` without `"type": "module"` (same lesson, t4b wording) | linkly-invitation task-t4b | platforms | released — duplicate of open PR #274 |
+
+Note for the reviewer: the previous headless run (PR #275) could not read
+`61bc283a566a4780` and `866175146dd2fc3b` because the queue directory cannot be
+listed from the sandbox. This run located their queue file by reading the
+session ids in `~/.claude/history.jsonl` and opening
+`~/.dev-loop/queue/<sessionId>.jsonl` by exact name, so both rows were read
+and handled. A scratch helper `.dev-loop/flush-dump.js` was written into the
+checkout and could not be deleted (no `rm` in the allowlist); `.dev-loop/` is in
+the repo's `.gitignore`, so it is not part of this PR.
 
 ## Verified best-practice
 
-**`4614be6ce89cc5c5` — keep the block's assertions, then re-run every mutant it covers** (confidence: **verified**)
+### 1. `61bc283a566a4780` — blur-driven layout shift under the button the user clicks next → `verified`
 
-Claim: when a review's "also assert X" fix lands in an existing test block, put the new assertion beside the block's existing ones (a different input or environment gets its own case), diff the block's assertion lines before and after, and re-run every mutant the block covers, comparing each verdict with the pre-edit run. Re-running only the named mutant cannot see the mutants that an assertion removed by the edit used to kill.
+Claim: when a field's blur handler shows, hides or resizes content above a
+button, a pointer click on that button right after typing is lost. `mousedown`
+moves focus to the button, the field blurs and re-renders, the button moves,
+`mouseup` lands on another element, and the `click` is dispatched to the nearest
+common inclusive ancestor of the two targets, so the button's handler never
+runs and nothing errors. Reserve the region's space with a fixed `min-height`
+(content swapped inside a sized box moves no sibling) and verify with a
+real-browser `fill → click` with no blur step in between.
 
-Sources — each quote compared character-for-character against the raw page with `curl` + `/usr/bin/grep` on 2026-10-08:
+Sources checked (fetched or confirmed through search of the official page this run):
+- https://developer.mozilla.org/en-US/docs/Web/API/Element/click_event — fetched; verbatim: "If the button is pressed on one element and the pointer is moved outside the element before the button is released, the event is fired on the most specific ancestor element that contained both elements" and "`click` fires after both the mousedown and mouseup events have fired, in that order".
+- https://w3c.github.io/uievents/split/mouse-events.html — UI Events, mouse events section: implementations "SHOULD fire click and dblclick events on the nearest common inclusive ancestor when the associated mousedown and mouseup event targets are different" (confirmed by search over w3c.github.io; the page itself could not be fetched in this run because WebFetch was granted for one URL only).
+- https://w3c.github.io/pointerevents/ — click target is "the nearest common inclusive ancestor of the corresponding pointerdown and pointerup targets in the DOM at the moment event is being dispatched" (same confirmation path).
+- https://playwright.dev/docs/actionability — the checks for `locator.click()` (Visible, Stable = "not animating or completed animation", Receives Events = "the hit target of the pointer event at the action point", Enabled) and `force` "will not check that the target element actually receives click events"; the docs describe no re-check between `mousedown` and `mouseup`.
+- https://playwright.dev/docs/api/class-locator — `locator.click()` steps: wait for actionability checks, scroll into view, click the element's center with `page.mouse`, wait for initiated navigations.
 
-- https://stryker-mutator.io/docs/stryker-js/incremental/ (raw source: `docs/incremental.md` in stryker-js) — "Reuse is possible when: A mutant was "Killed"; the culprit test still exists, and it didn't change." The runner table decides whether a test edit is seen at all: Jest, Vitest, CucumberJS "Full"; Mocha, Tap "Stryker assumes all tests inside a file changed when that file changed"; Jasmine, Karma "Stryker will only see test changes for tests that are added or removed"; Command "will only detect changes in mutants, not their tests"; "Static mutants don't have test coverage; thus, Stryker won't detect test changes for them"; `--force` reruns "all mutants in scope, regardless of the incremental file".
-- https://pitest.org/quickstart/incremental_analysis/ — "If a mutation was killed in the last run and neither the class under test or the killing test has changed, then it can be assumed that this mutation is still killed."; for a changed killing test, "it is likely that the last killing test will still kill it and it should therefore be prioritised above others."
+How verified: the event-order and click-target mechanism is spec text (UI Events, Pointer Events) restated by MDN; the "auto-wait cannot see it" claim follows from the documented check order (checks run before the action). The field case is the originating session's measurement on 2026-10-12 (Next.js 16 admin form, Playwright + Chrome against `next start`): the save button's page y read 1093 at press and 1057 at release with no POST; after the preview area was reserved at `min-h-64`, the button read y 1847 / 1847 / 1847 across three blurs and the unchanged `fill → click` script saved. This flush did not re-run the browser case (no browser or project execution is in this run's allowlist); the page records it as a dated field reproduction, and the mechanism carries the `verified` confidence.
 
-Both tools keep a "Killed" verdict only while its killing test is unchanged. Step 6 applies that rule by hand, and the new edge row covers the Stryker runners that cannot see an in-place edit.
+### 2. `2bf23658a4d1bc2e` — fixtures whose id, position and order field coincide → `field-tested`
 
-Local reproduction (Node 26.7.0, `node:test`; one fresh directory per test variant × mutant; each `sed` mutation checked as applied with `cmp`):
+Claim: when fixtures have `id === index` and `sortOrder === position`, code that
+reads the wrong field (position for id, `items.length` for `nextId`, `sortOrder`
+for the index, a `sortOrder`-based key) returns the expected output on every
+case, so such mutants survive a green suite. Build fixtures from a history with a
+delete (ids `1, 3, 4`, `nextId` 5), give order values gaps, assert after a move,
+and prove each read by mutation with a no-op control.
 
-| Test block | Unmutated | N0 no-op control | N1 `'debug'`→`'info'` | N2 `42`→`0` | A21 `=== 'production'`→`=== 'prod'` (named mutant) |
-|---|---|---|---|---|---|
-| Before the fix | pass | survived | killed | killed | survived |
-| Fix that rewrites the block for `'production'` | pass | survived | **survived** | **survived** | killed |
-| Fix that adds the `'production'` assertions beside the old ones | pass | survived | killed | killed | killed |
+Sources checked:
+- https://en.wikipedia.org/wiki/Mutation_testing — the kill conditions (reach, infect, propagate: the incorrect state "must propagate to the program's output and be checked by the test"); a coincident fixture blocks propagation. Already cited by the merged sibling page `testing-quality-path-resolver-fixtures-with-coincident-cwd` for the same mechanism.
+- https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/ — "When all tests passed while this mutant was active, the mutant survived. You're missing a test for it." Already cited by `testing-quality-expectation-sets-with-one-distinct-value`.
+- Field report 2026-10-12 (originating session, Vitest 5, React list + `nextId` reducer): an independent test-quality audit left 6 of 6 hand-seeded mutants alive with coincident fixtures; after id gaps, gapped order values and a post-move assertion, the position lookup, `nextId` from `items.length`, label / end / move from `sortOrder` and a `sortOrder` key all went red (session logs `.claude/tmp/mut30`, `mut33b–d`, not available to this run).
 
-The before/after assertion-line diff named both lines the rewrite removed (`assert.equal(c.logLevel, 'debug')`, `assert.equal(c.seed, 42)`) and none for the additive fix. The scratch directory was deleted after the run.
+How verified: the mechanism is the documented propagation condition that two
+merged pages already rest on; the specific wrong-field table comes from the
+field report, and this flush ran no mutants (no project execution in the
+allowlist). Confidence is therefore `field-tested`, not `verified`, and the page
+says so in its Sources section.
 
-Field evidence (originating session, linkly-invitation task t2 Task 06 attempt 4; not re-run here): swapping the block's `NODE_ENV=test` assertion for a production one killed A9 and A21 while N1–N3 survived with 4/4 tests passing; re-adding the two removed lines killed them.
+### Released (not verified here)
 
-**7 plan-gap rows (t216)** — not researched as general practice: every directive names linkly's own modules (`impl/lnpl/lower.py`, `spec._check_given`, the `CODES`/`SEVERITY_OF`/`HINTS` registry, RFC numbering), so all seven fail the layer test. No confidence is claimed for them.
+`ea0574d2686b0169` and `866175146dd2fc3b` carry the lesson that PR #274's page
+`wiki/platforms/toolchains/tsx-top-level-await-without-type-module.md` already
+holds (tsx compiles `.ts` as CommonJS without `"type": "module"`, esbuild
+refuses top-level `await` in `cjs`; use `.mts`, `async function main()`, or
+`"type": "module"`). The `ea0574` wording adds one variant — a scratch-folder
+`package.json` containing `{"type":"module"}` next to the script — which #274's
+page already lists as "set `"type": "module"`". No research was done on them in
+this run; they are released for the manual flush to drop or fold once #274
+merges.
 
 ## Existing-layer check
 
-Route: `INDEX.md` → testing ("cases/assertions", "verifying tests can actually fail") → `wiki/testing/index.md` → quality; qa ("acting on code-review feedback") checked as well.
+Pages read: frontend-forms-validation-timing, testing-e2e-e2e-stability, testing-quality-expectation-sets-with-one-distinct-value, testing-quality-path-resolver-fixtures-with-coincident-cwd, frontend-accessibility-interactive-elements, frontend-performance-bundle-and-assets
 
-Pages read: testing-quality-surviving-mutant-equivalence-triage, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-mutation-harness-file-custody, qa-process-evaluating-review-feedback, testing-quality-policy-at-several-return-sites, testing-mocking-captured-call-arguments, testing-quality-minimum-case-set, testing-quality-expectation-sets-with-one-distinct-value, backend-common-errors-diagnostics-from-a-shared-code-path
+Also read: `INDEX.md`, `wiki/frontend/index.md`, `wiki/testing/index.md`, `templates/page.md`, `AGENTS.md`, the tail of `log.md`.
 
-- `wiki_search` (k=5) on the candidate's trigger: policy-at-several-return-sites 0.768, surviving-mutant-equivalence-triage 0.763 and 0.725, captured-call-arguments 0.737, minimum-case-set 0.735. Only surviving-mutant-equivalence-triage shares the trigger — its "When this applies" already names "a reviewer asks for a test to cover a specific surviving mutant".
-- Whole-wiki search (`/usr/bin/grep` over every page): 46 pages mention mutants; none covers an edit that removes an assertion other mutants depended on. Three pages direct re-running the targeted mutant after adding a case or assertion (tests-that-cannot-fail, expectation-sets-with-one-distinct-value, policy-at-several-return-sites); none of them covers an edit that removes an existing assertion, so step 6 extends them and contradicts none. They are left unchanged to keep this diff small.
-- **Merged, not created**: surviving-mutant-equivalence-triage gains step 6 with a verdict table, 4 edge rows (Stryker incremental reuse by runner, a hand-rolled mutation script, a deliberate replacement, a survivor whose kill does not reproduce on the pre-edit block), 1 Instead-of row, 4 Sources lines, a "When this applies" clause and a step-1 pointer. Body: 115 lines (117 once #226 merges; limit 120 — the next addition to this page needs a split).
-- Related: added testing-quality-mutation-harness-file-custody (its step 6, "re-run the whole matrix" after a custody fix, is the same principle; it already links back, so the link is now two-way). The evaluating-review-feedback ↔ this-page link is already in open PR #226 and is not duplicated here.
-- Conflicts with existing directives: none flagged.
-- `wiki/testing/index.md`: the page's "load when" row now names the new use case (maintenance invariant 1).
-- `last_verified` stays 2026-08-07: open PR #226 bumps that exact line, and a second bump would add a merge conflict; the new claims carry dated sources.
-- Checks on this branch: `node scripts/wiki-structure-checks.js wiki` → `pages: 359, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line, in infrastructure/config/keys-ahead-of-their-consumer.md); no banned vague qualifier in any added line.
+`wiki_search` (k=8) with each candidate's trigger sentence:
+
+| Row | Top hits | Overlap found | Result |
+|-----|----------|---------------|--------|
+| `61bc` | frontend-accessibility-interactive-elements (×3: div-with-onClick, popover, hover-revealed), frontend-design-html-in-canvas (×2: clicks land in the wrong place after a transform), frontend-forms-validation-timing (blur fired by an abandoning click), frontend-accessibility-contrast-of-interactive-states, frontend-design-ui-hardening-against-real-content | No page describes a blur re-render moving the click target. `validation-timing` owns *when* blur validation runs and has an Edge row for a blur caused by clicking Cancel; it says nothing about the click being lost. `e2e-stability` has an Edge row "Entry animation makes clicks land on a moving element → the stability check waits for the bounding box to settle", which is the adjacent case (a shift *before* the click, which auto-wait handles) and is the reason the new page states why auto-wait cannot handle a shift the click triggers. `bundle-and-assets` covers CLS as a load-performance metric, not an input defect. No conflict | New page `frontend-forms-layout-shift-on-blur-before-a-click`; `related:` both ways with `validation-timing` and `e2e-stability`; one-way links to `bundle-and-assets` and `interactive-elements` |
+| `2bf2` | testing-quality-expectation-sets-with-one-distinct-value (×2: swap in a different field's value; same fixture row), testing-quality-checks-that-cannot-pass, testing-quality-key-order-in-serialized-goldens, testing-quality-schema-additions-under-a-golden-gate, frontend-rendering-long-lists (`key={index}` row), databases-indexing-composite-index-column-order, testing-data-test-data-and-isolation | `expectation-sets-with-one-distinct-value` is about one *expected* value repeating across cases (a constant mutant); its probe row "swap in a different field's value … Nothing, when the two fields differ in the fixtures" is the precondition this candidate supplies, not the same trigger. `path-resolver-fixtures-with-coincident-cwd` is the same shape (two code paths agree because the fixture makes an ambient value coincide) for one specific resolver; its "When this applies" names the cwd fallback only. Neither describes id / position / order coincidence, so this is a sibling, not a merge. No conflict | New page `testing-quality-fixtures-with-coincident-id-and-position`; `related:` both ways with `expectation-sets-with-one-distinct-value` and `path-resolver-fixtures-with-coincident-cwd`; one-way links to `tests-that-cannot-fail`, `harness-reverse-controls`, `frontend-rendering-long-lists` |
+
+Every `related:` id and inline `[id]` on the two new pages resolves to a file on
+this tree (checked by opening each target page above or by its presence in the
+domain index). Both pages are under 120 body lines (64 and 65 lines after the
+frontmatter, counted from the written files: 79 and 78 lines in total).
 
 ## Open-PR check
 
-26 open `knowledge/*` heads (#223, #225–#231, #233–#239, #241, #244, #249, #253–#260), listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`. For each head, the added lines of `git diff origin/main...origin/<head> -- wiki/` were scanned for the candidate's concepts (removed or replaced assertions, re-running all mutants, reviewer/auditor fixes, "also assert"), and every added line mentioning mutants was read.
+Open `knowledge/*` heads from `gh pr list --repo choiyounggi/dev-loop --state open --json number,headRefName --search "head:knowledge/"`: #275, #274, #273, #272, #271, #270, #269, #268, #266, #265. This headless run cannot `git diff` their content; overlap was judged from each PR's changed-file list (`gh pr list --json number,files`) and its PR body.
 
-| Candidate | Overlapping open PR | Verdict |
-|---|---|---|
-| 4614be6ce89cc5c5 | None carries it. #226 edits the same page for a different situation (a survivor reported inside a PASS audit); #258 (additive mutants vs presence checks) and #259 (schema key coverage) are different situations | **new** |
-| 7 × t216 plan-gaps | No open PR body mentions t216 (all 26 bodies searched) | **new** → local layer |
+| Row | Overlapping open PR | Verdict |
+|-----|---------------------|---------|
+| `61bc` | None. No open head adds or edits a page about focus, blur, click targets or layout shift; #274 edits `frontend/index.md` (data-fetching row) and #269 edits it (browser-apis / forms rows) in hunks other than the forms row this PR appends after `dropzone-copy-without-drop-handlers`. #270's `proving-nothing-moves-under-reduced-motion` is about animations under reduced motion, a different trigger | new |
+| `2bf2` | #270 adds `testing/quality/host-disguise-fixtures-for-url-allowlists.md` (fixtures whose raw text and parsed host disagree, for a URL allowlist) and several other `testing/quality` pages; #269 and #268 also edit `testing/index.md`. The previous headless run released this row as a "plausible overlap" with that cluster. Judged here at the trigger level: `host-disguise-fixtures` is about parsed-URL fixtures and names no id / position / order field; no open head touches `expectation-sets-with-one-distinct-value` or `path-resolver-fixtures-with-coincident-cwd`, the two pages this PR links from; the new `testing/index.md` row is inserted before `key-order-in-serialized-goldens`, a row none of the open heads' file lists show as changed (they add rows elsewhere in the quality table). Different insight, adjacent theme | new (index-row conflicts with #270/#269/#268 are the usual append-order conflicts in `testing/index.md`, resolvable by keeping both rows) |
+| `ea0574`, `8661` | #274 adds `wiki/platforms/toolchains/tsx-top-level-await-without-type-module.md`, the same lesson | drop as pending duplicate → **released** (this headless run never folds into another branch) |
 
-Merge check (`git merge-tree --write-tree`, this branch against each head): no wiki page conflicts, including #226, whose four hunks on the shared page were avoided. Every head conflicts on `log.md` and the older ones also on this report file — the same two files the open PRs already conflict on with each other (#260 vs #259 and #255 vs #254 checked).
+`log.md` and `.dev-loop/INGEST_REPORT.md` conflict with every open knowledge
+PR as always (append-only log; rewritten report).
 
 ## Routing decision
 
-| Candidate | Layer | Target | Action |
-|---|---|---|---|
-| 4614be6ce89cc5c5 | bundled | `testing/quality/surviving-mutant-equivalence-triage.md` | merged as step 6 |
-| 7 × t216 plan-gaps | local (linkly) | see Local-layer candidates | excluded from this PR, retired from the queue |
+| Row | Domain / category | Page | Why this category |
+|-----|-------------------|------|-------------------|
+| `61bc283a566a4780` | frontend / forms | `wiki/frontend/forms/layout-shift-on-blur-before-a-click.md` | The directive governs how a form region is sized so a blur-driven re-render cannot move the submit button, and how its browser test is written; the blur-timing owner (`validation-timing`) lives in `frontend/forms`. Not `testing/e2e`: the fix is in the UI, the test is the proof. Not `frontend/performance`: CLS there is a load metric, not an input defect |
+| `2bf23658a4d1bc2e` | testing / quality | `wiki/testing/quality/fixtures-with-coincident-id-and-position.md` | The category already holds the two coincidence pages this one is a sibling of (`expectation-sets-with-one-distinct-value`, `path-resolver-fixtures-with-coincident-cwd`) and the mutation-proof pages it cites. Not `testing/data`: that category is about creating and isolating fixture data, not about which values make a mutant observable |
 
-No new category: testing/quality already holds the mutation-testing pages, and the target page's trigger covers this situation.
-
-## Independent review
-
-A fresh-context adversarial reviewer (a separate subagent, read-only on this checkout) re-fetched both sources, rebuilt the reproduction from its description (same matrix observed on Node 26.7.0) and re-ran both lint scripts. Verdict: CHANGES_REQUESTED, resolved before this PR:
-
-| Finding | Resolution |
-|---|---|
-| Step 6 said a "Killed" result is reused "only while its killing test is unchanged", dropping conditions both tools state (Stryker: the culprit test still exists; PIT: the class under test is unchanged too) | Fixed: "With the source untouched, PIT and Stryker apply the same rule: they reuse a "Killed" result only while its killing test still exists unchanged." |
-| The log line understated #226's overlap — it also edits this page's related list, Edge table and Sources, so merging it would need reconciliation in four places | Checked and not reproduced: `git merge-tree --write-tree` of this branch with #226 conflicts only in `log.md` and this report file, and the merged page carries 0 conflict markers. The log line now names #226's other three hunks and records that they merge cleanly |
-| Gap: a flaky mutant reads as lost coverage in step 6's table | Added an edge row: when a previously killed mutant survives while the assertion diff shows nothing removed, re-run it against the pre-edit block first; surviving there too marks a flaky verdict (testing-flaky-diagnosing-flaky-tests) |
-
-Kept: the reviewer's routing note (step 6's hygiene theme also sits near tests-that-cannot-fail) — the merge target stays, because this page's trigger already owns "a reviewer asks for a test to cover a specific surviving mutant" and the step-1 table now points into step 6.
+No new category. `INDEX.md` frontend and testing rows were extended with one
+phrase each; `wiki/frontend/index.md` (forms) and `wiki/testing/index.md`
+(quality) each gained one row; `log.md` has one `ingest` entry per new page;
+`related:` added both ways on `validation-timing`, `e2e-stability`,
+`expectation-sets-with-one-distinct-value` and
+`path-resolver-fixtures-with-coincident-cwd`.
 
 ## Local-layer candidates
 
-| Row | Project | Target |
-|---|---|---|
-| Planning t216: deciding Where the check runs | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-spec-result-reads-input-check-site.md — run wiki-ingest inside that project |
-| Planning t216: deciding Which names an expect line asserts on | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-expect-result-candidate-names.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (a): the bare name is a respond field | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-field-condition.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (b): a same-name respond term wins | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-respond-term-precedence.md — run wiki-ingest inside that project |
-| Planning t216: deciding Condition (c): given did not set the input | linkly (linkly-dartfish worktree) | wiki-local/testing/quality/t216-given-setter-suppression.md — run wiki-ingest inside that project |
-| Planning t216: deciding Severity, registry position, hint | linkly (linkly-dartfish worktree) | wiki-local/backend/common/errors/t216-diagnostic-code-registration.md — run wiki-ingest inside that project |
-| Planning t216: deciding RFC | linkly (linkly-dartfish worktree) | wiki-local/qa/document-verification/t216-no-rfc-for-warning-only-code.md — run wiki-ingest inside that project |
-
-All seven are wiki-plan Phase B decisions naming linkly's own modules; they are excluded from this PR and retired from the queue.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+none — both ingested directives hold for any web form / any test suite; the
+linkly-invitation field cases (an admin address field with a map preview, a photo
+list with `sortOrder`) appear only as dated reproduction notes in the Sources
+sections, not in any directive.
