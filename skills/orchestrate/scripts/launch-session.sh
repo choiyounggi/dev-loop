@@ -25,8 +25,9 @@
 #   exit 0    launched and the prompt is confirmed submitted
 #   exit 1    wrong argument count
 #   exit 2    invalid permission mode, invalid worker model or effort, invalid session
-#             name, a worktree argument that is not a git work-tree root, or
-#             an LO_STATUS_DIR/LO_TASK_ID pair with exactly one set (issue #123)
+#             name, a worktree argument that is not a git work-tree root,
+#             an LO_STATUS_DIR/LO_TASK_ID pair with exactly one set (issue #123),
+#             or an LO_TRUST_KEYS key outside the allowlist (#290)
 #   exit 4    the REPL never became ready (prints the last screen)
 #   exit 5    the prompt was sent but submission could NOT be confirmed — the
 #             session is alive and may hold an unsubmitted prompt (prints the
@@ -45,6 +46,12 @@
 #   LO_READY_TIMEOUT / LO_READY_INTERVAL   REPL-ready budget (default 60 / 2);
 #                      attempts = floor(timeout/interval), minimum 1
 #   LO_READY_EXTRA / LO_TRUST_EXTRA        extra screen-match substrings
+#   LO_TRUST_KEYS      keys sent when LO_TRUST_EXTRA matches: space-separated,
+#                      each one of Up Down Left Right Enter Escape Tab Space 0-9
+#                      y n (send-prompt.sh `keys` allowlist); unset, empty or
+#                      blank = Enter. Keep Enter only for a screen whose
+#                      highlighted default is safe. A key outside the allowlist
+#                      exits 2 before any tmux call (#290).
 #   LO_SUBMIT_TIMEOUT / LO_SUBMIT_INTERVAL submission-confirm budget (default
 #                      20 / 2); attempts = floor(timeout/interval), minimum 1
 #   LO_STATUS_DIR / LO_TASK_ID  when BOTH are set, pre-seed the status record
@@ -109,6 +116,22 @@ case "$effort" in
   ''|low|medium|high|xhigh|max) : ;;
   *) echo "launch-session: invalid effort '$effort'" >&2; exit 2 ;;
 esac
+
+# LO_TRUST_KEYS (#290): the keys sent when LO_TRUST_EXTRA matches. Same
+# allowlist as send-prompt.sh `keys`; every token is checked here, before the
+# dry-run exit and before any tmux call. `set -f` keeps a `*` or `?` token from
+# expanding to file names. trust_keys starts empty so an inherited environment
+# variable of that name cannot skip the check or the Enter default.
+trust_keys=""
+set -f
+for k in ${LO_TRUST_KEYS:-}; do
+  case "$k" in
+    Up|Down|Left|Right|Enter|Escape|Tab|Space|0|1|2|3|4|5|6|7|8|9|y|n) trust_keys="$trust_keys $k" ;;
+    *) echo "launch-session: LO_TRUST_KEYS key '$k' not in allowlist (Up Down Left Right Enter Escape Tab Space 0-9 y n)" >&2; exit 2 ;;
+  esac
+done
+set +f
+[ -n "$trust_keys" ] || trust_keys="Enter"
 
 # Resolve-only mode: print the effective session name and exit before touching
 # tmux/claude. Lets the orchestrator (and tests) learn the exact name.
@@ -230,11 +253,24 @@ launchcmd="$launchcmd && ${effort_env}\"$CLAUDE\" --permission-mode $perm"
 # tunable via env — adapt to a new CLI without editing this file:
 #   LO_READY_TIMEOUT / LO_READY_INTERVAL  (seconds; default 60 / 2)
 #   LO_READY_EXTRA   an extra substring that means "REPL is ready"
-#   LO_TRUST_EXTRA   an extra substring of a trust prompt to confirm with Enter
+#   LO_TRUST_EXTRA   an extra substring of a trust prompt; when it matches, the
+#                    keys in LO_TRUST_KEYS are sent (default Enter — safe only
+#                    on a screen whose highlighted default is safe)
 ready_timeout="${LO_READY_TIMEOUT:-60}"; ready_interval="${LO_READY_INTERVAL:-2}"
 [ "$ready_timeout" -ge 1 ] 2>/dev/null || ready_timeout=60
 [ "$ready_interval" -ge 1 ] 2>/dev/null || ready_interval=2
 iters=$(( ready_timeout / ready_interval )); [ "$iters" -ge 1 ] || iters=1
+
+# Send the validated LO_TRUST_KEYS (default Enter) in the order given, one
+# send-keys call per key, 1 s apart like the Down/Enter arms below.
+send_trust_keys() {
+  tk_first=1
+  for k in $trust_keys; do
+    [ "$tk_first" -eq 1 ] || sleep 1
+    tk_first=0
+    "$TMUX_BIN" send-keys -t "$session" "$k"
+  done
+}
 
 ready=0; i=0; pane=""
 while [ "$i" -lt "$iters" ]; do
@@ -256,7 +292,7 @@ while [ "$i" -lt "$iters" ]; do
       "$TMUX_BIN" send-keys -t "$session" Enter ;;
     *)
       if [ -n "${LO_TRUST_EXTRA:-}" ] && printf '%s' "$pane" | grep -qF "$LO_TRUST_EXTRA"; then
-        "$TMUX_BIN" send-keys -t "$session" Enter
+        send_trust_keys
       fi ;;
   esac
   i=$((i+1))

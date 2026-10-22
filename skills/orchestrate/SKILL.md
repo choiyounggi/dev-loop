@@ -605,8 +605,14 @@ see exit 8 below. `ready-set.sh` reads the
 status dir directly and does not poll, so before every `ready-set.sh` round also
 run `scripts/collect-status.sh .orchestration/graph.json .orchestration/status
 .worktrees` yourself (Phase 3 step 1). Trust-screen wording drifts between CLI releases —
-if a launch hangs, set `LO_READY_EXTRA` / `LO_TRUST_EXTRA` (substrings) or
-`LO_READY_TIMEOUT`. `LO_PASTED_TAIL_LINES` (default 40) is `send-prompt.sh`'s
+if a launch hangs, set `LO_READY_EXTRA` (substring) or `LO_READY_TIMEOUT`; for a
+screen that needs an answer, set `LO_TRUST_EXTRA` (a substring of that screen) and
+`LO_TRUST_KEYS` (the keys sent when it matches, space-separated, from `Up Down Left
+Right Enter Escape Tab Space 0-9 y n`; default `Enter`; any other key is refused with
+exit 2). Keep the default `Enter` only for a screen whose highlighted default is safe:
+on a screen highlighting "No, exit" or an option that changes a user setting, Enter
+quits the worker or picks that option, so set `LO_TRUST_KEYS` to the keys that reach
+the safe option. `LO_PASTED_TAIL_LINES` (default 40) is `send-prompt.sh`'s
 fallback pasted-marker window, scanned only when it cannot locate the input box
 in the pane capture — raise it if a CLI release changes the input-box chrome so
 the box stops being locatable. `send-prompt.sh send` pastes any payload of
