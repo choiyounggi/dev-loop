@@ -341,8 +341,8 @@ from the graph and not confirmed is recorded on the blackboard as
 
 ```json
 { "tasks": [
-    { "id": "t1", "deps": [],     "files": ["src/auth/**"], "outputs": ["AuthToken"], "risk": "R1", "risk_basis": ["none"] },
-    { "id": "t3", "deps": ["t1"], "files": ["src/api/**"],  "consumes": ["AuthToken"], "risk": "R3", "risk_basis": ["path:auth", "shared-surface"] }
+    { "id": "t1", "deps": [],     "files": ["src/auth/token.ts"], "outputs": ["AuthToken"], "risk": "R3", "risk_basis": ["path:auth", "shared-surface"] },
+    { "id": "t3", "deps": ["t1"], "files": ["src/api/client.ts", "src/api/routes.ts", "src/api/errors.ts"], "consumes": ["AuthToken"], "risk": "R1", "risk_basis": ["files:3"] }
 ] }
 ```
 

@@ -363,6 +363,33 @@ brief_dependencies_region() {
   [ "$status" -eq 0 ]
 }
 
+# The example must follow its own rubric: an auth-path task carries path:auth
+# at R3, only a producer whose output another task consumes carries
+# shared-surface, and a task with more than two files carries files:<n>.
+EXAMPLE_RUBRIC_JQ='.tasks as $t | all($t[];
+  (([.files[] | test("auth")] | any) == (.risk_basis | index("path:auth") != null))
+  and ((.risk_basis | index("path:auth") == null) or .risk == "R3")
+  and ((((.outputs // []) - ([$t[].consumes // []] | add)) != (.outputs // []))
+       == (.risk_basis | index("shared-surface") != null))
+  and ((.files | length) as $n | $n <= 2 or (.risk_basis | index("files:\($n)") != null)))'
+
+@test "Phase 2 JSON example follows the risk rubric it illustrates" {
+  json="$(awk '/^```json/{p=1;next} /^```/{p=0} p' <(phase2_section "$SKILL"))"
+  [ -n "$json" ]
+  run jq -e "$EXAMPLE_RUBRIC_JQ" <<< "$json"
+  [ "$status" -eq 0 ]
+}
+
+@test "negative control: the old example (auth producer at R1/none, basis on the consumer) fails the rubric check" {
+  json='{ "tasks": [
+    { "id": "t1", "deps": [], "files": ["src/auth/**"], "outputs": ["AuthToken"], "risk": "R1", "risk_basis": ["none"] },
+    { "id": "t3", "deps": ["t1"], "files": ["src/api/**"], "consumes": ["AuthToken"], "risk": "R3", "risk_basis": ["path:auth", "shared-surface"] }
+  ] }'
+  run jq -e "$EXAMPLE_RUBRIC_JQ" <<< "$json"
+  # 1 = evaluated to false; a jq syntax error exits 3 and must not pass here.
+  [ "$status" -eq 1 ]
+}
+
 @test "negative control: a task with risk R9 fails the valid-risk-token check" {
   json='{ "tasks": [ { "id": "t1", "risk": "R9" } ] }'
   run jq -e '[.tasks[].risk] | all(. as $r | ["R0","R1","R2","R3"] | index($r) != null)' <<< "$json"
