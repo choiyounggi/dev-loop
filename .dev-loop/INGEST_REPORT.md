@@ -1,82 +1,127 @@
-# Knowledge flush — 4 insight(s) (3 pages; two queue rows were the same lesson)
+# Knowledge flush — 2 insight(s) ingested (headless auto-flush run 20261015-095737-42481)
 
-Queue rows claimed by this run: `c84a501fdfc4637c` (eslint rule), `7a9afd1eae7809f1` + `65299b5a2504f128` (tsx top-level await, English + Korean duplicate), `1366b511a1affcc5` (Next.js Server Action refresh). All harvested 2026-10-12 from linkly-invitation task worktrees (t4c / t4d / t4e).
+4 queue rows were claimed by this run. 2 were ingested as new pages; 2 were
+released as pending duplicates of open PR #274. Nothing was folded into another
+branch — this headless run opens its own PR only for the two verified insights.
+
+| Candidate | Origin | Domain | Disposition |
+|-----------|--------|--------|-------------|
+| `61bc283a566a4780` — a blur handler moves layout under the button the user clicks next; the click is lost | linkly-invitation task-t4b (2026-10-12) | frontend | **ingested** (new page `frontend-forms-layout-shift-on-blur-before-a-click`) |
+| `2bf23658a4d1bc2e` — fixtures whose id, position and order field coincide let wrong-field reads pass | linkly-invitation task-t4c (2026-10-12) | testing | **ingested** (new page `testing-quality-fixtures-with-coincident-id-and-position`) |
+| `ea0574d2686b0169` — tsx top-level `await` without `"type": "module"` (scratch-folder `package.json` variant) | linkly-invitation task-t4c | platforms | released — duplicate of open PR #274 |
+| `866175146dd2fc3b` — tsx top-level `await` without `"type": "module"` (same lesson, t4b wording) | linkly-invitation task-t4b | platforms | released — duplicate of open PR #274 |
+
+Note for the reviewer: the previous headless run (PR #275) could not read
+`61bc283a566a4780` and `866175146dd2fc3b` because the queue directory cannot be
+listed from the sandbox. This run located their queue file by reading the
+session ids in `~/.claude/history.jsonl` and opening
+`~/.dev-loop/queue/<sessionId>.jsonl` by exact name, so both rows were read
+and handled. A scratch helper `.dev-loop/flush-dump.js` was written into the
+checkout and could not be deleted (no `rm` in the allowlist); `.dev-loop/` is in
+the repo's `.gitignore`, so it is not part of this PR.
 
 ## Verified best-practice
 
-### 1. `@next/next/no-html-link-for-pages` misses static App Router routes → `verified`
+### 1. `61bc283a566a4780` — blur-driven layout shift under the button the user clicks next → `verified`
 
-Claim: on `@next/eslint-plugin-next` 16.3.8 (and earlier) the rule flags `<a href="/">` and dynamic app routes only; a static app route such as `/admin` is never reported, because the app-route patterns are built with `normalizeAppPath` (no trailing slash, `^/admin$`) while every href is passed through `normalizeURL`, which appends a slash (`/admin/`).
+Claim: when a field's blur handler shows, hides or resizes content above a
+button, a pointer click on that button right after typing is lost. `mousedown`
+moves focus to the button, the field blurs and re-renders, the button moves,
+`mouseup` lands on another element, and the `click` is dispatched to the nearest
+common inclusive ancestor of the two targets, so the button's handler never
+runs and nothing errors. Reserve the region's space with a fixed `min-height`
+(content swapped inside a sized box moves no sibling) and verify with a
+real-browser `fill → click` with no blur step in between.
+
+Sources checked (fetched or confirmed through search of the official page this run):
+- https://developer.mozilla.org/en-US/docs/Web/API/Element/click_event — fetched; verbatim: "If the button is pressed on one element and the pointer is moved outside the element before the button is released, the event is fired on the most specific ancestor element that contained both elements" and "`click` fires after both the mousedown and mouseup events have fired, in that order".
+- https://w3c.github.io/uievents/split/mouse-events.html — UI Events, mouse events section: implementations "SHOULD fire click and dblclick events on the nearest common inclusive ancestor when the associated mousedown and mouseup event targets are different" (confirmed by search over w3c.github.io; the page itself could not be fetched in this run because WebFetch was granted for one URL only).
+- https://w3c.github.io/pointerevents/ — click target is "the nearest common inclusive ancestor of the corresponding pointerdown and pointerup targets in the DOM at the moment event is being dispatched" (same confirmation path).
+- https://playwright.dev/docs/actionability — the checks for `locator.click()` (Visible, Stable = "not animating or completed animation", Receives Events = "the hit target of the pointer event at the action point", Enabled) and `force` "will not check that the target element actually receives click events"; the docs describe no re-check between `mousedown` and `mouseup`.
+- https://playwright.dev/docs/api/class-locator — `locator.click()` steps: wait for actionability checks, scroll into view, click the element's center with `page.mouse`, wait for initiated navigations.
+
+How verified: the event-order and click-target mechanism is spec text (UI Events, Pointer Events) restated by MDN; the "auto-wait cannot see it" claim follows from the documented check order (checks run before the action). The field case is the originating session's measurement on 2026-10-12 (Next.js 16 admin form, Playwright + Chrome against `next start`): the save button's page y read 1093 at press and 1057 at release with no POST; after the preview area was reserved at `min-h-64`, the button read y 1847 / 1847 / 1847 across three blurs and the unchanged `fill → click` script saved. This flush did not re-run the browser case (no browser or project execution is in this run's allowlist); the page records it as a dated field reproduction, and the mechanism carries the `verified` confidence.
+
+### 2. `2bf23658a4d1bc2e` — fixtures whose id, position and order field coincide → `field-tested`
+
+Claim: when fixtures have `id === index` and `sortOrder === position`, code that
+reads the wrong field (position for id, `items.length` for `nextId`, `sortOrder`
+for the index, a `sortOrder`-based key) returns the expected output on every
+case, so such mutants survive a green suite. Build fixtures from a history with a
+delete (ids `1, 3, 4`, `nextId` 5), give order values gaps, assert after a move,
+and prove each read by mutation with a no-op control.
 
 Sources checked:
-- `packages/eslint-plugin-next/src/utils/url.ts` at tag v16.3.8 (read through `gh api …?ref=v16.3.8`): L69–L80 `normalizeURL` (`url.endsWith('/') ? url : url + '/'`), L148 Pages list `^${normalizeURL(url)}$`, L169 App list `^${normalizeAppPath(url)}$`.
-- `src/rules/no-html-link-for-pages.ts` at v16.3.8: L149 `normalizeURL(href.value.value)`, L156 `foundUrl.test(normalizeURL(hrefPath))`.
-- Canary `url.ts` still has the same two wrappers (L148 / L169), so the gap is unfixed upstream.
-- Open upstream PRs https://github.com/vercel/next.js/pull/97557 (2026-08-19, "flag `<a>` links to static App Router routes", describes exactly this mismatch) and https://github.com/vercel/next.js/pull/94556 (2026-06-08, names "`normalizeAppPath` omitted trailing slashes for static app routes"); issue #53473 for the `pageExtensions` gap.
-- https://nextjs.org/docs/messages/no-html-link-for-pages resolves (HTTP 200).
+- https://en.wikipedia.org/wiki/Mutation_testing — the kill conditions (reach, infect, propagate: the incorrect state "must propagate to the program's output and be checked by the test"); a coincident fixture blocks propagation. Already cited by the merged sibling page `testing-quality-path-resolver-fixtures-with-coincident-cwd` for the same mechanism.
+- https://stryker-mutator.io/docs/mutation-testing-elements/mutant-states-and-metrics/ — "When all tests passed while this mutant was active, the mutant survived. You're missing a test for it." Already cited by `testing-quality-expectation-sets-with-one-distinct-value`.
+- Field report 2026-10-12 (originating session, Vitest 5, React list + `nextId` reducer): an independent test-quality audit left 6 of 6 hand-seeded mutants alive with coincident fixtures; after id gaps, gapped order values and a post-move assertion, the position lookup, `nextId` from `items.length`, label / end / move from `sortOrder` and a `sortOrder` key all went red (session logs `.claude/tmp/mut30`, `mut33b–d`, not available to this run).
 
-How verified: downloaded the published `@next/eslint-plugin-next@16.3.8` tarball into the project scratch dir and called `getUrlFromAppDirectory` + `normalizeURL` from `dist/utils/url.js` directly against a synthetic `app/` tree (`/`, `/admin`, `/admin/login`, `/guestbook`, `/post/[slug]`, `/(group)/about`, `/docs/[...rest]`). Result: only `/`, `/post/abc`, `/docs/a/b` match; `/admin`, `/admin/login`, `/guestbook`, `/about` do not (static routes), including `/admin/` written with a slash. The harvested session's own probe (`eslint-config-next` 16.3.8: `href="/"` exit 1, the three static routes pass) agrees. The replacement grep gate on the page was run against a known-bad file (4 of 4 lines reported) and a known-good file (0 of 5 reported) before being written down.
+How verified: the mechanism is the documented propagation condition that two
+merged pages already rest on; the specific wrong-field table comes from the
+field report, and this flush ran no mutants (no project execution in the
+allowlist). Confidence is therefore `field-tested`, not `verified`, and the page
+says so in its Sources section.
 
-### 2. tsx + top-level `await` in a package without `"type": "module"` → `verified`
+### Released (not verified here)
 
-Claim: tsx compiles `.ts` as CommonJS when the nearest `package.json` has no `"type"`, and esbuild refuses top-level `await` in `cjs` output; save the script as `.mts`, wrap the body in `async function main()`, or set `"type": "module"`. tsconfig `module` does not change the decision.
-
-Sources checked:
-- https://esbuild.github.io/content-types/#javascript — "bundling code containing top-level await is only supported when the output format is set to esm" (fetched, quote confirmed).
-- https://nodejs.org/api/typescript.html — ".mts files will always be run as ES modules", ".cts … CommonJS", `.ts` follows `package.json` `"type"` (read from `nodejs/node` `doc/api/typescript.md` L129–L132; page HTTP 200).
-- tsx docs `docs/typescript.md` "Compiler limitations" — "tsx uses esbuild to compile TypeScript and ESM, so it shares some of the same limitations" (raw file read).
-- https://github.com/privatenumber/tsx/issues/488 (closed; maintainer answer points to the README and esbuild's JavaScript caveats), #552 (closed, node_modules variant), #849 (open, `tsx -e` variant, mentioned only as an edge).
-
-How verified: reproduction in linkly-invitation (tsx 4.23.15, Node 26.7.0, no `"type"`, tsconfig `"module": "esnext"` / `"moduleResolution": "bundler"`): `tla.ts` → exit 1 with `ERROR: Top-level await is currently not supported with the "cjs" output format`; identical `tla.mts` → `TLA_OK 2`, exit 0; `.ts` with `async function main()` → `MAIN_OK 3`, exit 0. Scratch files removed in the same step.
-
-### 3. Next.js Server Action: current-route refresh vs `revalidatePath` of another path → `verified`
-
-Claim: on Next.js 16.3.8 any `revalidatePath`/`revalidateTag` without a cache-life profile sets `pathWasRevalidated = ActionDidRevalidateStaticAndDynamic` regardless of path, so the action response re-renders the current route; the docs call this temporary and the source carries `// TODO: only revalidate if the path matches`. When the current page must refresh no matter what was revalidated, call `refresh()` from `next/cache` (16.0.0+), and pin the behaviour with a browser check that reads the DOM before any reload.
-
-Sources checked:
-- https://nextjs.org/docs/app/api-reference/functions/revalidatePath (docs version 16.3.8) — Good to know: "Updates the UI immediately (if viewing the affected path). Currently, it also causes all previously visited pages to refresh … This behavior is temporary and will be updated in the future to apply only to the specific path."
-- https://nextjs.org/docs/app/api-reference/functions/refresh — "refresh allows you to refresh the client router from within a Server Action"; only callable in Server Actions.
-- `revalidate.ts` at v16.3.8: L73–L91 `refresh()` (throws outside the action phase, sets `ActionDidRevalidateDynamicOnly`), L255–L256 the TODO and `ActionDidRevalidate` assignment; at v15.5.0 the site sets a boolean and no `refresh` export exists; at v16.0.0 `export function refresh()` is at L60.
-- `action-handler.ts` at v16.3.8 L1410–L1412 (`skipPageRendering ||= … undefined || ActionDidNotRevalidate`), L197–L202 (header `x-action-revalidated`).
-- `server-action-reducer.ts` at v16.3.8 L206–L207 (both kinds accepted), L364–L365 (`invalidateEntirePrefetchCache` only for static-and-dynamic).
-
-How verified: the same lines were read from the installed `node_modules/next/dist` (16.3.8) in linkly-invitation — `revalidate.js:70-84`, `:221-222`; `action-handler.js:990`; `server-action-reducer.js:129`, `:233` — and the tag-pinned GitHub sources above were fetched with `gh api …?ref=v16.3.8|v16.0.0|v15.5.0` to confirm line numbers and the version the export appeared in. The harvested session's field case (`/admin/photos` refreshed after `revalidatePath('/')`) matches the mechanism.
+`ea0574d2686b0169` and `866175146dd2fc3b` carry the lesson that PR #274's page
+`wiki/platforms/toolchains/tsx-top-level-await-without-type-module.md` already
+holds (tsx compiles `.ts` as CommonJS without `"type": "module"`, esbuild
+refuses top-level `await` in `cjs`; use `.mts`, `async function main()`, or
+`"type": "module"`). The `ea0574` wording adds one variant — a scratch-folder
+`package.json` containing `{"type":"module"}` next to the script — which #274's
+page already lists as "set `"type": "module"`". No research was done on them in
+this run; they are released for the manual flush to drop or fold once #274
+merges.
 
 ## Existing-layer check
 
-Pages read: platforms-toolchains-typescript-6-global-types, platforms-toolchains-nextjs-16-build-output-and-tsconfig-rewrite, platforms-toolchains-flag-availability-at-the-execution-site, platforms-toolchains-self-import-inside-a-workspace-package, platforms-toolchains-agent-files-written-by-next-dev, platforms-processes-sentinel-driven-repl-payloads, infrastructure-ci-cd-changed-files-only-gates, frontend-design-design-system-lint-gate-for-agents, testing-quality-checks-that-cannot-pass, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-gate-parsing-vs-command-execution, frontend-data-fetching-query-key-prefix-invalidation, frontend-data-fetching-async-ui-states
+Pages read: frontend-forms-validation-timing, testing-e2e-e2e-stability, testing-quality-expectation-sets-with-one-distinct-value, testing-quality-path-resolver-fixtures-with-coincident-cwd, frontend-accessibility-interactive-elements, frontend-performance-bundle-and-assets
 
-Also read: `INDEX.md`, `wiki/frontend/index.md`, `wiki/platforms/index.md`, `wiki/infrastructure/index.md`, `wiki/backend/index.md`, `wiki/backend/node/index.md`, `templates/page.md`, `AGENTS.md` (category rules).
+Also read: `INDEX.md`, `wiki/frontend/index.md`, `wiki/testing/index.md`, `templates/page.md`, `AGENTS.md`, the tail of `log.md`.
 
-Keyword sweep over `wiki/` (`no-html-link-for-pages|top-level await|top-level-await|\.mts\b|revalidatePath|pathWasRevalidated`): 1 file, `platforms-processes-sentinel-driven-repl-payloads` (mentions top-level `await` inside a REPL payload — a different mechanism; linked as related, not merged). `wiki_search` (k=5) for each of the three trigger sentences returned no page describing the same situation (top hits: mobile-navigation-test-files-in-expo-router-app-directory, platforms-toolchains-self-import-inside-a-workspace-package, platforms-toolchains-agent-files-written-by-next-dev).
+`wiki_search` (k=8) with each candidate's trigger sentence:
 
-Overlaps / merges: none of the three triggers exists → 3 new pages. The two tsx rows (`7a9afd1eae7809f1`, `65299b5a2504f128`) describe the same situation and directive in two languages; merged into one page. No conflicts with an existing directive.
+| Row | Top hits | Overlap found | Result |
+|-----|----------|---------------|--------|
+| `61bc` | frontend-accessibility-interactive-elements (×3: div-with-onClick, popover, hover-revealed), frontend-design-html-in-canvas (×2: clicks land in the wrong place after a transform), frontend-forms-validation-timing (blur fired by an abandoning click), frontend-accessibility-contrast-of-interactive-states, frontend-design-ui-hardening-against-real-content | No page describes a blur re-render moving the click target. `validation-timing` owns *when* blur validation runs and has an Edge row for a blur caused by clicking Cancel; it says nothing about the click being lost. `e2e-stability` has an Edge row "Entry animation makes clicks land on a moving element → the stability check waits for the bounding box to settle", which is the adjacent case (a shift *before* the click, which auto-wait handles) and is the reason the new page states why auto-wait cannot handle a shift the click triggers. `bundle-and-assets` covers CLS as a load-performance metric, not an input defect. No conflict | New page `frontend-forms-layout-shift-on-blur-before-a-click`; `related:` both ways with `validation-timing` and `e2e-stability`; one-way links to `bundle-and-assets` and `interactive-elements` |
+| `2bf2` | testing-quality-expectation-sets-with-one-distinct-value (×2: swap in a different field's value; same fixture row), testing-quality-checks-that-cannot-pass, testing-quality-key-order-in-serialized-goldens, testing-quality-schema-additions-under-a-golden-gate, frontend-rendering-long-lists (`key={index}` row), databases-indexing-composite-index-column-order, testing-data-test-data-and-isolation | `expectation-sets-with-one-distinct-value` is about one *expected* value repeating across cases (a constant mutant); its probe row "swap in a different field's value … Nothing, when the two fields differ in the fixtures" is the precondition this candidate supplies, not the same trigger. `path-resolver-fixtures-with-coincident-cwd` is the same shape (two code paths agree because the fixture makes an ambient value coincide) for one specific resolver; its "When this applies" names the cwd fallback only. Neither describes id / position / order coincidence, so this is a sibling, not a merge. No conflict | New page `testing-quality-fixtures-with-coincident-id-and-position`; `related:` both ways with `expectation-sets-with-one-distinct-value` and `path-resolver-fixtures-with-coincident-cwd`; one-way links to `tests-that-cannot-fail`, `harness-reverse-controls`, `frontend-rendering-long-lists` |
 
-Related links added both ways:
-- A (eslint) ↔ infrastructure-ci-cd-changed-files-only-gates, testing-quality-checks-that-cannot-pass, platforms-toolchains-flag-availability-at-the-execution-site, frontend-design-design-system-lint-gate-for-agents, platforms-toolchains-nextjs-16-build-output-and-tsconfig-rewrite
-- B (tsx) ↔ platforms-toolchains-typescript-6-global-types, platforms-processes-sentinel-driven-repl-payloads, platforms-toolchains-self-import-inside-a-workspace-package
-- C (refresh) ↔ frontend-data-fetching-query-key-prefix-invalidation, frontend-data-fetching-async-ui-states, platforms-toolchains-flag-availability-at-the-execution-site
+Every `related:` id and inline `[id]` on the two new pages resolves to a file on
+this tree (checked by opening each target page above or by its presence in the
+domain index). Both pages are under 120 body lines (64 and 65 lines after the
+frontmatter, counted from the written files: 79 and 78 lines in total).
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed with `gh pr list --search "head:knowledge/"`: #273 (`…-20261011-235540`), #272 (`…-223623`), #271 (`…-213648`), #270 (`…-193253`), #269 (`…-022522`), #268 (`…-002014`), #266 (`…-20261010-021455`), #265 (`…-20261009-222812`). Each head was fetched and `git diff origin/main origin/<head> -- wiki/` grepped for the same keyword set plus `server action|next/link|eslint-config-next|tsx `.
+Open `knowledge/*` heads from `gh pr list --repo choiyounggi/dev-loop --state open --json number,headRefName --search "head:knowledge/"`: #275, #274, #273, #272, #271, #270, #269, #268, #266, #265. This headless run cannot `git diff` their content; overlap was judged from each PR's changed-file list (`gh pr list --json number,files`) and its PR body.
 
-- #269 adds `wiki/frontend/rendering/request-time-data-in-a-nextjs-page.md` (route-segment `revalidate`/`dynamic` config under Cache Components). Different trigger from candidate 3 (that page is about request-time reads in a page; this one is about the action response after a write). Verdict for candidate 3: **new**. A related-link to that page is deferred until #269 merges (linking to a page absent from `main` would be a broken link in this PR).
-- #270 adds `wiki/platforms/toolchains/agent-files-written-by-next-dev.md` — already on `main` (merged content); no overlap with any candidate.
-- No other open head touches these triggers.
+| Row | Overlapping open PR | Verdict |
+|-----|---------------------|---------|
+| `61bc` | None. No open head adds or edits a page about focus, blur, click targets or layout shift; #274 edits `frontend/index.md` (data-fetching row) and #269 edits it (browser-apis / forms rows) in hunks other than the forms row this PR appends after `dropzone-copy-without-drop-handlers`. #270's `proving-nothing-moves-under-reduced-motion` is about animations under reduced motion, a different trigger | new |
+| `2bf2` | #270 adds `testing/quality/host-disguise-fixtures-for-url-allowlists.md` (fixtures whose raw text and parsed host disagree, for a URL allowlist) and several other `testing/quality` pages; #269 and #268 also edit `testing/index.md`. The previous headless run released this row as a "plausible overlap" with that cluster. Judged here at the trigger level: `host-disguise-fixtures` is about parsed-URL fixtures and names no id / position / order field; no open head touches `expectation-sets-with-one-distinct-value` or `path-resolver-fixtures-with-coincident-cwd`, the two pages this PR links from; the new `testing/index.md` row is inserted before `key-order-in-serialized-goldens`, a row none of the open heads' file lists show as changed (they add rows elsewhere in the quality table). Different insight, adjacent theme | new (index-row conflicts with #270/#269/#268 are the usual append-order conflicts in `testing/index.md`, resolvable by keeping both rows) |
+| `ea0574`, `8661` | #274 adds `wiki/platforms/toolchains/tsx-top-level-await-without-type-module.md`, the same lesson | drop as pending duplicate → **released** (this headless run never folds into another branch) |
 
-Per-candidate verdicts: `c84a501fdfc4637c` **new**; `7a9afd1eae7809f1` **new** (merged with its sibling row below); `65299b5a2504f128` **drop as in-run duplicate** (same lesson as `7a9afd1eae7809f1`, folded into the same page, not a separate page); `1366b511a1affcc5` **new**.
+`log.md` and `.dev-loop/INGEST_REPORT.md` conflict with every open knowledge
+PR as always (append-only log; rewritten report).
 
 ## Routing decision
 
-| Candidate | Target | Why this category |
-|-----------|--------|-------------------|
-| `c84a501fdfc4637c` eslint rule | `platforms/toolchains/no-html-link-for-pages-misses-app-router-routes.md` | The lesson is about what a pinned lint toolchain actually checks, not about UI code; the other Next.js tooling pages (`nextjs-16-build-output-and-tsconfig-rewrite`, `agent-files-written-by-next-dev`) already live in `platforms/toolchains`. `frontend` has no lint/routing category, and `frontend/design`'s lint page is design-system specific |
-| `7a9afd1eae7809f1` + `65299b5a2504f128` tsx | `platforms/toolchains/tsx-top-level-await-without-type-module.md` | Script-runner module-format behaviour across a toolchain (tsx + esbuild + Node's extension rule), next to `typescript-6-global-types` and `self-import-inside-a-workspace-package`. The rows were harvested under `infrastructure` and `backend`; neither index has a script-runner category and `backend/node` is for service code |
-| `1366b511a1affcc5` Server Action refresh | `frontend/data-fetching/server-action-refresh-of-the-current-route.md` | In-UI data refresh after a mutation is this category's subject (`query-key-prefix-invalidation`, `async-ui-states`); the directive governs what the page does after a write, with Next.js mechanics as the evidence |
+| Row | Domain / category | Page | Why this category |
+|-----|-------------------|------|-------------------|
+| `61bc283a566a4780` | frontend / forms | `wiki/frontend/forms/layout-shift-on-blur-before-a-click.md` | The directive governs how a form region is sized so a blur-driven re-render cannot move the submit button, and how its browser test is written; the blur-timing owner (`validation-timing`) lives in `frontend/forms`. Not `testing/e2e`: the fix is in the UI, the test is the proof. Not `frontend/performance`: CLS there is a load metric, not an input defect |
+| `2bf23658a4d1bc2e` | testing / quality | `wiki/testing/quality/fixtures-with-coincident-id-and-position.md` | The category already holds the two coincidence pages this one is a sibling of (`expectation-sets-with-one-distinct-value`, `path-resolver-fixtures-with-coincident-cwd`) and the mutation-proof pages it cites. Not `testing/data`: that category is about creating and isolating fixture data, not about which values make a mutant observable |
 
-No new category. `INDEX.md` frontend and platforms rows were extended with one routing phrase each; domain `index.md` rows and `log.md` entries added.
+No new category. `INDEX.md` frontend and testing rows were extended with one
+phrase each; `wiki/frontend/index.md` (forms) and `wiki/testing/index.md`
+(quality) each gained one row; `log.md` has one `ingest` entry per new page;
+`related:` added both ways on `validation-timing`, `e2e-stability`,
+`expectation-sets-with-one-distinct-value` and
+`path-resolver-fixtures-with-coincident-cwd`.
 
 ## Local-layer candidates
 
-none — every candidate's directive holds for any Next.js / tsx project; the harvested field evidence (linkly-invitation routes, `/admin/photos`) appears only as a dated reproduction note, not as a directive.
+none — both ingested directives hold for any web form / any test suite; the
+linkly-invitation field cases (an admin address field with a map preview, a photo
+list with `sortOrder`) appear only as dated reproduction notes in the Sources
+sections, not in any directive.

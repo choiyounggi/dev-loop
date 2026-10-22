@@ -15,7 +15,7 @@ sources:
   - "Local reproduction 2026-10-11 (jsdom 30.1.2, @testing-library/dom 10.4.2): a test-id prefix selector over sections that each hold a shared heading id"
   - "Field case 2026-10 (linkly-invitation task t5; recorded by the originating session): a section-order helper read 15 ids where 8 sections existed"
 last_verified: 2026-10-11
-related: [testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-minimum-case-set, testing-mocking-what-to-mock, qa-environments-headless-browser-bot-blocking, testing-e2e-dynamic-file-input-uploads-in-headless-chromium]
+related: [testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-minimum-case-set, testing-mocking-what-to-mock, qa-environments-headless-browser-bot-blocking, testing-e2e-dynamic-file-input-uploads-in-headless-chromium, frontend-forms-layout-shift-on-blur-before-a-click]
 ---
 
 # Keeping Browser E2E Tests Stable and Fast

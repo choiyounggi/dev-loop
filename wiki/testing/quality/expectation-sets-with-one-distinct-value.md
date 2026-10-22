@@ -15,6 +15,7 @@ related:
     testing-quality-unasserted-return-fields,
     testing-quality-harness-reverse-controls,
     testing-quality-source-text-wiring-assertions,
+    testing-quality-fixtures-with-coincident-id-and-position,
   ]
 ---
 

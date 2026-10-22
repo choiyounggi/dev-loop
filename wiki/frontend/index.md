@@ -62,6 +62,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [validation-timing](forms/validation-timing.md) | Implementing form validation and deciding when to validate / when errors show; reworking a form abandoned over premature, late, or unexplained errors; mapping server validation errors to fields |
 | [dropzone-copy-without-drop-handlers](forms/dropzone-copy-without-drop-handlers.md) | Building or restyling a file-upload control whose `<input type=file>` is visually hidden and whose label/wrapper is styled as a dropzone; deciding whether the copy may say "drag and drop"; adding real drag-and-drop to such a control; reviewing a restyle diff for an advertised affordance with no `dragover`/`drop` handlers |
+| [layout-shift-on-blur-before-a-click](forms/layout-shift-on-blur-before-a-click.md) | A field's blur handler shows, hides or resizes content above a button the user clicks right after typing (preview, inline error, async lookup result); a click on that button runs nothing with no error; a browser test passes as fill → blur → wait → click but fails as fill → click; sizing the conditional region (`min-height`, scroll inside a box); why Playwright's actionability checks do not catch a shift the click itself triggers |
 
 ## browser-apis
 
