@@ -1,63 +1,82 @@
-# Knowledge flush — 4 insight(s) claimed: 1 new page, 1 merge, 1 dropped as already covered, 1 local-layer
+# Knowledge flush — 4 insight(s) (3 pages; two queue rows were the same lesson)
+
+Queue rows claimed by this run: `c84a501fdfc4637c` (eslint rule), `7a9afd1eae7809f1` + `65299b5a2504f128` (tsx top-level await, English + Korean duplicate), `1366b511a1affcc5` (Next.js Server Action refresh). All harvested 2026-10-12 from linkly-invitation task worktrees (t4c / t4d / t4e).
 
 ## Verified best-practice
 
-### 1. `a50099e971917b38` — `echo "$VAR"` truncates fetched text at `\c` (zsh / XSI sh)
-- **Claim:** when a script stores text it did not write (fetched HTML, file contents, tool output) in a variable and passes it on with `echo "$VAR" | grep …`, zsh's builtin `echo` interprets backslash escapes and `\c` ends the output, so greps silently return nothing. Carry data with `printf '%s\n' "$VAR"` or pipe the producer straight into the consumer.
-- **Sources checked:**
-  - https://zsh.sourceforge.io/Doc/Release/Shell-Builtin-Commands.html — `echo [ -neE ]`: "echo recognizes the following escape sequences"; `\c` "suppress subsequent characters and final newline".
-  - https://zsh.sourceforge.io/Doc/Release/Options.html — `BSD_ECHO`: "disables backslashed escape sequences in echo strings unless the -e option is specified".
-  - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/echo.html — XSI `echo` recognizes `\c` and ignores all following characters; Application Usage: "New applications are encouraged to use printf instead of echo".
-- **How verified:** reproduced 2026-10-11 on macOS 26.1 / zsh 5.9: a 27-byte variable containing `\c`; `echo "$v" | grep -c after-marker` printed `0` under zsh, macOS `/bin/sh` and dash, `1` under bash; `printf '%s\n'`, `echo -E`, and `setopt BSD_ECHO` each printed `1`. The candidate's own evidence (125 KB `libpq-connect.html`, every `echo "$RAW" | grep` empty, `curl | sed | grep` matched) agrees. The candidate said "zsh"; the reproduction widened it to XSI `sh`/dash with bash as the exception, and the page says so.
-- **Confidence:** verified.
+### 1. `@next/next/no-html-link-for-pages` misses static App Router routes → `verified`
 
-### 2. `0ed3d5d2828d5597` — BSD `wc -l` pads the count with leading spaces
-- **Claim:** on macOS `N=$(wc -l < file)` yields `     398`; `tail -n +"$N"` fails with `illegal offset` and an `until` waiter repeats the failure forever while looking like "still waiting". Strip with `$(( … ))` or `tr -d ' '` and assert all-digits before using it as an offset.
-- **Sources checked:**
-  - https://github.com/apple-oss-distributions/text_cmds/blob/main/wc/wc.c — `xo_emit_h(xop, " {:lines/%7ju/%ju}", linect)` (7-wide right-aligned field).
-  - https://github.com/freebsd/freebsd-src/blob/main/usr.bin/wc/wc.c — same `%7ju` format.
-  - https://www.gnu.org/software/coreutils/manual/html_node/wc-invocation.html — "The width of the count fields varies depending on the inputs, so you should not depend on a particular field width".
-  - https://man.freebsd.org/cgi/man.cgi?query=wc&sektion=1 and local `man wc` — the man pages document only "written to the standard output" (no width), which is why the source file is cited.
-- **How verified:** reproduced 2026-10-11 on macOS 26.1 with a 398-line file: raw `[     398]`, `tail: illegal offset -- +     398: Invalid argument`; `$(( $(wc -l < f) ))` and `tr -d ' '` both gave `398` and `tail` then worked; `[ "$N" -eq 398 ]` passed on the padded value while `case "$N" in *[!0-9]*)` matched it as not-all-digits; GNU `gwc -l < f` printed `398`.
-- **Confidence:** verified.
+Claim: on `@next/eslint-plugin-next` 16.3.8 (and earlier) the rule flags `<a href="/">` and dynamic app routes only; a static app route such as `/admin` is never reported, because the app-route patterns are built with `normalizeAppPath` (no trailing slash, `^/admin$`) while every href is passed through `normalizeURL`, which appends a slash (`/admin/`).
 
-### 3. `850131cacaecd1c7` — same-length Python mutations in the same second reuse the earlier `.pyc`
-- **Claim:** run the interpreter with `-B` and delete the module's `__pycache__/*.pyc` before each mutation run, because timestamp+size `.pyc` validation matches two same-length edits made in the same second.
-- **Sources checked:** `wiki/backend/python/language/bytecode-cache-staleness.md` (merged on main, `last_verified: 2026-10-06`) already cites https://docs.python.org/3/reference/import.html, PEP 552, and https://docs.python.org/3/using/cmdline.html for exactly this mechanism.
-- **How verified:** the existing page's Edge-cases row "Two *different* mutations each change the file by the same number of bytes … written in the same second" states this case with the same remedy, and its row "The tree is read-only, or the harness runs under `-B` / `PYTHONDONTWRITEBYTECODE`" already corrects the candidate's `-B`-first wording (`-B` governs writing only; purge first). Its Sources list carries a field case from 2026-10-06 with two 10-byte-shorter mutations of `wsgi.py` within one second — the same repository and symptom as this candidate's 2026-10-11 evidence.
-- **Confidence:** verified, but **dropped as already covered** (no new mechanism, no new remedy; the page is at 101 lines and the 2026-10-11 run adds no fact its 2026-10-06 field case lacks).
+Sources checked:
+- `packages/eslint-plugin-next/src/utils/url.ts` at tag v16.3.8 (read through `gh api …?ref=v16.3.8`): L69–L80 `normalizeURL` (`url.endsWith('/') ? url : url + '/'`), L148 Pages list `^${normalizeURL(url)}$`, L169 App list `^${normalizeAppPath(url)}$`.
+- `src/rules/no-html-link-for-pages.ts` at v16.3.8: L149 `normalizeURL(href.value.value)`, L156 `foundUrl.test(normalizeURL(hrefPath))`.
+- Canary `url.ts` still has the same two wrappers (L148 / L169), so the gap is unfixed upstream.
+- Open upstream PRs https://github.com/vercel/next.js/pull/97557 (2026-08-19, "flag `<a>` links to static App Router routes", describes exactly this mismatch) and https://github.com/vercel/next.js/pull/94556 (2026-06-08, names "`normalizeAppPath` omitted trailing slashes for static app routes"); issue #53473 for the `pageExtensions` gap.
+- https://nextjs.org/docs/messages/no-html-link-for-pages resolves (HTTP 200).
 
-### 4. `0b0437866e81266d` — plan-gaps row for `t2-serve-idempotency-unsupported` (anhinga)
-- Project-specific ownership/untouched-files decision for one linkly task; names `impl/lnpl/wsgi.py`, `cli.py:1020-1027`, `examples/deploy/README.md:138`. Not verifiable as general knowledge and would be wrong in any other codebase. Routed to the local layer (see below), not ingested here.
+How verified: downloaded the published `@next/eslint-plugin-next@16.3.8` tarball into the project scratch dir and called `getUrlFromAppDirectory` + `normalizeURL` from `dist/utils/url.js` directly against a synthetic `app/` tree (`/`, `/admin`, `/admin/login`, `/guestbook`, `/post/[slug]`, `/(group)/about`, `/docs/[...rest]`). Result: only `/`, `/post/abc`, `/docs/a/b` match; `/admin`, `/admin/login`, `/guestbook`, `/about` do not (static routes), including `/admin/` written with a slash. The harvested session's own probe (`eslint-config-next` 16.3.8: `href="/"` exit 1, the three static routes pass) agrees. The replacement grep gate on the page was run against a known-bad file (4 of 4 lines reported) and a known-good file (0 of 5 reported) before being written down.
+
+### 2. tsx + top-level `await` in a package without `"type": "module"` → `verified`
+
+Claim: tsx compiles `.ts` as CommonJS when the nearest `package.json` has no `"type"`, and esbuild refuses top-level `await` in `cjs` output; save the script as `.mts`, wrap the body in `async function main()`, or set `"type": "module"`. tsconfig `module` does not change the decision.
+
+Sources checked:
+- https://esbuild.github.io/content-types/#javascript — "bundling code containing top-level await is only supported when the output format is set to esm" (fetched, quote confirmed).
+- https://nodejs.org/api/typescript.html — ".mts files will always be run as ES modules", ".cts … CommonJS", `.ts` follows `package.json` `"type"` (read from `nodejs/node` `doc/api/typescript.md` L129–L132; page HTTP 200).
+- tsx docs `docs/typescript.md` "Compiler limitations" — "tsx uses esbuild to compile TypeScript and ESM, so it shares some of the same limitations" (raw file read).
+- https://github.com/privatenumber/tsx/issues/488 (closed; maintainer answer points to the README and esbuild's JavaScript caveats), #552 (closed, node_modules variant), #849 (open, `tsx -e` variant, mentioned only as an edge).
+
+How verified: reproduction in linkly-invitation (tsx 4.23.15, Node 26.7.0, no `"type"`, tsconfig `"module": "esnext"` / `"moduleResolution": "bundler"`): `tla.ts` → exit 1 with `ERROR: Top-level await is currently not supported with the "cjs" output format`; identical `tla.mts` → `TLA_OK 2`, exit 0; `.ts` with `async function main()` → `MAIN_OK 3`, exit 0. Scratch files removed in the same step.
+
+### 3. Next.js Server Action: current-route refresh vs `revalidatePath` of another path → `verified`
+
+Claim: on Next.js 16.3.8 any `revalidatePath`/`revalidateTag` without a cache-life profile sets `pathWasRevalidated = ActionDidRevalidateStaticAndDynamic` regardless of path, so the action response re-renders the current route; the docs call this temporary and the source carries `// TODO: only revalidate if the path matches`. When the current page must refresh no matter what was revalidated, call `refresh()` from `next/cache` (16.0.0+), and pin the behaviour with a browser check that reads the DOM before any reload.
+
+Sources checked:
+- https://nextjs.org/docs/app/api-reference/functions/revalidatePath (docs version 16.3.8) — Good to know: "Updates the UI immediately (if viewing the affected path). Currently, it also causes all previously visited pages to refresh … This behavior is temporary and will be updated in the future to apply only to the specific path."
+- https://nextjs.org/docs/app/api-reference/functions/refresh — "refresh allows you to refresh the client router from within a Server Action"; only callable in Server Actions.
+- `revalidate.ts` at v16.3.8: L73–L91 `refresh()` (throws outside the action phase, sets `ActionDidRevalidateDynamicOnly`), L255–L256 the TODO and `ActionDidRevalidate` assignment; at v15.5.0 the site sets a boolean and no `refresh` export exists; at v16.0.0 `export function refresh()` is at L60.
+- `action-handler.ts` at v16.3.8 L1410–L1412 (`skipPageRendering ||= … undefined || ActionDidNotRevalidate`), L197–L202 (header `x-action-revalidated`).
+- `server-action-reducer.ts` at v16.3.8 L206–L207 (both kinds accepted), L364–L365 (`invalidateEntirePrefetchCache` only for static-and-dynamic).
+
+How verified: the same lines were read from the installed `node_modules/next/dist` (16.3.8) in linkly-invitation — `revalidate.js:70-84`, `:221-222`; `action-handler.js:990`; `server-action-reducer.js:129`, `:233` — and the tag-pinned GitHub sources above were fetched with `gh api …?ref=v16.3.8|v16.0.0|v15.5.0` to confirm line numbers and the version the export appeared in. The harvested session's field case (`/admin/photos` refreshed after `revalidatePath('/')`) matches the mechanism.
 
 ## Existing-layer check
 
-Pages read: platforms-shells-portable-shell-scripts, platforms-shells-escapes-in-shell-string-literals, platforms-tools-bsd-vs-gnu-cli, backend-python-language-bytecode-cache-staleness, platforms-shells-option-like-argument-values, platforms-shells-line-by-line-read-loops, testing-quality-completion-predicates
+Pages read: platforms-toolchains-typescript-6-global-types, platforms-toolchains-nextjs-16-build-output-and-tsconfig-rewrite, platforms-toolchains-flag-availability-at-the-execution-site, platforms-toolchains-self-import-inside-a-workspace-package, platforms-toolchains-agent-files-written-by-next-dev, platforms-processes-sentinel-driven-repl-payloads, infrastructure-ci-cd-changed-files-only-gates, frontend-design-design-system-lint-gate-for-agents, testing-quality-checks-that-cannot-pass, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-gate-parsing-vs-command-execution, frontend-data-fetching-query-key-prefix-invalidation, frontend-data-fetching-async-ui-states
 
-- **Candidate 1:** `wiki_search` top-5 (k=5) were all sections of `platforms-shells-escapes-in-shell-string-literals` (0.78–0.77) and `platforms-shells-portable-shell-scripts` (0.78). Both are about escapes in *literals you typed* (regex/pattern quoting), not about `echo` processing escapes inside *data*; `bsd-vs-gnu-cli` has one edge row ("Any flags passed to `echo` — use `printf` for anything beyond a bare literal string") that names the remedy without the trigger or the `\c` mechanism. Repo-wide grep for `builtin echo|echo interprets|BSD_ECHO|xpg_echo|echo -e` found no page owning it. No conflict. → **created** `wiki/platforms/shells/echo-of-text-you-did-not-write.md` (id `platforms-shells-echo-of-text-you-did-not-write`, 63 body lines). `related:` added both ways with `portable-shell-scripts`, `escapes-in-shell-string-literals`, `option-like-argument-values`, `line-by-line-read-loops`, `bsd-vs-gnu-cli` (frontmatter only on the 120-line `portable-shell-scripts`).
-- **Candidate 2:** `wiki_search` top-5: `testing-quality-completion-predicates` (0.76, `wc -l` undercounts an unterminated last line — a different defect), `platforms-shells-line-by-line-read-loops` ×2, `platforms-tools-bsd-vs-gnu-cli` (0.75, the per-command BSD/GNU table), `platforms-filesystems-trailing-separator-under-realpath`. Repo-wide grep for `wc -l <|leading space|illegal offset|tr -d` found no page covering the padding. `bsd-vs-gnu-cli` is the same trigger class (same command name, different userland output) → **merged** into it: one table row (`Line count as a number`), one Edge-cases row, one Instead-of row, three sources + a reproduction line, `last_verified` 2026-07-10 → 2026-10-11 (69 → 62 body lines after the frontmatter grew). No conflict with the page's existing `wc -l` "count items by lines" advice; the new row qualifies how to consume that count.
-- **Candidate 3:** `wiki_search` top-5 led with `backend-python-language-default-encoding-in-text-io` (0.84, links to the staleness page) and `backend-python-language-bytecode-cache-staleness` edge_case + trigger (0.83, 0.81). Read in full; it already carries this exact case and corrects the candidate's `-B` emphasis. → **dropped** as duplicate; nothing added.
-- **Candidate 4:** not routed into the bundled wiki (local layer).
+Also read: `INDEX.md`, `wiki/frontend/index.md`, `wiki/platforms/index.md`, `wiki/infrastructure/index.md`, `wiki/backend/index.md`, `wiki/backend/node/index.md`, `templates/page.md`, `AGENTS.md` (category rules).
+
+Keyword sweep over `wiki/` (`no-html-link-for-pages|top-level await|top-level-await|\.mts\b|revalidatePath|pathWasRevalidated`): 1 file, `platforms-processes-sentinel-driven-repl-payloads` (mentions top-level `await` inside a REPL payload — a different mechanism; linked as related, not merged). `wiki_search` (k=5) for each of the three trigger sentences returned no page describing the same situation (top hits: mobile-navigation-test-files-in-expo-router-app-directory, platforms-toolchains-self-import-inside-a-workspace-package, platforms-toolchains-agent-files-written-by-next-dev).
+
+Overlaps / merges: none of the three triggers exists → 3 new pages. The two tsx rows (`7a9afd1eae7809f1`, `65299b5a2504f128`) describe the same situation and directive in two languages; merged into one page. No conflicts with an existing directive.
+
+Related links added both ways:
+- A (eslint) ↔ infrastructure-ci-cd-changed-files-only-gates, testing-quality-checks-that-cannot-pass, platforms-toolchains-flag-availability-at-the-execution-site, frontend-design-design-system-lint-gate-for-agents, platforms-toolchains-nextjs-16-build-output-and-tsconfig-rewrite
+- B (tsx) ↔ platforms-toolchains-typescript-6-global-types, platforms-processes-sentinel-driven-repl-payloads, platforms-toolchains-self-import-inside-a-workspace-package
+- C (refresh) ↔ frontend-data-fetching-query-key-prefix-invalidation, frontend-data-fetching-async-ui-states, platforms-toolchains-flag-availability-at-the-execution-site
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed with `gh pr list --search "head:knowledge/"`: #265 (`knowledge/choiyounggi-20261009-222812`), #266 (`…20261010-021455`), #268 (`…20261011-002014`), #269 (`…20261011-022522`), #270 (`…20261011-193253`), #271 (`…20261011-213648`), #272 (`…20261011-223623`). Non-knowledge open PR #267 (`fix/autoflush-opt-in`) touches no wiki page.
+Open `knowledge/*` heads listed with `gh pr list --search "head:knowledge/"`: #273 (`…-20261011-235540`), #272 (`…-223623`), #271 (`…-213648`), #270 (`…-193253`), #269 (`…-022522`), #268 (`…-002014`), #266 (`…-20261010-021455`), #265 (`…-20261009-222812`). Each head was fetched and `git diff origin/main origin/<head> -- wiki/` grepped for the same keyword set plus `server action|next/link|eslint-config-next|tsx `.
 
-Each head was fetched and `git diff origin/main origin/<head> -- wiki/` was grepped for `builtin echo|echo interprets|BSD_ECHO|xpg_echo|illegal offset|wc -l <|leading space|right-align|__pycache__|.pyc|same number of bytes|same length`: zero added lines in all seven. #270 touches `mutation-harness-file-custody`, `surviving-mutant-equivalence-triage` and `harness-reverse-controls`, but its only bytecode-related line is an unchanged `related:` entry. #265 and #266 touch `wiki/platforms/index.md` on other rows (no overlap with the two rows edited here). File-level overlap of this PR with open heads: `wiki/platforms/index.md` (#265, #266, #270 — different rows, merges line-wise), `wiki/testing/quality/*` untouched here.
+- #269 adds `wiki/frontend/rendering/request-time-data-in-a-nextjs-page.md` (route-segment `revalidate`/`dynamic` config under Cache Components). Different trigger from candidate 3 (that page is about request-time reads in a page; this one is about the action response after a write). Verdict for candidate 3: **new**. A related-link to that page is deferred until #269 merges (linking to a page absent from `main` would be a broken link in this PR).
+- #270 adds `wiki/platforms/toolchains/agent-files-written-by-next-dev.md` — already on `main` (merged content); no overlap with any candidate.
+- No other open head touches these triggers.
 
-Verdicts: candidate 1 **new**; candidate 2 **new**; candidate 3 **drop** (duplicate of merged main, not of an open PR); candidate 4 **drop** from this PR (local layer).
+Per-candidate verdicts: `c84a501fdfc4637c` **new**; `7a9afd1eae7809f1` **new** (merged with its sibling row below); `65299b5a2504f128` **drop as in-run duplicate** (same lesson as `7a9afd1eae7809f1`, folded into the same page, not a separate page); `1366b511a1affcc5` **new**.
 
 ## Routing decision
 
-| Candidate | Target | Action |
-|-----------|--------|--------|
-| 1 echo `\c` | `platforms/shells` → `echo-of-text-you-did-not-write.md` | new page; `shells` fits (shell builtin semantics across zsh/sh/bash); index row added |
-| 2 wc padding | `platforms/tools` → `bsd-vs-gnu-cli.md` | merge (table row + edge + instead-of + sources); index "load when" extended |
-| 3 pyc same-second | `backend/python/language` → `bytecode-cache-staleness.md` | already covered; no edit |
-| 4 plan-gaps | local layer | excluded |
+| Candidate | Target | Why this category |
+|-----------|--------|-------------------|
+| `c84a501fdfc4637c` eslint rule | `platforms/toolchains/no-html-link-for-pages-misses-app-router-routes.md` | The lesson is about what a pinned lint toolchain actually checks, not about UI code; the other Next.js tooling pages (`nextjs-16-build-output-and-tsconfig-rewrite`, `agent-files-written-by-next-dev`) already live in `platforms/toolchains`. `frontend` has no lint/routing category, and `frontend/design`'s lint page is design-system specific |
+| `7a9afd1eae7809f1` + `65299b5a2504f128` tsx | `platforms/toolchains/tsx-top-level-await-without-type-module.md` | Script-runner module-format behaviour across a toolchain (tsx + esbuild + Node's extension rule), next to `typescript-6-global-types` and `self-import-inside-a-workspace-package`. The rows were harvested under `infrastructure` and `backend`; neither index has a script-runner category and `backend/node` is for service code |
+| `1366b511a1affcc5` Server Action refresh | `frontend/data-fetching/server-action-refresh-of-the-current-route.md` | In-UI data refresh after a mutation is this category's subject (`query-key-prefix-invalidation`, `async-ui-states`); the directive governs what the page does after a write, with Next.js mechanics as the evidence |
 
-No new category.
+No new category. `INDEX.md` frontend and platforms rows were extended with one routing phrase each; domain `index.md` rows and `log.md` entries added.
 
 ## Local-layer candidates
 
-- `0b0437866e81266d` (project `anhinga` / linkly, task `t2-serve-idempotency-unsupported`): ownership and untouched-file ruling for the 501-on-`Idempotency-Key` change (`wsgi.py`, `lexer.py`, `docs/serving.md`, `relay` 501 handling in `cli.py` deferred to t3). Target `wiki-local/backend/http/idempotency-key-refusal-ownership.md` in that repository — run `wiki-ingest` inside that project.
+none — every candidate's directive holds for any Next.js / tsx project; the harvested field evidence (linkly-invitation routes, `/admin/photos`) appears only as a dated reproduction note, not as a directive.

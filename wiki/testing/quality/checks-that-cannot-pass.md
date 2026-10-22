@@ -12,7 +12,7 @@ sources:
   - https://nodejs.org/api/path.html
   - "Local reproduction 2026-10-11 (Node v26.7.0): path.posix.normalize around path.posix.join over fixed and random segments, and an inner-input mutant"
 last_verified: 2026-10-11
-related: [testing-quality-tests-that-cannot-fail, testing-quality-surviving-mutant-equivalence-triage, testing-quality-minimum-case-set, backend-common-change-impact-call-site-enumeration, platforms-processes-tool-diagnostics-without-a-failing-exit-code, qa-process-scope-purity-checks, testing-quality-history-dependent-checks-on-shallow-clones, platforms-tools-deny-rules-under-bypassed-permissions, testing-quality-assertion-scanner-false-positive-on-unittest-convention, infrastructure-agent-orchestration-gate-evidence-exit-code-class, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-surviving-mutant-equivalence-triage, testing-quality-minimum-case-set, backend-common-change-impact-call-site-enumeration, platforms-processes-tool-diagnostics-without-a-failing-exit-code, qa-process-scope-purity-checks, testing-quality-history-dependent-checks-on-shallow-clones, platforms-tools-deny-rules-under-bypassed-permissions, testing-quality-assertion-scanner-false-positive-on-unittest-convention, infrastructure-agent-orchestration-gate-evidence-exit-code-class, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, platforms-toolchains-no-html-link-for-pages-misses-app-router-routes]
 ---
 
 # Validating a Check Whose Target Does Not Exist Yet
