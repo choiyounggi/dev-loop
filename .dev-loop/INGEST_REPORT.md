@@ -1,54 +1,184 @@
-# Knowledge flush — 1 insight(s)
+# Knowledge flush — 8 insight(s)
 
-Headless autoflush run `20261018-232423-76361`. Claimed 8 candidates: 1 ingested, 4 retired as local-layer plan-gaps, 3 released back to pending (2 plausible duplicates of open PRs, 1 whose queue file this run could not locate).
+Claimed 10 queue rows (run `20261009-222550-75928`): 8 harvested ★ Insights and 2 wiki-plan plan-gap rows (linkly-invitation t6).
+
+- **5 new pages:**
+  - `backend-common-integrations-wrapping-quotes-in-a-frontmatter-value`
+  - `infrastructure-ci-cd-chaining-workflows-past-a-github-token-event`
+  - `qa-process-blind-llm-judgment-of-a-visual-rule`
+  - `platforms-tools-search-evidence-from-a-wrapped-grep`
+  - `infrastructure-agent-orchestration-review-diff-base-after-a-sibling-merge`
+- **4 amended pages:** `platforms-tools-per-call-subagent-effort` (step 5), `qa-process-scope-purity-checks` (Do #3), `backend-common-change-impact-corpus-sweep-before-a-rejection-rule` (edge row) and `infrastructure-ci-cd-workflow-authored-pull-requests` (revised for a GitHub docs change).
+- **2 plan-gap rows** retired as local-layer.
+
+**Recovered work.** A flush on 2026-10-08 13:57 wrote drafts for 4 of these candidates (grep wrapper, diff base, gate token, effort floor) and died before committing. Its staged diff was saved to a patch and re-applied on top of current `main`. The 9 files that conflicted were each a one-line insertion (`related:` id, index phrase, log line), and each was re-inserted by hand. Every claim and URL in the drafts was then re-checked (see below).
+
+The draft said the effort-floor insight had been pushed to #241's branch. It never was: no ref contains it, and #241 merged without it. So it is ingested here.
 
 ## Verified best-practice
 
-**0d334673a1a799d2 — a WebGL scene that freezes the main thread under software GL (headless Chromium, SwiftShader)**
+### 1. Search evidence from Claude Code's wrapped `grep` (`1ded49b00eff54c6`)
 
-- Claim: under headless Chromium with SwiftShader and software compositing, a visible WebGL canvas is read back on every frame commit (`Commit → GLES2::ReadPixels`), and the readback waits for all queued GPU work, including shader JIT. The first frames of a three.js scene therefore freeze the main thread and break DOM timing tests. Fix: compile the scene and each post-processing pass, poll a WebGL2 fence, render once offscreen, poll the fence again, and keep the canvas `visibility: hidden` until both fences signal.
-- Sources checked:
-  - https://threejs.org/docs/pages/WebGLRenderer.html — `compileAsync` exists so the scene renders "without unnecessary stalling due to shader compilation", and the docs recommend it.
-  - https://developer.mozilla.org/docs/Web/API/KHR_parallel_shader_compile — compile and link status can be polled without stalls only through `COMPLETION_STATUS_KHR`; the extension is not Baseline.
-  - https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext/getSyncParameter — `fenceSync(SYNC_GPU_COMMANDS_COMPLETE, 0)` and `getSyncParameter(sync, SYNC_STATUS)` return `SIGNALED`/`UNSIGNALED`; WebGL2 only.
-  - https://chromium.googlesource.com/chromium/src/+/da170c2267b2201954efe1c8fa5d2d89ab09f7bf/docs/gpu/swiftshader.md and https://groups.google.com/a/chromium.org/g/blink-dev/c/yhFguWS_3pM/m/oLrB5up_BwAJ — automatic SwiftShader fallback is being removed; `--enable-unsafe-swiftshader` opts back in for headless testing.
-  - https://www.khronos.org/webgl/public-mailing-list/public_webgl/1005/msg00219.php — browsers read each WebGL frame back to composite it in software (2010; background only).
-- How verified: the session's own Chrome trace showed long tasks `Commit → GLES2::ReadPixels` of 556 ms and 658 ms. With the hidden-canvas warm-up there were 0 long tasks, and the E2E suite passed 36/36 three runs in a row. I also read the session's implementation (`three/shader-warmup.ts`: compile → fence → offscreen render → fence, bounded at 300 frames) so the page's steps match what was proven. The external sources confirm the APIs and the per-commit readback model. No current Chromium document describes the exact `Commit → ReadPixels` wait, so that mechanism rests on the field trace.
-- Confidence: **field-tested**. The WebGL1 and `data-ready` edge rows are not measured; they are phrased as "check the trace again" or as fallbacks.
+- **Claim:** in Claude Code's Bash tool, `grep` is a function that runs the bundled ugrep with `--ignore-files`. A recursive search skips gitignored files, and a pattern too complex for ugrep exits 2 with empty stdout. Evidence searches use `/usr/bin/grep -r` or `git grep` and check the exit status.
+- **Sources:** code.claude.com `tools-reference`, Claude Code CHANGELOG 2.1.117, anthropics/claude-code#69736 (open), Genivia/ugrep PR #556, POSIX `grep` and `command`.
+- **How verified:**
+  - An independent agent re-fetched every URL (all HTTP 200) and matched each quote.
+  - It re-ran the probe this session: `type grep` gave a shell function, and in a dir whose `.gitignore` lists `hidden.txt` the wrapper listed only `shown.txt` while `/usr/bin/grep -rl` listed both.
+- **Fixes made this run:**
+  - The #69736 title had been quoted without its last words; the full title is now quoted.
+  - The page said no setting turns the function off. It now adds the maintainer comment of 2026-08-17 on #69736: naming the tools (`--allowedTools Grep,Glob`) brings them back and stops the shadowing.
+  - The "every file" row now passes `--exclude-dir=.git -I`, so `/usr/bin/grep` skips the same `.git/` and binary files the wrapper skips.
+- **Confidence:** verified.
+
+### 2. Diff base for reviewing a parallel task after a sibling merged (`d32b7f2d828fa120`)
+
+- **Claim:** review a task's worktree with `git diff --merge-base <integ>`, not the integration tip.
+- **Sources:** git-scm pages for `git-diff` (`--merge-base`; present in 2.30.0, absent in 2.29.0), `git-merge-tree`, `git-merge` and `git-worktree`, plus RelNotes 2.38.0. Every quote was re-matched.
+- **How verified:** re-run on git 2.50.1. `git diff integ` showed the sibling's `sib.txt` as deleted, while `git diff --merge-base integ` showed only the task's own file.
+- **Confidence:** verified.
+
+### 3. A multi-condition gate's pass token (`1a7d6c33f7409531`)
+
+- **Claim:** the pass token must depend on every condition, and the control must feed the bad input into that same gate.
+- **Sources:** GNU Bash manual, *Lists*. Its three quotes were re-matched.
+- **How verified:** the 2026-10-08 local reproduction. The chained one-liner printed the violating path and `SCOPE_OK` with exit 0; the single script printed `bad=[src/styles/x.css]` with exit 1.
+- **Fixes made this run:**
+  - The new row cited `portable-shell-scripts`, which does not support it; it now points at the Bash manual.
+  - An existing `git-status` quote on the same page was corrected from "Shows" to "Show".
+- **Confidence:** verified.
+
+### 4. Paths that bypass an effort/model floor (`dfcdfaaba94e1bad`)
+
+- **Claim:** a floor written in agent frontmatter has three bypass paths:
+  - the variant generator's step-down rule;
+  - `CLAUDE_CODE_EFFORT_LEVEL` on the parent session;
+  - a 429/overload retry list (or `fallbackModel`) that names a cheaper model.
+- **Sources:** code.claude.com raw `.md` pages, all re-fetched 2026-10-09:
+  - `env-vars`: "Takes precedence over `--effort`, `/effort`, and the `modelSettings` and `effortLevel` settings";
+  - `sub-agents` `effort` row: "Overrides the session effort level, but not the `CLAUDE_CODE_EFFORT_LEVEL` environment variable". The wording on `main` was older and has been updated;
+  - `settings-reference#fallbackmodel`.
+- **How verified:**
+  - dev-loop PR #262 (`5c9bddb`): read `VARIANTS` and the "never below high" rule in `scripts/gen-agent-tier-variants.sh`, and the "whichever of `opus` and `fable` the 429 does not name … never below Opus" text in `skills/orchestrate/SKILL.md` and `agents/*.md`.
+  - Reproduced in a scratch clone: `tests/agent-model-pin.bats` plus `tests/agent-tier-variants.bats` gave 21 ok / 0 not ok on `main`. With `task-reviewer:medium` regenerated, test 5 "meets the opus-5.5-high floor" failed (rc 1).
+- **Correction to the candidate:** its "429 fallback chain" is a hand-written retry rule. Claude Code's `fallbackModel` is a separate list, so the page names both.
+- **Confidence:** verified.
+
+### 5. Removing wrapping quotes from a frontmatter value (`b81d88806614c826`, Korean)
+
+- **Claim:** `replace(/^["']|["']$/g, "")` strips each end on its own, so a value quoted at only one end keeps an unpaired quote. Read the value with a YAML parser, or strip a matching pair only.
+- **Sources:**
+  - YAML 1.2.2 §7.3.3: "Plain scalars must not begin with most indicators"; §7.3.2 and §7.3.1 on escapes.
+  - gray-matter README: it uses js-yaml by default.
+- **How verified:** Node 26.7.0, PyYAML 6.0.3 and js-yaml 5.4.3 on nine values. I re-ran the key cells myself.
+- **Extensions beyond the candidate:**
+  - The candidate's own example, `title: "인용구" — 부제`, is invalid YAML: both parsers raise an error, so the page says to fix the source.
+  - The paired regex still mis-strips `"a" and "b"`.
+  - A trailing `# comment` defeats the paired regex.
+- **Confidence:** verified.
+
+### 6. A Release made with `GITHUB_TOKEN` must start another workflow (`c82505cfaeffcc30`)
+
+- **Claim:** events created with `GITHUB_TOKEN` start no new workflow runs. Chain by a same-workflow job or `workflow_call`, by explicit dispatch, or with an App token or PAT.
+- **Sources (raw pages fetched 2026-10-09 and grepped):**
+  - docs.github.com `concepts/security/github_token`;
+  - `reusable-workflows`;
+  - the REST `create-a-workflow-dispatch-event` page: fine-grained "'Actions' repository permissions (write)";
+  - `events-that-trigger-workflows`: the `workflow_run` three-level limit, and the default-branch note on `workflow_run`, `workflow_dispatch` and `repository_dispatch`;
+  - the release-please-action README.
+- **Correction found:** the token page now lists a second exception that the candidate and an existing page both missed. A PR opened or updated with the token gets `pull_request` runs "in an approval-required state".
+  - `workflow-authored-pull-requests` was revised for this; the log records it as `revise`.
+  - Its directive is unchanged (use a PAT or App token). Its 2026-08-25 field record of zero check runs is kept.
+- **Not covered by the docs:** whether `workflow_run` fires after a `GITHUB_TOKEN` event. The page says to prove it with one run.
+- **Confidence:** verified.
+
+### 7. Blind LLM judgment of a measurable visual rule (`11d73c443f7a0fdf`, Korean)
+
+- **Claim:**
+  - brief the judge blind;
+  - ask for reasoning before the verdict;
+  - read every pair line;
+  - use three judges and fail any split;
+  - set per-cue and whole-image thresholds.
+- **Sources:**
+  - Sharma et al. 2023, arXiv 2310.13548 §3.3: "The user suggesting an incorrect answer can reduce accuracy by up to 27%";
+  - Anthropic `develop-tests`: "Use a grader model with thinking on, so that it reasons before it produces an evaluation score";
+  - Zheng et al. 2023, arXiv 2306.05685 (judge biases);
+  - Verga et al. 2024, arXiv 2404.18796 (a panel of judges);
+  - Turpin et al. 2023, arXiv 2305.04388 (stated reasoning can be unfaithful).
+  - Each quote was grepped in the fetched abstract or full text.
+- **Not sourced:** "read every line" (step 3) and the per-cue overstatement (step 5, 76 vs 39 cells) are field-only. No general source was found for step 5.
+- **Confidence:** field-tested.
+
+### 8. Measure a received rule on the named failures before implementing (`5ab0888e4a52c7e6`, Korean)
+
+- **Claim:** score a new rule on the pairs the judges named before implementing it. As worded, the rule would have passed 5 of 6 named pairs.
+- **Sources:** this is the existing page's method (eslint-remote-tester, clippy lintcheck, crater). The new row adds field evidence only.
+- **Confidence:** the page stays `verified`; the new row is field evidence.
 
 ## Existing-layer check
 
-Pages read: testing-e2e-dynamic-file-input-uploads-in-headless-chromium, testing-e2e-e2e-stability
+Pages read: infrastructure-ci-cd-workflow-authored-pull-requests, backend-common-change-impact-corpus-sweep-before-a-rejection-rule, platforms-tools-per-call-subagent-effort, qa-process-llm-review-pipelines, qa-process-fresh-context-code-review, testing-quality-anchor-cases-for-allowlist-regexes, qa-process-scope-purity-checks, platforms-tools-search-evidence-from-a-wrapped-grep, platforms-environment-path-resolution, platforms-tools-harness-mediated-tool-results, debugging-methodology-reproduce-first, testing-quality-checks-that-cannot-pass, platforms-shells-portable-shell-scripts, infrastructure-agent-orchestration-semantic-conflicts-after-parallel-merge, infrastructure-agent-orchestration-ours-resolution-on-a-mixed-content-conflict, infrastructure-agent-orchestration-worktree-isolated-workers
 
-- `wiki_search` top hits for the trigger: frontend-design-html-in-canvas, frontend-design-theme-swap-propagation-check, frontend-design-token-mapping-under-scoped-theme-overrides, qa-environments-offscreen-render-capture-without-screen-recording, frontend-accessibility-contrast-of-interactive-states. A second query (Playwright / WebGL / main thread blocked) returned debugging-concurrency-intermittent-failures, frontend-rendering-rerender-and-memoization, frontend-state-effects-usage, frontend-design-anti-slop-visual-design. None of them covers WebGL readback stalls, shader warm-up, or SwiftShader, so no merge target exists.
-- I read the `testing/e2e` index rows and both e2e pages. e2e-stability is about generic selector and wait strategy, and the file-input page is a different headless-Chromium quirk. Created new: `wiki/testing/e2e/webgl-scene-stalls-under-software-gl.md`.
-- Related links on the new page: testing-e2e-e2e-stability, frontend-state-effects-usage, testing-flaky-diagnosing-flaky-tests. I did not add backlinks on those pages: open PRs #279 and #270 edit `testing/e2e/e2e-stability.md`, and a frontmatter edit there risks a conflict. The owner can add the backlink after those PRs land.
-- No conflicts flagged.
+- **Searches run:**
+  - Keyword search over all of `wiki/` with `/usr/bin/grep -rliE` for `GITHUB_TOKEN`, `repository_dispatch`, `workflow_run`, `frontmatter`, quote stripping, `blind`, `judge`, `perceptual`, `calibrat`, `EFFORT_LEVEL` and `fallbackModel`.
+  - `wiki_search` (k=5) on each new trigger.
+- **The last seven ids above were read by the 2026-10-08 run that drafted candidates 1–3.** This run re-checked only their `related:` lines and the drafts' claims.
+- **Per candidate:**
+  - **1, 2, 3:** see the draft's original check. No new overlap appeared on `main` since then: the 27 PRs it compared against are now merged, and none adds a page on grep wrappers, review diff bases or gate tokens.
+  - **4:** `per-call-subagent-effort` already covered bypass path 2 as an edge row. Same trigger, compatible directive → merged as step 5 plus one `Instead of` row.
+  - **5:** no page on frontmatter quote handling. The nearest hits were shell quoting pages (`portable-shell-scripts`, `escapes-in-shell-string-literals`), a different trigger → new page. Back-link from `anchor-cases-for-allowlist-regexes`, another regex-anchoring trap.
+  - **6:** `workflow-authored-pull-requests` states the token rule for a bot that opens its own PR. A Release → publish chain is a different trigger → new page, with links both ways. The existing page was revised where the docs change refutes "zero check runs" as a general statement.
+  - **7:** no page on LLM judges for visual criteria. `llm-review-pipelines` and `fresh-context-code-review` cover code review → new page, back-linked from `fresh-context-code-review`.
+  - **8:** `corpus-sweep-before-a-rejection-rule` steps 1–3 are the same practice → merged as one edge row, back-linked to page 7.
+- **Conflicts with existing directives:** none. The `workflow-authored-pull-requests` change is a fact update; its directive is unchanged.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed: #284, #283, #282, #280, #279, #275, #274, #273, #272, #271, #270, #269, #268, #266, #265. This headless run cannot diff their contents, so I compared titles and touched file lists, and released any candidate that plausibly overlaps.
-
-| Candidate | Overlapping open PR | Verdict |
-|-----------|---------------------|---------|
-| 0d334673a1a799d2 (WebGL under SwiftShader) | none: no open PR touches WebGL, shaders, or SwiftShader. #279 and #270 edit `testing/e2e/e2e-stability.md` for blur layout shift and reduced motion, a different trigger | **new** |
-| 12aa086463fd4e2a (BSD grep `$` in `\|` alternation) | #273 (`platforms/tools/bsd-vs-gnu-cli.md`, shell pages); #265 (`platforms/tools/search-evidence-from-a-wrapped-grep.md`) | released (pending duplicate) |
-| d631595a0e889652 (colour-role rule judged from screenshots) | #265 (`qa/process/blind-llm-judgment-of-a-visual-rule.md`) | released (pending duplicate) |
-| 444a0a15e38e04d9, e7fbe0b415a7759a, 2061ccd070f93ead, a2c6a0c5368e9dec | n/a (project-specific) | retired as local-layer |
-| 97c37473b53e63c2 | not assessed: this run could not locate its queue file (no directory listing is allowed headless) | released unread |
+- **Open `knowledge/*` heads:** none.
+  - `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"` returned `[]`.
+  - The backlog #223–#261 was merged on 2026-10-09 between 13:02 and 13:21 UTC (`gh pr list --state merged`).
+- **Verdicts:** all 8 candidates are **new** relative to open PRs.
+- **#241:** the earlier draft's "fold into #241" was never pushed, and #241 is merged without it, so candidate 4 is ingested here instead.
 
 ## Routing decision
 
-- 0d334673a1a799d2 → `testing/e2e/webgl-scene-stalls-under-software-gl.md` (new page; id `testing-e2e-webgl-scene-stalls-under-software-gl`). The trigger is a browser E2E suite that fails only under headless software GL, and the existing `e2e` category covers headless-Chromium quirks (see the file-input page). The fix is rendering code, but the situation you route on is the failing E2E run. The candidate's `domain: frontend` hint was overridden for that reason. The row was added to `wiki/testing/index.md` under `## e2e`, and the entry to `log.md`.
+| Candidate | Target |
+|---|---|
+| 1 | `platforms/tools/search-evidence-from-a-wrapped-grep.md` (new) |
+| 2 | `infrastructure/agent-orchestration/review-diff-base-after-a-sibling-merge.md` (new) |
+| 3 | `qa/process/scope-purity-checks.md` (amend Do #3) |
+| 4 | `platforms/tools/per-call-subagent-effort.md` (amend step 5) |
+| 5 | `backend/common/integrations/wrapping-quotes-in-a-frontmatter-value.md` (new). `integrations` holds the pages on consuming formats other tools write (`json-parse-of-a-no-body-response`, `checksum-restored-identifiers`) |
+| 6 | `infrastructure/ci-cd/chaining-workflows-past-a-github-token-event.md` (new), plus a revision of `workflow-authored-pull-requests.md` |
+| 7 | `qa/process/blind-llm-judgment-of-a-visual-rule.md` (new), next to `llm-review-pipelines` and `fresh-context-code-review` |
+| 8 | `backend/common/change-impact/corpus-sweep-before-a-rejection-rule.md` (edge row) |
+
 - No new category.
+- The `INDEX.md` rows gain phrases for: the wrapped `grep`, the review diff base, hand-parsed frontmatter values and blind LLM judgments.
+
+**Review:** an adversarial reviewer (`feature-dev:code-reviewer`) read the staged diff before the commit and reported 3 blockers and 11 minor findings.
+- **Fixed:**
+  - two misquoted lines on the token page;
+  - the approval-path wording on `workflow-authored-pull-requests` and its index row;
+  - a `--effort` remedy that the env var outranks;
+  - the dispatch default-branch rule;
+  - the release-please row;
+  - the Sharma claim, now narrowed;
+  - "several judges", now three;
+  - the grep page's tool-naming escape and its `.git/` and binary-file note;
+  - the scope-purity link;
+  - the YAML `# comment` row;
+  - the generator wording.
+- **Not changed:**
+  - the CHANGELOG 2.1.117 quote: the reviewer's fetch was cut off, and an independent re-fetch matched it exactly;
+  - `last_verified` on `workflow-authored-pull-requests` and `corpus-sweep`: their other claims were not re-verified.
+- **Lint:** `wiki-structure-checks.js` reports 431 pages, 0 findings. `wiki-lint-prohibitions.js` reports no violations in any changed page; its remaining hits are the 3 already on `main` and copies under the ignored `.claude/tmp/`.
 
 ## Local-layer candidates
 
-All four are linkly-halli-galli-lamprey plan-gaps for task t3-scene3d. Their directives name that repo's files (`three/psx.ts`, `club-room.tsx`, `club-geometry.ts`, `sceneGeometry`), so run wiki-ingest inside that project:
+| Row | Target | Project |
+|---|---|---|
+| `53963e04e573a487` "Planning t6: deciding Thinking and output budget" | `wiki-local/backend/llm/thinking-and-output-budget.md` | linkly-invitation (run wiki-ingest inside that project) |
+| `b3423a63c28655e7` "Planning t6: deciding Prompt" | `wiki-local/backend/llm/vision-analyze-prompt.md` | linkly-invitation (run wiki-ingest inside that project) |
 
-- 444a0a15e38e04d9 (Lights and triangle budget) → `wiki-local/frontend/rendering/club-scene-lights-and-triangle-budget.md`
-- a2c6a0c5368e9dec (Lights and triangle budget, later revision with off-centre spot) → same page as above (newer revision supersedes)
-- e7fbe0b415a7759a (Table layout) → `wiki-local/frontend/rendering/club-scene-table-layout.md`
-- 2061ccd070f93ead (Static world content) → `wiki-local/frontend/rendering/club-scene-static-world-content.md`
-
-Separately: 444a/a2c6 contain one general three.js lesson. When `SpotLight.distance` is 0, the spot shadow camera keeps its default `far` (500), so receivers farther from the light are never shadowed; set `shadow.camera.near`/`far` explicitly. It would make a good bundled-wiki candidate if emitted as its own ★ Insight with a source.
+Both are wiki-plan Phase B decisions that name that repo's own files (`src/server/vision/prompt.ts`, `plans/t6/design.md`). They were retired, not ingested here.
