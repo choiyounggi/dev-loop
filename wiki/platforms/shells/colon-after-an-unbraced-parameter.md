@@ -8,7 +8,7 @@ sources:
   - https://zsh.sourceforge.io/Doc/Release/Expansion.html
   - https://zsh.sourceforge.io/Doc/Release/Options.html
 last_verified: 2026-10-07
-related: [platforms-shells-portable-shell-scripts, platforms-shells-unset-versus-empty-parameters, platforms-shells-escapes-in-shell-string-literals]
+related: [platforms-shells-portable-shell-scripts, platforms-shells-unset-versus-empty-parameters, platforms-shells-escapes-in-shell-string-literals, platforms-shells-non-ascii-text-after-an-unbraced-parameter]
 ---
 
 # A Colon Right After an Unbraced Parameter in zsh
