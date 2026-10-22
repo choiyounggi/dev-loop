@@ -1,78 +1,54 @@
 # Knowledge flush — 1 insight(s)
 
-Headless autoflush run. 16 queue rows were claimed. 4 were found and judged: 1 ingested, 3 released as pending duplicates of open PRs. The other 12 were released untouched, because this run could not find them (see the Open-PR check).
+Headless autoflush run `20261018-232423-76361`. Claimed 8 candidates: 1 ingested, 4 retired as local-layer plan-gaps, 3 released back to pending (2 plausible duplicates of open PRs, 1 whose queue file this run could not locate).
 
 ## Verified best-practice
 
-**Candidate `85e196ab8171f1d5` — when a JS/TS script inserts text it did not write with `String.prototype.replace`, pass that text through a replacer function.**
+**0d334673a1a799d2 — a WebGL scene that freezes the main thread under software GL (headless Chromium, SwiftShader)**
 
-- Claim: a replacement *string* is a template even when `from` is a plain string. `$$` becomes `$`. `$&`, `` $` `` and `$'` insert the match, the text before it and the text after it. `$n` and `$<name>` insert capture groups (regex patterns only). The value a replacer function returns is inserted as-is. `replaceAll` and regex replacements follow the same rules.
+- Claim: under headless Chromium with SwiftShader and software compositing, a visible WebGL canvas is read back on every frame commit (`Commit → GLES2::ReadPixels`), and the readback waits for all queued GPU work, including shader JIT. The first frames of a three.js scene therefore freeze the main thread and break DOM timing tests. Fix: compile the scene and each post-processing pass, poll a WebGL2 fence, render once offscreen, poll the fence again, and keep the canvas `visibility: hidden` until both fences signal.
 - Sources checked:
-  - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace
-    - The replacement-patterns table.
-    - "Specifying a function as the replacement": the return value is used as the replacement, and the special replacement patterns do not apply to strings it returns.
-    - Confirmed through two web searches. One of them also turned up the same note in OpenJDK JDK-8016542 (https://bugs.openjdk.org/browse/JDK-8016542), where `"abc".replace("c", "$&")` with a function replacement must keep the literal `$&`.
-  - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replaceAll
-    - The replacement has the same semantics as `replace()`.
-  - https://tc39.es/ecma262/#sec-getsubstitution
-    - The spec operation behind both `replace` and `RegExp.prototype[Symbol.replace]`. A WebKit changeset in the search results cites it.
-- Field evidence from the candidate's session: a plpgsql `AS $$ … $$` fixture was spliced in with `str.replace(from, to)`. Postgres then failed with 42601 `syntax error at or near "$"`. Redoing the splice so the text went in verbatim made the suite pass 6/6.
-- This headless run has no Node execution tool, so no new local repro was run. The page leans on the MDN text and the session's field evidence.
-- Confidence: **verified**.
+  - https://threejs.org/docs/pages/WebGLRenderer.html — `compileAsync` exists so the scene renders "without unnecessary stalling due to shader compilation", and the docs recommend it.
+  - https://developer.mozilla.org/docs/Web/API/KHR_parallel_shader_compile — compile and link status can be polled without stalls only through `COMPLETION_STATUS_KHR`; the extension is not Baseline.
+  - https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext/getSyncParameter — `fenceSync(SYNC_GPU_COMMANDS_COMPLETE, 0)` and `getSyncParameter(sync, SYNC_STATUS)` return `SIGNALED`/`UNSIGNALED`; WebGL2 only.
+  - https://chromium.googlesource.com/chromium/src/+/da170c2267b2201954efe1c8fa5d2d89ab09f7bf/docs/gpu/swiftshader.md and https://groups.google.com/a/chromium.org/g/blink-dev/c/yhFguWS_3pM/m/oLrB5up_BwAJ — automatic SwiftShader fallback is being removed; `--enable-unsafe-swiftshader` opts back in for headless testing.
+  - https://www.khronos.org/webgl/public-mailing-list/public_webgl/1005/msg00219.php — browsers read each WebGL frame back to composite it in software (2010; background only).
+- How verified: the session's own Chrome trace showed long tasks `Commit → GLES2::ReadPixels` of 556 ms and 658 ms. With the hidden-canvas warm-up there were 0 long tasks, and the E2E suite passed 36/36 three runs in a row. I also read the session's implementation (`three/shader-warmup.ts`: compile → fence → offscreen render → fence, bounded at 300 frames) so the page's steps match what was proven. The external sources confirm the APIs and the per-commit readback model. No current Chromium document describes the exact `Commit → ReadPixels` wait, so that mechanism rests on the field trace.
+- Confidence: **field-tested**. The WebGL1 and `data-ready` edge rows are not measured; they are phrased as "check the trace again" or as fallbacks.
 
 ## Existing-layer check
 
-- `wiki_search` was run with the candidate's trigger and with a paraphrase (k=8 each). Top hits:
-  - testing-quality-anchor-cases-for-allowlist-regexes
-  - platforms-shells-escapes-in-shell-string-literals
-  - testing-quality-schema-additions-under-a-golden-gate
-  - platforms-shells-unset-versus-empty-parameters
-  - infrastructure-config-config-values-emitted-as-source-text
-  - frontend-security-xss-safe-rendering
-  - testing-quality-json-manifest-edit-gates
-  - testing-quality-ci-workflow-step-behavior-tests
-- Opened and compared "When this applies":
-  - anchor-cases: regex `^`/`$` anchors in allowlist tests. Different trigger.
-  - escapes-in-shell-string-literals: backslash escapes in shell literals. Different trigger.
-  - config-values-emitted-as-source-text: escaping a value a build step writes into generated source. This is the adjacent case, and it now has a `related:` link both ways.
-- No existing page covers JS `replace` replacement patterns, so this is a **new page**. No conflicts were flagged.
-- `wiki/backend/node/index.md` had no `language` category. `wiki/backend/python/index.md` does have one, and it served as the model.
+Pages read: testing-e2e-dynamic-file-input-uploads-in-headless-chromium, testing-e2e-e2e-stability
 
-Pages read: infrastructure-config-config-values-emitted-as-source-text, platforms-shells-escapes-in-shell-string-literals, testing-quality-anchor-cases-for-allowlist-regexes, infrastructure-agent-orchestration-worktree-isolated-workers
+- `wiki_search` top hits for the trigger: frontend-design-html-in-canvas, frontend-design-theme-swap-propagation-check, frontend-design-token-mapping-under-scoped-theme-overrides, qa-environments-offscreen-render-capture-without-screen-recording, frontend-accessibility-contrast-of-interactive-states. A second query (Playwright / WebGL / main thread blocked) returned debugging-concurrency-intermittent-failures, frontend-rendering-rerender-and-memoization, frontend-state-effects-usage, frontend-design-anti-slop-visual-design. None of them covers WebGL readback stalls, shader warm-up, or SwiftShader, so no merge target exists.
+- I read the `testing/e2e` index rows and both e2e pages. e2e-stability is about generic selector and wait strategy, and the file-input page is a different headless-Chromium quirk. Created new: `wiki/testing/e2e/webgl-scene-stalls-under-software-gl.md`.
+- Related links on the new page: testing-e2e-e2e-stability, frontend-state-effects-usage, testing-flaky-diagnosing-flaky-tests. I did not add backlinks on those pages: open PRs #279 and #270 edit `testing/e2e/e2e-stability.md`, and a frontmatter edit there risks a conflict. The owner can add the backlink after those PRs land.
+- No conflicts flagged.
 
 ## Open-PR check
 
-Open `knowledge/*` heads: #280, #279, #275, #274, #273, #272, #271, #270, #269, #268, #266, #265. This run cannot git-diff them, so overlap was judged from each PR's title and file list (`gh pr list … --json number,title,files`).
+Open `knowledge/*` heads listed: #284, #283, #282, #280, #279, #275, #274, #273, #272, #271, #270, #269, #268, #266, #265. This headless run cannot diff their contents, so I compared titles and touched file lists, and released any candidate that plausibly overlaps.
 
-| Candidate | Overlapping open PR(s) | Verdict |
-|-----------|------------------------|---------|
-| `85e196ab8171f1d5` JS `String.replace` `$` patterns | None. No open PR touches `backend/node/language/` or a JS string-replacement topic. | **new**, ingested |
-| `12aa086463fd4e2a` macOS BSD grep: `$` in a BRE with `\|` alternation is literal | #273 (`platforms/tools/bsd-vs-gnu-cli.md`, `platforms/shells/portable-shell-scripts.md`) and #265 (wrapped grep) | pending duplicate, claim **released** |
-| `66f97671dfa1b324` Prisma 7 driver adapter: COMMIT-time errors arrive as `DriverAdapterError` and slip past an `instanceof Prisma.*Error` wrapper | #280 (a wrapper's own error label pinned by a boundary fault) and #269 (`backend/common/orm/prisma-7-…`) | pending duplicate, claim **released** |
-| `447c9601617b87ca` Assertion-count detector misses unittest `self.assert*` | #270, #274 (`testing/quality/checks-that-cannot-pass.md`, `harness-reverse-controls.md`) | pending duplicate, claim **released** |
-
-The 12 other claimed ids could not be located:
-
-```
-97c37473b53e63c2, 51b969b2ddf1a0e4, eb432a16d29c7f6b, 059bcdc4893c6cb6,
-9308b554babe5a27, a8587555b58e7c6e, 3c9c55ed8769b312, 3e9ce6cd2ed89d38,
-96c6e1721a7f2aaf, a2ca98b37ab9ef8f, 7ec41d4bae57db6e, 056027e7c9098793
-```
-
-- Cause: this headless run's permissions do not allow listing `~/.dev-loop/queue/`, and the session files holding these rows could not be found from session ids.
-- They were **released** (set back to pending), not retired, so the next manual `/dev-loop:knowledge-flush` will process them.
+| Candidate | Overlapping open PR | Verdict |
+|-----------|---------------------|---------|
+| 0d334673a1a799d2 (WebGL under SwiftShader) | none: no open PR touches WebGL, shaders, or SwiftShader. #279 and #270 edit `testing/e2e/e2e-stability.md` for blur layout shift and reduced motion, a different trigger | **new** |
+| 12aa086463fd4e2a (BSD grep `$` in `\|` alternation) | #273 (`platforms/tools/bsd-vs-gnu-cli.md`, shell pages); #265 (`platforms/tools/search-evidence-from-a-wrapped-grep.md`) | released (pending duplicate) |
+| d631595a0e889652 (colour-role rule judged from screenshots) | #265 (`qa/process/blind-llm-judgment-of-a-visual-rule.md`) | released (pending duplicate) |
+| 444a0a15e38e04d9, e7fbe0b415a7759a, 2061ccd070f93ead, a2c6a0c5368e9dec | n/a (project-specific) | retired as local-layer |
+| 97c37473b53e63c2 | not assessed: this run could not locate its queue file (no directory listing is allowed headless) | released unread |
 
 ## Routing decision
 
-- `85e196ab8171f1d5` → `backend/node/language/string-replace-replacement-patterns.md`, id `backend-node-language-string-replace-replacement-patterns`.
-  - The candidate's `domain: testing` hint was not followed. The lesson is a JavaScript language rule that applies to any script splicing text, not a test-design rule.
-  - This adds a **new category `language`** to the `backend/node` subtree. Why: the node subtree only has `runtime` (process/runtime environment), `async` and `boundaries` (validating external data). None of them covers built-in language semantics. The python subtree already keeps its equivalent traps under `language/`.
-- Plumbing:
-  - `wiki/backend/node/index.md` gets a new `## language` section at the end of the file. It goes at the end so it does not sit next to rows that open PRs #266 and #268 add to that index.
-  - `log.md` gets an ingest line.
-  - `related:` link added both ways with infrastructure-config-config-values-emitted-as-source-text.
-- `INDEX.md` and `wiki/backend/index.md` were left unchanged. Their node rows already send any Node.js/TypeScript code question to the node subtree. Open PRs #265/#274/#279 (INDEX.md) and #265/#266/#268/#269/#272 (backend/index.md) edit those files.
+- 0d334673a1a799d2 → `testing/e2e/webgl-scene-stalls-under-software-gl.md` (new page; id `testing-e2e-webgl-scene-stalls-under-software-gl`). The trigger is a browser E2E suite that fails only under headless software GL, and the existing `e2e` category covers headless-Chromium quirks (see the file-input page). The fix is rendering code, but the situation you route on is the failing E2E run. The candidate's `domain: frontend` hint was overridden for that reason. The row was added to `wiki/testing/index.md` under `## e2e`, and the entry to `log.md`.
+- No new category.
 
 ## Local-layer candidates
 
-none
+All four are linkly-halli-galli-lamprey plan-gaps for task t3-scene3d. Their directives name that repo's files (`three/psx.ts`, `club-room.tsx`, `club-geometry.ts`, `sceneGeometry`), so run wiki-ingest inside that project:
+
+- 444a0a15e38e04d9 (Lights and triangle budget) → `wiki-local/frontend/rendering/club-scene-lights-and-triangle-budget.md`
+- a2c6a0c5368e9dec (Lights and triangle budget, later revision with off-centre spot) → same page as above (newer revision supersedes)
+- e7fbe0b415a7759a (Table layout) → `wiki-local/frontend/rendering/club-scene-table-layout.md`
+- 2061ccd070f93ead (Static world content) → `wiki-local/frontend/rendering/club-scene-static-world-content.md`
+
+Separately: 444a/a2c6 contain one general three.js lesson. When `SpotLight.distance` is 0, the spot shadow camera keeps its default `far` (500), so receivers farther from the light are never shadowed; set `shadow.camera.near`/`far` explicitly. It would make a good bundled-wiki candidate if emitted as its own ★ Insight with a source.
