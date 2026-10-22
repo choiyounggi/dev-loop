@@ -21,6 +21,7 @@ own the Node mechanics.
 | Page | Load when |
 |------|-----------|
 | [promise-error-handling](async/promise-error-handling.md) | unhandledRejection crashes/warnings in logs; errors vanishing from async flows; an async function called without await inside a handler; choosing between Promise.all / allSettled / any / race for parallel work; racing a timeout that must actually cancel the loser; deciding `return promise` vs `return await promise` in a try block |
+| [request-body-reader-cancel](async/request-body-reader-cancel.md) | Racing a deadline against `reader.read()` on a request body in a Node server (Next.js route handler in the Node runtime, or `new Request(url, { body: nodeReadable, duplex: 'half' })`) and cancelling the reader when the deadline wins; a slow-upload guard or in-flight cap whose slot is released only after ~300 s (Node `requestTimeout`); `await reader.cancel()` that never returns; a deadline test that passes with a `new ReadableStream({})` fake body |
 
 ## boundaries
 
@@ -30,3 +31,9 @@ own the Node mechanics.
 | [zod-4-checks-continue-after-a-failure](boundaries/zod-4-checks-continue-after-a-failure.md) | A zod 4 schema chains `.regex()`/`.min()`/other checks and then a `.refine()`/`.superRefine()` whose function throws or misjudges input the earlier check should have excluded (`BigInt`, `new URL`, `JSON.parse`) |
 | [runtime-validation](boundaries/runtime-validation.md) | Typing request bodies/query params/env vars/third-party responses/queue messages in a TypeScript service; an `as` cast on external data; runtime shape errors deep inside code that compiled fine; choosing where schema parse lives (handler, startup config, consumer) and where static types alone suffice |
 | [nestjs-multer-upload-errors](boundaries/nestjs-multer-upload-errors.md) | A NestJS `FileInterceptor`/`FilesInterceptor` route needs its own error body for upload failures (file too large, too many files, unexpected field, malformed multipart); a `@Catch(MulterError)` filter never runs; choosing which exception classes an upload filter catches and how to test it |
+
+## language
+
+| Page | Load when |
+|------|-----------|
+| [string-replace-replacement-patterns](language/string-replace-replacement-patterns.md) | A JS/TS script (codemod, fixture or snippet paster, template filler, build step) inserts text it did not write — SQL, shell, a fixture, user input, file contents — with `replace`/`replaceAll` or a regex; a pasted plpgsql `$$` body arrives as `$` (Postgres 42601 `syntax error at or near "$"`) or a `$&`/`` $` ``/`$'` in the inserted text turns into other text; choosing between a replacer function, `split/join`, and escaping `$` as `$$` |

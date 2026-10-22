@@ -45,6 +45,40 @@ flat_skill() {
   [[ "$output" == *"tui-idle"* ]]
 }
 
+# GROUNDWORK_GUARDRAILS_CONFIG: the guardrails plugin now only lets a repo
+# config TIGHTEN rules, and only trusts GROUNDWORK_GUARDRAILS_CONFIG when it
+# resolves OUTSIDE every project tree, so the worker's own loosened config
+# must reach it as that external, trusted file
+# ($HOME/.claude/groundwork/overrides/dev-loop-<id>.json) via this env var, derived from
+# the --worktree selector. Needs a worktree that actually exists on disk
+# (worker-guardrails.sh --path resolves it), unlike the other DRYRUN tests'
+# fake "/wt" selector.
+@test "worker mode: also exports GROUNDWORK_GUARDRAILS_CONFIG as the EXTERNAL guardrails path" {
+  realwt="$BATS_TEST_TMPDIR/realwt"; mkdir -p "$realwt"
+  fakehome="$BATS_TEST_TMPDIR/fakehome"; mkdir -p "$fakehome"
+  WG="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/worker-guardrails.sh"
+  # write-mode must have already run (as it does in real use, before the
+  # worker is launched) for the file the export now checks to exist.
+  HOME="$fakehome" sh "$WG" "$realwt" >/dev/null
+  run env HOME="$fakehome" ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e GROUNDWORK_TASK_ID=lo-1 \
+      bash "$OWS" --task task_1 --worktree "id:r::$realwt" --agent claude
+  [ "$status" -eq 0 ]
+  expected="$(HOME="$fakehome" sh "$WG" --path "$realwt")"
+  [[ "$output" == *"GROUNDWORK_GUARDRAILS_CONFIG='$expected'"* ]]
+  [[ "$expected" != "$realwt"* ]]
+  [[ "$expected" == "$fakehome/.claude/groundwork/overrides/dev-loop-"*".json" ]]
+}
+
+@test "worker mode: does NOT export GROUNDWORK_GUARDRAILS_CONFIG when worker-guardrails.sh never wrote the file" {
+  realwt="$BATS_TEST_TMPDIR/realwt_nowrite"; mkdir -p "$realwt"
+  fakehome="$BATS_TEST_TMPDIR/fakehome_nowrite"; mkdir -p "$fakehome"
+  # No write-mode call here — only --path's computed name exists, no file.
+  run env HOME="$fakehome" ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e GROUNDWORK_TASK_ID=lo-1 \
+      bash "$OWS" --task task_1 --worktree "id:r::$realwt" --agent claude
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"GROUNDWORK_GUARDRAILS_CONFIG"* ]]
+}
+
 @test "worker mode: binds the Dispatch to the terminal it created, not to --agent" {
   run env ORCA_WORKER_START_DRYRUN=1 GROUNDWORK_ESCALATION_DIR=/e \
       ORCA_WORKER_START_CREATE_JSON='{"result":{"terminal":{"handle":"term_new"}}}' \

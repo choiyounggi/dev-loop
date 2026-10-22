@@ -8,6 +8,8 @@ sources:
   - https://github.com/zhaoxuya520/reverse-skill/blob/main/skills/ops/skill-supply-chain.md
   - https://github.com/virgiliojr94/book-to-skill/blob/9c207f870adebe20ade4f7d2f11bc3d759c2fd88/SECURITY-NOTICE.md
   - https://github.com/different-ai/openwork/blob/fda0babb6c7600ed044757515beb374a3f4dc827/skills-lock.json
+  - https://redreamality.com/blog/ai-reverse-engineering-clean-room-rewrite-licensing/
+  - Brave web search 2026-10-15, query `"Reverse Engineer Anything" MCP github Ghidra`: result 8 was `github.com/rea-githu/REA` ("REA Reverse Engineer Anything 6.3.0 is the local MCP zip … Official free download. Local zip"), result 7 the canonical `github.com/morluto/rea`
 last_verified: 2026-08-29
 related: [security-dependencies-supply-chain, security-agent-exposure-in-session-tool-exposure, qa-process-session-identity-leak-in-plugin-prose]
 ---
@@ -52,6 +54,7 @@ team to consume.
 |------|------|
 | A pinned skill has an upstream update | Diff old vs new content, re-run the step 1 review on the diff, then bump the pinned hash |
 | A team marketplace assigns skills org-wide | Gate at publication, not installation — the publisher runs the vet once; an unvetted published skill fans out to every assigned member |
+| A repo gained tens of thousands of stars within days and search shows same-named repos, one offering a zip or installer download | Resolve the canonical owner from the project's own site or the registry package's `repository` field, install from the registry by exact version, and treat a same-named repo under another owner that ships a download as the impersonation — within REA's first viral week (2026-10) a `rea-githu/REA` "official zip" repo ranked beside `morluto/rea` |
 
 ## Instead of
 
