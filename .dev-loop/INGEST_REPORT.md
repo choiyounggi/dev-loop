@@ -1,89 +1,56 @@
 # Knowledge flush — 2 insight(s)
 
-Headless auto-flush, claim run `20261020-151535-5268`. 6 queue rows claimed: **2 ingested as new pages, 4 released** as plausible duplicates of open knowledge PRs (left for the manual flush to diff). 1 existing page gained a `related:` link. Nothing was folded into another branch.
+Headless autoflush run. 8 rows claimed; 2 ingested (merged into one new page), 6 released back to pending (5 overlap an open `knowledge/*` PR, 1 could not be read in this run).
 
 ## Verified best-practice
 
-**`1107bc36bfcbfe79` — wait for every moving axis (or the animation's end signal) before capturing an animated element** (confidence: **verified**)
+**Insight A — `3ccda4118b5d0dd4`** (three.js object lit only by `emissive` reads as a flat polygon)
+- Claim: when no light reaches a surface, `emissive` adds one uniform colour to every face, so changing colour or albedo has no effect; toggle each light and the emissive term and measure the region's pixels before tuning; fix by giving the object real shading or removing the glow.
+- Sources checked:
+  - https://discourse.threejs.org/t/meshphongmaterial-emissive-not-working/45543 — with no lights, a mesh renders black once its emissive is removed (emissive is the only term reaching the screen).
+  - https://developer.apple.com/documentation/scenekit/scnmaterial/emission — emission adds a uniform colour independent of lighting.
+  - https://docs.unity3d.com/550/Documentation/Manual/StandardShaderMaterialParameterEmission.html — emissive surfaces are self-illuminated and stay bright in dark areas.
+  - Not confirmed: the exact wording of the three.js `MeshStandardMaterial.emissive` doc entry (searches did not surface it; no claim on the page quotes it).
+- Field evidence: session region stats — spot 0 + hemisphere 0 left the lamp at mean RGB 77/74/67, emissive 0 made it 0/1/0, a lighter albedo gave identical numbers.
+- Confidence: **field-tested** (mechanism backed by cross-engine docs and a three.js forum thread; the measurement method is from the session).
 
-- **Claim:** a wait that polls one coordinate of an animated element's box fires mid-travel when that axis moves only a little. Wait on `Promise.all(el.getAnimations().map((a) => a.finished))` or the library's completion signal. Otherwise compare every axis with non-zero travel, set the tolerance below the smallest travel, and require two equal readings one frame apart.
-- **Sources:**
-  - https://developer.mozilla.org/en-US/docs/Web/API/Animation/finished — "returns a Promise which resolves once the animation has finished playing", plus the `Promise.all(elem.getAnimations().map((animation) => animation.finished))` example. Fetched 2026-10-20.
-  - https://developer.mozilla.org/en-US/docs/Web/API/Element/getAnimations — "This array includes CSS Animations, CSS Transitions, and Web Animations"; the `subtree` option. Fetched 2026-10-20.
-  - https://playwright.dev/docs/actionability — Stable = "the same bounding box for at least two consecutive animation frames". Found through search results on playwright.dev; a direct fetch was not permitted in this run.
-  - https://playwright.dev/docs/api/class-locator — "Assuming the page is static, it is safe to use bounding box coordinates to perform input". Screenshot `animations: "disabled"` fast-forwards finite animations and resets infinite ones; the locator screenshot defaults to `"allow"`. Found through playwright.dev search results.
-- **How verified:** local reproduction (Node 26.7.0): a 600 ms ease-out tween moving `left` 192 px and `top` 13 px, sampled every 16 ms.
-
-  | Wait rule | First passes at | `left` then (target 698.25) |
-  |---|---|---|
-  | top-only ±6 px | 144 ms | 782.5 |
-  | both axes ±6 px | 416 ms | 703.8 |
-  | both axes ±1 px | 496 ms | 699.2 |
-  | end of animation | 608 ms | 698.3 |
-
-  The field case from the originating session (shot at `top 651.1`, `left ≈ 750`; fixed rule captured `left 700.5`) agrees.
-- **Removed while drafting:** 2 edge rows I could not source in this run: a transform's effect on `boundingBox()`, and an empty `getAnimations()` right after a trigger. Neither is on the page.
-
-**`0480b14856db7f7c` — exact mid-window values from an independent oracle pin tuned constants; shape checks do not** (confidence: **verified**)
-
-- **Claim:** tests that check only the curve's shape ("overshoots 1", "ends near 1") pass for every spring, easing or duration in the same family. To pin the constants:
-  - sample mid-window points;
-  - compute the expected values independently (closed form, a separate semi-implicit Euler run, easing control points by hand);
-  - set the tolerance between the integrator error and the gap to the sibling preset;
-  - require red on each one-constant swap.
-- **Sources:**
-  - https://learn.microsoft.com/en-us/dotnet/core/testing/mutation-testing and https://pitest.org/quickstart/basic_concepts/ — what a surviving mutant means.
-  - https://testing.googleblog.com/2014/07/testing-on-toilet-dont-put-logic-in.html — logic in tests is hard to check by reading. This is the reason for the edge row that gives the oracle helper its own known-answer test, and it resolves the apparent conflict with "compute the expected value in the test".
-  - https://splishsplash.readthedocs.io/en/2.10.0/api/class_s_p_h_1_1_time_integration.html — the semi-implicit Euler update order.
-- **How verified:** local reproduction (Node 26.7.0):
-  - Setup: a spring integrated at 1 ms with presets `bounce {k:300,c:12}` and `settle {k:170,c:14}`. The oracle is the closed-form underdamped solution, tolerance 0.02.
-  - The shape check passed for the correct code and for all 3 mutants (`bounce`→`settle`, `k 300→250`, `c 12→16`).
-  - Exact values at 100/200/300 ms passed for the correct code (0.8346/1.3095/1.0297 vs oracle 0.8273/1.3114/1.0336) and failed for all 3 mutants.
-  - The originating session's audit (26 survivors under shape-only tests, all killed after exact-value tests) agrees.
-- The scratch scripts used for both reproductions are in `/Users/choeyeong-gi/.dev-loop/scratch-flush/`, outside the repo. This run was not allowed to delete them.
+**Insight B — `0358d858600ee3e0`** (three.js shadow judged "not visible" under headless/software GL)
+- Claim: before changing settings, project the light ray to see how far the shadow falls outside the caster's footprint, and toggle `castShadow` on a deterministic (reduced-motion) frame and diff the decoded pixels; a correct shadow can be hidden under the caster or on a near-black receiver.
+- Sources checked:
+  - https://threejs.org/manual/zh/shadows.html — the shadow camera box is the region that casts shadows; visualise it with `CameraHelper` on `light.shadow.camera` (used for the "toggle changes nothing" row).
+  - Forum threads found in search list the standard setup checklist (shadowMap enabled, `castShadow`/`receiveShadow`, lit receiver material); not cited per-thread because the search summary did not tie each point to one URL.
+- Field evidence: bell shadow only 5 units outside its footprint under an overhead lamp; toggle changed the shadow spot 30→12; lit felt 13–16/255.
+- Confidence: **field-tested**. The projection is plain similar-triangle geometry (`d · h / (H − h)`), stated on the page.
 
 ## Existing-layer check
 
-Pages read: testing-e2e-e2e-stability, qa-environments-element-crop-screenshots, testing-quality-default-values-under-test, testing-mocking-captured-call-arguments, testing-quality-tests-that-cannot-fail, frontend-design-pointer-attracted-particle-fields, testing-quality-path-resolver-fixtures-with-coincident-cwd
-
-- **Routing input:** `wiki/testing/index.md`, read in full.
-- **`wiki_search` (k=6) for candidate 1:** top hits were `qa-environments-element-crop-screenshots` (0.80, about clip coordinates, not animation waits) and the `e2e-stability` edge row "Entry animation makes clicks land on a moving element" (0.78). That row covers Playwright's auto-wait before an *action*, not a hand-written box poll before a *capture*.
-- **Repo-wide `grep -rl` for candidate 1** (`animation.*finished|getAnimations|transitionend|animationend|end pose|mid-travel|one axis`): 0 pages.
-- **Candidate 1 verdict:** new page.
-- **`wiki_search` (k=6) for candidate 2:** top hits were `captured-call-arguments` (0.73) and `pointer-attracted-particle-fields` (0.72, a spring *implementation* edge row). Neither covers asserting tuned curves.
-- **Repo-wide `grep -rl` for candidate 2** (`qualitative|overshoot|stiffness|damping|easing token|same family`): 7 pages. The 3 testing/frontend hits were read at the matching lines; they use "overshoot" in another sense (a path-resolver mutant), "same family" in another sense (spec documents), or describe a spring implementation.
-- **Closest existing page for candidate 2:** `default-values-under-test`. It covers a single numeric constructor default asserted at a boundary. A curve shaped by a preset table needs mid-window samples and an oracle, so this is a new page. The new page's "When this applies" points single-default cases back to `default-values-under-test`.
-- **Conflicts:** none.
-- **Related links:**
-  - `testing-quality-default-values-under-test` now lists `testing-quality-tuned-constant-assertions`.
-  - The new e2e page links one way to `testing-e2e-e2e-stability`, `qa-environments-element-crop-screenshots` and `testing-quality-completion-predicates`. Back-links on the first two were left out because open PRs #279/#270 edit those files.
-- **Checks on this tree:**
-  - `node scripts/wiki-structure-checks.js wiki` → `pages: 430, indexes: 13, findings: 0`.
-  - `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0`; its 1 info line is the pre-existing one in `infrastructure/config/keys-ahead-of-their-consumer.md`.
-  - New page bodies are 76 and 89 file lines.
+- Route: `INDEX.md` → frontend (visual design, canvas effect layers) → `wiki/frontend/index.md` → `design` category.
+- `wiki_search` (k=6) for both triggers: top hits were frontend-design-theme-swap-propagation-check, testing-quality-value-preserving-refactor-assertions, frontend-design-design-system-lint-gate-for-agents, frontend-design-anti-slop-visual-design, frontend-design-html-in-canvas, qa-environments-element-crop-screenshots, frontend-design-multi-shape-canvas-mask. None covers 3D lighting, emissive, or shadow diagnosis; the closest (theme-swap pixel checks, html-in-canvas) cover different triggers.
+- Merge decision: no existing page has the trigger → **created one new page** that holds both candidates, since they share one trigger family (a screenshot complaint about 3D lighting → measure each render term before tuning).
+- Conflicts: none.
+- Related links: frontend-design-html-in-canvas ↔ frontend-design-measuring-3d-lighting-before-tuning (both ways).
+- Pages read: frontend-design-multi-shape-canvas-mask, frontend-design-html-in-canvas
 
 ## Open-PR check
 
-18 open `knowledge/*` heads: #287, #286, #285, #284, #283, #282, #280, #279, #275, #274, #273, #272, #271, #270, #269, #268, #266, #265. This headless run cannot git-diff them. I read their changed wiki file lists (`gh pr list --json files`) and grepped `gh pr diff` output for each candidate's key terms.
+Open `knowledge/*` heads listed (17): #286, #285, #284, #283, #282, #280, #279, #275, #274, #273, #272, #271, #270, #269, #268, #266, #265. This headless run cannot diff their content, so any plausible overlap (by changed file paths and title) is treated as a pending duplicate and the claim is released.
 
-| Candidate | Overlapping open head | Verdict |
-|---|---|---|
-| `97c37473b53e63c2` — String.prototype.replace `$` patterns with a string pattern | #282 adds `backend-node-language-string-replace-replacement-patterns` (same insight) | pending duplicate → **released** |
-| `12aa086463fd4e2a` — BSD grep `\|` alternation with `$` anchors on macOS | #273 edits `platforms-tools-bsd-vs-gnu-cli` and `platforms-shells-escapes-in-shell-string-literals`; #265 adds `platforms-tools-search-evidence-from-a-wrapped-grep` | plausible overlap → **released** |
-| `0a0ccc4ca0904514` — e2e failure that moves between tests under CPU contention | #275 adds a "different subset of files fails each run" (Docker-VM exhaustion) row to `testing-flaky-diagnosing-flaky-tests`; #285 covers headless software-GL stalls breaking DOM timing tests | plausible overlap → **released** |
-| `d631595a0e889652` — judging a colour-role rule with exact hex and selectors | #265 adds `qa-process-blind-llm-judgment-of-a-visual-rule` | plausible overlap → **released** |
-| `1107bc36bfcbfe79` — polling one axis of an animated element | #279/#270 edit `e2e-stability` for a blur-driven shift and reduced motion; #270's `proving-nothing-moves-under-reduced-motion` covers `getAnimations()` under reduced motion. No head covers waiting for an element's end position | **new** |
-| `0480b14856db7f7c` — exact-value tests for tuned constants | #270/#269 edit `surviving-mutant-equivalence-triage`; no head mentions tuning, springs, easing or shape-only assertions (grep of #268/#269/#270/#280/#283 diffs) | **new** |
+| Candidate | Overlapping open PR | Verdict |
+|-----------|---------------------|---------|
+| `3ccda4118b5d0dd4` three.js emissive-only lighting | none (no open PR touches 3D lighting; #285 is WebGL stall timing, #270 touches anti-slop design only) | **new** — ingested |
+| `0358d858600ee3e0` three.js shadow "not visible" | none (#285 is shader warm-up/stalls, not shadows) | **new** — ingested |
+| `1107bc36bfcbfe79` e2e polling one axis of an animated element | #279 and #270 edit `wiki/testing/e2e/e2e-stability.md`; #270 adds qa reduced-motion capture pages | pending duplicate — claim released |
+| `12aa086463fd4e2a` BSD grep `$` in BRE with `\|` alternation | #273 edits `wiki/platforms/tools/bsd-vs-gnu-cli.md` and shell pages | pending duplicate — claim released |
+| `d631595a0e889652` colour-role rule judged from screenshots | #265 adds `wiki/qa/process/blind-llm-judgment-of-a-visual-rule.md` | pending duplicate — claim released |
+| `0480b14856db7f7c` exact mid-window values for tuned constants | #268 (`tests-that-cannot-fail.md`), #279 (`expectation-sets-with-one-distinct-value.md`), #269/#270 (`surviving-mutant-equivalence-triage.md`) | pending duplicate — claim released |
+| `0a0ccc4ca0904514` e2e failure that moves between tests under CPU contention | #275 edits `wiki/testing/flaky/diagnosing-flaky-tests.md` | pending duplicate — claim released |
+| `97c37473b53e63c2` (content unknown) | n/a — its queue file could not be located with this run's tools | not handled — claim released for the next run |
 
 ## Routing decision
 
-| Candidate | Target |
-|---|---|
-| `1107bc36bfcbfe79` | `testing/e2e/polling-an-animated-element-for-its-end-position.md` (new). It sits in `e2e` beside `e2e-stability`, because the defect is in the test's wait, not the product. QA screenshot cropping stays in `qa/environments` |
-| `0480b14856db7f7c` | `testing/quality/tuned-constant-assertions.md` (new). `quality` owns "can this test detect the defect" pages (`default-values-under-test`, `tests-that-cannot-fail`) |
-
-`wiki/testing/index.md` gained one row in `e2e` and one in `quality`. `log.md` gained 2 `ingest` entries. The root `INDEX.md` testing row already covers both ("cases/assertions", "browser E2E selector/wait/setup strategy"), so it is unchanged.
+- Both ingested insights → `frontend/design/measuring-3d-lighting-before-tuning.md` (id `frontend-design-measuring-3d-lighting-before-tuning`). `design` already holds the canvas/WebGL pages (html-in-canvas, multi-shape-canvas-mask, pointer-attracted-particle-fields), so no new category.
+- Plumbing: row added to `wiki/frontend/index.md` (design table) and its route header; `INDEX.md` frontend route line extended; `log.md` ingest entry; `related:` added on html-in-canvas.
 
 ## Local-layer candidates
 
-none — every ingested candidate is general (no project files, modules or conventions in its directive).
+none
