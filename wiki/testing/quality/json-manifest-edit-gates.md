@@ -13,7 +13,7 @@ sources:
   - "Second reproduction 2026-10-08 (jq 1.7.1, monorepo layout): the gate from a package directory, a first dependency, a wrong version, a JSONC file through --argjson"
   - "Field case 2026-10-07 (a dev-loop task adding one dependency to package.json): the plan expected 2 changed lines, git diff showed 3"
 last_verified: 2026-10-08
-related: [testing-quality-unchanged-function-gates, testing-quality-checks-that-cannot-pass, platforms-toolchains-regeneration-silently-drops-hand-edited-state]
+related: [testing-quality-unchanged-function-gates, testing-quality-checks-that-cannot-pass, platforms-toolchains-regeneration-silently-drops-hand-edited-state, testing-quality-diff-algorithm-dependent-line-counts]
 ---
 
 # Gating a One-Key Edit to a JSON Manifest
