@@ -118,6 +118,7 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [diagnosing-flaky-tests](flaky/diagnosing-flaky-tests.md) | The unreliable thing is a test in your suite — it fails in CI but passes locally, passes on retry, or fails only when run with other tests — and you are hunting its test-level cause (order dependence, shared fixture state, time/timezone, async waits) or setting quarantine-vs-retry policy for it (the same intermittency also appears outside the suite, or the test-level causes are exhausted and you still cannot trigger it on demand → wiki/debugging/concurrency/intermittent-failures.md); stress loops reproduce a race against a background task's intentional state reset rarely or never and the test already holds that task's completion handle (await it between the setup write and the read for a deterministic red, before the write for the green) |
+| [docker-vm-oversubscription-under-parallel-containers](flaky/docker-vm-oversubscription-under-parallel-containers.md) | A suite whose test files each start a service container (Testcontainers, docker-compose) fails on a different subset of its container/DB-backed files each full run, with a container error (`409 ... is not running`, a start/connect timeout) rather than an assertion; choosing a runner worker cap (`--maxWorkers`, `--workers`) for full-suite gates on a Docker VM |
 
 ## async
 
