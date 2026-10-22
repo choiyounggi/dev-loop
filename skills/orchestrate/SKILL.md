@@ -365,6 +365,8 @@ changes — and every node added later with graph-add.sh carries them too.
 | two or more dependents in graph.json | graph reverse lookup | fan-out:<n> | R2 |
 | wiki-plan Size verdict large | step 2a | size:large | R2 |
 | one or more [no-wiki] decisions | step 2a | no-wiki:<n> | R1 |
+| more than two affected files (a `**` glob counts as more than two) | Phase 2 affected files, re-read at step 2a from the plan | files:<n> | R1 |
+| more than one task in the wiki-plan task table | step 2a | tasks:<n> | R1 |
 | no signal and Size verdict small | — | none | R0 |
 
 The tier is the max-of-signals: the highest Floor any single signal sets is
@@ -372,7 +374,7 @@ the tier; signals are never summed, because a sum lets several low signals
 dilute one payment-path hit into R1.
 
 Phase 2 sets the initial tier from the file and graph signals; step 2a
-re-reads the two plan-derived signals (size:large, no-wiki:<n>) and may only
+re-reads the four plan-derived signals (size:large, no-wiki:<n>, files:<n>, tasks:<n>) and may only
 RAISE the tier — record each raise on the blackboard as
 `- [<task>] Ruling: risk <old>-><new> — <signal> — <cost if wrong>` and
 rewrite graph.json; a tier is LOWERED only by the user at Gate 1 answering
@@ -423,7 +425,7 @@ brief carries the report's `trail dir` for the fingerprint grep
 | planning | wiki-plan lite | full A/B/C | full A/B/C, plan-reviewer required | R2 plus a second plan-reviewer call with the Agent model override `fable` |
 | analysis agent — wiki-plan Phase A, claude-fable-5-1 | `task-analyst-r1` (high) | `task-analyst-r1` (high) | `task-analyst` (xhigh) | `task-analyst` (xhigh) |
 | design agent — wiki-plan Phase B+C, claude-opus-5-5 | `task-planner-r1` (high) | `task-planner-r1` (high) | `task-planner` (high) | `task-planner` (high) |
-| worker model (DEV_LOOP_WORKER_MODEL) | claude-sonnet-5-5 | claude-sonnet-5-5 | claude-sonnet-5-5 | claude-sonnet-5-5 |
+| worker model (DEV_LOOP_WORKER_MODEL) | claude-sonnet-5-5 | claude-opus-5-5 | claude-opus-5-5 | claude-opus-5-5 |
 | worker effort (DEV_LOOP_WORKER_EFFORT) | high | high | high | high |
 | QA agents — task review and coordinator auditor cross-call, claude-fable-5-1 | `task-reviewer-r1` (high) | `task-reviewer-r1`, `test-quality-auditor-r1` (high) | `task-reviewer`, `test-quality-auditor` (high) | `task-reviewer`, `test-quality-auditor` (high) |
 | final review agent — Phase 5, claude-fable-5-1, picked by the run's highest task tier | `integration-reviewer-r1` (xhigh) | `integration-reviewer-r1` (xhigh) | `integration-reviewer` (max) | `integration-reviewer` (max) |
@@ -893,8 +895,8 @@ reasoning-effort flags) that `worker-start` cannot express.
    on the gate-A ledger yourself; on exit 0 invoke the bundled `task-planner`
    agent, which runs Phase B and C from that analysis and writes
    `plans/<task>/` plus the flat `plans/<task>.md`. Planning still
-   belongs to the coordinator side on purpose: a worker runs a cheaper tier
-   (`DEV_LOOP_WORKER_MODEL`), and a plan is where an unmade
+   belongs to the coordinator side on purpose: a worker's model follows its
+   tier (`DEV_LOOP_WORKER_MODEL`, Sonnet at R0), and a plan is where an unmade
    decision becomes the implementer's guess — so the plan must come from the
    pinned planning models, not from whatever tier is executing. Both agents
    pin their model and effort in frontmatter (the Tier to pipeline profile
@@ -914,7 +916,7 @@ reasoning-effort flags) that `worker-start` cannot express.
    plan-reviewer call required (R3: a second call with the Agent model
    override `fable`, both verdicts recorded). In every full-mode tier the
    plan-reviewer call is yours, not the agent's — see the two-stage handshake
-   below. Then re-check the plan-derived signals (size:large, no-wiki:<n>) and raise the
+   below. Then re-check the plan-derived signals (size:large, no-wiki:<n>, files:<n>, tasks:<n>) and raise the
    tier per the Phase 2 rule before launching. A raise that changes the
    planning profile — out of R0 (lite to full), or from R0/R1 to R2/R3 (`-r1`
    to base agents) — re-plans on the new tier's agents from Phase A, with the
