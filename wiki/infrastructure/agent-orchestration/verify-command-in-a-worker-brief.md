@@ -7,6 +7,8 @@ confidence: verified
 sources:
   - https://docs.python.org/3/library/venv.html
   - https://docs.python.org/3/library/unittest.html
+  - https://vitest.dev/guide/filtering
+  - "Local reproduction 2026-10-11 (Vitest 5.0.3, zsh 5.9, GNU bash 5.3.15): literal, escaped and pattern forms of route-group and dynamic-segment test paths"
 last_verified: 2026-09-03
 related: [platforms-environment-path-resolution, platforms-toolchains-version-management, platforms-toolchains-compiler-sysroot-on-macos, qa-process-completion-claims, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-done-criteria-in-a-split-task-piece]
 ---
@@ -67,6 +69,7 @@ Done:     Ran ≥ 3549, failures ≤ 1, and the only failure is that same test i
 | The tests spawn subprocesses with `sys.executable` | The path form propagates the venv interpreter; a bare name resolves again in the child |
 | No venv exists and the system interpreter is the intended one | Still write the path (`/usr/bin/python3`), so a later venv or a different `PATH` cannot change what the brief means |
 | The task's deliverable is a new numbered/spec document (RFC, ADR) in a repo with doc-currency gates (a README-count test, a generated-reference `--check`) | Name those gate tests on the task's own verify line and include the files they read (README rows, the routes/registry constant) in the task's scope, not only at integration |
+| The verify line passes Vitest a test file whose path holds `(`, `)`, `[` or `]` (a Next.js route group `src/app/(group)/page.test.tsx`, a dynamic segment `[slug]`) | Single-quote the path for the shell and leave it unescaped for Vitest: Vitest runs the files "whose path contains the given string", a plain substring, so `'src/app/(group)/page.test.tsx'` selects the file, while an escaped or pattern form (`\(group\)`, `layou[t]`, `.*`) selects nothing and exits 1 with "No test files found". Unquoted, zsh stops with "no matches found" and bash with a syntax error at `(`; bash also rewrites an unquoted `[slug]` to `src/app/s/…` when such a path exists |
 
 ## Instead of
 
@@ -76,6 +79,7 @@ Done:     Ran ≥ 3549, failures ≤ 1, and the only failure is that same test i
 | Let the worker measure the baseline itself | Measure it on the base branch with the same command and put it in the brief | A baseline measured on the worker's changed tree is the thing in question |
 | Accept "the failures are environmental" from the worker's report | Diff its totals and ids against the brief's baseline | Import errors and regressions both read as "environment" in a self-report |
 | Scope a new-document task's brief to the document directory only, and check currency gates only at integration | Include the repo's README-count and generated-reference tests on that task's own verify line from the start | The gates fail deterministically at integration once every task lands; one in-task test run catches a missing registry entry before it costs a full rework round-trip |
+| Regex-escape a route-group path on a Vitest verify line (`src/app/\(group\)/page.test.tsx`) | Single-quote the literal path | Vitest matches the filter as a substring, so the escaped text matches no file and the gate can never pass |
 
 ## Sources
 
@@ -83,3 +87,6 @@ Done:     Ran ≥ 3549, failures ≤ 1, and the only failure is that same test i
 - https://docs.python.org/3/library/unittest.html — the text runner's `Ran N tests in …` summary followed by `OK` or `FAILED (failures=M, errors=E)`; reproduced 2026-09-03 with a 3-test case: `Ran 3 tests … FAILED (failures=1, errors=1)`
 - Field measurement 2026-08-31 (linkly, one worktree): `python3 -m unittest` → Ran 3532, failures=15, errors=18; `.venv/bin/python -m unittest` → Ran 3549, failures=1. All 33 extra failures were `ModuleNotFoundError: jsonschema` and a missing MLIR toolchain, both named by the repo's `scripts/dev_doctor.sh`; the repo's own baseline was one failure, so "must pass" could never have been met
 - Field evidence 2026-08-29 (linkly, run `enf0829`): a task briefed to add RFC-0043 was scoped to its document directory only, with the currency gates left for integration; the integration suite failed 10 cases, 9 on `test_readme_currency` plus 1 on `test_plugin_references`, from one missing `RFC_ROUTES["0043"]` entry and its README rows. Fixed and re-run at 3374 tests OK; a verify line naming those two tests inside the doc task would have caught it before integration
+- https://vitest.dev/guide/filtering — "Vitest will only run test files whose path contains the given string"; a `file:line` target "requires the full filename (relative or absolute)"
+- Local reproduction 2026-10-11 (Vitest 5.0.3; zsh 5.9; GNU bash 5.3.15): `vitest run 'src/app/(group)/page.test.js'`, `'src/app/[slug]/page.test.js'`, `'(group)'`, `'app/(gr'` and `layout` each selected their file; `'src/app/\(group\)/page.test.js'`, `'src/app/layou[t].test.js'` and `'src/app/.*'` printed "No test files found, exiting with code 1". Unquoted, zsh printed `no matches found: src/app/(group)/page.test.js` (and the same for `[slug]`), bash printed ``syntax error near unexpected token `('`` and passed `src/app/[slug]/page.test.js` through unchanged until a `src/app/s/page.test.js` existed, then substituted that path
+- Field origin 2026-10 (linkly-invitation task t5; recorded by the originating session): a plan's verify commands named route-group test files; `vitest run 'src/app/layou[t].test.tsx'` printing "No test files found" (exit 1) showed that the filter is not a regex before the commands were adopted

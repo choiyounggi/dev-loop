@@ -17,6 +17,7 @@ last_verified: 2026-10-11
 related:
   [
     testing-quality-tests-that-cannot-fail,
+    testing-quality-checks-that-cannot-pass,
     testing-quality-harness-reverse-controls,
     testing-quality-mutation-harness-file-custody,
     testing-quality-minimum-case-set,

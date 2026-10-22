@@ -51,6 +51,7 @@ control that must fail when an anchor is removed.
 | Python, pattern used with `re.match` | `re.match` only matches at the start, so deleting `^` changes nothing (the prefix case still fails to match): that mutant is equivalent. Switch to `re.fullmatch` so both ends are explicit |
 | The pattern has the `m` flag (JS) or `re.MULTILINE` | `^` and `$` then match at every line; an embedded-newline input passes — drop the flag for single-value allowlists |
 | The value is joined into a filesystem path after the check | Keep the prefix case even when anchors are present, and resolve the joined path and check it stays under the base directory ([security-input-validation-at-trust-boundaries]) |
+| The allowlist decides on a URL's scheme and host after `new URL()` parses it | Choose fixtures whose raw text and parsed host disagree (userinfo, `\`, `?`, `#`, `%2F`, lookalike labels) — [testing-quality-host-disguise-fixtures-for-url-allowlists] |
 
 ## Instead of
 
