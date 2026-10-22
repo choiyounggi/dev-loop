@@ -16,7 +16,9 @@ And it scales past one session: the `orchestrate` skill is a **multi-session
 orchestrator** over the same loop — it decomposes a goal into a dependency
 graph, schedules parallel workers with a ready-set scheduler, and supervises
 them **Orca-natively** when the Orca CLI is installed (raw tmux otherwise).
-See [Orca integration](#orca-integration--supervision-not-just-spawning).
+See [Orca integration](#orca-integration--supervision-not-just-spawning), and
+watch a run live from the coordinator's own session with the
+[session-progress](#watch-a-run-live--the-session-progress-mod) mod.
 
 **The one change from upstream loop-orchestrator:** the plan step is no longer an
 optional, pluggable role. It is **fixed to the bundled `wiki-plan` methodology** —
@@ -133,6 +135,7 @@ can map its **capability roles** to your real tools so the loop uses them:
 | `design` | Figma / visual-spec MCP (UI work) |
 | `intake` | issue tracker (orchestrate's work-list) |
 | `research` | external best-practice/pitfall search (wiki-plan Phase A/B). Fixed fallback when unset: brave-search MCP if present → built-in WebSearch → open `ABANDON` |
+| `inspect` | an app/site/binary inspection tool (e.g. the REA MCP) for studying how an existing product behaves when a feature mirrors it (wiki-plan Phase A3 reference study). Unset: `scripts/reference-study.sh` runs the pinned REA MCP in a headless study session when a goal names a reference product — nothing to install or register |
 
 (`plan` is **not** a role — the plan step is fixed to `wiki-plan`. And the bundled
 best-practice `wiki/` needs no config; `knowledge` is a *separate* external wiki —
@@ -164,7 +167,8 @@ gate, and from then on the whole run flows through Orca orchestration:
   distinct exit, never a silent timeout.
 - **Env-carrying worker start** — `orca-worker-start.sh` composes the worktree,
   an agent terminal that carries the guardrails escalation contract
-  (`GROUNDWORK_ESCALATION_DIR` / `GROUNDWORK_TASK_ID`), and the Dispatch
+  (`GROUNDWORK_ESCALATION_DIR` / `GROUNDWORK_TASK_ID`) and the worker's own
+  guardrails config (`GROUNDWORK_GUARDRAILS_CONFIG`), and the Dispatch
   binding; on re-entry it probes for a live agent first, so one worktree never
   ends up with two agents.
 - **Liveness is two questions** — `orca-worktree-alive.sh` (is the terminal
@@ -180,6 +184,17 @@ on-screen chooser is answered with allowlisted key events
 worker that dies during planning is caught instead of waited out. The
 guardrails escalation contract is identical on both substrates.
 
+**Worker guardrails loosening is opt-in.** By default a worker's destructive
+rules (`rm_rf`, `git_discard`, `system_tmp_write`) stay `ask`, same as your own
+session — only the `.orchestration` status/plan path is pre-allowed, so that
+protocol still works without a prompt. Set `DEV_LOOP_WORKER_RELAX=1` (e.g.
+`"env": {"DEV_LOOP_WORKER_RELAX": "1"}` in `~/.claude/settings.json`) to get
+today's looser default (those three rules set to `off`) back, trading
+friction for speed on routine in-worktree cleanup. Guardrails is a seatbelt
+against mistakes, not a sandbox: any session running as your user, including
+a worker, can edit its own guardrails config files, so opting in means
+trusting workers with that.
+
 **One setup note for auto-mode coordinators (tmux):** the launcher starts each
 worker as `claude --permission-mode bypassPermissions`, which an auto-mode
 permission classifier flags as privilege escalation — it cannot see the
@@ -193,6 +208,47 @@ backed-up, atomic; never silent), otherwise it shows you the snippet to paste
 yourself. `safe-cleanup.sh` is deliberately excluded so destructive verbs keep
 their normal review, and a blocked coordinator stops and re-asks rather than
 working around the classifier.
+
+### Watch a run live — the session-progress mod
+
+`orchestrate` already records everything a run does in plain files:
+`.orchestration/graph.json`, one `.orchestration/status/<task>.json` per worker,
+and each worker's `.dev-loop/gates/<task>.md` ledger. The
+**[session-progress](https://github.com/choiyounggi/groundwork/tree/main/plugins/session-progress)**
+mod (in the groundwork marketplace) reads those files and draws the run into a
+pane of the coordinator's own Claude Code session, so you check on the workers
+without opening a terminal per worker or running `collect-status.sh`.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/choiyounggi/groundwork/v0.3.1/plugins/session-progress/assets/screenshot-en.png" alt="session-progress in a coordinator session: a dev-loop run with four workers at 48% overall, each with its phase, gates and age" width="560">
+</p>
+
+- **Per worker:** its phase as the run records it (`pending` → `plan_ready` →
+  `impl_done` → `done`, plus `rework` and `failed`), `gates n/m` from its
+  ledger, `try N` after a second rework, and how long ago it last reported;
+  expand a worker for its session, last error and gate list. When the worker's
+  own status copy in its worktree is newer, that copy wins (the same
+  newer-`updatedAt` rule `collect-status.sh` uses).
+- **Overall:** the run's percent and worker count; while the pane is closed and
+  the run is active, the summary and its workers sit above the prompt instead.
+- **Where it shows:** only in the coordinator's checkout; worker sessions inside
+  `.worktrees/` show nothing. It reads; it never writes to the run. Workers call
+  `status-update.sh` on both Orca and raw tmux, so it works on either. On Orca a
+  worker first appears once the coordinator's `collect-status.sh` has picked up
+  its record.
+- **Kept compatible:** groundwork's CI regenerates the mod's fixture with this
+  repo's own `graph-add.sh`, `status-update.sh` and `gate-check.sh` at the
+  pinned dev-loop release, so a change to the file format shows up there (it
+  pins the format, not which phases a run writes).
+
+```
+/plugin marketplace add choiyounggi/groundwork
+/plugin install session-progress@groundwork
+```
+
+A *mod* is a Claude Code plugin of in-process function hooks that can draw its
+own pane; it needs a build with mod support (verified on 2.1.296). The same pane
+also shows the current request's plan, the task history and a context gauge.
 
 ---
 
@@ -220,8 +276,12 @@ The wiki is meant to grow from what you actually learn. Three moving parts:
    - **check existing layers** for duplicates to merge into and pages to link
      (naming the page ids it actually read),
    - **check open `knowledge/*` PRs** so sibling flushes don't pile up duplicate
-     PRs — each candidate is folded into an in-flight PR, dropped as a pending
-     duplicate, or ingested as new,
+     PRs — the **manual** path can `git diff` an in-flight PR's branch, so it
+     folds a genuine overlap into that branch, drops a pure duplicate, or
+     ingests as new. The **automatic headless** path has no git at all (see
+     below) and so cannot diff those PRs' content; it only lists them, and
+     drops any candidate whose domain/trigger plausibly overlaps as a pending
+     duplicate — it never folds into another branch,
    - **decide the target layer/category** (or justify a new category),
    - then run `wiki-ingest` and write an `INGEST_REPORT.md`.
 
@@ -231,13 +291,59 @@ The wiki is meant to grow from what you actually learn. Three moving parts:
    `dev-loop:knowledge` PRs and merges or rejects each one.
 
    Two ways it runs:
-   - **Automatic** — the `hooks/auto-flush.sh` Stop hook fires the pipeline in a
-     detached, headless `claude` run when the queue crosses a threshold and the
-     rate-limit window has elapsed, so PRs appear without you doing anything.
-     Guarded: kill switch `DEV_LOOP_AUTOFLUSH=0`, once per
-     `DEV_LOOP_AUTOFLUSH_INTERVAL` (default 3600s), only at
-     `DEV_LOOP_AUTOFLUSH_MIN` (default 3) pending items, an owner-token
-     single-flight lock shared with the manual flush below
+   - **Automatic, opt-in (OFF by default)** — set `DEV_LOOP_AUTOFLUSH=1` and the
+     `hooks/auto-flush.sh` Stop hook fires the pipeline in a detached, headless
+     `claude` run when the queue crosses a threshold and the rate-limit window
+     has elapsed, so PRs appear without you doing anything. That run keeps your
+     normal permission checks — it passes an explicit `--allowedTools`/
+     `--disallowedTools` pair scoped to exactly what the flush pipeline calls,
+     never `--permission-mode bypassPermissions`.
+
+     **The nested session gets no git tool at all, and no `gh pr create`.**
+     Scoping git by *subcommand* (`Bash(git -C <repo>:*)`) still let a
+     prompt-injected session run arbitrary code through an allowed-looking
+     `git` prefix — `git -C <repo> -c alias.x='!sh -c evil' x`,
+     `fetch --upload-pack=<cmd>` / `push --receive-pack=<cmd>`,
+     `log --output=<any path>`, `rebase --exec`, `submodule foreach`,
+     `bisect run` all execute a program, and a subcommand denylist/allowlist
+     never closes (the same lesson as the regex shell lexer). So the boundary
+     moved: `hooks/auto-flush.sh` itself — never inside any Claude session's
+     permission system — does the checkout, branch, commit, push, and
+     `gh pr create`, each with fixed arguments. The nested session only edits
+     files (research, dedup, wiki-ingest's edits, and a small
+     `autoflush-result.json` naming the PR title and report path), and even
+     its Edit/Write access is explicitly denied inside the checkout's own
+     `.git/` (so it can't plant a hook there), with an independent checksum
+     comparison of `.git/hooks/*` + `.git/config` before/after the session as
+     a second, trusted-side check that doesn't rely on the deny rule holding.
+     Each allowed/denied entry and why it's there:
+
+     | Entry | Why |
+     |---|---|
+     | `Bash(export DEV_LOOP_FLUSH_RUN_ID=*)` | Kept for parity with the manual skill path; this headless run doesn't need to call it (the hook holds the flush lock for the whole run). |
+     | `Bash(sh <plugin root>/scripts/flush-lock.sh:*)` | Kept for parity, unused this run — not a bare `sh:*`, which would run any script or `sh -c '<anything>'`. |
+     | `Bash(node <plugin root>/hooks/queue-claim.js:*)` | Claims/releases queue rows, pinned to its exact path — not a bare `node:*`, which would run `node -e '<anything>'`. |
+     | `Bash(gh api user:*)` | Kept for parity — not `gh api:*`, which would allow any GitHub API call. |
+     | `Bash(gh pr list --repo choiyounggi/dev-loop:*)` | Lists open `knowledge/*` PRs for the (read-only, drop-on-overlap) dedup check, scoped to this repo. |
+     | `Read` | Reads the wiki, templates, and queue files; left unscoped since nothing here is sensitive to read. |
+     | `Edit(//<~/.dev-loop>/**)` | Covers both the Edit and Write tools (Claude Code only checks `Edit` path rules), scoped to the checkout plus the queue dir it also retires rows in — not a bare `Edit`/`Write`, which would write anywhere. |
+     | `Skill` | Runs the `wiki-ingest` sub-skill. |
+     | `WebSearch` | Verifies each candidate against real sources before ingesting it. |
+     | `mcp__plugin_dev-loop_dev-loop-wiki__wiki_search` | Semantic dedup against the existing wiki before creating a new page. |
+     | **disallowed:** `Edit(//<~/.dev-loop>/repo/.git/**)` | Carves the checkout's own `.git/` back out of the Edit allow rule above — a deny rule wins over a matching allow rule — so the session can't plant a `.git/hooks/*` script or rewrite `.git/config`. |
+
+     Claude Code's Bash permission matcher is a static, literal-text prefix
+     match: it can't auto-approve a command containing an unresolved shell
+     variable (so `${CLAUDE_PLUGIN_ROOT}` must be the already-resolved literal
+     path), an `if`/`else` conditional, or a `||` fallback.
+     `skills/knowledge-flush/SKILL.md` keeps its portable, human-readable form
+     for the manual, approved-by-you path. Left at the default (unset, or
+     anything other than `1`), the hook never spawns a session or opens a PR;
+     instead it emits one rate-limited notice telling you how many insights are
+     queued and to run the manual flush below.
+     Guarded either way: once per `DEV_LOOP_AUTOFLUSH_INTERVAL` (default
+     3600s), only at `DEV_LOOP_AUTOFLUSH_MIN` (default 3) pending items, an
+     owner-token single-flight lock shared with the manual flush below
      (`DEV_LOOP_FLUSH_LOCK_TTL`, default 900s, before a crashed holder's lock
      is reclaimable) plus a per-run queue claim (`DEV_LOOP_CLAIM_TTL`, default
      3600s) so the two entry points never ingest the same candidate, and
@@ -310,7 +416,7 @@ dev-loop/
 │   ├── wiki-index.sh                 # SessionStart: refresh the local wiki vector index in the background (DEV_LOOP_WIKI_INDEX=0 disables)
 │   ├── loop-gate.sh                  # Stop: verification-loop integrity gate
 │   ├── harvest-insights.sh + harvest.js  # Stop: harvest insights → queue
-│   ├── auto-flush.sh                 # Stop: auto-run knowledge-flush (guarded) → PR
+│   ├── auto-flush.sh                 # Stop: opt-in (DEV_LOOP_AUTOFLUSH=1) knowledge-flush → PR; default off = notice only
 │   ├── pre-flush-pr-gate.sh          # PreToolUse: enforce the flush pre-PR pipeline
 │   └── orchestrate-ask-gate.sh       # PreToolUse: no worker launch until Gate 1 was asked with AskUserQuestion
 ├── scripts/resolve-tools.sh          # capability-role profile resolver (no `plan` role)

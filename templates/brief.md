@@ -29,7 +29,9 @@ later Wave's dependencies, so make it copy-pasteable.>
 ## Tools
 <tools_guidance>
 <!-- The resolved tool profile for this task, role by role: knowledge, tacit,
-     verify, explore, design. Name the actual tool per role so the worker inherits
+     verify, explore, design; write `inspect: default` always — the reference
+     study ran before planning and the worker gets its rows, never the tool.
+     Name the actual tool per role so the worker inherits
      it even if it cannot re-read the config; write "default" for an unset role.
      The plan step is NOT a role — it is fixed to wiki-plan. -->
 </tools_guidance>

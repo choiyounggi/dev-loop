@@ -65,7 +65,8 @@ Resolve the pluggable tool profile once up front:
 roles — `intake` (issue-tracker work-list source), `knowledge` (domain/policy),
 `tacit` (incidents/danger zones), `verify` (test/build/lint/typecheck/QA
 command), `explore` (code search; a fresh graphify graph when Preflight says
-so), `design` (visual/UI spec, e.g. Figma) — to
+so), `design` (visual/UI spec, e.g. Figma), `inspect` (how an existing
+product behaves, for a feature that mirrors it — wiki-plan Phase A3) — to
 whatever tools this installation has, or to generic defaults when unset (optional,
 layered per-user then per-repo; see `references/tool-profile.md`). Use
 `knowledge`/`tacit` yourself during Clarify/Decompose, and write each task's
@@ -359,6 +360,7 @@ changes — and every node added later with graph-add.sh carries them too.
 | public API contract or deploy pipeline files (.github/workflows, Dockerfile) | affected files | path:public-api path:pipeline | R2 |
 | shared-surface producer (another task consumes its output) | conflict matrix | shared-surface | R2 |
 | new external dependency | plan | new-dependency | R2 |
+| the task mirrors a behavior of an existing third-party product and the Phase 2 reference study returned one or more rows | Phase 2 reference study report | reference-study | R2 |
 | concurrency or multi-object write | lens 4 signal | concurrency | R2 |
 | two or more dependents in graph.json | graph reverse lookup | fan-out:<n> | R2 |
 | wiki-plan Size verdict large | step 2a | size:large | R2 |
@@ -375,6 +377,44 @@ RAISE the tier — record each raise on the blackboard as
 `- [<task>] Ruling: risk <old>-><new> — <signal> — <cost if wrong>` and
 rewrite graph.json; a tier is LOWERED only by the user at Gate 1 answering
 revise.
+
+**Reference study (the `inspect` role).** When a task mirrors a behavior an
+existing product already has and the goal or issue names that product as the
+reference, run the study now, before Gate 1, so its tier and licence outcome
+sit on the Gate 1 risk table. Write the brief (the product — name, version,
+where it runs — and the behaviors to observe, one line each with its oracle
+question) to `{ORCH_DIR}/reference/<product-slug>-brief.md` and run, in the
+background, `sh ${CLAUDE_PLUGIN_ROOT}/scripts/reference-study.sh --brief <that
+abs path> --slug <product-slug>`: with the `inspect` role unset (`default`)
+the script starts a headless study session whose only MCP server is the pinned
+REA, so nothing is registered and this session never loads the tool; it
+supplies the rest of the study brief from
+`${CLAUDE_PLUGIN_ROOT}/references/tool-profile.md` (`### inspect`) — the
+absolute path of the licence table
+`${CLAUDE_PLUGIN_ROOT}/wiki/qa/exploratory/behavioral-spec-from-a-reference-product.md`,
+whose row is settled BEFORE the first capture (no matching row, or a row that
+forbids a driven browser or capture tooling: capture nothing, return
+`licence: unresolved` with `rows: 0`); the trail dir
+`<checkout>/.claude/tmp/reference/<product-slug>/` once `git check-ignore -q
+.claude/tmp` exits 0 (else pass `--out <abs dir in the session scratchpad>`),
+one study per product shared by every task that mirrors it, holding the
+captures, the trail (tool calls, files read, product version, licence outcome,
+`## Fingerprints`) and `rows.md` in the `### Reference study` table format of
+`templates/analysis.md`; and the fixed report it prints: `product: <name
+version>` / `licence: <table-row outcome | unresolved>` / `tool: <tool used |
+none (black-box)>` / `rows: <n>` / `unknowns: <n>` / `rows file: <abs path>` /
+`trail dir: <abs path>`. When the role is configured to an MCP you registered
+yourself, spawn one fresh-context `general-purpose` Agent per product with the
+full brief instead — it inherits this session's MCP tools and you never call
+them yourself. A `rows: 0` report, `licence: unresolved`, a script exit of 3,
+4 or 5, or `tool: none` with a configured role (the MCP was not connected at
+session start) is a Gate 1 question, not a silent drop. On one or more rows, add
+`reference-study` to each consuming task's `risk_basis` (floor R2) and keep the
+report beside the task on the blackboard; at step 2a pass the rows file to the
+task-analyst as a pointer file — the analyst copies the rows into
+`### Reference study` and never calls the tool; at Phase 4 the task reviewer's
+brief carries the report's `trail dir` for the fingerprint grep
+(`wiki/infrastructure/agent-orchestration/reference-study-in-a-plan.md`).
 
 **Tier to pipeline profile.**
 
@@ -458,7 +498,8 @@ fine), the proposed **slot count with its rationale and what it protects**, and 
 rough cost note. The briefing also carries the risk table, one row per task with
 exactly the columns | task | risk | basis | profile (plan depth / worker model /
 review lenses) | rework budget |, filled from the Tier to pipeline profile
-table; this adds no AskUserQuestion question — a tier change is requested
+table (a `reference-study` basis cell also names the product and version, the
+licence-table outcome and the row count); this adds no AskUserQuestion question — a tier change is requested
 through the existing revise answer. That report is the briefing; the approval itself is **one
 AskUserQuestion call** (§ Asking the user) in the same turn — Q1 the task split
 (approve as proposed / revise / abort). Bundle every remaining open decision
@@ -863,7 +904,8 @@ reasoning-effort flags) that `worker-start` cannot express.
    yourself, and the Size verdict line — never `analysis.md`, `design.md`,
    `plan.md`, or the flat plan. Pass each agent the task id, brief path, plan dir,
    gates dir, risk tier, wiki root, integ ref, and any pointer files (issue
-   text, user decisions, blackboard).
+   text, user decisions, blackboard, the Phase 2 rows file of a
+   `reference-study` task).
 
    **Apply the tier's profile here.** Read the task's risk from graph.json
    first, call the profile table's file for that tier (`task-analyst-r1` /
@@ -1109,7 +1151,12 @@ pipeline profile table). Pass it: the task id and round N, the worktree
 path, the integration ref, the `{ORCH_DIR}` paths of the brief and the plan,
 the task's risk tier, the floor result (`floor=pass` or `floor=unknown`), the
 absolute review output path `{ORCH_DIR}/reviews/<task>-rN.md`, and the
-template path `templates/review-report.md`. The agent runs `git -C <wt> diff
+template path `templates/review-report.md`. For a task whose `risk_basis`
+carries `reference-study`, also pass the `trail dir` from that task's Phase 2
+study report with the instruction to grep the diff for every `## Fingerprints`
+entry under lens 5 and report a hit as a Findings item ("expression crossed
+the wall"); a trail dir that does not exist is itself a Findings item, never a
+skipped check. The agent runs `git -C <wt> diff
 <integ>` plus `git -C <wt> ls-files --others --exclude-standard` for
 untracked files itself (the worker has not committed yet) and writes
 `reviews/<task>-rN.md` from `templates/review-report.md` with line 1 EXACTLY

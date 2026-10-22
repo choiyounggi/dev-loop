@@ -10,7 +10,7 @@ sources:
   - "Local reproduction 2026-10-08 (Node v26.7.0, Python 3.14.6): a 6-case set against an anchored key pattern and the same pattern without ^"
   - "Field case 2026-10-07 (an 11-case rejection list for an object-key allowlist regex)"
 last_verified: 2026-10-08
-related: [testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-minimum-case-set, security-input-validation-at-trust-boundaries]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-minimum-case-set, security-input-validation-at-trust-boundaries, backend-common-integrations-wrapping-quotes-in-a-frontmatter-value]
 ---
 
 # Anchor Cases for an Allowlist Regex

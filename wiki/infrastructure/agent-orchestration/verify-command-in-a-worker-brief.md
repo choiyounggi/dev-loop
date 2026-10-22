@@ -10,7 +10,7 @@ sources:
   - https://vitest.dev/guide/filtering
   - "Local reproduction 2026-10-11 (Vitest 5.0.3, zsh 5.9, GNU bash 5.3.15): literal, escaped and pattern forms of route-group and dynamic-segment test paths"
 last_verified: 2026-09-03
-related: [platforms-environment-path-resolution, platforms-toolchains-version-management, platforms-toolchains-compiler-sysroot-on-macos, qa-process-completion-claims, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-worktree-isolated-workers]
+related: [platforms-environment-path-resolution, platforms-toolchains-version-management, platforms-toolchains-compiler-sysroot-on-macos, qa-process-completion-claims, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-done-criteria-in-a-split-task-piece]
 ---
 
 # The Test Command Written Into a Worker's Brief
