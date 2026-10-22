@@ -12,7 +12,7 @@ sources:
   - https://github.com/facebook/react-native/blob/v0.87.1/packages/react-native/Libraries/Blob/URL.js
   - https://github.com/mdn/browser-compat-data/blob/main/api/URL.json
 last_verified: 2026-10-06
-related: [platforms-toolchains-version-management, platforms-tools-bsd-vs-gnu-cli, backend-common-integrations-externally-owned-defaults, platforms-processes-non-interactive-cli-invocation, qa-deliverables-documented-behavior-of-a-third-party-tool, platforms-toolchains-self-import-inside-a-workspace-package, databases-schema-design-migration-sql-without-a-database]
+related: [platforms-toolchains-version-management, platforms-tools-bsd-vs-gnu-cli, backend-common-integrations-externally-owned-defaults, platforms-processes-non-interactive-cli-invocation, qa-deliverables-documented-behavior-of-a-third-party-tool, platforms-toolchains-self-import-inside-a-workspace-package, databases-schema-design-migration-sql-without-a-database, platforms-toolchains-no-html-link-for-pages-misses-app-router-routes, frontend-data-fetching-server-action-refresh-of-the-current-route]
 ---
 
 # A CLI Flag, Subcommand, or API Method That Exists Locally but Not Where It Runs

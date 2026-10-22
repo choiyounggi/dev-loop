@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html
 last_verified: 2026-09-03
-related: [security-input-validation-at-trust-boundaries, infrastructure-agent-orchestration-worktree-isolated-workers, qa-process-adversarial-change-review]
+related: [security-input-validation-at-trust-boundaries, infrastructure-agent-orchestration-worktree-isolated-workers, qa-process-adversarial-change-review, infrastructure-agent-orchestration-done-criteria-in-a-split-task-piece]
 ---
 
 # Recording Inbound Validation as a Decision on the Receiver's Task, Not Only the Producer's

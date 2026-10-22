@@ -1,11 +1,15 @@
 # frontend — Domain Index
 
 Route here for: web UI code — component state placement, effect usage, rendering
-performance, component structure/composition, in-UI data fetching, async
+performance, build-time vs request-time rendering of a Next.js page that reads a
+database, browser APIs gated by secure context, user activation or engine
+support (clipboard writes, in-browser image decode/encode before upload),
+component structure/composition, in-UI data fetching, async
 loading/error/empty UI states, bundle/asset load performance, form validation UX,
 XSS-safe output, client-side auth token handling, interactive-element accessibility,
 any new or changed user action (this wiki's development standard adds a WebMCP tool per action), visual design decisions
-(color/typography/layout/motion styling, canvas effect layers, responsive
+(color/typography/layout/motion styling, canvas effect layers, three.js scene
+lighting and shadow complaints from screenshot reviews, responsive
 layout across viewport sizes), and visual-design deliverables (screen/UI mockups,
 redesigns, design explorations, landing/print drafts — routed through the design
 canvas skill).
@@ -33,6 +37,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [rerender-and-memoization](rendering/rerender-and-memoization.md) | UI is measurably sluggish on an interaction; deciding whether to add memo/useMemo/useCallback to new or reviewed code |
 | [long-lists](rendering/long-lists.md) | Rendering a list that can reach hundreds+ rows (feed, table, dropdown, log view); list scroll jank or slow mount; choosing row keys for reorderable/filterable lists |
+| [request-time-data-in-a-nextjs-page](rendering/request-time-data-in-a-nextjs-page.md) | A Next.js App Router page or layout reads a database or other non-`fetch` source (Prisma, `pg`) with no request-time API; `next build` fails with "Error occurred prerendering page" where `DATABASE_URL` is unset, or "Failed to collect configuration" from a module-scope check; the page serves data read at build time; choosing between `connection()`, `io()`, `dynamic = 'force-dynamic'`, `unstable_noStore` and the Cache Components model (`<Suspense>`, the `dynamic` export rejected) |
 
 ## data-fetching
 
@@ -43,6 +48,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [query-state-vs-fetch-state](data-fetching/query-state-vs-fetch-state.md) | Defining what a component receives from a server-state cache (TanStack Query and equivalents) and about to treat `data === undefined` as "loading"; a view shows a permanent spinner with no error and no retry; the query can be disabled (`enabled: false`, `skipToken`) or paused by the network mode; deciding what the presentational component's state prop should be |
 | [infinite-scroll](data-fetching/infinite-scroll.md) | Implementing infinite scroll or a load-more feed; an existing feed loses scroll position on back-navigation, duplicates/skips items, or spams page requests; choosing between infinite scroll and a load-more button |
 | [query-key-prefix-invalidation](data-fetching/query-key-prefix-invalidation.md) | Adding a TanStack Query key for a new resource (status endpoint, sub-resource, polled job) and deciding whether it starts with an existing entity's key or gets its own first segment; a mutation's `invalidateQueries` refetches an unrelated view, or a polled query refetches on every parent edit; choosing `exact: true`; renaming a key prefix that existing invalidate/setQueryData calls match |
+| [server-action-refresh-of-the-current-route](data-fetching/server-action-refresh-of-the-current-route.md) | A Next.js App Router page must show new state right after a Server Action whose write happened elsewhere (an XHR upload Route Handler, a background job); the action calls `revalidatePath` with another path such as `/` and the current page refreshes anyway, and you are deciding whether to rely on that; choosing `refresh()` from `next/cache` (16.0.0+) vs `revalidatePath`; writing the e2e that pins "the list refreshed without a reload" |
 
 ## performance
 
@@ -57,6 +63,13 @@ Match your situation to a "load when" line; load only matching pages.
 | [validation-timing](forms/validation-timing.md) | Implementing form validation and deciding when to validate / when errors show; reworking a form abandoned over premature, late, or unexplained errors; mapping server validation errors to fields |
 | [dropzone-copy-without-drop-handlers](forms/dropzone-copy-without-drop-handlers.md) | Building or restyling a file-upload control whose `<input type=file>` is visually hidden and whose label/wrapper is styled as a dropzone; deciding whether the copy may say "drag and drop"; adding real drag-and-drop to such a control; reviewing a restyle diff for an advertised affordance with no `dragover`/`drop` handlers |
 | [layout-shift-on-blur-before-a-click](forms/layout-shift-on-blur-before-a-click.md) | A field's blur handler shows, hides or resizes content above a button the user clicks right after typing (preview, inline error, async lookup result); a click on that button runs nothing with no error; a browser test passes as fill → blur → wait → click but fails as fill → click; sizing the conditional region (`min-height`, scroll inside a box); why Playwright's actionability checks do not catch a shift the click itself triggers |
+
+## browser-apis
+
+| Page | Load when |
+|------|-----------|
+| [copying-text-from-a-tap](browser-apis/copying-text-from-a-tap.md) | A button copies text (account number, invite code, link) with `navigator.clipboard.writeText`; the page is also served over http on a LAN IP or opened in an in-app browser; `navigator.clipboard` is undefined or the write rejects; choosing the `execCommand('copy')` textarea fallback and the copy-failed UI; awaiting something before the write; stubbing the clipboard under jsdom |
+| [downscaling-a-photo-before-upload](browser-apis/downscaling-a-photo-before-upload.md) | Resizing a phone photo in the browser before upload with `createImageBitmap` and a canvas; choosing the target size for a Claude vision request (standard vs high-resolution tier, edge and visual-token limits); EXIF orientation; `toBlob` returning PNG or `null`; Safari/iOS canvas size limits; HEIC files from an iPhone |
 
 ## security
 
@@ -97,6 +110,7 @@ Match your situation to a "load when" line; load only matching pages.
 | [html-in-canvas](design/html-in-canvas.md) | Wanting shader/3D/canvas-composited effects on real interactive HTML (forms, buttons, sections); about to hand-draw UI widgets inside a canvas with manual hit-testing; adding a canvas effect layer to an existing page |
 | [multi-shape-canvas-mask](design/multi-shape-canvas-mask.md) | Masking or clipping canvas content to the union of several shapes with `globalCompositeOperation = 'destination-in'`; painted strokes vanish after a per-shape mask loop; reviewing a loop that applies `destination-in` once per shape |
 | [lightness-steps-on-dark-surfaces](design/lightness-steps-on-dark-surfaces.md) | Designing or reviewing dark-UI fill tokens where states or elevation levels differ by OKLCH lightness steps and any step sits below about L 30%; a token ladder is called "perceptually distinct" because its L values differ; deciding whether a state cue meets WCAG 1.4.11's 3:1 or must move to outline/chroma/shape; validating an OKLCH→sRGB converter against the browser |
+| [measuring-3d-lighting-before-tuning](design/measuring-3d-lighting-before-tuning.md) | A screenshot review of a three.js/WebGL scene says an object looks flat, has no depth, or casts no shadow, and the next step would be another colour, material, or light tweak; a lamp shade or fixture sits above its own light and reads as a flat polygon; an emissive-lit mesh ignores albedo changes; a shadow under an overhead light looks missing in headless/software GL; deciding which render term (each light, `emissive`, `castShadow`) to toggle and measure on a frozen frame |
 | [pointer-attracted-particle-fields](design/pointer-attracted-particle-fields.md) | Writing or reviewing a canvas/WebGL particle or network background whose nodes move a fixed fraction toward the pointer each frame; the effect clumps after the mouse rests or the page is scrolled; a plan says "pull N % per frame toward the cursor" with no release or inner radius; choosing the regression test for such an update rule |
 | [scrubbed-scroll-animations-under-reduced-motion](design/scrubbed-scroll-animations-under-reduced-motion.md) | Adding or reviewing a scroll-driven effect (GSAP `scrollTrigger: { scrub }`, a count-up/typing/parallax updated from scroll progress) in a codebase whose reduced-motion handling is one global clock switch (`globalTimeline.timeScale()`, a duration multiplier); a scrubbed effect keeps animating under `prefers-reduced-motion: reduce` |
 | [two-theme-computed-color-comparison](design/two-theme-computed-color-comparison.md) | A test or script renders one component inside two theme wrappers (`[data-theme]` sections, sibling theme classes) and calls it themed when its computed colors differ; building the known-bad control for such a check; a control made by deleting the component's color class still reports "themed" (inherited `color`, `currentcolor` borders/outline/text-decoration); choosing between an any-property-differs verdict and a per-component must-theme property list; a component with a hardcoded background and themed text that passes the check; a pinned root whose child keeps its own theme class |

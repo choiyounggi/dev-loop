@@ -11,7 +11,7 @@ sources:
   - https://github.com/anthropics/claude-code/issues/61954
   - https://github.com/mattpocock/skills/blob/main/scripts/sync-plugin-version.mjs
 last_verified: 2026-09-04
-related: [platforms-toolchains-version-management, platforms-tools-plugin-mcp-server-registration, platforms-tools-unpacked-extension-source-reload]
+related: [platforms-toolchains-version-management, platforms-tools-plugin-mcp-server-registration, platforms-tools-unpacked-extension-source-reload, platforms-tools-plugin-dependencies-after-an-update]
 ---
 
 # Shipping New Code Through a Version-Keyed Artifact Cache

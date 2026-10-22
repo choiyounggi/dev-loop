@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/File_drag_and_drop
 last_verified: 2026-09-03
-related: [frontend-accessibility-interactive-elements, frontend-forms-validation-timing]
+related: [frontend-accessibility-interactive-elements, frontend-forms-validation-timing, frontend-browser-apis-downscaling-a-photo-before-upload]
 ---
 
 # "Drag and Drop" Copy on a Styled File-Upload Dropzone

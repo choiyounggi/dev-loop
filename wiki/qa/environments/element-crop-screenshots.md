@@ -9,7 +9,7 @@ sources:
   - https://playwright.dev/docs/api/class-page
   - https://playwright.dev/docs/api/class-locator
 last_verified: 2026-09-03
-related: [qa-environments-browser-console-capture-gaps, qa-process-completion-claims, qa-bug-reports-reproducible-reports]
+related: [qa-environments-browser-console-capture-gaps, qa-process-completion-claims, qa-bug-reports-reproducible-reports, qa-environments-horizontal-overflow-in-full-page-screenshots]
 ---
 
 # Cropping a Screenshot to a Single Page Element

@@ -36,6 +36,12 @@
     "how": "get_spec_links -> inspect_node / get_dev_ready / get_design_tokens",
     "when": "issue has a Figma link AND the change touches UI; skip for backend-only tasks"
   },
+  "inspect": {
+    "kind": "mcp",
+    "ref": "rea",
+    "how": "investigate_feature prompt -> list_browser_targets -> capture_browser_scenario -> inspect_web_network_capture; analyze_web_bundle | analyze_javascript_application only under a licence row that allows static analysis of the shipped code; copy each result's confidence + limitations into the row's Unknown cell",
+    "when": "Phase A3 reference study, called only by the fresh-context study agent when the requester names an existing product as the reference; workers get inspect=default; the verify_reconstruction prompt stays unused — comparison is the oracle test. Set this entry ONLY when you registered the MCP yourself (claude mcp add --scope local rea -- npx -y rea-agents@<x.y.z> mcp, e.g. for a Ghidra engine env); unset, scripts/reference-study.sh starts the pinned rea-agents for the study session and nothing is registered"
+  },
   "workspace": {
     "roots": ["/Users/me/workspace"],
     "depth": 2,
