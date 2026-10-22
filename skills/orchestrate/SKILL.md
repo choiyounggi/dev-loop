@@ -587,11 +587,18 @@ answered.
 **Session knobs (tmux substrate, set once per run):** `export LO_RUN_ID=<short-run-id>`
 so every `launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reuse that
 exact name for later `send-prompt.sh`); the script also exports the guardrails
-escalation env into each worker. Also export `LO_GRAPH=.orchestration/graph.json
-LO_WORKTREES_ROOT=<root>/.worktrees` once per run: with both set, every
-`watch-status.sh` call pulls each worker's worktree-local `.orchestration/status`
-(and `questions/`) records into the canonical dir automatically, once per poll
-(issue #167 — workers never write into this checkout). It also collects
+escalation env into each worker. Every `watch-status.sh` call pulls each worker's
+worktree-local `.orchestration/status` (and `questions/`) records into the
+canonical dir automatically, once per poll (issue #167 — workers never write into
+this checkout). It reads `LO_GRAPH` and `LO_WORKTREES_ROOT`; when either is unset
+or empty it derives the default from the status dir — `<status-dir>/../graph.json`
+and `<status-dir>/../../.worktrees` (issue #277) — and uses it when that path
+exists, so exporting `LO_GRAPH=.orchestration/graph.json
+LO_WORKTREES_ROOT=<root>/.worktrees` once per run is optional, and an exported
+value always wins over the derived one. When a default path is missing, the watch
+prints one `collection off` warning line on stderr at start-up and runs without
+collection: treat that line as a wrong status-dir argument or a missing graph or
+worktrees path, not as a slow worker. It also collects
 `blocked/` records (the `worker-blocked-signal.sh` hook) the same way, except a
 canonical `blocked/<task>.json` is pruned once its worker-side copy is gone —
 see exit 8 below. `ready-set.sh` reads the

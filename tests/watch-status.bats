@@ -596,11 +596,14 @@ SCRIPT
   refute_output_has "worker stalled"
 }
 
-# ---- collector integration (LO_GRAPH + LO_WORKTREES_ROOT, issue #167) -------
+# ---- collector integration (LO_GRAPH + LO_WORKTREES_ROOT, issues #167, #277) --
 # Workers write status worker-locally now; watch pulls those records into the
-# canonical dir via collect-status.sh once per poll iteration, but only when
-# BOTH envs are set. Either env unset must be byte-identical to old behavior:
-# a worker-local-only record is invisible and the wait times out as before.
+# canonical dir via collect-status.sh once per poll iteration. An explicit
+# non-empty LO_GRAPH / LO_WORKTREES_ROOT wins; an unset or empty one is derived
+# from the status dir ($ORCH/graph.json and $BATS_TEST_TMPDIR/.worktrees here)
+# when that path exists. When either stays unresolved there is no collector
+# call and one `collection off` line goes to stderr: a worker-local-only
+# record is invisible and the wait times out.
 
 @test "collector: both envs set — a worker-local record is collected and the target is reached" {
   GRAPH="$BATS_TEST_TMPDIR/graph.json"
@@ -616,7 +619,7 @@ SCRIPT
   [ "$(jq -r '.phase' "$ORCH/status/t1.json")" = "impl_done" ]
 }
 
-@test "collector: envs unset — a worker-local-only record is NOT seen (old behavior)" {
+@test "collector: envs unset and no graph.json or .worktrees beside the status dir — a worker-local-only record is NOT seen" {
   WROOT="$BATS_TEST_TMPDIR/worktrees"
   mkdir -p "$WROOT/wt1/.orchestration/status"
   printf '{"task":"t1","phase":"impl_done","updatedAt":"2026-01-01T00:05:00Z"}' \
@@ -627,7 +630,7 @@ SCRIPT
   [ ! -e "$ORCH/status/t1.json" ]
 }
 
-@test "collector: only LO_GRAPH set (LO_WORKTREES_ROOT unset) — old behavior, no collector call" {
+@test "collector: only LO_GRAPH set and no .worktrees beside the status dir — no collector call" {
   GRAPH="$BATS_TEST_TMPDIR/graph.json"
   printf '{"tasks":[{"id":"t1","deps":[]}]}' > "$GRAPH"
   WROOT="$BATS_TEST_TMPDIR/worktrees"
@@ -645,6 +648,84 @@ SCRIPT
       sh "$WS" "$ORCH/status" done 1 5 1
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"collect failed"* ]]
+}
+
+@test "collector: envs unset — defaults derived from the status dir collect a worker-local record (issue #277)" {
+  printf '{"tasks":[{"id":"t1","deps":[]}]}' > "$ORCH/graph.json"
+  WROOT="$BATS_TEST_TMPDIR/.worktrees"
+  mkdir -p "$WROOT/wt1/.orchestration/status"
+  printf '{"task":"t1","phase":"impl_done","updatedAt":"2026-01-01T00:05:00Z"}' \
+    > "$WROOT/wt1/.orchestration/status/t1.json"
+  run --separate-stderr env -u LO_GRAPH -u LO_WORKTREES_ROOT \
+      sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.phase' "$ORCH/status/t1.json")" = "impl_done" ]
+  [ "$(printf '%s\n' "$stderr" | grep -c 'collection off')" -eq 0 ]
+  # An empty value behaves as unset (no off switch): derivation still runs.
+  rm "$ORCH/status/t1.json"
+  run --separate-stderr env LO_GRAPH= LO_WORKTREES_ROOT= \
+      sh "$WS" "$ORCH/status" impl_done 1 5 1
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.phase' "$ORCH/status/t1.json")" = "impl_done" ]
+}
+
+@test "collector: envs unset and no derivable layout — one 'collection off' stderr line, exit code unchanged (issue #277, error)" {
+  printf '{"task":"t1","phase":"implementing"}' > "$ORCH/status/t1.json"
+  run --separate-stderr env -u LO_GRAPH -u LO_WORKTREES_ROOT \
+      sh "$WS" "$ORCH/status" impl_done 1 3 1
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"TIMEOUT"* ]]
+  [[ "$output" != *"collection off"* ]]
+  [ "$(printf '%s\n' "$stderr" | grep -c 'collection off')" -eq 1 ]
+  [[ "$stderr" == *"$BATS_TEST_TMPDIR/.worktrees/*/.orchestration/status"* ]]
+  printf '{"task":"t1","phase":"failed"}' > "$ORCH/status/t1.json"
+  run --separate-stderr env -u LO_GRAPH -u LO_WORKTREES_ROOT \
+      sh "$WS" "$ORCH/status" impl_done 1 3 1
+  [ "$status" -eq 3 ]
+  [ "$(printf '%s\n' "$stderr" | grep -c 'collection off')" -eq 1 ]
+}
+
+@test "collector: an explicit LO_GRAPH or LO_WORKTREES_ROOT wins over the derived default (issue #277, boundary)" {
+  printf '{"tasks":[{"id":"t2","deps":[]}]}' > "$ORCH/graph.json"
+  printf '{"tasks":[{"id":"t1","deps":[]}]}' > "$BATS_TEST_TMPDIR/g1.json"
+  mkdir -p "$BATS_TEST_TMPDIR/.worktrees/wt1/.orchestration/status" \
+           "$BATS_TEST_TMPDIR/alt/wt2/.orchestration/status"
+  printf '{"task":"t1","phase":"impl_done","updatedAt":"2026-01-01T00:05:00Z"}' \
+    > "$BATS_TEST_TMPDIR/.worktrees/wt1/.orchestration/status/t1.json"
+  printf '{"task":"t2","phase":"impl_done","updatedAt":"2026-01-01T00:05:00Z"}' \
+    > "$BATS_TEST_TMPDIR/alt/wt2/.orchestration/status/t2.json"
+  # Explicit LO_GRAPH (lists t1) beats the derived graph.json (lists only t2).
+  run --separate-stderr env -u LO_WORKTREES_ROOT LO_GRAPH="$BATS_TEST_TMPDIR/g1.json" \
+      sh "$WS" --tasks t1 "$ORCH/status" impl_done 1 3 1
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.phase' "$ORCH/status/t1.json")" = "impl_done" ]
+  # Explicit LO_WORKTREES_ROOT (holds t2) beats the derived .worktrees (no t2).
+  rm "$ORCH/status/t1.json"
+  run --separate-stderr env -u LO_GRAPH LO_WORKTREES_ROOT="$BATS_TEST_TMPDIR/alt" \
+      sh "$WS" --tasks t2 "$ORCH/status" impl_done 1 3 1
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.phase' "$ORCH/status/t2.json")" = "impl_done" ]
+}
+
+@test "collector: envs unset and only ONE derived path exists — still one 'collection off' line naming the missing one (issue #277, boundary)" {
+  # graph.json present, .worktrees absent.
+  printf '{"tasks":[{"id":"t1","deps":[]}]}' > "$ORCH/graph.json"
+  run --separate-stderr env -u LO_GRAPH -u LO_WORKTREES_ROOT \
+      sh "$WS" "$ORCH/status" impl_done 1 3 1
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s\n' "$stderr" | grep -c 'collection off')" -eq 1 ]
+  [[ "$stderr" == *"missing: $BATS_TEST_TMPDIR/.worktrees;"* ]]
+  # .worktrees present with a worker-local record, graph.json absent.
+  rm "$ORCH/graph.json"
+  mkdir -p "$BATS_TEST_TMPDIR/.worktrees/wt1/.orchestration/status"
+  printf '{"task":"t1","phase":"impl_done","updatedAt":"2026-01-01T00:05:00Z"}' \
+    > "$BATS_TEST_TMPDIR/.worktrees/wt1/.orchestration/status/t1.json"
+  run --separate-stderr env -u LO_GRAPH -u LO_WORKTREES_ROOT \
+      sh "$WS" "$ORCH/status" impl_done 1 3 1
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s\n' "$stderr" | grep -c 'collection off')" -eq 1 ]
+  [[ "$stderr" == *"missing: $ORCH/graph.json;"* ]]
+  [ ! -e "$ORCH/status/t1.json" ]
 }
 
 # ---- auto-recover (unsubmitted paste -> Enter) ----
