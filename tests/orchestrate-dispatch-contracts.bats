@@ -429,6 +429,34 @@ brief_dependencies_region() {
   [ "$n" -eq 1 ]
 }
 
+@test "the profile table has exactly one worker-model row: Sonnet at R0, Opus at R1-R3" {
+  n="$(phase2_section "$SKILL" | grep -c '| worker model (DEV_LOOP_WORKER_MODEL) | claude-sonnet-5-5 | claude-opus-5-5 | claude-opus-5-5 | claude-opus-5-5 |')"
+  [ "$n" -eq 1 ]
+}
+
+@test "negative control: a Phase 2 copy with Sonnet at every tier fails the worker-model check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-sonnet-everywhere.md"
+  sed '/^| worker model (DEV_LOOP_WORKER_MODEL)/s/claude-opus-5-5/claude-sonnet-5-5/g' "$SKILL" > "$fixture"
+  n="$(phase2_section "$fixture" | grep -c '| worker model (DEV_LOOP_WORKER_MODEL) | claude-sonnet-5-5 | claude-opus-5-5 | claude-opus-5-5 | claude-opus-5-5 |' || true)"
+  [ "$n" -eq 0 ]
+}
+
+@test "the rubric caps R0 at two files and one plan task, and step 2a re-reads the task count" {
+  section="$(normalize_ws "$(phase2_section "$SKILL")")"
+  [[ "$section" == *'| more than two affected files (a `**` glob counts as more than two) | Phase 2 affected files, re-read at step 2a from the plan | files:<n> | R1 |'* ]]
+  [[ "$section" == *'| more than one task in the wiki-plan task table | step 2a | tasks:<n> | R1 |'* ]]
+  [[ "$section" == *"re-reads the four plan-derived signals (size:large, no-wiki:<n>, files:<n>, tasks:<n>)"* ]]
+  s2a="$(normalize_ws "$(step2a_section "$SKILL")")"
+  [[ "$s2a" == *"re-check the plan-derived signals (size:large, no-wiki:<n>, files:<n>, tasks:<n>)"* ]]
+}
+
+@test "negative control: a Phase 2 copy without the tasks:<n> row fails the R0-cap check" {
+  fixture="${BATS_TEST_TMPDIR}/skill-no-tasks-signal.md"
+  grep -v '| tasks:<n> | R1 |' "$SKILL" > "$fixture"
+  section="$(normalize_ws "$(phase2_section "$fixture")")"
+  [[ "$section" != *'| step 2a | tasks:<n> | R1 |'* ]]
+}
+
 @test "the profile table's coordinator auditor cross-call row does not contradict the worker's mandatory step 6.5 auditor call" {
   section="$(normalize_ws "$(phase2_section "$SKILL")")"
   [[ "$section" == *"coordinator auditor cross-call"* ]]
