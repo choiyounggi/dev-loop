@@ -2,15 +2,18 @@
 id: testing-quality-anchor-cases-for-allowlist-regexes
 domain: testing
 category: quality
-applies_to: [general, javascript, python]
+applies_to: [general, javascript, python, shell]
 confidence: verified
 sources:
   - https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/
   - https://docs.python.org/3/library/re.html
+  - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html
+  - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
+  - https://www.austingroupbugs.net/view.php?id=1546
   - "Local reproduction 2026-10-08 (Node v26.7.0, Python 3.14.6): a 6-case set against an anchored key pattern and the same pattern without ^"
   - "Field case 2026-10-07 (an 11-case rejection list for an object-key allowlist regex)"
-last_verified: 2026-10-08
-related: [testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-minimum-case-set, security-input-validation-at-trust-boundaries, backend-common-integrations-wrapping-quotes-in-a-frontmatter-value]
+last_verified: 2026-10-22
+related: [testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-minimum-case-set, security-input-validation-at-trust-boundaries, backend-common-integrations-wrapping-quotes-in-a-frontmatter-value, qa-process-scope-purity-checks]
 ---
 
 # Anchor Cases for an Allowlist Regex
@@ -51,6 +54,7 @@ control that must fail when an anchor is removed.
 | Python, pattern used with `re.match` | `re.match` only matches at the start, so deleting `^` changes nothing (the prefix case still fails to match): that mutant is equivalent. Switch to `re.fullmatch` so both ends are explicit |
 | The pattern has the `m` flag (JS) or `re.MULTILINE` | `^` and `$` then match at every line; an embedded-newline input passes — drop the flag for single-value allowlists |
 | The value is joined into a filesystem path after the check | Keep the prefix case even when anchors are present, and resolve the joined path and check it stays under the base directory ([security-input-validation-at-trust-boundaries]) |
+| A shell check joins anchored lines into one basic regex with `\|` (`grep -v '^ M a.md$\|^ M b.md$'`), especially on macOS | Write it as an extended regex matched against the whole line: `grep -Ex 'a|b'` (or `grep -E '^(a|b)$'`), then run it once on an input it must pass and once on one it must reject. POSIX makes `$` an anchor in a BRE only as the last character of the entire expression (before `\|` it is left to the implementation), and `\|` is itself an extension. On macOS the filter selected nothing — consistent with the first `$` being read as a literal character — and `grep -v` let every line through |
 | The allowlist decides on a URL's scheme and host after `new URL()` parses it | Choose fixtures whose raw text and parsed host disagree (userinfo, `\`, `?`, `#`, `%2F`, lookalike labels) — [testing-quality-host-disguise-fixtures-for-url-allowlists] |
 
 ## Instead of
@@ -65,4 +69,8 @@ control that must fail when an anchor is removed.
 - https://stryker-mutator.io/docs/mutation-testing-elements/supported-mutators/ — Regex mutator: StrykerJS and Stryker4s mutate regexes with weapon-regex; the mutation table maps `^abc` to `abc` and `abc$` to `abc`
 - https://docs.python.org/3/library/re.html — `$` "Matches the end of the string or just before the newline at the end of the string"; `re.fullmatch` returns a match only "If the whole string matches"
 - Local reproduction 2026-10-08 (Node v26.7.0, Python 3.14.6): for `^[0-9a-f]{2}\/[0-9a-f]{32}\.jpg$`, the wrong-extension, short and empty cases were rejected both with and without `^`; `'../' + valid` and `'/etc/' + valid` were rejected only with `^`. Python `re.search` matched `valid + '\n'`, `re.fullmatch` did not; JS `/…$/` rejected it; JS `/^…$/m` accepted `'../evil\n' + valid`; Python `re.match` without `^` rejected `'../' + valid`
+- https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html — 9.3.8 BRE anchoring: "A <dollar-sign> ( '$' ) shall be an anchor when used as the last character of an entire BRE. The implementation may treat a <dollar-sign> as an anchor when used as the last character of a subexpression"
+- https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html — `-x`: only input lines that use all their characters to match the expression are matching lines; `-E` selects extended regular expressions, where `|` is alternation
+- https://www.austingroupbugs.net/view.php?id=1546 — Austin Group item on BRE anchoring wording, including how `$` before a `\|` alternation is treated (implementations differ)
+- Field case 2026-10-15 (a lnpl-postgres task worktree, macOS `/bin/bash` with the system grep; recorded by the originating session): `grep -v '^ M README.md$\|…'` passed all 3 `git status` lines through (the filter selected none); the `grep -vEx` form gave 0 lines on the real status and 2 after two stray lines were added
 - Field case 2026-10-07: an 11-case reject list for a storage-key regex — deleting `^` changed 0 of the 11 results; `'../3f/<32 hex>.jpg'` passed only the unanchored pattern

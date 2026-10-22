@@ -1,76 +1,79 @@
-# Knowledge flush — 1 insight(s)
+# Knowledge flush — 4 insight(s)
 
-A wrapper that forwards a lower layer's typed-fault message and prints its own operation label only for other errors cannot have that label pinned by lower-layer fault injection; one generic rejection at the wrapper's boundary (Vitest `vi.mock(path, { spy: true })` + `mockRejectedValueOnce`) does it, and `mockReset()` — not `vi.restoreAllMocks()` — clears the autospy. **1 new page, 1 index row, 1 back-link, 1 log entry. 2 rows released as pending duplicates of open PR #274, 0 dropped.**
+Four lessons from shell gates and visual review: brace a shell variable when non-ASCII text follows it; a passing new-vs-baseline list comparison can be 0 lines against 0; a `\|`-joined basic regex with `$` anchors matched nothing on macOS; a colour-role rule should be measured, not judged from screenshots. **1 new page, 3 edge rows on existing pages, 3 index rows, 4 log entries. 1 row dropped as a duplicate, 1 released as a pending duplicate of open PR #275, 14 released unread.**
 
-Headless autoflush run `20261015-105809-96863`. Claimed 3 queue rows with `queue-claim.js claim`: `86a482be00c360fc` (Vitest autospy, testing), `866175146dd2fc3b` and `ea0574d2686b0169` (both: tsx top-level await needs `"type": "module"`, platforms).
+Headless autoflush run, claim id `20261022-124048-18072`. `queue-claim.js claim` returned 20 ids. This run had no tool that lists a directory, and queue files are named by session id, so it found rows by opening `~/.dev-loop/queue/<session-id>.jsonl` for the session ids in `~/.claude/history.jsonl` (2026-10-11 onward). 6 claimed rows were found. The other 14 (`97c37473b53e63c2`, `3632d0989f629104`, `9700770d7c05b820`, `3d578bcfcbcc6b97`, `54aeaa8fdee5e0e7`, `0e0e7c7c4cef34c3`, `05df421bf905f5ce`, `1670e43e60cb7fe3`, `1666b8cf32e274ea`, `2df80edab8d41dfb`, `7bfb7541e4e4bd8c`, `410400eb22f77f77`, `5ee53f499cc8d657`, `744090ce219677c0`) sit in files this run could not locate. They were released back to `pending` without being read, so a manual `/dev-loop:knowledge-flush` can pick them up.
 
 ## Verified best-practice
 
-**`86a482be00c360fc` — pin a wrapper's own error label with a fault injected at its boundary** (confidence: **verified**)
-
-Claim: when a wrapper logs the lower layer's typed-fault message for that fault class and its own label for any other error, tests that inject faults only at the lower layer never exercise the label branch, so a renamed label stays green. Inject one generic rejection at the wrapper's boundary — under Vitest `vi.mock("./lower", { spy: true })` keeps every export real while allowing `vi.mocked(lower.fn).mockRejectedValueOnce(new Error("boom"))` in one test — and assert the whole log line. Reset the autospy with `mockReset()`; `vi.restoreAllMocks()` acts on `vi.spyOn` spies and leaves an automock-created override in place. Prove the test with the rename mutant.
-
-Sources checked:
-
-- https://vitest.dev/api/vi — `vi.mock(path, { spy: true })`: Vitest automocks the module but does not override the implementations of its exports (since Vitest 2.1); `vi.restoreAllMocks` restores the original implementations of `vi.spyOn` spies and does not affect mocks created during automocking. Retrieved through WebSearch on 2026-10-15 (WebFetch is not permitted in this headless run, so the wording was read from the search tool's rendering of the official page, not from the raw HTML; the page is cited without verbatim quotes).
-- https://vitest.dev/guide/mocking/modules — the `spy` option spies on every export of the module without replacing them with fakes.
-- https://pitest.org/quickstart/basic_concepts/ — "Survived: The mutation was not detected by the covering test" (same quote already carried by `testing-mocking-captured-call-arguments`).
-- Installed Vitest 5.0.3 (`node_modules/vitest/dist/index.d.ts` in linkly-invitation): `mock(path, factory?: ModuleMockFactoryWithHelper | ModuleMockOptions)` — the `ModuleMockOptions` type the candidate cited is imported from `@vitest/mocker`. The same file's comment on `restoreAllMocks` says it calls `mockRestore()` on "every mocked function", which the reproduction below shows is not what happens to an automock-created spy; the page records that discrepancy next to the official wording.
-
-Local reproduction (Vitest 5.0.3, run with the project's installed `vitest.mjs --root <scratch>`; scratch directory under the checkout's `.dev-loop/` was deleted after the run and is not part of this diff):
-
-| Test | Result |
-|---|---|
-| Typed lower-layer fault through the wrapper | log = `fault: lower-op[faulty] failed` — the wrapper's label is absent |
-| Autospied export called normally | real value returned, `toHaveBeenCalledWith("fine")` green |
-| `mockRejectedValueOnce(new Error("boom"))` at the boundary | log = `fault: wrapper-op[createInvite] boom` — the wrapper's own label |
-| `mockRejectedValue(new Error("sticky"))`, then `vi.restoreAllMocks()`, then a real call | log = `fault: wrapper-op[createInvite] sticky` — the override survived the restore |
-| `mockRejectedValue(...)`, then `mockReset()`, then a real call | log = `[]` — the real implementation came back |
-
-Runner's own marker: `Test Files  1 passed (1)`, `Tests  5 passed (5)`.
-
-Field evidence (originating session, linkly-invitation task t4e, `runAdminWrite` logging `DatabaseFaultError.message`; not re-run here): renaming both action operations kept 8/8 green with faults only at the database layer; after the autospy rejection test, rename mutants 46d and 46e reddened.
-
-**`866175146dd2fc3b`, `ea0574d2686b0169` — tsx compiles a `.ts` file as CommonJS when the nearest package.json lacks `"type": "module"`, so top-level await fails** — not researched further in this run: open PR #274 already carries `wiki/platforms/toolchains/tsx-top-level-await-without-type-module.md` for exactly this trigger (see Open-PR check). No confidence is claimed here.
+1. **`5b37c398f717e032` — brace a parameter that non-ASCII text follows** (field-tested)
+   - Claim: `"$NAME가 없어"` breaks under a UTF-8 locale; `"${NAME}가 없어"` is right everywhere.
+   - Sources: https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html ("The braces are required when … parameter is followed by a character which is not to be interpreted as part of its name"); https://www.gnu.org/software/bash/manual/html_node/Definitions.html (`name` = letters, numbers, underscores; which bytes are letters depends on the locale); https://mail.gnu.org/archive/html/bug-bash/2015-12/msg00030.html (in a UTF-8 locale bash's character classes treat a non-ASCII letter as alphabetic).
+   - Evidence: the session's macOS bash 5.3 measurement — `env -i LANG=C.UTF-8 X=ANTHROPIC bash -c 'echo "[$X가 없어]"'` printed `[�� 없어]`, without `LANG` it printed `[ANTHROPIC가 없어]`, and `${X}` was right in both.
+   - Correction: the candidate said this matches the GitHub runner. That was **not verified**: nothing was measured on Linux/glibc, and the C library there may classify bytes differently. The page keeps only the directive the bash manual backs, plus the measured macOS result. It tells readers to test under the job's own `LANG` value rather than assuming `C.UTF-8`. The one-byte reading of the broken output is labelled as inference.
+2. **`1be71abc38a603ca` — a passing two-list comparison can be 0 vs 0** (verified)
+   - Claim: after `grep … | sort -u > list` gates pass, count both lists and cite the runner's own success line.
+   - Source: https://www.gnu.org/software/bash/manual/html_node/Pipelines.html ("The exit status of a pipeline is the exit status of the last command in the pipeline, unless the pipefail option is enabled"). The page already cites POSIX grep exit status 1 for "no lines selected".
+   - Evidence: the session's G4 gate, where both lists had 0 lines and the pass rested on the `OK (skipped=1)` lines.
+3. **`12aa086463fd4e2a` — `\|`-joined BRE with `$` anchors** (verified)
+   - Claim: write `grep -Ex 'a|b'` and test one passing and one rejected input.
+   - Sources: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html (9.3.8: `$` is an anchor only as the last character of an entire BRE; at the end of a subexpression it is up to the implementation); https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html (`-x`, `-E`); https://www.austingroupbugs.net/view.php?id=1546 (BRE anchor wording, including `$` before `\|`; implementations differ, as the musl/glibc notes found in the same search show).
+   - Evidence: the session's macOS measurement — the BRE filter passed all 3 lines; the `-vEx` form gave 0 on the real status and 2 with stray lines.
+   - Wording: "the first `$` is a literal" is consistent with POSIX but was not shown separately, so the page says "consistent with".
+4. **`d631595a0e889652` — measure a colour-role rule instead of judging screenshots** (field-tested)
+   - Source: https://developer.mozilla.org/en-US/docs/Web/API/Window/getComputedStyle (resolved values, the thing compared).
+   - Evidence: the session's two review rounds — a darker danger red `rgb(164,42,36)` was failed as "alarm red" by eye; with `#ff4d3f` and the selector list, the colour was found only on the three allowed elements.
 
 ## Existing-layer check
 
-Route: `INDEX.md` → testing ("mock decisions", "cases/assertions") → `wiki/testing/index.md` → mocking. The platforms index was read for the two tsx rows (toolchains category; no merged page covers tsx/ESM module-format detection — the page in flight is on PR #274).
+`wiki_search` was run with each trigger (k=4–6).
 
-Pages read: testing-mocking-what-to-mock, testing-mocking-captured-call-arguments, testing-quality-tests-that-cannot-fail, testing-quality-surviving-mutant-equivalence-triage
+| Row | Pages read | Finding | Action |
+|-----|------------|---------|--------|
+| `5b37c398f717e032` | colon-after-an-unbraced-parameter (zsh `:` modifiers), portable-shell-scripts | Closest family, but the colon page is zsh-only by title and `applies_to`; portable-shell-scripts is already at about 121 body lines | **Create** a sibling page; `related:` added both ways with the colon page; also links portable-shell-scripts, timezone-and-locale, unicode-text-matching |
+| `1be71abc38a603ca` | checks-that-cannot-pass | Its "output is piped" row covers grep's error 2 hidden by a pipe, not two empty lists compared equal | **Merge** an edge row |
+| — | search-evidence-from-a-wrapped-grep, unmatched-glob-in-a-command-argument (shown in search hits) | Adjacent, not merged | — |
+| `12aa086463fd4e2a` | anchor-cases-for-allowlist-regexes, scope-purity-checks | Neither covers BRE `$` before `\|`. scope-purity-checks has the `$`-anchoring row for porcelain filters and already links anchor-cases | **Merge** an edge row into anchor-cases; added `shell` to `applies_to`; reverse `related:` link added |
+| `d631595a0e889652` | blind-llm-judgment-of-a-visual-rule, theme-swap-propagation-check | No colour-role measurement row. Possible conflict: the blind-brief step says to hide the rule from the judge | **Merge** an edge row that scopes the blind brief to perception questions; for a fact about elements, the value is the rule. `related:` both ways |
+| `c0d3c103586e607c` | assertion-scanner-false-positive-on-unittest-convention | Same trigger and directive (test-floor `/assert[ \t]/` misses `self.assert*`; trust the auditor); merged 2026-10-15 from an earlier row | **Drop** as duplicate; also names dev-loop's own script |
 
-- `wiki_search` (k=8) on the candidate's trigger/directive: extracted-method-this-binding 0.772, what-to-mock 0.744 and 0.710, typescript-6-global-types 0.733, captured-call-arguments 0.730, test-data-and-isolation 0.721, behavior-not-implementation 0.715. None describes the same situation: what-to-mock's edge row "test your code's handling of a provider's failure modes → stub at your wrapper boundary" is the general rule this page specialises (which fault *depth* reaches which log line), and no page mentions `spy: true`, automock reset behaviour, or a wrapper label hidden behind a forwarded message.
-- `wiki_search` (k=8) on the tsx trigger returned no page about tsx/esbuild module format (top hit typescript-6-global-types 0.700 is a different situation), consistent with the page living only on PR #274.
-- **Created new**: `wiki/testing/mocking/wrapper-label-pinned-by-a-boundary-fault.md` (body 75 lines; 0 banned qualifiers; every prohibition is paired in its own cell). Merging into what-to-mock was rejected: that page is a general decision table at 60+ body lines and is held by open PR #268; the new situation has its own trigger (fault depth vs. the wrapper's own line) and a framework-specific reset trap.
-- Conflicts with existing directives: none. The page agrees with what-to-mock ("stub at the boundary you own") and with tests-that-cannot-fail (one mutation per assertion).
-- Related links: forward links to what-to-mock, captured-call-arguments, tests-that-cannot-fail, surviving-mutant-equivalence-triage. Back-link added on **captured-call-arguments only** (no open PR touches it). Back-links on what-to-mock and tests-that-cannot-fail (both edited by open PR #268) and surviving-mutant-equivalence-triage (edited by #269 and #270) are deferred to a later flush to keep this PR conflict-free on those pages; the log entry records this.
-- `wiki/testing/index.md`: one row added at the end of the mocking table (maintenance invariant 1). This index file is also edited by #268, #269, #270, #275 and #279, as every testing-domain flush is.
-- Checks on this checkout: `node scripts/wiki-structure-checks.js wiki` → `pages: 427, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line in infrastructure/config/keys-ahead-of-their-consumer.md).
+No conflicting directive was overwritten, and no contradiction was flagged.
+
+Pages read: platforms-shells-colon-after-an-unbraced-parameter, platforms-shells-portable-shell-scripts, platforms-environment-unicode-text-matching, platforms-environment-timezone-and-locale, testing-quality-checks-that-cannot-pass, testing-quality-anchor-cases-for-allowlist-regexes, qa-process-scope-purity-checks, qa-process-blind-llm-judgment-of-a-visual-rule, frontend-design-theme-swap-propagation-check, testing-quality-assertion-scanner-false-positive-on-unittest-convention
 
 ## Open-PR check
 
-11 open `knowledge/*` heads listed with `gh pr list --repo choiyounggi/dev-loop --state open --json number,title,headRefName,files --search "head:knowledge/"`: #279, #275, #274, #273, #272, #271, #270, #269, #268, #266, #265. This headless run has no git access, so overlap was judged from each PR's changed-file list and title, plus `gh pr diff <n>` grepped for the candidate's terms (`spy: true`, autospy, automock, restoreAllMocks, mockReset, mockRejectedValueOnce, "operation name") on the five heads that touch `wiki/testing/` (#268, #269, #270, #275, #279).
+`gh pr list --repo choiyounggi/dev-loop --state open --json number,headRefName,title,files --search "head:knowledge/"` returned one PR:
 
-| Candidate | Overlapping open PR | Verdict |
-|---|---|---|
-| 86a482be00c360fc (Vitest autospy boundary fault) | None carries it. The only hit was #270, whose new page `testing/mocking/proving-a-value-never-reaches-the-console.md` has an edge row about `afterEach(() => vi.restoreAllMocks())` ordering for console spies — a different trigger (`vi.spyOn` on console, restore-before-assert), and it does not mention automocking or `spy: true`. #268 (`what-to-mock` fs-mock default export), #269 (pull probe, lock control), #275 (Testcontainers workers), #279 (coincident fixtures) are different situations | **new** |
-| 866175146dd2fc3b (tsx top-level await, `"type": "module"`) | #274 adds `wiki/platforms/toolchains/tsx-top-level-await-without-type-module.md` and its title names "tsx top-level await without type:module" — the same trigger and directive | **pending duplicate → released** (headless rule: never fold into another branch; the row returns to `pending` and the next flush will drop it against the merged page) |
-| ea0574d2686b0169 (same tsx insight, second session) | #274, as above | **pending duplicate → released** |
+- **#275** `knowledge/autoflush-20261012-150339-99224` — "cap test-runner workers so per-file Testcontainers DBs don't exhaust the Docker VM".
+- Files: `wiki/testing/flaky/diagnosing-flaky-tests.md`, a new `wiki/testing/flaky/docker-vm-oversubscription-under-parallel-containers.md`, `wiki/testing/data/testcontainers-reaper-on-docker-desktop-macos.md`, `wiki/testing/index.md`, `log.md`.
 
-No `git merge-tree` check was possible in this run. Expected conflicts with the open heads are limited to `wiki/testing/index.md` (one appended row) and `log.md`, the two files every knowledge PR appends to.
+This headless run cannot diff that branch, so overlap was judged from domain, category and trigger:
+
+| Row | Verdict | Reason |
+|-----|---------|--------|
+| `0a0ccc4ca0904514` (e2e failures that move between tests under CPU contention) | **Pending duplicate — released** | Same testing/flaky trigger: resource contention reads as tests failing at random. #275 edits diagnosing-flaky-tests.md and adds a resource-exhaustion page. Ingest it manually after #275 lands |
+| `5b37c398f717e032` | new | platforms/shells; #275 touches no platforms page |
+| `1be71abc38a603ca` | new | testing/quality gate semantics; #275 touches flaky/data only |
+| `12aa086463fd4e2a` | new | Same reason as the row above |
+| `d631595a0e889652` | new | qa/process; #275 touches no qa page |
+| `c0d3c103586e607c` | drop | Already in the merged layer (see above) |
+
+Shared file: #275 and this flush both edit `wiki/testing/index.md` and `log.md`, in different rows (quality vs flaky) and at append-only log lines. Expect a trivial merge.
 
 ## Routing decision
 
-| Candidate | Layer | Target | Action |
-|---|---|---|---|
-| 86a482be00c360fc | bundled | `testing/mocking/wrapper-label-pinned-by-a-boundary-fault.md` (id `testing-mocking-wrapper-label-pinned-by-a-boundary-fault`) | created; index row + log entry + 1 back-link |
-| 866175146dd2fc3b | bundled | `platforms/toolchains/tsx-top-level-await-without-type-module.md` (on PR #274) | released, not ingested |
-| ea0574d2686b0169 | bundled | same as above | released, not ingested |
+| Row | Target | Change |
+|-----|--------|--------|
+| `5b37c398f717e032` | platforms / shells / **new** `wiki/platforms/shells/non-ascii-text-after-an-unbraced-parameter.md` | Index row in `wiki/platforms/index.md` |
+| `1be71abc38a603ca` | testing / quality / `checks-that-cannot-pass.md` | Edge row + Pipelines source; index line extended |
+| `12aa086463fd4e2a` | testing / quality / `anchor-cases-for-allowlist-regexes.md` | Edge row + 3 POSIX/Austin Group sources + field case; index line extended. Chosen over scope-purity-checks because the lesson is about regex anchors, not about `git status` scope |
+| `d631595a0e889652` | qa / process / `blind-llm-judgment-of-a-visual-rule.md` | Edge row + MDN source + field case; index line extended |
 
-No new category: testing/mocking already owns "mock decisions" and holds the sibling pages (what-to-mock, captured-call-arguments). Layer test: the directive names no repository-specific file or module — `runAdminWrite`/`DatabaseFaultError` appear only in the field-evidence line as the originating case — so it is general knowledge.
+No new category was needed.
+
+Retired with outcome (`status: retired`, `retiredBy`/`retiredAt`): the 4 ingested rows and `c0d3c103586e607c` (dropped: duplicate). Released to pending: `0a0ccc4ca0904514` and the 14 unlocated rows.
 
 ## Local-layer candidates
 
 none
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
