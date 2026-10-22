@@ -12,6 +12,7 @@ sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
   - https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.engine.URL.render_as_string
   - https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS
+  - https://github.com/python/cpython/blob/main/Lib/http/client.py
 last_verified: 2026-07-12
 related: [infrastructure-ci-cd-secrets-handling, security-secrets-ciphertext-orphaned-by-a-regenerated-key, backend-common-errors-refusing-a-backend-without-the-needed-capability]
 ---
@@ -59,6 +60,7 @@ string; or you are setting up secret hygiene for a repository.
 | Secret must reach a config file at runtime (library only reads files) | Render the file at deploy/start from the secret store into a non-repo path; the template in the repo holds placeholders |
 | A third-party API takes its key in a URL query param and your HTTP client logs requests | The client (httpx/requests/axios) logs the full URL — key included — at its INFO level, so enabling root/DEBUG logging leaks it into log files. Keep the client's logger above INFO (or redact the URL), and confine any redaction/proxy to your own log calls — app-level redaction never sees the client library's own log lines |
 | A CLI or service error message or log line is about to echo a connection string the operator passed (`--backend`, `DATABASE_URL`) | Print its scheme only (the text before the first `:`); when host or database must appear, render a copy with its query string removed and the password hidden (SQLAlchemy `URL.render_as_string()` hides the password by default, but masks the `user:password@` slot only and includes query options as they are); a DSN carries `user[:password]@` and OWASP lists database connection strings among the data to remove or mask before recording → [backend-common-errors-refusing-a-backend-without-the-needed-capability] |
+| A script puts a secret from an env var into an HTTP request header (Python `http.client` / `urllib`) and redacts only its own error types | Before building the request, reject a key that contains any whitespace or control character, with an error that names the variable and not the value; send every unexpected exception through the same redaction as the named errors; test with a pasted key that ends in `\n`. `http.client.putheader` raises `ValueError('Invalid header value %r')` on a bare CR/LF, and that message holds the whole header value (`b'Bearer <key>\n'`), so a traceback that escapes the redaction prints the key to CI logs |
 
 ## Instead of
 
@@ -77,3 +79,5 @@ string; or you are setting up secret hygiene for a repository.
 - https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html — Data to exclude: "Database connection strings" and "Authentication passwords" are among the data that "should usually not be recorded directly in the logs, but instead should be removed, masked, sanitized, hashed, or encrypted"
 - https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.engine.URL.render_as_string — `hide_password` "Defaults to True. The password is not shown in the string unless this is set to False."; "The method directly includes additional options."
 - https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS — `postgresql://[userspec@][hostspec][/dbname][?paramspec]` where userspec is `user[:password]`: the password rides inside the connection string
+- https://github.com/python/cpython/blob/main/Lib/http/client.py — `_is_illegal_header_value = re.compile(rb'\n(?![ \t])|\r(?![ \t\n])').search`, and `putheader` runs `raise ValueError('Invalid header value %r' % (values[i],))` on a match: a trailing `\n` matches, and the message repeats the full encoded value (read in the local CPython 3.9 `Lib/http/client.py`, l.138 and l.1234-1235, 2026-10-22; the check dates from the CVE-2016-5699 header-injection fix)
+- Field reproduction 2026-10-22 (an AI-gate HTTP runner script, Python 3.13 and 3.11): an API key env var set to a value ending in `\n` produced a traceback containing the key; after a whitespace/control-character check before the request and catch-all redaction, the same input printed 0 key occurrences on both versions and the mutation checks went red
