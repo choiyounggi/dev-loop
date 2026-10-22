@@ -12,7 +12,7 @@ sources:
   - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/await
   - https://developer.mozilla.org/en-US/docs/Web/API/AbortController
 last_verified: 2026-07-10
-related: [backend-common-errors-async-failure-handling, backend-common-errors-exception-handling, backend-common-reliability-timeouts-and-retries]
+related: [backend-common-errors-async-failure-handling, backend-common-errors-exception-handling, backend-common-reliability-timeouts-and-retries, backend-node-async-request-body-reader-cancel]
 ---
 
 # Promise Rejections That Escape Their Consumers

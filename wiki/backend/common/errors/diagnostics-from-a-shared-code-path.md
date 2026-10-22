@@ -9,7 +9,7 @@ sources:
   - https://doc.rust-lang.org/stable/nightly-rustc/rustc_errors/enum.Applicability.html
   - https://www.nngroup.com/articles/error-message-guidelines/
 last_verified: 2026-08-09
-related: [backend-common-api-design-error-responses, backend-common-api-design-unenforced-declarations, backend-common-change-impact-call-site-enumeration, debugging-signals-reading-error-messages, backend-common-change-impact-sibling-validators-on-a-shared-node]
+related: [backend-common-api-design-error-responses, backend-common-api-design-unenforced-declarations, backend-common-change-impact-call-site-enumeration, debugging-signals-reading-error-messages, backend-common-change-impact-sibling-validators-on-a-shared-node, backend-common-errors-refusing-a-backend-without-the-needed-capability]
 ---
 
 # A Rejection Message Emitted From a Code Path Two Constructs Share

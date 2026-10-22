@@ -10,7 +10,8 @@ sources:
   - https://git-scm.com/docs/git-status
   - "Local reproduction 2026-10-08 (git, macOS): a tracked edit and an untracked file before reset --hard; git diff carried only the tracked edit"
   - "Field case 2026-10-08 (dev-loop knowledge-flush, ~/.dev-loop/repo reused across runs)"
-last_verified: 2026-10-08
+  - "Field case 2026-10-11 (dev-loop knowledge-flush, same checkout: two runs interrupted in one day; the third preserved the draft and re-verified it before adopting it)"
+last_verified: 2026-10-11
 related: [infrastructure-agent-orchestration-shared-run-state, infrastructure-agent-orchestration-usage-limit-paused-workers, infrastructure-agent-orchestration-worktree-isolated-workers]
 ---
 
@@ -58,6 +59,8 @@ way (crash, usage limit, timeout) before it committed.
 | The job also runs `git clean -fdx` | `-x` also deletes ignored files, which `git status --porcelain` does not list and neither the WIP commit nor the patch carries: list them with `git status --porcelain --ignored` (`!!` lines) and copy out any you need before the clean |
 | Several worktrees share the repository | Use a WIP commit, not `git stash`: `refs/stash` is shared by every worktree, so another run can pop your entry |
 | The job holds a lock across runs | Preserve under the lock you hold, before any step that can be interrupted again |
+| The job's inputs are claimed or leased with a TTL (queue rows, tickets) and will be re-offered after it expires | Preserve anyway: the inputs come back after the TTL, the processing does not — a draft that passes step 3 saves the whole pass, and the re-offered inputs are then retired against it |
+| The leftovers are a draft that cites sources and records reproductions (an ingest, a report, generated docs) | Do step 3 as: re-fetch every cited URL and compare the quoted text, re-run the lint or schema check, re-run a sample of the recorded reproductions; adopt only the parts that re-checked, and record which reproductions were re-run and which were not |
 
 ## Instead of
 
@@ -73,3 +76,4 @@ way (crash, usage limit, timeout) before it committed.
 - https://git-scm.com/docs/git-status — `--porcelain` output format (`XY PATH`, `??` for untracked)
 - Local reproduction 2026-10-08 (git on macOS): with one tracked edit and one untracked file, `git diff > patch` held 1 file (the tracked edit only); after `git reset --hard HEAD` the tracked edit was gone and the untracked file remained (`?? untracked.md`); re-applying the patch and then `git apply --check -R` passed
 - Field case 2026-10-08 (dev-loop knowledge-flush, which starts with `checkout main` + `reset --hard origin/main` in a checkout reused across runs): a run found 19 uncommitted files from the previous run, which had stopped at the account usage limit before committing; a patch verified with a reverse-apply check plus a WIP commit preserved them, and they shipped in the next PR
+- Field case 2026-10-11 (dev-loop knowledge-flush, same checkout; figures recounted here): two headless runs (11:00 and 13:28 KST) each ingested their claimed rows and wrote a report, then stopped before committing; the 19:29 run found the 13:28 tree dirty, saved its diff as a patch holding 23 files (`grep -c '^diff --git'`), committed it as safety WIP `e43e647` on the old branch (`git show --stat`: 23 files changed, 421 insertions, 95 deletions), branched from it, re-fetched the draft's cited URLs, re-ran lint and a sample of its reproductions (five, by its own report), and opened PR choiyounggi/dev-loop#270; the rows the dead runs had claimed became claimable again after the 3600 s claim TTL — the research did not

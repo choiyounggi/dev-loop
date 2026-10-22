@@ -8,7 +8,7 @@ sources:
   - https://code.claude.com/docs/en/hooks
   - https://code.claude.com/docs/en/tools-reference
 last_verified: 2026-09-03
-related: [platforms-shells-command-text-inspected-before-execution, platforms-processes-non-interactive-cli-invocation, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-agent-permission-classifier-denials, platforms-tools-hook-input-fields-from-the-reference]
+related: [platforms-shells-command-text-inspected-before-execution, platforms-processes-non-interactive-cli-invocation, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, platforms-tools-agent-permission-classifier-denials, platforms-tools-hook-input-fields-from-the-reference, platforms-tools-search-evidence-from-a-wrapped-grep]
 ---
 
 # A Plugin Rewrites What a Tool Returns Before the Agent Sees It

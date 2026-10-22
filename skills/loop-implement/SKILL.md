@@ -47,9 +47,11 @@ incidents, edge cases, danger zones), `verify` (the project's test / build / lin
 typecheck / QA command), `explore` (code/symbol search — a fresh graphify graph is the
 recommended cli; call the binary directly and never load the graphify skill
 document (1,300+ lines), see `references/tool-profile.md`), `design`
-(visual/UI spec for a UI task, e.g. a Figma link), and `research` (external
+(visual/UI spec for a UI task, e.g. a Figma link), `research` (external
 best-practice/pitfall search for wiki-plan Phase A4/A3 and `[no-wiki]`
-grounding in Phase B — see below).
+grounding in Phase B — see below), and `inspect` (studying how an existing
+app, site, or binary behaves for a feature that mirrors it — wiki-plan Phase
+A3 reference study; see `references/tool-profile.md`).
 (`plan` is intentionally absent — see above.) Resolve them once at the start:
 
 ```

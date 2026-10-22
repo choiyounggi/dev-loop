@@ -9,7 +9,7 @@ sources:
   - https://github.com/rust-lang/rust-clippy/blob/master/lintcheck/README.md
   - https://github.com/rust-lang/crater
 last_verified: 2026-08-07
-related: [backend-common-change-impact-call-site-enumeration, backend-common-api-design-unenforced-declarations, testing-quality-guard-shape-vs-consequence, qa-process-regression-scope, infrastructure-ci-cd-write-time-limit-guards]
+related: [backend-common-change-impact-call-site-enumeration, backend-common-api-design-unenforced-declarations, testing-quality-guard-shape-vs-consequence, qa-process-regression-scope, infrastructure-ci-cd-write-time-limit-guards, qa-process-blind-llm-judgment-of-a-visual-rule]
 ---
 
 # Bounding a New Rejection Rule Against the Existing Corpus
@@ -67,6 +67,7 @@ guard that is already red on one legitimate artifact →
 | The sweep rejects zero inputs | Treat it as unproven, not clean: feed it one input you know the rule must reject and require a reject before believing the zero ([testing-quality-checks-that-cannot-pass]) |
 | The corpus contains the bug's own reproduction case | It is supposed to be rejected — list it in the plan as an expected reject instead of exempting it |
 | The tool's own suite carries deliberately invalid inputs | Exclude negative-test fixtures by location and name the excluded directory next to the count |
+| The rule arrives as prose from a reviewer or judge, written to stop failures they named ("the pair must differ in silhouette") | The named failures are the known-defective set: implement the wording as the throwaway predicate, score every named failure, and take any named failure it still passes back to the rule's author with the measurement before writing production code. A category word in the rule ("silhouette") can cover changes that move almost nothing on screen |
 | The throwaway predicate and the landed rule disagree on an input | Re-run both on that input and fix whichever one contradicts the accepted list in the plan; the plan's list is the decision of record |
 | The corpus is large enough that a full pass is slow | Keep a cheap textual prefilter and run the real predicate only on what it matched — the reported set is still the full-corpus answer |
 
@@ -85,4 +86,5 @@ guard that is already red on one legitimate artifact →
 - https://github.com/rust-lang/rust-clippy/blob/master/lintcheck/README.md — lintcheck "Runs Clippy on a fixed set of crates read from `lintcheck/lintcheck_crates.toml` and saves logs of the lint warnings into the repo. We can then check the diff and spot new or disappearing warnings" — the recorded, diffed verdict list is the deliverable, not the count
 - https://github.com/rust-lang/crater — "Crater is a tool to run experiments across parts of the Rust ecosystem. Its primary purpose is to detect regressions in the Rust compiler, and it does this by building a large number of crates, running their test suites and comparing the results between two versions of the Rust compiler" — the same measurement at ecosystem scale, run before a potentially breaking change lands
 - Field evidence 2026-08-07 (`linkly` #53, Python): three draft rejection rules for a DSL compiler were implemented first as a throwaway `sweep.py` and run over 148 sources (40 `.lnpl` files plus 108 triple-quoted inline programs in tests) → 2 rejects, both the QA probes the issue had named. The sweep caught a false positive in the first draft at plan time: it rejected the legitimate case where a guard owns its own block. Fixtures assembled with `.replace()` were invisible to the text sweep, so those 5 sites were confirmed by hand — the blind spot from the edge-case table, observed rather than hypothesized
+- Field evidence 2026-10-09 (a sprite-variant generator checked by blind LLM-subagent judgments): a rule received to stop the pairs the judges named failing was first measured on those pairs. Implemented as worded, it would have passed 5 of the 6 named pairs — a top-cut change counts as "silhouette" by category but moved 2 cells in one pair and 8 in another. Reporting the measurement with the rule saved one rework round. Related: [qa-process-blind-llm-judgment-of-a-visual-rule]
 - The pre-implementation ordering (throwaway predicate before production code) is the field-tested refinement of this page; the corpus-sweep-and-diff method itself is the practice the three tools above implement

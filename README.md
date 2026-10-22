@@ -135,6 +135,7 @@ can map its **capability roles** to your real tools so the loop uses them:
 | `design` | Figma / visual-spec MCP (UI work) |
 | `intake` | issue tracker (orchestrate's work-list) |
 | `research` | external best-practice/pitfall search (wiki-plan Phase A/B). Fixed fallback when unset: brave-search MCP if present → built-in WebSearch → open `ABANDON` |
+| `inspect` | an app/site/binary inspection tool (e.g. the REA MCP) for studying how an existing product behaves when a feature mirrors it (wiki-plan Phase A3 reference study). Unset: `scripts/reference-study.sh` runs the pinned REA MCP in a headless study session when a goal names a reference product — nothing to install or register |
 
 (`plan` is **not** a role — the plan step is fixed to `wiki-plan`. And the bundled
 best-practice `wiki/` needs no config; `knowledge` is a *separate* external wiki —
