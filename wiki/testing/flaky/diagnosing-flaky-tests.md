@@ -10,7 +10,7 @@ sources:
   - https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html
   - https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html
 last_verified: 2026-09-27
-related: [testing-data-test-data-and-isolation, testing-mocking-what-to-mock, debugging-concurrency-intermittent-failures, testing-quality-sequential-dispatch-assumption-under-concurrency, testing-async-async-testing, testing-mocking-fake-server-forward-before-reply]
+related: [testing-data-test-data-and-isolation, testing-mocking-what-to-mock, debugging-concurrency-intermittent-failures, testing-quality-sequential-dispatch-assumption-under-concurrency, testing-async-async-testing, testing-mocking-fake-server-forward-before-reply, testing-flaky-docker-vm-oversubscription-under-parallel-containers]
 ---
 
 # Fixing a Test That Fails Intermittently
@@ -60,6 +60,7 @@ wiki/debugging/concurrency/intermittent-failures.md.
 | The flake reproduces only in CI, never locally | Diff the environments: CPU/parallelism, timezone, locale, dependency versions, resource limits — then reproduce locally by matching the differing factor (e.g. run with CI's timezone and parallelism) |
 | The "flaky test" is actually an intermittent production bug (race in the code under test) | The test is doing its job — fix the code, not the test; deep diagnosis methodology → wiki/debugging/ |
 | A test cannot be de-flaked at its current level (full-stack e2e with inherent variance) | Push the assertions down to unit/integration level and keep only a minimal smoke check at e2e ([testing-strategy-test-level-choice]) |
+| Each run fails on a different subset of container/DB-backed files with a container error (`409 ... is not running`, a start timeout) rather than an assertion | Check the Docker VM's capacity against the runner's worker count before hunting a test-level cause — [testing-flaky-docker-vm-oversubscription-under-parallel-containers] |
 
 ## Instead of
 

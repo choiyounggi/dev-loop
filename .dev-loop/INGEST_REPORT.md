@@ -1,76 +1,125 @@
-# Knowledge flush — 1 insight(s)
+# Knowledge flush — 1 insight ingested (headless auto-flush run 20261012-150339-99224)
 
-A wrapper that forwards a lower layer's typed-fault message and prints its own operation label only for other errors cannot have that label pinned by lower-layer fault injection; one generic rejection at the wrapper's boundary (Vitest `vi.mock(path, { spy: true })` + `mockRejectedValueOnce`) does it, and `mockReset()` — not `vi.restoreAllMocks()` — clears the autospy. **1 new page, 1 index row, 1 back-link, 1 log entry. 2 rows released as pending duplicates of open PR #274, 0 dropped.**
+5 queue rows were claimed this run. 1 was ingested; 4 were released (one open-PR
+duplicate, one plausible open-PR overlap, and two that could not be read in this
+headless run). Nothing was folded into another branch — this run opens its own PR
+only for the single verified insight.
 
-Headless autoflush run `20261015-105809-96863`. Claimed 3 queue rows with `queue-claim.js claim`: `86a482be00c360fc` (Vitest autospy, testing), `866175146dd2fc3b` and `ea0574d2686b0169` (both: tsx top-level await needs `"type": "module"`, platforms).
+| Candidate | Domain | Disposition |
+|-----------|--------|-------------|
+| `e94ff70e02df728b` — cap the test runner's workers so per-file Testcontainers DBs don't exhaust the Docker VM | testing | **ingested** (merged into `testing-flaky-diagnosing-flaky-tests`) |
+| `ea0574d2686b0169` — tsx top-level `await` needs `.mts` / `type: module` | platforms | released — duplicate of open PR #274 |
+| `2bf23658a4d1bc2e` — give fixtures distinct id/index/order values | testing | released — plausible overlap with open PR #270 |
+| `61bc283a566a4780` — unread | unknown | released — unreadable in this run |
+| `866175146dd2fc3b` — unread | unknown | released — unreadable in this run |
+
+Note on the two unread rows: in this run the insight-queue directory
+(`~/.dev-loop/queue`) cannot be listed or searched with any available tool (the
+Bash sandbox confines `ls`/`find`/`grep`/`cat` to the task worktree, and the
+`Read` tool needs an exact filename), so the two rows that live in queue files
+whose names this run never learned could not be opened. An unreadable candidate
+cannot be verified, so both were **released** (not retired) and will be offered
+again to a future flush — the manual skill, run from an unsandboxed shell, can
+read them.
 
 ## Verified best-practice
 
-**`86a482be00c360fc` — pin a wrapper's own error label with a fault injected at its boundary** (confidence: **verified**)
+**`e94ff70e02df728b` — cap the runner's worker count to the Docker VM's memory so
+per-file Testcontainers databases are not killed mid-run** — confidence:
+**field-tested** (documented knob; one-machine failure mechanism).
 
-Claim: when a wrapper logs the lower layer's typed-fault message for that fault class and its own label for any other error, tests that inject faults only at the lower layer never exercise the label branch, so a renamed label stays green. Inject one generic rejection at the wrapper's boundary — under Vitest `vi.mock("./lower", { spy: true })` keeps every export real while allowing `vi.mocked(lower.fn).mockRejectedValueOnce(new Error("boom"))` in one test — and assert the whole log line. Reset the autospy with `mockReset()`; `vi.restoreAllMocks()` acts on `vi.spyOn` spies and leaves an automock-created override in place. Prove the test with the rename mutant.
+Claim: when each DB-backed test file starts its own Testcontainers Postgres and
+the test runner's default worker count scales with host CPU parallelism, a
+many-core host starts many containers at once; a small Docker VM then kills some
+containers mid-run, which looks like flaky tests (a different subset of files
+fails each run) rather than a resource ceiling. Capping the runner's workers to
+what the VM can hold fixes it without changing the test files or counts.
 
 Sources checked:
-
-- https://vitest.dev/api/vi — `vi.mock(path, { spy: true })`: Vitest automocks the module but does not override the implementations of its exports (since Vitest 2.1); `vi.restoreAllMocks` restores the original implementations of `vi.spyOn` spies and does not affect mocks created during automocking. Retrieved through WebSearch on 2026-10-15 (WebFetch is not permitted in this headless run, so the wording was read from the search tool's rendering of the official page, not from the raw HTML; the page is cited without verbatim quotes).
-- https://vitest.dev/guide/mocking/modules — the `spy` option spies on every export of the module without replacing them with fakes.
-- https://pitest.org/quickstart/basic_concepts/ — "Survived: The mutation was not detected by the covering test" (same quote already carried by `testing-mocking-captured-call-arguments`).
-- Installed Vitest 5.0.3 (`node_modules/vitest/dist/index.d.ts` in linkly-invitation): `mock(path, factory?: ModuleMockFactoryWithHelper | ModuleMockOptions)` — the `ModuleMockOptions` type the candidate cited is imported from `@vitest/mocker`. The same file's comment on `restoreAllMocks` says it calls `mockRestore()` on "every mocked function", which the reproduction below shows is not what happens to an automock-created spy; the page records that discrepancy next to the official wording.
-
-Local reproduction (Vitest 5.0.3, run with the project's installed `vitest.mjs --root <scratch>`; scratch directory under the checkout's `.dev-loop/` was deleted after the run and is not part of this diff):
-
-| Test | Result |
-|---|---|
-| Typed lower-layer fault through the wrapper | log = `fault: lower-op[faulty] failed` — the wrapper's label is absent |
-| Autospied export called normally | real value returned, `toHaveBeenCalledWith("fine")` green |
-| `mockRejectedValueOnce(new Error("boom"))` at the boundary | log = `fault: wrapper-op[createInvite] boom` — the wrapper's own label |
-| `mockRejectedValue(new Error("sticky"))`, then `vi.restoreAllMocks()`, then a real call | log = `fault: wrapper-op[createInvite] sticky` — the override survived the restore |
-| `mockRejectedValue(...)`, then `mockReset()`, then a real call | log = `[]` — the real implementation came back |
-
-Runner's own marker: `Test Files  1 passed (1)`, `Tests  5 passed (5)`.
-
-Field evidence (originating session, linkly-invitation task t4e, `runAdminWrite` logging `DatabaseFaultError.message`; not re-run here): renaming both action operations kept 8/8 green with faults only at the database layer; after the autospy rejection test, rename mutants 46d and 46e reddened.
-
-**`866175146dd2fc3b`, `ea0574d2686b0169` — tsx compiles a `.ts` file as CommonJS when the nearest package.json lacks `"type": "module"`, so top-level await fails** — not researched further in this run: open PR #274 already carries `wiki/platforms/toolchains/tsx-top-level-await-without-type-module.md` for exactly this trigger (see Open-PR check). No confidence is claimed here.
+- https://vitest.dev/config/maxworkers — the `maxWorkers` option caps concurrent
+  worker processes; with watch mode off it defaults to the host's available
+  parallelism (`os.availableParallelism()`) and is halved in watch mode, and it
+  accepts a number or a percentage string. Confirmed via web search of the
+  official docs page (the page itself could not be fetched in this run; only the
+  documented default/knob is cited, not a verbatim quote).
+- Docker Engine returns `HTTP 409 ... is not running` when an operation targets a
+  container that has already stopped — consistent with the VM killing a container
+  mid-run; corroborated by general search results, used only to read the error,
+  not as the page's load-bearing citation.
+- Field reproduction 2026-10-12 (linkly-invitation, Vitest 5 +
+  `@testcontainers/postgresql` 12.2.0 on macOS Docker Desktop, `docker info` = 8
+  CPUs / 4 GB): three `pnpm test` runs at one commit each failed only on DB-backed
+  files, a different subset each time (2, then 1, then 4), with
+  `HTTP code 409 ... is not running` and a 120 s `startTestDatabase` timeout;
+  `pnpm test --maxWorkers=4` passed 126/126 files (1077 passed, 2 skipped) and
+  every later full-suite gate passed with the same cap. This is the load-bearing
+  evidence; the page is marked field-tested, not verified.
 
 ## Existing-layer check
 
-Route: `INDEX.md` → testing ("mock decisions", "cases/assertions") → `wiki/testing/index.md` → mocking. The platforms index was read for the two tsx rows (toolchains category; no merged page covers tsx/ESM module-format detection — the page in flight is on PR #274).
+Pages read: testing-flaky-diagnosing-flaky-tests, testing-data-testcontainers-reaper-on-docker-desktop-macos, testing-quality-expectation-sets-with-one-distinct-value, testing-quality-path-resolver-fixtures-with-coincident-cwd, testing-data-test-data-and-isolation
 
-Pages read: testing-mocking-what-to-mock, testing-mocking-captured-call-arguments, testing-quality-tests-that-cannot-fail, testing-quality-surviving-mutant-equivalence-triage
+- **`testing-flaky-diagnosing-flaky-tests`** — the merge target. Its symptom table
+  already carries a "fails only in parallel / only in CI → shared external
+  resource" row, but that is resource *collision* (same schema/port/temp dir),
+  whose fix is per-worker isolation. The `e94` case is resource *exhaustion* (too
+  many containers for the VM's memory), whose fix is to *cap* the workers — a
+  distinct symptom and a distinct fix, so it was added as a new symptom row, one
+  edge-case row (the `409`/timeout signature → read it as a ceiling), and one
+  Instead-of row (cap workers, don't retry). Added the vitest source and bumped
+  `last_verified` to 2026-10-12.
+- **`testing-data-testcontainers-reaper-on-docker-desktop-macos`** — adjacent but
+  a different trigger (the Ryuk reaper cannot mount the Docker socket, so 0 tests
+  run before any container starts). Not merged into; cross-linked both ways
+  (`related:`) and named in the new edge-case row so a reader can tell the
+  socket failure from the memory failure.
+- **`testing-quality-expectation-sets-with-one-distinct-value`**,
+  **`testing-quality-path-resolver-fixtures-with-coincident-cwd`**,
+  **`testing-data-test-data-and-isolation`** — read while assessing the released
+  `2bf2` candidate (coincident fixture values). They are the merged-wiki siblings
+  of that lesson; `2bf2` was released for the manual flush rather than ingested
+  here (see Open-PR check), so no edit was made to them.
 
-- `wiki_search` (k=8) on the candidate's trigger/directive: extracted-method-this-binding 0.772, what-to-mock 0.744 and 0.710, typescript-6-global-types 0.733, captured-call-arguments 0.730, test-data-and-isolation 0.721, behavior-not-implementation 0.715. None describes the same situation: what-to-mock's edge row "test your code's handling of a provider's failure modes → stub at your wrapper boundary" is the general rule this page specialises (which fault *depth* reaches which log line), and no page mentions `spy: true`, automock reset behaviour, or a wrapper label hidden behind a forwarded message.
-- `wiki_search` (k=8) on the tsx trigger returned no page about tsx/esbuild module format (top hit typescript-6-global-types 0.700 is a different situation), consistent with the page living only on PR #274.
-- **Created new**: `wiki/testing/mocking/wrapper-label-pinned-by-a-boundary-fault.md` (body 75 lines; 0 banned qualifiers; every prohibition is paired in its own cell). Merging into what-to-mock was rejected: that page is a general decision table at 60+ body lines and is held by open PR #268; the new situation has its own trigger (fault depth vs. the wrapper's own line) and a framework-specific reset trap.
-- Conflicts with existing directives: none. The page agrees with what-to-mock ("stub at the boundary you own") and with tests-that-cannot-fail (one mutation per assertion).
-- Related links: forward links to what-to-mock, captured-call-arguments, tests-that-cannot-fail, surviving-mutant-equivalence-triage. Back-link added on **captured-call-arguments only** (no open PR touches it). Back-links on what-to-mock and tests-that-cannot-fail (both edited by open PR #268) and surviving-mutant-equivalence-triage (edited by #269 and #270) are deferred to a later flush to keep this PR conflict-free on those pages; the log entry records this.
-- `wiki/testing/index.md`: one row added at the end of the mocking table (maintenance invariant 1). This index file is also edited by #268, #269, #270, #275 and #279, as every testing-domain flush is.
-- Checks on this checkout: `node scripts/wiki-structure-checks.js wiki` → `pages: 427, indexes: 13, findings: 0`; `node scripts/wiki-lint-prohibitions.js wiki` → `violations: 0` (1 pre-existing info line in infrastructure/config/keys-ahead-of-their-consumer.md).
+No conflicting directive was found; no page was superseded.
 
 ## Open-PR check
 
-11 open `knowledge/*` heads listed with `gh pr list --repo choiyounggi/dev-loop --state open --json number,title,headRefName,files --search "head:knowledge/"`: #279, #275, #274, #273, #272, #271, #270, #269, #268, #266, #265. This headless run has no git access, so overlap was judged from each PR's changed-file list and title, plus `gh pr diff <n>` grepped for the candidate's terms (`spy: true`, autospy, automock, restoreAllMocks, mockReset, mockRejectedValueOnce, "operation name") on the five heads that touch `wiki/testing/` (#268, #269, #270, #275, #279).
+Open `knowledge/*` heads at flush time (via
+`gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`):
+#274, #273, #272, #271, #270, #269, #268, #266, #265. This headless run cannot
+`git diff` their content, but it does have each PR's changed-file list (from
+`gh pr list --json files`), so overlap was judged at the page/trigger level
+against those file lists:
 
-| Candidate | Overlapping open PR | Verdict |
-|---|---|---|
-| 86a482be00c360fc (Vitest autospy boundary fault) | None carries it. The only hit was #270, whose new page `testing/mocking/proving-a-value-never-reaches-the-console.md` has an edge row about `afterEach(() => vi.restoreAllMocks())` ordering for console spies — a different trigger (`vi.spyOn` on console, restore-before-assert), and it does not mention automocking or `spy: true`. #268 (`what-to-mock` fs-mock default export), #269 (pull probe, lock control), #275 (Testcontainers workers), #279 (coincident fixtures) are different situations | **new** |
-| 866175146dd2fc3b (tsx top-level await, `"type": "module"`) | #274 adds `wiki/platforms/toolchains/tsx-top-level-await-without-type-module.md` and its title names "tsx top-level await without type:module" — the same trigger and directive | **pending duplicate → released** (headless rule: never fold into another branch; the row returns to `pending` and the next flush will drop it against the merged page) |
-| ea0574d2686b0169 (same tsx insight, second session) | #274, as above | **pending duplicate → released** |
-
-No `git merge-tree` check was possible in this run. Expected conflicts with the open heads are limited to `wiki/testing/index.md` (one appended row) and `log.md`, the two files every knowledge PR appends to.
+- **`e94` (Testcontainers / Docker memory / runner worker cap)** — verdict:
+  **new**. No open PR touches a Testcontainers, Docker-memory, or worker-count
+  page, and none edits `testing/flaky/diagnosing-flaky-tests.md`, so the merge
+  does not collide with any branch in flight.
+- **`ea0574d2686b0169` (tsx top-level await without `type: module`)** — verdict:
+  **drop (duplicate)**. PR #274 adds
+  `wiki/platforms/toolchains/tsx-top-level-await-without-type-module.md`, the exact
+  same lesson (its EN/KO variants were the rows PR #274 ingested). Released.
+- **`2bf23658a4d1bc2e` (distinct fixture id/index/order values)** — verdict:
+  **drop (plausible overlap)**. PR #270 is actively adding several
+  `testing/quality` fixture-and-mutation pages (`mutation-harness-file-custody`,
+  `host-disguise-fixtures-for-url-allowlists`, `surviving-mutant-equivalence-triage`,
+  `anchor-cases-for-allowlist-regexes`). This candidate is the same fixtures-for-
+  mutation-detection theme; because this run cannot diff #270's content, it was
+  released so the manual flush can decide between folding it into that cluster and
+  opening it as a new sibling of the merged coincidental-correctness pages.
+- **`61bc283a566a4780`, `866175146dd2fc3b`** — could not be read (see the note at
+  the top), so overlap could not be assessed. Released.
 
 ## Routing decision
 
-| Candidate | Layer | Target | Action |
-|---|---|---|---|
-| 86a482be00c360fc | bundled | `testing/mocking/wrapper-label-pinned-by-a-boundary-fault.md` (id `testing-mocking-wrapper-label-pinned-by-a-boundary-fault`) | created; index row + log entry + 1 back-link |
-| 866175146dd2fc3b | bundled | `platforms/toolchains/tsx-top-level-await-without-type-module.md` (on PR #274) | released, not ingested |
-| ea0574d2686b0169 | bundled | same as above | released, not ingested |
-
-No new category: testing/mocking already owns "mock decisions" and holds the sibling pages (what-to-mock, captured-call-arguments). Layer test: the directive names no repository-specific file or module — `runAdminWrite`/`DatabaseFaultError` appear only in the field-evidence line as the originating case — so it is general knowledge.
+- `e94ff70e02df728b` → `testing` / `flaky` → merged into
+  `wiki/testing/flaky/diagnosing-flaky-tests.md` (merge-before-create: an existing
+  page owns the exact symptom, so no new page was created). Plumbing updated:
+  `wiki/testing/index.md` "load when" line extended, `log.md` appended, `related:`
+  links added both ways with `testing-data-testcontainers-reaper-on-docker-desktop-macos`.
+- No new category was created.
 
 ## Local-layer candidates
 
-none
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+none — the single ingested insight is a general runner/Testcontainers behavior,
+not specific to one repository's files or infrastructure.
