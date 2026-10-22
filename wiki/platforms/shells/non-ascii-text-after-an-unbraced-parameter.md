@@ -8,6 +8,7 @@ sources:
   - https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
   - https://www.gnu.org/software/bash/manual/html_node/Definitions.html
   - https://mail.gnu.org/archive/html/bug-bash/2015-12/msg00030.html
+  - "Local reproduction 2026-10-22 (macOS /bin/bash 3.2.57 and Homebrew bash 5.3.15, with and without LANG=C.UTF-8)"
   - "Field case 2026-10-22 (a GitHub Actions run: block extracted and run locally on macOS, bash 5.3): `$X가` printed two broken bytes under LANG=C.UTF-8 and the full value without LANG"
 last_verified: 2026-10-22
 related: [platforms-shells-colon-after-an-unbraced-parameter, platforms-shells-portable-shell-scripts, platforms-environment-timezone-and-locale, platforms-environment-unicode-text-matching]
@@ -42,7 +43,7 @@ empty value, broken bytes (`��`), or works in one terminal and not in anothe
 
 | Case | Then |
 |------|------|
-| Measured on macOS, bash 5.3, `X=ANTHROPIC` | `LANG=C.UTF-8`: `"[$X가 없어]"` printed `[�� 없어]` — an empty value and two broken bytes. No `LANG` (C locale): `[ANTHROPIC가 없어]`. `"${X}가"` was right in both |
+| Measured on macOS, `X=ANTHROPIC`, `env -i` | `/bin/bash` 3.2.57: `LANG=C.UTF-8` printed `"[$X가 없어]"` as `[�� 없어]` (an empty value and two broken bytes); no `LANG` (C locale) printed `[ANTHROPIC가 없어]`. Homebrew bash 5.3.15: `[�� 없어]` under both. `"${X}가"` was right in all four runs. The originating field record saw bash 5.3 print the value without `LANG`, so the C-locale result also varies by build — brace it (step 1) |
 | Why only part of the character vanished | `가` is the three bytes `EA B0 80`. The output kept two broken bytes, which fits the name taking the first byte only; that byte-by-byte reading is an inference from this output, not a documented rule. Bash's own character-class test also treats non-ASCII letters as alphabetic in a UTF-8 locale (bug-bash 2015-12) |
 | The job runs on a Linux runner | Not measured here; the C library there may classify the same bytes differently. Brace the name whatever the runner (step 1) |
 | The line runs in zsh | zsh decides name characters with its own rules and also applies `:` modifiers after an unbraced name ([platforms-shells-colon-after-an-unbraced-parameter]); the braced form is right in both |
@@ -53,7 +54,7 @@ empty value, broken bytes (`��`), or works in one terminal and not in anothe
 | If you are about to | Do this instead | Why |
 |---------------------|-----------------|-----|
 | Write `"$NAME가 없어"` in a script or `run:` step | Write `"${NAME}가 없어"` | The name boundary depends on the locale; braces fix it in every locale |
-| Trust a local run of the extracted block | Run it with the job's `LANG` (step 2) | Without `LANG` the block ran correctly on the same machine where the UTF-8 run broke |
+| Trust a local run of the extracted block | Run it with the job's `LANG` (step 2) | The unbraced form's result changes with the locale and the bash build: on one Mac `/bin/bash` 3.2 ran it correctly without `LANG` and broke under `C.UTF-8` |
 
 ## Sources
 
@@ -61,3 +62,4 @@ empty value, broken bytes (`��`), or works in one terminal and not in anothe
 - https://www.gnu.org/software/bash/manual/html_node/Definitions.html — `name`: "A word consisting solely of letters, numbers, and underscores, and beginning with a letter or underscore"; which bytes are letters is left to the locale
 - https://mail.gnu.org/archive/html/bug-bash/2015-12/msg00030.html — bug-bash thread: under a UTF-8 locale bash's `[[:alpha:]]`/`[[:alnum:]]` test treats a non-ASCII letter (`aØb`) as alphabetic, while the identifier rules disagree
 - Field case 2026-10-22 (field-tested; a GitHub Actions workflow edited in the linkly repository, run locally on macOS with bash 5.3): `env -i LANG=C.UTF-8 X=ANTHROPIC bash -c 'echo "[$X가 없어]"'` printed `[�� 없어]`; without `LANG` it printed `[ANTHROPIC가 없어]`; `${X}` printed the value in both. Recorded by the originating session; the Linux runner's behaviour was not measured
+- Local reproduction 2026-10-22 (macOS, `env -i [LANG=C.UTF-8] X=ANTHROPIC <bash> -c 'echo "[$X가 없어] [${X}가]"'`): `/bin/bash` 3.2.57 broke only under `C.UTF-8`; Homebrew bash 5.3.15 printed `[�� 없어]` with and without `LANG`; the braced form printed `[ANTHROPIC가]` every time
