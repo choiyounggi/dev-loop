@@ -9,7 +9,7 @@ sources:
   - https://react.dev/reference/react-dom/components/common
   - https://github.com/cure53/DOMPurify
 last_verified: 2026-07-10
-related: [frontend-forms-validation-timing]
+related: [frontend-forms-validation-timing, testing-quality-host-disguise-fixtures-for-url-allowlists]
 ---
 
 # Rendering Data Not Authored by Your Team

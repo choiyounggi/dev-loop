@@ -49,6 +49,26 @@ Timeboxed investigation of load-bearing unknowns (XP spike). Record what was
 discovered; a remaining unknown that blocks Phase B must be escalated to the
 requester, not left as a placeholder.
 
+### Reference study
+Optional — keep only when the feature mirrors a behavior an existing product
+(app, site, binary) already has and a fresh-context study agent observed it
+through the `inspect` role (you copy its rows; you never call the tool). One
+row per observed behavior; the Unknown cell names what the tooling could not
+see, or `none`. The row carries the behavior in words; the Evidence cell
+carries the tool name and the capture's evidence id or file name (REA
+`ev_<sha>`, `search.har`) — the artifact itself lives outside the tracked tree
+(`.claude/tmp/reference/<product-slug>/` once `git check-ignore -q .claude/tmp`
+exits 0, else the session scratchpad) and only the study agent and the
+reviewer open it. Pasting decompiled code, captured payloads, or assets here
+is replaced by that reference. gate-A does not read this block; the task
+review's fingerprint grep is the check. Each row that shapes the design
+becomes an `R<n>` row above, with its oracle (input -> the original's output)
+as the Concrete example; the product version and licence outcome go in
+`## Constraints`.
+
+| Observed behavior | Evidence (tool -> evidence id or capture name) | Unknown |
+|-------------------|------------------------------------------------|---------|
+
 ## Research
 External best-practice/pitfall search for this feature's domain (`research`
 role). One row per query, or the literal line `no useful results — queries:

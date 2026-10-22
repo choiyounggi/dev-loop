@@ -12,7 +12,7 @@ sources:
   - "Local reproduction 2026-10-08 (react/react-dom 19.3.0, @testing-library/react 16.3.3, jsdom 30.1.2, plain Node and Vitest 5.0.3): call counts per render in sequence, thrown error, hook and async limits"
   - "Field case 2026-10-07 (Next.js page test, React 19.3, Vitest 5.0.3 jsdom): mocked notFound() called 3 times by one render()"
 last_verified: 2026-10-08
-related: [testing-quality-behavior-not-implementation, testing-mocking-what-to-mock]
+related: [testing-quality-behavior-not-implementation, testing-mocking-what-to-mock, testing-quality-calls-inside-the-event-dispatch]
 ---
 
 # Counting Calls Made by a Component That Throws While Rendering
