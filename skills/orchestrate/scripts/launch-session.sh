@@ -214,10 +214,18 @@ launchcmd="$launchcmd && ${effort_env}\"$CLAUDE\" --permission-mode $perm"
 [ -n "$model" ] && launchcmd="$launchcmd --model '$model'"
 "$TMUX_BIN" send-keys -t "$session" "$launchcmd" Enter
 
-# Pass trust screen + permission warning, wait for REPL ready (~60s).
-# NOTE: the bypassPermissions warning defaults to "1. No, exit" — pressing Enter
-# would quit claude. We must Down->Enter to pick "Yes, I accept". The ready/accept
-# patterns are matched before the generic trust patterns.
+# Pass the first-launch screens, wait for REPL ready (~60s). A screen whose
+# highlighted default is harmful gets explicit keys, never a bare Enter:
+#   bypassPermissions warning ("1. No, exit" highlighted) -> Down, Enter =
+#     "Yes, I accept" (Enter alone would quit claude)
+#   auto-mode chooser ("Make auto mode your default permission mode?",
+#     groundwork#41) -> key 2 = "No, keep bypass permissions" (option 1 would
+#     rewrite the user's global default permission mode)
+#   folder-trust screen ("Quick safety check", "No, exit" highlighted,
+#     dev-loop#276) -> Down, Enter = "Yes, I trust this folder"
+# Order: ready patterns first, then these screens, then the generic Enter-only
+# trust patterns — a screen that also shows "Enter to confirm" must never fall
+# into the Enter-only arm.
 # Wording is version-dependent, so the wait budget and the match patterns are
 # tunable via env — adapt to a new CLI without editing this file:
 #   LO_READY_TIMEOUT / LO_READY_INTERVAL  (seconds; default 60 / 2)
@@ -238,6 +246,10 @@ while [ "$i" -lt "$iters" ]; do
   case "$pane" in
     *"bypass permissions on"*|*"shift+tab to cycle"*|*"for shortcuts"*|*"? for"*)
       ready=1; break ;;
+    *"Make auto mode your default permission mode"*|*"No, keep bypass permissions"*)
+      "$TMUX_BIN" send-keys -t "$session" 2 ;;
+    *"Yes, I trust this folder"*|*"Quick safety check"*)
+      "$TMUX_BIN" send-keys -t "$session" Down; sleep 1; "$TMUX_BIN" send-keys -t "$session" Enter ;;
     *"Yes, I accept"*|*"accept all responsibility"*)
       "$TMUX_BIN" send-keys -t "$session" Down; sleep 1; "$TMUX_BIN" send-keys -t "$session" Enter ;;
     *"Do you trust"*|*"trust the files"*|*"Enter to confirm"*)
