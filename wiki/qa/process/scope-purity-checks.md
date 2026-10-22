@@ -6,6 +6,8 @@ applies_to: [general]
 confidence: verified
 sources:
   - https://git-scm.com/docs/git-status
+  - https://www.gnu.org/software/bash/manual/html_node/Lists.html
+  - "Local reproduction 2026-10-08 (zsh 5.9, BSD grep 2.6.0): chained one-liner printed a violator and `SCOPE_OK` with exit 0; a single-verdict script exited 1 with no token"
   - "Local reproduction, git 2.50.1 (Apple Git-155), 2026-08-05: collapsed `?? qa/` vs -uall per-file expansion"
   - https://bazel.build/reference/test-encyclopedia
   - "Field reproduction 2026-08-14 (dev-loop, reviews/i83-insight-emission-r1.md): a permanent bats test asserting `git status` scope failed on an unrelated uncommitted sibling file; rewritten to commit-diff evidence → 521/521"
@@ -50,7 +52,18 @@ developer happens to have uncommitted.
    run it against a tree whose changes are all in scope (must pass) and against
    the same tree with one planted out-of-scope file (must fail). A gate first
    observed only failing — or only passing — has not demonstrated it can tell
-   the two apart ([testing-quality-checks-that-cannot-pass]).
+   the two apart ([testing-quality-checks-that-cannot-pass]). "Fail" means the
+   gate's own verdict — a non-zero exit and no pass token — not the planted
+   path showing up in its output. Compute that verdict in one script from every
+   condition (scope filter, forbidden files, any other check), print the token
+   only after all of them held, and plant the bad input into that script's
+   input rather than into a copy of one filter:
+
+| Gate shape | Planted out-of-scope path produces |
+|------------|------------------------------------|
+| Chained one-liner: `<filter that prints violators>; <other check> \|\| echo SCOPE_OK` | The path **and** `SCOPE_OK`, exit 0 — the token follows the last check's status only (Bash manual, Lists, in Sources) |
+| One script that appends each violation to `bad`, prints `bad=[…]` and exits 1 when `bad` is non-empty, and otherwise prints the token | `bad=[<path>]`, exit 1, no token |
+
 4. **Choose the evidence source by the gate's lifetime.** The working tree is
    valid evidence only for a run that owns that tree:
 
@@ -84,12 +97,15 @@ developer happens to have uncommitted.
 | Filter default `git status --porcelain` output with per-file path patterns | Add `-uall` first | An entirely-untracked directory collapses to `?? dir/`, which file-level patterns cannot match |
 | Rely on the repo's ambient untracked-files default | Pass `-uall` explicitly in the gate script | `status.showUntrackedFiles=no` in any user config hides untracked files and turns the gate into a rubber stamp |
 | Adopt the gate after seeing it fail once on real output | Run known-in-scope and planted-out-of-scope controls | Every mistyped filter also produces a failing run; only the pass/fail pair shows the gate discriminates |
+| Prove the gate by running its path filter alone on the planted path | Plant the path in the whole gate's input and check its exit status and pass token | A filter run proves the filter; a token chained to only one of the checks still prints OK beside the violation |
 | Assert `git status` output in a permanent test suite | Prove scope from the introducing commit's own diff, or skip when the environment cannot answer | The ambient tree is whoever-runs-it's in-progress state — an undeclared dependency that makes results non-reproducible |
 | Delete the tool's ledger directory, or add it to the tracked `.gitignore` inside a scoped task, to turn the gate green | Hide it through `git rev-parse --git-path info/exclude` or allow it for this run; commit the `.gitignore` line as its own change | The ledger is still read for the final verdict, and a `.gitignore` edit is itself a tracked change outside the allowed set |
 
 ## Sources
 
-- https://git-scm.com/docs/git-status — `-u` modes ("normal — Shows untracked files and directories", "all — Also show individual files in untracked directories"), `status.showUntrackedFiles`, porcelain v1 rename format (`<orig-path> -> <path>`), C-string quoting vs `-z`, `--ignored=matching`
+- https://git-scm.com/docs/git-status — `-u` modes ("normal — Show untracked files and directories", "all — Also show individual files in untracked directories"), `status.showUntrackedFiles`, porcelain v1 rename format (`<orig-path> -> <path>`), C-string quoting vs `-z`, `--ignored=matching`
+- https://www.gnu.org/software/bash/manual/html_node/Lists.html — "Commands separated by a ';' are executed sequentially"; in an OR list "command2 is executed if, and only if, command1 returns a non-zero exit status"; "The return status of AND and OR lists is the exit status of the last command executed in the list" — so `<filter>; <check> || echo SCOPE_OK` prints the token whenever the last check finds nothing, whatever the filter printed
+- Local reproduction 2026-10-08 (zsh 5.9, BSD grep 2.6.0-FreeBSD): input `src/lib/pixel/a.ts` and `src/styles/x.css` through `<grep -vE scope filter>; <grep -qE forbidden-file check> || echo SCOPE_OK` printed `src/styles/x.css` and `SCOPE_OK`, exit 0, and the filter run alone printed the path. A single script collecting violations into `bad` printed `bad=[src/styles/x.css]`, exit 1, no token; it passed a known-good input and caught an in-scope `.env`. Field case the same day (a linkly task worktree, audit round 2): the task's gate printed `src/styles/x.css` with `SCOPE_OK` and exit 0, and its single-script rewrite reported `bad=[src/styles/x.css]` with no token
 - Local reproduction (git 2.50.1, 2026-08-05): scratch repo with `qa/cases/x/{a,b}.md`; default porcelain printed the single line `?? qa/`, which a `^\?\? qa/…` per-file filter treated as a violation; `-uall` expanded to three file lines and the filter passed
 - https://bazel.build/reference/test-encyclopedia — "Tests should be hermetic: that is, they ought to access only those resources on which they have a declared dependency"; "If tests are not properly hermetic then they do not give historically reproducible results"
 - Field reproduction 2026-08-14 (dev-loop, reviews/i83-insight-emission-r1.md): a permanent bats test asserted working-tree purity via `git status` and failed spuriously on an uncommitted sibling file; rewritten to prove scope from the introducing commit's diff → suite back to 521/521
