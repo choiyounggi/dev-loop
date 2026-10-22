@@ -17,9 +17,14 @@ case "${CLAUDE_PROJECT_DIR:-$PWD}" in
   "$HOME/.dev-loop/repo"*) exit 0 ;;
 esac
 
-HERE=$(cd "$(dirname "$0")" && pwd -P)
+# Literal helper paths — no $(dirname)/".." computation (directory-validator
+# UNPINNED_NPX: the executed program must be spellable, not derived at run
+# time). CLAUDE_PLUGIN_ROOT is set by the Claude Code CLI in production; the
+# string-trim fallback covers bats, which invokes this script by its real
+# repo path without exporting it.
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${BASH_SOURCE[0]%/hooks/*}}"
 
-ws=$(sh "$HERE/../scripts/resolve-tools.sh" --role workspace 2>/dev/null)
+ws=$(sh "$PLUGIN_ROOT/scripts/resolve-tools.sh" --role workspace 2>/dev/null)
 printf '%s' "$ws" | jq -e '(.roots? // []) | length > 0' >/dev/null 2>&1 || exit 0
 
 # Rate-limit: skip if nudged within the last 7 days.
@@ -41,7 +46,7 @@ while IFS= read -r r; do
 done < <(printf '%s' "$ws" | jq -r '.roots[]? // empty')
 
 out=$(mktemp)
-sh "$HERE/../scripts/graph-workspace.sh" --status --depth "$depth" "${excl[@]}" -- "${roots[@]}" </dev/null >"$out" 2>/dev/null
+sh "$PLUGIN_ROOT/scripts/graph-workspace.sh" --status --depth "$depth" "${excl[@]}" -- "${roots[@]}" </dev/null >"$out" 2>/dev/null
 
 # A hit is a repo line with an absent/cannot-evaluate graph or none/partial
 # hooks, or a top-level cannot-evaluate (a missing root, bad flags).

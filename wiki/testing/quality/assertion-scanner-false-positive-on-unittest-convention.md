@@ -8,7 +8,8 @@ sources:
   - https://docs.python.org/3/library/unittest.html
   - https://docs.pytest.org/en/stable/how-to/assert.html
   - https://doc.rust-lang.org/book/ch11-03-test-organization.html
-last_verified: 2026-09-04
+  - https://bugs.python.org/msg315638
+last_verified: 2026-10-15
 related: [qa-process-evaluating-review-feedback, testing-quality-checks-that-cannot-pass, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, testing-quality-harness-reverse-controls]
 ---
 
@@ -68,6 +69,7 @@ plain source and the floor reports `no-tests` on a fully tested module.
 | The repo mixes pytest-style and unittest-style files | Scope the scanner's accepted patterns per file (a `unittest.TestCase` subclass, or a directory convention) rather than one global pattern |
 | The floor also requires an "error case" and the file uses `self.assertRaises` / `assertRaisesRegex` | Add those names to the error-case pattern alongside `pytest.raises`; they are the same assertion in the other framework |
 | Two workers in the same run report the identical false positive | Fix the scanner once at the coordinator level; do not dispatch per-file rework to each worker |
+| The scanner flags most cases in a `self.assertX` file but passes one or two of them | Read the passing cases too: a comment such as `# surfaced by the assert below` matches `/assert[ \t]/`, so that "pass" is the same blind spot, not proof of an assertion. Count assertions from the parsed code instead (Python: walk `ast.parse(src)` for `ast.Assert` nodes and `ast.Call` nodes whose function name starts with `assert`) — the standard `ast` tree carries no comments — and check the detector on one unittest file and one pytest file before trusting its counts |
 | The scanner classifies by file path/name only and the failing file's language keeps tests inline in source with no `tests/`-style directory or `_test`-suffix filename (Rust `#[cfg(test)] mod tests` in `src/foo.rs`) | Read the classifier's pattern list before charging a rework round — a `.rs` file with no matching pattern always classifies as `source`; confirm with `grep -c '#\[test\]\|#\[tokio::test\]'` and the language's own runner (`cargo test`) before dispatching rework |
 
 ## Instead of
@@ -82,8 +84,10 @@ plain source and the floor reports `no-tests` on a fully tested module.
 
 - https://docs.python.org/3/library/unittest.html — "The crux of each test is a call to assertEqual() … assertTrue() or assertFalse() … or assertRaises() … These methods are used instead of the assert statement so the test runner can accumulate all test results and produce a report"
 - https://docs.pytest.org/en/stable/how-to/assert.html — "pytest allows you to use the standard Python assert for verifying expectations and values in Python tests"; assertion rewriting puts introspection information into the failure message
+- https://bugs.python.org/msg315638 — CPython tracker: the built-in AST does not preserve comments or whitespace; https://pypi.org/project/ast-comments/ exists to add a `Comment` node type the standard `ast` tree lacks
 - https://doc.rust-lang.org/book/ch11-03-test-organization.html — "You'll put unit tests in the src directory in each file with the code that they're testing. The convention is to create a module named tests in each file to contain the test functions and to annotate the module with cfg(test)"
 - Local reproduction 2026-09-04 (this repo, `skills/orchestrate/scripts/test-floor.sh`, `classify()`): the case patterns are `*.bats`, `test_*.py`, `*_test.py`, `*_test.go`, `*.test.*`, `*.spec.*`, and `*/tests/*|*/test/*|*/__tests__/*` — no `.rs` pattern exists, so a `.rs` source file always classifies `source` and `no-tests` fires regardless of inline `#[cfg(test)]` coverage
 - Field evidence 2026-08-31 (measured in a linkly-crew orchestration run): `test-floor.sh` on a worktree whose only source change was `crates/crew-lead/src/cmd_exec.rs` reported exit 3 `no-tests`; the file's `#[cfg(test)] mod tests` block held 10 `#[test]`/`#[tokio::test]` functions with 16 assertions and `cargo test -p crew-lead` passed rc 0. A sibling task in the same run whose tests lived under `crates/crew-harness/tests/` (matching `*/tests/*`) was classified `pass`, so the false verdict applied only to the inline-test file
 - Field reproduction 2026-08-25 (linkly, `test-floor.sh` run against shipped commit 305f8e2 from merged PR #81): exit 3 "no-assertion" on already-reviewed code; the pattern `/assert[ \t]/` misses unittest's `self.assertEqual(`, the convention of 108 of the repo's 112 test files
+- Field evidence 2026-10-15 (lnpl-postgres orchestration run, `test-floor.sh` 1.32.31 `analyze_pytest`): 17 of 18 cases in a unittest file were flagged no-assertion; the 18th passed only because its comment read "# surfaced by the assert below". An AST walk found 2–5 `self.assert*` calls in every case
 - Field evidence 2026-08-24 (linkly, two orchestration runs): workers t96 and t85 each reported the same "no assertion" floor failure on `self.assertX`-convention files; the canonical `test-floor.sh`, run by the coordinator in each worktree, passed both diffs (rc 0)

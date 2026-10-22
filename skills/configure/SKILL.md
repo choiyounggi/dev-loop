@@ -44,6 +44,7 @@ when it exists) also needs no config; it is not the `knowledge` role.
    | `tacit` | past incidents / danger-zone lore (MCP) | check for a lore/incidents MCP |
    | `design` | Figma / visual-spec MCP | only if UI work; check for a Figma MCP |
    | `intake` | issue tracker (orchestrate work-list) | Jira/GitHub issues MCP, if used |
+   | `inspect` | an app/site/binary inspection MCP for studying a reference product's behavior | leave `default` — the bundled `scripts/reference-study.sh` runs the pinned REA MCP in a headless study session with nothing to register; set only when the user already registered another inspection MCP themselves, after the vet in `wiki/security/dependencies/agent-skill-supply-chain.md` |
 
    Leave any role the user has no tool for as `default` (omit it).
    `kind` is one of `mcp | skill | agent | cli | default`; add `ref`, and

@@ -1,0 +1,16 @@
+# Locked runtime for scripts/wiki-mcp.py and scripts/wiki-index.py.
+# scripts/wiki-mcp-launch.sh runs them with `uv run --locked` against this
+# project, so the code that installs is exactly what uv.lock records. Bump a
+# pin here, run `uv lock --project scripts/wiki-env`, and commit both files.
+[project]
+name = "dev-loop-wiki-env"
+version = "0"
+requires-python = ">=3.10"
+dependencies = [
+  "sqlite-vec==0.1.9",
+  "fastembed==0.9.0",
+  "mcp==2.3.0",
+]
+
+[tool.uv]
+package = false

@@ -34,8 +34,14 @@
 set +e
 
 MAX_GATE_BLOCKS=6
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)
-GATE_CHECK="${LOOP_GATE_CHECK:-$SCRIPT_DIR/../skills/loop-implement/scripts/gate-check.sh}"
+# No $(dirname)/".." computation (directory-validator UNPINNED_NPX: the
+# executed program must be spellable, not derived at run time).
+# CLAUDE_PLUGIN_ROOT is set by the Claude Code CLI in production; the
+# string-trim fallback covers bats, which invokes this script by its real
+# repo path without exporting it. LOOP_GATE_CHECK remains the test/override
+# seam for pointing at a different checker entirely.
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${BASH_SOURCE[0]%/hooks/*}}"
+GATE_CHECK="${LOOP_GATE_CHECK:-$PLUGIN_ROOT/skills/loop-implement/scripts/gate-check.sh}"
 
 INPUT=$(cat)
 JQ=$(command -v jq)
