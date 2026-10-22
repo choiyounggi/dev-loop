@@ -1,56 +1,45 @@
-# Knowledge flush — 2 insight(s)
+# Knowledge flush — 1 insight(s)
 
-Headless autoflush run. 8 rows claimed; 2 ingested (merged into one new page), 6 released back to pending (5 overlap an open `knowledge/*` PR, 1 could not be read in this run).
+If you point `TMPDIR` at a project-local folder, tools that create a socket under `os.tmpdir()` (tsx) can go past macOS's 104-byte socket path limit and fail with `listen EINVAL`. **1 page amended (1 new edge-case row), 0 new pages.** Of 5 claimed rows, 1 was ingested and 4 were released back to `pending`: 2 may duplicate open PRs, and 2 sit in queue files this headless run could not find.
 
 ## Verified best-practice
 
-**Insight A — `3ccda4118b5d0dd4`** (three.js object lit only by `emissive` reads as a flat polygon)
-- Claim: when no light reaches a surface, `emissive` adds one uniform colour to every face, so changing colour or albedo has no effect; toggle each light and the emissive term and measure the region's pixels before tuning; fix by giving the object real shading or removing the glow.
+**`7bb9e584c216294a`: deep `TMPDIR` overflows tsx's IPC socket path**
+- Claim: tsx creates its IPC pipe at `<TMPDIR>/tsx-<uid>/<pid>.pipe`. A Unix socket address on macOS fits in a 104-byte `sun_path` buffer, so a `TMPDIR` inside a deep worktree makes `listen` fail with `EINVAL` before any test runs. Keep the whole `TMPDIR` value short (under about 80 bytes), or leave it at the system default for commands that start such tools.
 - Sources checked:
-  - https://discourse.threejs.org/t/meshphongmaterial-emissive-not-working/45543 — with no lights, a mesh renders black once its emissive is removed (emissive is the only term reaching the screen).
-  - https://developer.apple.com/documentation/scenekit/scnmaterial/emission — emission adds a uniform colour independent of lighting.
-  - https://docs.unity3d.com/550/Documentation/Manual/StandardShaderMaterialParameterEmission.html — emissive surfaces are self-illuminated and stay bright in dark areas.
-  - Not confirmed: the exact wording of the three.js `MeshStandardMaterial.emissive` doc entry (searches did not surface it; no claim on the page quotes it).
-- Field evidence: session region stats — spot 0 + hemisphere 0 left the lamp at mean RGB 77/74/67, emissive 0 made it 0/1/0, a lighter albedo gave identical numbers.
-- Confidence: **field-tested** (mechanism backed by cross-engine docs and a three.js forum thread; the measurement method is from the session).
-
-**Insight B — `0358d858600ee3e0`** (three.js shadow judged "not visible" under headless/software GL)
-- Claim: before changing settings, project the light ray to see how far the shadow falls outside the caster's footprint, and toggle `castShadow` on a deterministic (reduced-motion) frame and diff the decoded pixels; a correct shadow can be hidden under the caster or on a near-black receiver.
-- Sources checked:
-  - https://threejs.org/manual/zh/shadows.html — the shadow camera box is the region that casts shadows; visualise it with `CameraHelper` on `light.shadow.camera` (used for the "toggle changes nothing" row).
-  - Forum threads found in search list the standard setup checklist (shadowMap enabled, `castShadow`/`receiveShadow`, lit receiver material); not cited per-thread because the search summary did not tie each point to one URL.
-- Field evidence: bell shadow only 5 units outside its footprint under an overhead lamp; toggle changed the shadow spot 30→12; lit felt 13–16/255.
-- Confidence: **field-tested**. The projection is plain similar-triangle geometry (`d · h / (H − h)`), stated on the page.
+  - https://github.com/privatenumber/tsx/issues/457: the error path `/tmp/tsx-0/26.pipe` shows the `<tmpdir>/tsx-<uid>/<pid>.pipe` layout.
+  - https://github.com/openai/codex/issues/8343: tsx creates a named pipe under `/tmp/tsx-<uid>/*.pipe`.
+  - The page already cites https://nodejs.org/api/net.html ("Typical values are 107 bytes on Linux and 103 bytes on macOS"), the macOS SDK `sys/un.h` (`char sun_path[104]`), and a local reproduction from 2026-09-04 in which a 131-byte path failed with `listen EINVAL`.
+- Field evidence (from the candidate): in a 2026-10-18 macOS worktree e2e run with `TMPDIR=<worktree>/.claude/tmp/pw-tmp`, the Playwright `webServer` crashed with `listen EINVAL ... .worktrees/t4-motion3d/.claude/tmp/pw-tmp/tsx-501/81159.pipe`. The same command without `TMPDIR` passed 6/6.
+- Confidence: **verified**. The buffer limit and the Node behaviour come from official docs and the SDK header. The tsx pipe layout comes from two public issue reports, not from tsx's own docs; I could not find the `get-pipe-path` source through search. The "about 80 bytes" margin is a rule of thumb: 104 bytes minus the tool's own suffix (`/tsx-501/81159.pipe` is 19 bytes) and slack for longer uid/pid values.
 
 ## Existing-layer check
 
-- Route: `INDEX.md` → frontend (visual design, canvas effect layers) → `wiki/frontend/index.md` → `design` category.
-- `wiki_search` (k=6) for both triggers: top hits were frontend-design-theme-swap-propagation-check, testing-quality-value-preserving-refactor-assertions, frontend-design-design-system-lint-gate-for-agents, frontend-design-anti-slop-visual-design, frontend-design-html-in-canvas, qa-environments-element-crop-screenshots, frontend-design-multi-shape-canvas-mask. None covers 3D lighting, emissive, or shadow diagnosis; the closest (theme-swap pixel checks, html-in-canvas) cover different triggers.
-- Merge decision: no existing page has the trigger → **created one new page** that holds both candidates, since they share one trigger family (a screenshot complaint about 3D lighting → measure each render term before tuning).
-- Conflicts: none.
-- Related links: frontend-design-html-in-canvas ↔ frontend-design-measuring-3d-lighting-before-tuning (both ways).
-- Pages read: frontend-design-multi-shape-canvas-mask, frontend-design-html-in-canvas
+Pages read: platforms-filesystems-unix-domain-socket-path-length, platforms-filesystems-paths-case-and-line-endings
+
+- `wiki_search` for the trigger returned `platforms-filesystems-unix-domain-socket-path-length` as the top hit. That page already covers the mechanism (the fixed `sun_path` limit, worktree depth, `listen EINVAL` on macOS) and has an edge row saying `TMPDIR` itself can be long.
+- What was missing: the case where **you** move `TMPDIR` into the project on purpose (a "keep scratch files local" policy) and a third-party tool you do not control derives its socket from it. The page's Do table says "keep it under `os.tmpdir()`", which is the very advice that breaks once `TMPDIR` points into the worktree.
+- Action: **merged**, no new page. Added one edge-case row, two frontmatter sources and two Sources lines, and set `last_verified` to 2026-10-19. Also extended the page's "load when" line in `wiki/platforms/index.md`. The page body is still well under 120 lines.
+- Conflicts: none. The new row narrows the existing "keep it in `os.tmpdir()`" advice and does not contradict it.
+- Related links: the page already links to `platforms-filesystems-paths-case-and-line-endings` (its socket edge row was the second search hit), so no new links were needed.
 
 ## Open-PR check
 
-Open `knowledge/*` heads listed (17): #286, #285, #284, #283, #282, #280, #279, #275, #274, #273, #272, #271, #270, #269, #268, #266, #265. This headless run cannot diff their content, so any plausible overlap (by changed file paths and title) is treated as a pending duplicate and the claim is released.
+Open `knowledge/*` heads (16): #285, #284, #283, #282, #280, #279, #275, #274, #273, #272, #271, #270, #269, #268, #266, #265. This headless run cannot git-diff them, so I judged overlap from each PR's title and changed-file list (`gh pr list --json number,title,files`).
 
 | Candidate | Overlapping open PR | Verdict |
 |-----------|---------------------|---------|
-| `3ccda4118b5d0dd4` three.js emissive-only lighting | none (no open PR touches 3D lighting; #285 is WebGL stall timing, #270 touches anti-slop design only) | **new** — ingested |
-| `0358d858600ee3e0` three.js shadow "not visible" | none (#285 is shader warm-up/stalls, not shadows) | **new** — ingested |
-| `1107bc36bfcbfe79` e2e polling one axis of an animated element | #279 and #270 edit `wiki/testing/e2e/e2e-stability.md`; #270 adds qa reduced-motion capture pages | pending duplicate — claim released |
-| `12aa086463fd4e2a` BSD grep `$` in BRE with `\|` alternation | #273 edits `wiki/platforms/tools/bsd-vs-gnu-cli.md` and shell pages | pending duplicate — claim released |
-| `d631595a0e889652` colour-role rule judged from screenshots | #265 adds `wiki/qa/process/blind-llm-judgment-of-a-visual-rule.md` | pending duplicate — claim released |
-| `0480b14856db7f7c` exact mid-window values for tuned constants | #268 (`tests-that-cannot-fail.md`), #279 (`expectation-sets-with-one-distinct-value.md`), #269/#270 (`surviving-mutant-equivalence-triage.md`) | pending duplicate — claim released |
-| `0a0ccc4ca0904514` e2e failure that moves between tests under CPU contention | #275 edits `wiki/testing/flaky/diagnosing-flaky-tests.md` | pending duplicate — claim released |
-| `97c37473b53e63c2` (content unknown) | n/a — its queue file could not be located with this run's tools | not handled — claim released for the next run |
+| `7bb9e584c216294a` (TMPDIR and socket path length) | none: no open PR touches `wiki/platforms/filesystems/`, and a title/body search for `unix-domain-socket-path-length` returned `[]` | **new**, ingested |
+| `0358d858600ee3e0` (three.js shadows that "can't be seen" under headless/software GL: measure the shadow's reach and the pixel difference before changing settings) | #285 adds `wiki/testing/e2e/webgl-scene-stalls-under-software-gl.md`: same session, same headless SwiftShader/WebGL trigger | **pending duplicate**, claim released |
+| `d631595a0e889652` (give a reviewer of a "red only on X" colour rule the exact token hex and allowed selectors, and have it list computed-colour matches) | #265 adds `wiki/qa/process/blind-llm-judgment-of-a-visual-rule.md`: same visual-rule review trigger | **pending duplicate**, claim released |
+| `12aa086463fd4e2a`, `97c37473b53e63c2` | not assessed: content unreadable (see below) | claim released |
+
+`12aa086463fd4e2a` and `97c37473b53e63c2` were claimed, but this run cannot list `~/.dev-loop/queue/`: Bash `ls`/`grep` and Glob are blocked outside the allowed working directory. Their `<sessionId>.jsonl` files did not match any session id I could find in `~/.claude/history.jsonl`. I released both untouched so the next manual `/dev-loop:knowledge-flush` can process them.
 
 ## Routing decision
 
-- Both ingested insights → `frontend/design/measuring-3d-lighting-before-tuning.md` (id `frontend-design-measuring-3d-lighting-before-tuning`). `design` already holds the canvas/WebGL pages (html-in-canvas, multi-shape-canvas-mask, pointer-attracted-particle-fields), so no new category.
-- Plumbing: row added to `wiki/frontend/index.md` (design table) and its route header; `INDEX.md` frontend route line extended; `log.md` ingest entry; `related:` added on html-in-canvas.
+- `7bb9e584c216294a` → `platforms/filesystems/unix-domain-socket-path-length.md` (existing page, new edge-case row). The candidate was tagged `testing`, but the cause is an OS socket-address limit that applies to any tool, not just test runners. The platforms page already owns that limit, so `testing` would have split one mechanism across two pages. No new category needed.
 
 ## Local-layer candidates
 
-none
+none. The only ingested candidate is general: it names tsx, Playwright and macOS, not one repository's own files.

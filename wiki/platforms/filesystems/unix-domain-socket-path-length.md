@@ -8,7 +8,9 @@ sources:
   - https://man7.org/linux/man-pages/man7/unix.7.html
   - https://nodejs.org/api/net.html
   - macOS SDK `sys/un.h` — `char sun_path[104];`
-last_verified: 2026-09-04
+  - https://github.com/privatenumber/tsx/issues/457
+  - https://github.com/openai/codex/issues/8343
+last_verified: 2026-10-19
 related: [platforms-filesystems-paths-case-and-line-endings, infrastructure-agent-orchestration-worktree-isolated-workers, platforms-processes-non-interactive-cli-invocation]
 ---
 
@@ -57,6 +59,7 @@ choosing where to place a socket file for a test suite or IPC channel.
 | The failing suite runs under several worktrees at once (parallel orchestration) | Give each worktree's sockets a short, run-scoped root outside any worktree path, keyed by run id rather than by worktree path |
 | The socket must live inside the worktree for cleanup-on-delete semantics | Create a short symlink from a fixed short path into the worktree location, and point the socket at the symlink |
 | Switching to `os.tmpdir()` still overflows | `TMPDIR` itself can be a long per-user path (macOS `/var/folders/...`, some CI images) — measure its length before assuming it is short |
+| You point `TMPDIR` at a project-local scratch dir (e.g. `<worktree>/.claude/tmp/...`) and a tool you do not control fails with `listen EINVAL` before any test runs | The tool builds its IPC socket under `os.tmpdir()` — tsx uses `<TMPDIR>/tsx-<uid>/<pid>.pipe`, so a Playwright `webServer` started through tsx inherits the worktree depth. Keep the whole `TMPDIR` value short (under about 80 bytes, which leaves room for the tool's own suffix), or leave `TMPDIR` at the system default for commands that start such tools and keep only your own scratch files project-local |
 | The error message is generic ("Failed to listen") with no path-length mention | The wrapping library does not always surface `bind(2)`'s errno clearly — reproduce the failing bind call directly (`node -e` with `net.createServer().listen(path)`) to see the underlying error code |
 
 ## Instead of
@@ -72,4 +75,6 @@ choosing where to place a socket file for a test suite or IPC channel.
 - https://man7.org/linux/man-pages/man7/unix.7.html — `struct sockaddr_un { sa_family_t sun_family; char sun_path[108]; }`
 - https://nodejs.org/api/net.html — "It will throw an error when the length of pathname is greater than the length of `sizeof(sockaddr_un.sun_path)`. Typical values are 107 bytes on Linux and 103 bytes on macOS."
 - Local reproduction 2026-09-04 (macOS, Node v26.7.0): `net.createServer().listen(<131-byte path>)` failed with `listen EINVAL: invalid argument <path>` — no `ENAMETOOLONG` and no mention of length in the message
+- https://github.com/privatenumber/tsx/issues/457 and https://github.com/openai/codex/issues/8343 — tsx creates its IPC pipe at `<tmpdir>/tsx-<uid>/<pid>.pipe` (error paths `/tmp/tsx-0/26.pipe`, `/tmp/tsx-<uid>/*.pipe`)
+- Field evidence 2026-10-18 (macOS, a git-worktree e2e run): with `TMPDIR=<worktree>/.claude/tmp/pw-tmp`, the Playwright `webServer` crashed with `listen EINVAL ... .worktrees/<task>/.claude/tmp/pw-tmp/tsx-501/<pid>.pipe`; the same command without `TMPDIR` passed 6/6
 - Field evidence 2026-08-19 (measured in a linkly-crew orchestration run): an IPC-listen test suite failed 14 cases from a git-worktree checkout and passed all of them from the main checkout; comparing the socket path's byte length against the worktree prefix explained the split
