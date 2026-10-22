@@ -195,6 +195,30 @@ pane_not_ready() { # matches none of the ready/trust patterns
   printf '%s\n' "Loading…" "NOTREADYMARKER"
 }
 
+pane_auto_mode_chooser() { # groundwork#41: option 1 is highlighted
+  printf '%s\n' \
+    " Make auto mode your default permission mode?" \
+    "   ❯ 1. Yes, set auto mode as my default permission mode" \
+    "     2. No, keep bypass permissions"
+}
+
+pane_folder_trust() { # dev-loop#276: "No, exit" is highlighted
+  printf '%s\n' \
+    "Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what's in this folder first." \
+    " Claude Code'll be able to read, edit, and execute files here." \
+    " Security guide" \
+    " ❯ No, exit" \
+    "   Yes, I trust this folder"
+}
+
+pane_bypass_warning() { # bypassPermissions warning: "1. No, exit" is highlighted
+  printf '%s\n' \
+    " WARNING: Claude Code running in Bypass Permissions mode" \
+    " By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode." \
+    " ❯ 1. No, exit" \
+    "   2. Yes, I accept"
+}
+
 # --- Task 01: launch-session.sh must not clobber tmux's own TMUX variable ---
 # TMUX is tmux's server-socket variable. Assigning it exports the corruption to
 # every child tmux, which then tries to connect to a binary path as a socket.
@@ -560,4 +584,93 @@ pane_not_ready() { # matches none of the ready/trust patterns
   printf '%s\n' "$output" | grep -qE '^ok 1 '
   [ -z "$(ls -A "$decoy_status" 2>/dev/null)" ]
   [ -z "$(ls -A "$decoy_esc" 2>/dev/null)" ]
+}
+
+# --- first-launch screens: auto-mode chooser (groundwork#41) and the
+# --- folder-trust screen with "No, exit" highlighted (dev-loop#276).
+# keys line 1 is always the launch command; a "bare Enter" is the exact line
+# "-t lo-1 Enter". The prompt's own submit adds one bare Enter after "-l".
+
+run_screens() { # <ready-timeout> -> runs the launcher against $sd
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT="$1" LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello"
+}
+
+@test "screens: auto-mode chooser is answered with key 2, never a bare Enter (groundwork#41)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_auto_mode_chooser > "$sd/pane-1"; pane_ready_submitted > "$sd/pane"
+  run_screens 4
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 2" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+  [ "$(grep -c '^-t lo-1 Enter$' "$sd/keys")" = "1" ]
+}
+
+@test "screens: folder-trust screen selects 'Yes, I trust this folder' with Down then Enter (dev-loop#276)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_folder_trust > "$sd/pane-1"; pane_ready_submitted > "$sd/pane"
+  run_screens 4
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 4p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+}
+
+@test "screens: chooser with an 'Enter to confirm' footer still gets key 2, not the generic Enter (precedence)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_auto_mode_chooser; printf '%s\n' " Enter to confirm · Esc to cancel"; } > "$sd/pane-1"
+  pane_ready_submitted > "$sd/pane"
+  run_screens 4
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 2" ]
+  [ "$(grep -c '^-t lo-1 Enter$' "$sd/keys")" = "1" ]
+}
+
+@test "screens: folder-trust with an 'Enter to confirm' footer still gets Down then Enter (precedence)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_folder_trust; printf '%s\n' " Enter to confirm · Esc to cancel"; } > "$sd/pane-1"
+  pane_ready_submitted > "$sd/pane"
+  run_screens 4
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
+}
+
+@test "screens: a chooser that never clears exits 4 with key 2 per attempt and no bare Enter (error)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_auto_mode_chooser > "$sd/pane"
+  run_screens 2
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$output" | grep -qF 'REPL not ready'
+  [ "$(grep -c '^-t lo-1 2$' "$sd/keys")" = "2" ]
+  [ "$(grep -c '^-t lo-1 Enter$' "$sd/keys")" = "0" ]
+  [ "$(grep -c -- ' -l ' "$sd/keys")" = "0" ]
+}
+
+@test "screens: a partial chooser render with only the option-2 line still gets key 2 (boundary)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  printf '%s\n' "     2. No, keep bypass permissions" > "$sd/pane-1"
+  pane_ready_submitted > "$sd/pane"
+  run_screens 4
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 2" ]
+}
+
+@test "screens: bypass-permissions warning still gets Down then Enter (unchanged)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_bypass_warning > "$sd/pane-1"; pane_ready_submitted > "$sd/pane"
+  run_screens 4
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
+}
+
+@test "screens: a ready REPL whose scrollback still shows the chooser is ready, no key 2 sent (unchanged)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_auto_mode_chooser; pane_ready_submitted; } > "$sd/pane"
+  run_screens 4
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^-t lo-1 2$' "$sd/keys")" = "0" ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
 }
