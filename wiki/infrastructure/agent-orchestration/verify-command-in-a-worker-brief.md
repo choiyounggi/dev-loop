@@ -8,7 +8,7 @@ sources:
   - https://docs.python.org/3/library/venv.html
   - https://docs.python.org/3/library/unittest.html
 last_verified: 2026-09-03
-related: [platforms-environment-path-resolution, platforms-toolchains-version-management, platforms-toolchains-compiler-sysroot-on-macos, qa-process-completion-claims, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-worktree-isolated-workers]
+related: [platforms-environment-path-resolution, platforms-toolchains-version-management, platforms-toolchains-compiler-sysroot-on-macos, qa-process-completion-claims, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-done-criteria-in-a-split-task-piece]
 ---
 
 # The Test Command Written Into a Worker's Brief
