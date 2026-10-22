@@ -15,7 +15,7 @@ sources:
   - https://github.com/AndyOGo/stylelint-declaration-strict-value
   - https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Cascading_variables/Using_custom_properties
 last_verified: 2026-10-06
-related: [frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, frontend-design-design-canvas-workflow, frontend-design-custom-property-values-read-from-script, frontend-design-theme-swap-propagation-check, infrastructure-ci-cd-changed-files-only-gates, infrastructure-ci-cd-write-time-limit-guards, testing-quality-checks-that-cannot-pass, frontend-design-slop-detector-gate]
+related: [frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, frontend-design-design-canvas-workflow, frontend-design-custom-property-values-read-from-script, frontend-design-theme-swap-propagation-check, infrastructure-ci-cd-changed-files-only-gates, infrastructure-ci-cd-write-time-limit-guards, testing-quality-checks-that-cannot-pass, frontend-design-slop-detector-gate, platforms-toolchains-no-html-link-for-pages-misses-app-router-routes]
 ---
 
 # A Lint Gate for Agent-Written UI in a Tailwind Design System

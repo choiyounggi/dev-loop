@@ -9,7 +9,7 @@ sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/Secure_Product_Design_Cheat_Sheet.html
   - https://github.com/badlogic/pi-mono/issues/555
 last_verified: 2026-09-28
-related: [security-agent-exposure-authorization-scope-persistence, backend-common-api-design-unenforced-declarations, testing-mocking-captured-call-arguments, security-authn-retiring-a-replaced-auth-gate]
+related: [security-agent-exposure-authorization-scope-persistence, backend-common-api-design-unenforced-declarations, testing-mocking-captured-call-arguments, security-authn-retiring-a-replaced-auth-gate, backend-common-errors-refusing-a-backend-without-the-needed-capability]
 ---
 
 # A Capability-Restriction Flag in a Shared Config That Only Some Adapters Enforce

@@ -16,7 +16,9 @@ And it scales past one session: the `orchestrate` skill is a **multi-session
 orchestrator** over the same loop — it decomposes a goal into a dependency
 graph, schedules parallel workers with a ready-set scheduler, and supervises
 them **Orca-natively** when the Orca CLI is installed (raw tmux otherwise).
-See [Orca integration](#orca-integration--supervision-not-just-spawning).
+See [Orca integration](#orca-integration--supervision-not-just-spawning), and
+watch a run live from the coordinator's own session with the
+[session-progress](#watch-a-run-live--the-session-progress-mod) mod.
 
 **The one change from upstream loop-orchestrator:** the plan step is no longer an
 optional, pluggable role. It is **fixed to the bundled `wiki-plan` methodology** —
@@ -133,6 +135,7 @@ can map its **capability roles** to your real tools so the loop uses them:
 | `design` | Figma / visual-spec MCP (UI work) |
 | `intake` | issue tracker (orchestrate's work-list) |
 | `research` | external best-practice/pitfall search (wiki-plan Phase A/B). Fixed fallback when unset: brave-search MCP if present → built-in WebSearch → open `ABANDON` |
+| `inspect` | an app/site/binary inspection tool (e.g. the REA MCP) for studying how an existing product behaves when a feature mirrors it (wiki-plan Phase A3 reference study). Unset: `scripts/reference-study.sh` runs the pinned REA MCP in a headless study session when a goal names a reference product — nothing to install or register |
 
 (`plan` is **not** a role — the plan step is fixed to `wiki-plan`. And the bundled
 best-practice `wiki/` needs no config; `knowledge` is a *separate* external wiki —
@@ -205,6 +208,47 @@ backed-up, atomic; never silent), otherwise it shows you the snippet to paste
 yourself. `safe-cleanup.sh` is deliberately excluded so destructive verbs keep
 their normal review, and a blocked coordinator stops and re-asks rather than
 working around the classifier.
+
+### Watch a run live — the session-progress mod
+
+`orchestrate` already records everything a run does in plain files:
+`.orchestration/graph.json`, one `.orchestration/status/<task>.json` per worker,
+and each worker's `.dev-loop/gates/<task>.md` ledger. The
+**[session-progress](https://github.com/choiyounggi/groundwork/tree/main/plugins/session-progress)**
+mod (in the groundwork marketplace) reads those files and draws the run into a
+pane of the coordinator's own Claude Code session, so you check on the workers
+without opening a terminal per worker or running `collect-status.sh`.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/choiyounggi/groundwork/v0.3.1/plugins/session-progress/assets/screenshot-en.png" alt="session-progress in a coordinator session: a dev-loop run with four workers at 48% overall, each with its phase, gates and age" width="560">
+</p>
+
+- **Per worker:** its phase as the run records it (`pending` → `plan_ready` →
+  `impl_done` → `done`, plus `rework` and `failed`), `gates n/m` from its
+  ledger, `try N` after a second rework, and how long ago it last reported;
+  expand a worker for its session, last error and gate list. When the worker's
+  own status copy in its worktree is newer, that copy wins (the same
+  newer-`updatedAt` rule `collect-status.sh` uses).
+- **Overall:** the run's percent and worker count; while the pane is closed and
+  the run is active, the summary and its workers sit above the prompt instead.
+- **Where it shows:** only in the coordinator's checkout; worker sessions inside
+  `.worktrees/` show nothing. It reads; it never writes to the run. Workers call
+  `status-update.sh` on both Orca and raw tmux, so it works on either. On Orca a
+  worker first appears once the coordinator's `collect-status.sh` has picked up
+  its record.
+- **Kept compatible:** groundwork's CI regenerates the mod's fixture with this
+  repo's own `graph-add.sh`, `status-update.sh` and `gate-check.sh` at the
+  pinned dev-loop release, so a change to the file format shows up there (it
+  pins the format, not which phases a run writes).
+
+```
+/plugin marketplace add choiyounggi/groundwork
+/plugin install session-progress@groundwork
+```
+
+A *mod* is a Claude Code plugin of in-process function hooks that can draw its
+own pane; it needs a build with mod support (verified on 2.1.296). The same pane
+also shows the current request's plan, the task history and a context gauge.
 
 ---
 

@@ -11,7 +11,7 @@ sources:
   - https://github.com/coe0718/hermes-review-loop/issues/153
   - "Local measurement 2026-10-07 (CPython 3.14.6, macOS): 200,000 names from tempfile's own name sequence — `42` in 1,046 (0.52%), `7` in 19.6%, `192192192` and `FAKE-SECRET` in none; after `random.seed(0)` two runs still produced different temp names"
 last_verified: 2026-10-07
-related: [security-data-masking-verification, testing-flaky-diagnosing-flaky-tests, testing-quality-source-text-wiring-assertions, testing-quality-value-preserving-refactor-assertions, testing-quality-tests-that-cannot-fail, testing-data-artifact-leakage-from-a-suite]
+related: [security-data-masking-verification, testing-flaky-diagnosing-flaky-tests, testing-quality-source-text-wiring-assertions, testing-quality-value-preserving-refactor-assertions, testing-quality-tests-that-cannot-fail, testing-data-artifact-leakage-from-a-suite, testing-mocking-proving-a-value-never-reaches-the-console]
 ---
 
 # Asserting a Value Is Absent From Output That Carries Generated Names

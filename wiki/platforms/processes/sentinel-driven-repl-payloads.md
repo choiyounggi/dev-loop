@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://nodejs.org/api/repl.html
 last_verified: 2026-09-04
-related: [platforms-processes-driving-a-tui-in-a-tmux-pane, platforms-processes-non-interactive-cli-invocation, testing-async-async-testing, testing-quality-tests-that-cannot-fail]
+related: [platforms-processes-driving-a-tui-in-a-tmux-pane, platforms-processes-non-interactive-cli-invocation, testing-async-async-testing, testing-quality-tests-that-cannot-fail, platforms-toolchains-tsx-top-level-await-without-type-module]
 ---
 
 # Driving an External REPL by Piped Payload Lines and a Completion Sentinel

@@ -12,7 +12,7 @@ sources:
   - https://man.openbsd.org/ssh
   - https://docs.docker.com/reference/cli/docker/compose/exec/
 last_verified: 2026-10-01
-related: [platforms-shells-portable-shell-scripts, platforms-processes-non-interactive-cli-invocation, platforms-tools-bsd-vs-gnu-cli, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-gate-evidence-exit-code-class]
+related: [platforms-shells-portable-shell-scripts, platforms-processes-non-interactive-cli-invocation, platforms-tools-bsd-vs-gnu-cli, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-gate-evidence-exit-code-class, platforms-shells-echo-of-text-you-did-not-write]
 ---
 
 # Shell Loops That Read Input One Line at a Time
