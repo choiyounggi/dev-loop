@@ -9,7 +9,7 @@ sources:
   - https://gsap.com/docs/v3/GSAP/Timeline/timeScale()/
   - https://gsap.com/docs/v3/GSAP/gsap.matchMedia()/
 last_verified: 2026-09-28
-related: [frontend-state-effects-usage, frontend-accessibility-interactive-elements, testing-mocking-fake-intersection-observer-for-viewport-animations]
+related: [frontend-state-effects-usage, frontend-accessibility-interactive-elements, testing-mocking-fake-intersection-observer-for-viewport-animations, qa-environments-proving-nothing-moves-under-reduced-motion]
 ---
 
 # Scroll-Scrubbed Animations Under a Reduced-Motion Preference

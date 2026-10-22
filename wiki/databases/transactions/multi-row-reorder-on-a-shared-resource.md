@@ -11,7 +11,7 @@ sources:
   - https://www.postgresql.org/docs/current/sql-insert.html
   - "Field evidence 2026-08-31 (linkly-calendar orchestration run, review findings t1 F2 / t3 F1): a shared-calendar reorder shipped as unguarded per-row updates; fixed to a parent-row lock inside one transaction with a DB upsert"
 last_verified: 2026-09-06
-related: [databases-transactions-isolation-level-selection, databases-transactions-optimistic-vs-pessimistic-locking, backend-common-orm-transaction-boundaries]
+related: [databases-transactions-isolation-level-selection, databases-transactions-optimistic-vs-pessimistic-locking, backend-common-orm-transaction-boundaries, backend-common-orm-prisma-driver-adapter-errors-at-commit]
 ---
 
 # Rewriting Several Rows at Once on a Resource Several Writers Share
@@ -69,6 +69,7 @@ resource the concurrent writer is the normal path, not an exception.**
 | The ORM issues one `UPDATE` per row under autocommit | Wrap the action explicitly ([backend-common-orm-transaction-boundaries]); per-row autocommit is the interleaving case in step 1 |
 | Many parents are reordered in one request | Lock all the parent rows up front with the global lock ordering [databases-transactions-isolation-level-selection] prescribes (one ordered `SELECT ... FOR UPDATE`), then reorder each parent's children |
 | Positions are fractional or sparse keys (LexoRank-style) so a move touches one row | Step 2's constraint question disappears for the moving row, but two movers inserting between the same neighbours still produce equal keys; keep the parent lock, or make the key unique and retry on conflict |
+| The constraint is made `DEFERRABLE INITIALLY DEFERRED` and the app writes through Prisma 7 with a driver adapter | The violation comes back from `COMMIT` as a raw `DriverAdapterError`; widen the app's fault mapping and test it with a commit-time fixture ([backend-common-orm-prisma-driver-adapter-errors-at-commit]) |
 | Readers must see a consistent order mid-rewrite | Readers at Read Committed see either the pre-commit or the post-commit order, never the interleaving, because the rewrite is one transaction |
 
 ## Instead of

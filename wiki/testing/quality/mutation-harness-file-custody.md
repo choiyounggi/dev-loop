@@ -9,7 +9,9 @@ sources:
   - https://pitest.org/quickstart/basic_concepts/
   - https://git-scm.com/docs/git-status
   - https://docs.python.org/3/library/pathlib.html
-last_verified: 2026-08-27
+  - https://stryker-mutator.io/docs/stryker-js/configuration/
+  - "Field case 2026-10 (linkly-invitation task t7; recorded by the originating session): in-place mutants live while an unrelated suite imported the file; the same mutants red again from scratch copies"
+last_verified: 2026-10-11
 related: [testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, testing-quality-surviving-mutant-equivalence-triage, testing-quality-completion-predicates, testing-data-artifact-leakage-from-a-suite, qa-process-scope-purity-checks, qa-process-completion-claims, testing-quality-narration-based-ordering-assertions]
 ---
 
@@ -67,7 +69,7 @@ such a harness is running, or you are about to cite its SURVIVED/KILLED verdicts
 |------|------|
 | Two backed-up files legitimately have identical length | Length and line count agree by coincidence — byte comparison (step 2) is what separates them; a line-count check reports the cross-restore as healthy |
 | The harness dies partway (crash, cancelled session, usage limit) | The tree still holds a mutation. Restore from the backups by path key, then run the full suite and require the pre-run pass count before treating the tree as clean |
-| Another agent or session shares the worktree | Its reads land inside your window and its writes land inside your backup — give the harness its own worktree, or serialise access with a lock ([backend-common-concurrency-distributed-locks]) |
+| Another agent, session or test run shares the worktree | Its reads land inside your window and its writes land inside your backup: a concurrent suite records a red or green caused by your mutant, and a concurrent harness can back up your mutant as its "original". Mutate copies instead — Stryker's default (`inPlace: false`) works in a copy of the project; by hand, copy the mutated module and the tests that import it into a scratch directory whose test config resolves every other import to the real tree, then require a mutant that went red in place to go red from the copy. When copies are not possible, give the harness its own worktree, or serialise access with a lock ([backend-common-concurrency-distributed-locks]) |
 | The mutated file is untracked (new work not yet committed) | `git checkout -- <path>` cannot restore it and reports nothing; the byte-compared copy from step 2 is the only restore path ([testing-quality-tests-that-cannot-fail]) |
 | The suite writes into the same tree (snapshots, generated fixtures) | Exclude those paths from the custody check, or the restore comparison fails on files the suite legitimately changed ([testing-data-artifact-leakage-from-a-suite]) |
 | A mutation makes the module fail to import | The suite total drops and the run still looks mostly green — compare test totals to the pre-mutation run, not just pass/fail |
@@ -89,5 +91,7 @@ such a harness is running, or you are about to cite its SURVIVED/KILLED verdicts
 - https://pitest.org/quickstart/basic_concepts/ — "'Survived' means the mutation was not detected by the covering test"; a survival caused by a corrupted restore carries the same label as a real one, which is why step 2 gates the next mutation
 - https://git-scm.com/docs/git-status — untracked files are reported separately from tracked modifications, and a path the repo does not track contributes no diff — the basis for step 3
 - https://docs.python.org/3/library/pathlib.html — `Path.read_bytes()` for the byte-exact restore comparison in step 2
+- https://stryker-mutator.io/docs/stryker-js/configuration/ — `inPlace` (default `false`): "When `false` (default) Stryker will work in the copy of your code inside the temp directory"; with `true`, "Stryker will override your files, but it will keep a copy of the originals in the temp directory"
+- Field case 2026-10 (linkly-invitation task t7; recorded by the originating session, not re-run in this flush): an auditor's in-place mutations of a shared guard module were live for nine minutes while an unrelated suite importing that module ran. After tasks 02, 03, 05 and 06 switched to scratch copies (their own Vitest config, the `@` alias pointed at the real `src`, cwd at the repo root), the same mutants still went red (26/26 and 20/20 in two of them) and the source files' hashes never changed
 - Field measurement 2026-08-21 (`rtb-unified`, NEWRTB-2936): a harness keyed backups by basename, so `routers/deal.ts` and `schemas/deal.ts` shared one entry. Restoring mutant M8 wrote the schema file's contents into the router, producing `Cannot find module './common.js' imported from src/routers/deal.ts`; `grep -c dealRouter` returned 0, confirming the destruction. Both files were 154 lines, so a line-count check reported them as matching. After re-keying by flattened relative path and re-running, mutants M9 and M10 moved from SURVIVED to KILLED — the earlier verdicts had been produced by the corruption
 - Field measurement 2026-08-21 (same session): a `git diff` read while `mutate.py` was mid-cycle showed an adapter predicate as `state = 'created'`; the committed code reads `state < 'active'`, and that substitution was precisely mutation D8. Re-reading after the harness exited, plus an anchor count, established the real text
