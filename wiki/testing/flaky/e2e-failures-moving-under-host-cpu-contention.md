@@ -64,5 +64,5 @@ same time.
 ## Sources
 
 - https://playwright.dev/docs/test-cli — `--workers`: "Number of concurrent workers or percentage of logical CPU cores, use 1 to run in a single worker (default: 50%)" — the default sizes itself to the host's cores, not to what is free on them
-- https://playwright.dev/docs/ci — recommends `workers: 1` in CI to prioritize stability and reproducibility, since tests run one at a time then get the full system resources (confirmed via web search of the official page on 2026-10-22; the page itself was not fetched in this run)
+- https://playwright.dev/docs/ci — "We recommend setting `workers` to `1` in CI environments to prioritize stability and reproducibility" (page fetched 2026-10-22)
 - Field observation 2026-10-18 (36-test Playwright e2e suite, macOS, shared agent host): load average 19 with another session's `chrome-headless-shell` at 110% CPU gave "1 failed" at `leave.spec.ts:37`, then "1 failed" at `game-bell.spec.ts:33` (a 5 s results-screen window and a 10 s locator wait); after 60 s with no other headless browser, the same tree gave "36 passed (50.9s)". One host, one suite — hence `field-tested`
