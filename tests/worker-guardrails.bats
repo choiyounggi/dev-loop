@@ -10,10 +10,43 @@ setup() {
   wt="${BATS_TEST_TMPDIR}/wt"; mkdir -p "$wt"
   git -C "$wt" init -q -b main
   git -C "$wt" config user.email t@t; git -C "$wt" config user.name t
+  # A temp HOME: the external guardrails config now lives at
+  # $HOME/.claude/groundwork/overrides/, so no test ever touches the real one.
+  HOME="${BATS_TEST_TMPDIR}/home"; mkdir -p "$HOME"
+  export HOME
+  # Isolate from an ambient DEV_LOOP_WORKER_RELAX=1 (this suite may itself be
+  # running inside a relaxed worker) so "default" tests see the real default.
+  unset DEV_LOOP_WORKER_RELAX
 }
 
-@test "writes the worker-scoped guardrails config" {
+# --- opt-in loosening (DEV_LOOP_WORKER_RELAX) -------------------------------
+# A worker can rewrite both config files this script writes (same user,
+# inside a tree the worker itself controls), so the DEFAULT must never hand
+# it a loosened destructive-command sandbox — loosening is opt-in, like
+# DEV_LOOP_AUTOFLUSH.
+
+@test "default (DEV_LOOP_WORKER_RELAX unset): no rule is 'off', in either file" {
   run sh "$WG" "$wt"
+  [ "$status" -eq 0 ]
+  cfg="$wt/.groundwork/guardrails.json"
+  ext="$(sh "$WG" --path "$wt")"
+  [ -f "$cfg" ]; [ -f "$ext" ]
+  run jq -e '[.rules[] | select(.mode == "off")] | length == 0' "$cfg"
+  [ "$status" -eq 0 ]
+  run jq -e '[.rules[] | select(.mode == "off")] | length == 0' "$ext"
+  [ "$status" -eq 0 ]
+  # the orchestration protocol's one sanctioned path still works without a prompt
+  run jq -r '.rules.worktree_escape.mode' "$cfg"
+  [ "$output" = "ask" ]
+  run jq -r '.rules.worktree_escape.allowPaths[0]' "$cfg"
+  [ "$output" = ".orchestration" ]
+  # and nothing else is declared — this is the minimal default, not a trimmed copy
+  run jq -r '.rules | keys_unsorted | join(",")' "$cfg"
+  [ "$output" = "worktree_escape" ]
+}
+
+@test "relax=1: keeps today's full loosened content" {
+  run env DEV_LOOP_WORKER_RELAX=1 sh "$WG" "$wt"
   [ "$status" -eq 0 ]
   cfg="$wt/.groundwork/guardrails.json"
   [ -f "$cfg" ]
@@ -23,6 +56,29 @@ setup() {
   [ "$output" = "ask" ]
   run jq -r '.rules.worktree_escape.mode' "$cfg"
   [ "$output" = "ask" ]
+}
+
+@test "relax=0 / relax=true: neither loosens (only the exact string \"1\" opts in)" {
+  for v in 0 true; do
+    run env DEV_LOOP_WORKER_RELAX="$v" sh "$WG" "$wt"
+    [ "$status" -eq 0 ]
+    cfg="$wt/.groundwork/guardrails.json"
+    run jq -e '[.rules[] | select(.mode == "off")] | length == 0' "$cfg"
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "a stale loosened external file from an earlier relax=1 run is overwritten once relax is off" {
+  env DEV_LOOP_WORKER_RELAX=1 sh "$WG" "$wt"
+  ext="$(sh "$WG" --path "$wt")"
+  run jq -r '.rules.rm_rf.mode' "$ext"
+  [ "$output" = "off" ]          # sanity: it really is the loosened file first
+  run sh "$WG" "$wt"             # relax off now — same worktree, re-run
+  [ "$status" -eq 0 ]
+  run jq -e '[.rules[] | select(.mode == "off")] | length == 0' "$ext"
+  [ "$status" -eq 0 ]
+  run jq -r '.rules | keys_unsorted | join(",")' "$ext"
+  [ "$output" = "worktree_escape" ]
 }
 
 @test "the config is git-excluded, so a worker cannot commit its sandbox" {
@@ -55,6 +111,68 @@ setup() {
   [[ "$output" == *"usage"* ]]
 }
 
+# --- external, outside-every-repo guardrails config (security review fix) --
+# Guardrails now REFUSES to trust GROUNDWORK_GUARDRAILS_CONFIG when it
+# resolves inside any project tree (current worktree, its main worktree, or
+# $PWD) — any command running in the worktree could rewrite such a file. So
+# the real loosening copy must live outside every repo, at
+# $HOME/.claude/groundwork/overrides/dev-loop-<id>.json, keyed off a hash of the
+# worktree's own absolute path. `--path` prints that location without writing
+# anything, so callers (the launch scripts) never re-derive the hash.
+
+@test "--path prints an absolute path under \$HOME/.claude/groundwork/overrides/, not inside the worktree" {
+  run sh "$WG" --path "$wt"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "$HOME/.claude/groundwork/overrides/dev-loop-"*".json" ]]
+  [[ "$output" != "$wt"* ]]
+}
+
+@test "write mode also writes the SAME json to the external path --path prints" {
+  run sh "$WG" "$wt"
+  [ "$status" -eq 0 ]
+  ext="$(sh "$WG" --path "$wt")"
+  [ -f "$ext" ]
+  diff "$wt/.groundwork/guardrails.json" "$ext"
+}
+
+@test "external config directory is mode 700 and the file is mode 600" {
+  sh "$WG" "$wt"
+  ext="$(sh "$WG" --path "$wt")"
+  extdir="$(dirname "$ext")"
+  # GNU `stat -c` first (Linux CI): BSD stat (macOS) has no -c and fails,
+  # falling through to -f. The reverse order is wrong on Linux — GNU `stat -f`
+  # means "filesystem status", not a format string, so it silently returns the
+  # wrong field instead of erring and never reaches the fallback.
+  [ "$(stat -c '%a' "$extdir" 2>/dev/null || stat -f '%Lp' "$extdir")" = "700" ]
+  [ "$(stat -c '%a' "$ext" 2>/dev/null || stat -f '%Lp' "$ext")" = "600" ]
+}
+
+@test "idempotent: the same worktree yields the same external id across runs" {
+  p1="$(sh "$WG" --path "$wt")"
+  p2="$(sh "$WG" --path "$wt")"
+  [ "$p1" = "$p2" ]
+}
+
+@test "two different worktrees yield two different external ids (boundary)" {
+  wt2="${BATS_TEST_TMPDIR}/wt2"; mkdir -p "$wt2"
+  git -C "$wt2" init -q -b main
+  git -C "$wt2" config user.email t@t; git -C "$wt2" config user.name t
+  p1="$(sh "$WG" --path "$wt")"
+  p2="$(sh "$WG" --path "$wt2")"
+  [ "$p1" != "$p2" ]
+}
+
+@test "--path errors on a missing argument (usage)" {
+  run sh "$WG" --path
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"usage"* ]]
+}
+
+@test "--path errors on a worktree that does not exist (boundary)" {
+  run sh "$WG" --path "${BATS_TEST_TMPDIR}/does-not-exist"
+  [ "$status" -eq 2 ]
+}
+
 @test "errors instead of silently writing when the worktree does not exist" {
   run sh "$WG" "${BATS_TEST_TMPDIR}/nope"
   [ "$status" -eq 2 ]
@@ -81,8 +199,8 @@ setup() {
   [ "$output" = "ask" ]
 }
 
-@test "coverage: the emitted config still holds exactly the nine known rule ids" {
-  sh "$WG" "$wt"
+@test "coverage (relax=1): the emitted config still holds exactly the nine known rule ids" {
+  env DEV_LOOP_WORKER_RELAX=1 sh "$WG" "$wt"
   cfg="$wt/.groundwork/guardrails.json"
   run jq -r '.rules | length' "$cfg"
   [ "$status" -eq 0 ]
@@ -91,8 +209,8 @@ setup() {
   [ "$output" = "rm_rf,git_discard,system_tmp_write,cloud_delete,sql_drop,git_force_push,secret_export,curl_pipe_shell,worktree_escape" ]
 }
 
-@test "validity: every pre-existing rule keeps its mode, and only worktree_escape gains a key" {
-  sh "$WG" "$wt"
+@test "validity (relax=1): every pre-existing rule keeps its mode, and only worktree_escape gains a key" {
+  env DEV_LOOP_WORKER_RELAX=1 sh "$WG" "$wt"
   cfg="$wt/.groundwork/guardrails.json"
   for pair in rm_rf:off git_discard:off system_tmp_write:off cloud_delete:ask \
               sql_drop:ask git_force_push:ask secret_export:ask \

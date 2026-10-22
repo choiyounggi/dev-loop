@@ -10,7 +10,7 @@ sources:
   - https://docs.rs/tokio/latest/tokio/runtime/struct.Runtime.html#shutdown
   - https://doc.rust-lang.org/book/ch11-01-writing-tests.html#using-resultt-e-in-tests
 last_verified: 2026-09-28
-related: [testing-async-async-testing, testing-data-artifact-leakage-from-a-suite, testing-data-test-data-and-isolation, testing-quality-tests-that-cannot-fail]
+related: [testing-async-async-testing, testing-data-artifact-leakage-from-a-suite, testing-data-test-data-and-isolation, testing-quality-tests-that-cannot-fail, backend-node-async-request-body-reader-cancel]
 ---
 
 # Deleting a Resource That Spawned Async Tasks Still Use

@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://google.github.io/styleguide/docguide/best_practices.html
   - https://www.writethedocs.org/guide/writing/docs-principles/
-last_verified: 2026-08-06
+last_verified: 2026-10-11
 related: [qa-deliverables-generated-artifacts-as-deliverable-source, qa-document-verification-spec-document-gates, testing-quality-spec-artifact-checks, testing-quality-synthetic-corpus-measurement-floor, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, qa-document-verification-sweeping-pre-gate-citations-for-fabrication, qa-document-verification-editing-a-gated-document, qa-deliverables-documented-behavior-of-a-third-party-tool]
 ---
 
@@ -19,7 +19,8 @@ You are about to publish or hand out a hand-maintained document that describes
 the repository — README, landing page, launch post, architecture overview — and
 it states counts: tests, rules, supported types, grammar productions, endpoints,
 documents in a given state. Also when someone reports that one number in such a
-document is wrong.
+document is wrong, or when a change edits one of its counts (an entry added to a
+list the document counts).
 
 ## Do this
 
@@ -54,6 +55,7 @@ document is wrong.
 | The count is non-deterministic across runs (parallel collection, generated cases) | State it as the run's reported value with the command, or state a floor ("1200+"); a bare exact number that moves between runs cannot be verified by anyone |
 | The spec and the implementation give different counts for the same concept | Publish the one matching the artifact the sentence is about, and name which — a README sentence about the schema counts schema branches, not implementation branches |
 | The number appears in more than one document (README, its translation, a landing page) | Fix every copy in the same change; a translated README drifts independently and is the copy most often missed |
+| A change edits one count (adds the 13th adapter) and updates the count line a test pins plus the table | Recheck every other number in that section and in each translated copy: breakdowns that must sum to the new total (9 stable + 3 beta + 1 deprecated), spelled-out numbers ("three beta adapters"), and enumerations whose length is a count. A search for the old total finds none of these, and the pinning test covers its own line only |
 | Verifying a claim requires a build that does not run on this machine | Mark the claim with the environment it was measured in rather than dropping it, and say what is untested here |
 | The document is generated | Re-run the generator instead of editing the number ([qa-deliverables-generated-artifacts-as-deliverable-source]) |
 | The number is decorative ("dozens of tests") | Leave it; the rule covers claims a reader could check and find false |
@@ -63,6 +65,7 @@ document is wrong.
 | If you are about to | Do this instead | Why |
 |---------------------|-----------------|-----|
 | Correct the one stale number that was reported and publish | Enumerate and recompute every number in the document in the same pass | Counts drift silently because no test asserts them; the reported one is the one someone happened to check, not the only one wrong |
+| Update the count line a test pins and the table row, then trust the green test | Recheck every number in that section, breakdowns and spelled-out words included, in each language copy | The test matches one line; a breakdown under the table kept the old total while the suite stayed green |
 | Take a number from an adjacent document or an earlier session's summary | Recompute from the source now | The adjacent document has the same drift mechanism and no check, so two documents agreeing is not corroboration |
 | Sum per-file test counts to get a suite total | Read the suite runner's own summary line | Per-file sums miss collection errors, skips, and dynamically generated cases |
 | Publish "N tests" as a durable fact | Publish it with the command and date that produced it | An unattributed count cannot be re-verified and becomes stale the next commit |
@@ -73,3 +76,4 @@ document is wrong.
 - https://www.writethedocs.org/guide/writing/docs-principles/ — sources of truth must be "clearly defined and disjoint" so the same fact is not maintained in parallel
 - Field incident 2026-08-06 (`linkly`, pre-launch README audit): of nine quantitative claims, five were stale — tests 386→1209, harness mutations 53→77, IR node kinds 20→21 (counted as JSON Schema `anyOf` branches), EBNF productions 51→58, "Twelve Accepted" RFCs→13. One had been reported; the other four were found only because the whole document was swept. Re-checked on 2026-08-06: `grep -on '[0-9]\+ tests\|[0-9]\+ node kinds\|[0-9]\+ productions' README.md` returns the corrected 1209 / 21 / 58
 - Field observation 2026-08-06 (same repo): back-to-back full-suite runs on one commit reported 1195 then 1209 tests — an exact published test count is only reproducible when the collection is deterministic
+- Field incident 2026-10-10 (same repo; review round 1, finding F1, in the run's archived `reviews/t2-write-miss-not-found-r1.md`, read 2026-10-11): a change adding the 65th RFC updated the bold "65 RFCs" line and the RFC table, while the Draft-list paragraph under the table, 75 lines below the bold line, still read "seventeen" (46 + 1 + 17 = 64) in both README.md and README.ko.md. The README test pinned only the bold line and the task step named only that line and the table. The rework changed the paragraph to "eighteen"; the merged end state is commit `1a68da3` on branch `orch/open-issues-1010`, whose `git show 1a68da3 -- README.md` changes "64 RFCs" → "65 RFCs" and "seventeen" → "eighteen" together

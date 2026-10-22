@@ -12,7 +12,7 @@ sources:
   - https://cmu-sei.github.io/secure-coding-standards/sei-cert-oracle-coding-standard-for-java/rules/input-output-fio/fio16-j/
   - https://zod.dev/api
 last_verified: 2026-09-03
-related: [security-authz-resource-level-checks, frontend-security-xss-safe-rendering, security-agent-exposure-in-session-tool-exposure, platforms-filesystems-trailing-separator-under-realpath]
+related: [security-authz-resource-level-checks, frontend-security-xss-safe-rendering, security-agent-exposure-in-session-tool-exposure, platforms-filesystems-trailing-separator-under-realpath, testing-quality-host-disguise-fixtures-for-url-allowlists]
 ---
 
 # Validating Data at a Trust Boundary

@@ -10,7 +10,11 @@ sources:
   - https://playwright.dev/docs/actionability
   - https://playwright.dev/docs/auth
   - https://testing-library.com/docs/queries/about/
-last_verified: 2026-07-10
+  - https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors
+  - https://testing-library.com/docs/queries/bytestid/
+  - "Local reproduction 2026-10-11 (jsdom 30.1.2, @testing-library/dom 10.4.2): a test-id prefix selector over sections that each hold a shared heading id"
+  - "Field case 2026-10 (linkly-invitation task t5; recorded by the originating session): a section-order helper read 15 ids where 8 sections existed"
+last_verified: 2026-10-11
 related: [testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isolation, testing-quality-minimum-case-set, testing-mocking-what-to-mock, qa-environments-headless-browser-bot-blocking, testing-e2e-dynamic-file-input-uploads-in-headless-chromium]
 ---
 
@@ -19,7 +23,8 @@ related: [testing-flaky-diagnosing-flaky-tests, testing-data-test-data-and-isola
 ## When this applies
 
 You are writing browser E2E tests (Playwright/Cypress-style), an E2E suite is
-flaky or slow, or you are choosing selectors and setup strategy for one.
+flaky or slow, or you are choosing selectors and setup strategy for one. Also
+when a component or E2E test collects a set of elements by a test-id prefix.
 
 ## Do this
 
@@ -62,6 +67,7 @@ flaky or slow, or you are choosing selectors and setup strategy for one.
 | Tests mutate shared server-side state (settings, org-wide data) | Authenticate each parallel worker with its own account so workers cannot collide |
 | Entry animation makes clicks land on a moving element | Auto-waiting's stability check waits for the bounding box to settle; disable or shorten animations in the test environment to cut wait time and misclicks |
 | Saved auth/storage state expires during long runs | Regenerate it in the setup project once per run — never per test, and never by committing credentials or state files to the repo |
+| A test collects elements by a test-id prefix or pattern (`[data-testid^="section-"]`, `getAllByTestId(/^section-/)`, `{ exact: false }`) and shared components inside them render ids that start the same way (`section-title`) | List the ids the page actually renders first. Then qualify the prefix by element type (`section[data-testid^="section-"]`) or compare against the exact id list: a prefix matches every id that starts the same way, so each nested heading adds a match and a count or order assertion cannot pass. A plain string (`getAllByTestId('section-hero')`) is an exact match and does not over-match |
 
 ## Instead of
 
@@ -79,3 +85,7 @@ flaky or slow, or you are choosing selectors and setup strategy for one.
 - https://playwright.dev/docs/actionability — auto-waiting: visible/stable/enabled checks retried before each action
 - https://playwright.dev/docs/auth — authenticate once in a setup project, reuse storage state; per-worker accounts for mutating tests
 - https://testing-library.com/docs/queries/about/ — query priority: role with accessible name first, test id last resort
+- https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors — `[attr^=value]` "Represents elements with an attribute name of _attr_ whose value is prefixed (preceded) by _value_"; `[attr=value]` matches a value that "is exactly _value_"
+- https://testing-library.com/docs/queries/bytestid/ — `getByTestId(container, text: TextMatch, options?: { exact?: boolean = true, … })`
+- Local reproduction 2026-10-11 (jsdom 30.1.2, @testing-library/dom 10.4.2): four `<section data-testid="section-…">` elements, each holding `<h2 data-testid="section-title">` — `[data-testid^="section-"]` matched 8, `section[data-testid^="section-"]` matched the 4 sections; `queryAllByTestId(body, /^section-/)` and `queryAllByTestId(body, 'section-', { exact: false })` matched 2 for one section with its heading, and the string `'section-'` matched 0
+- Field case 2026-10 (linkly-invitation task t5, Vitest 5.0.3 + jsdom; recorded by the originating session): a plan's section-order helper using `[data-testid^="section-"]` returned 15 ids (7 of them `section-title`) where 8 sections were expected; the element-qualified selector returned exactly the 8
