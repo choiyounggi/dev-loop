@@ -14,7 +14,7 @@ sources:
   - https://zsh.sourceforge.io/Doc/Release/Files.html
   - https://en.wikipedia.org/wiki/Regression_testing
 last_verified: 2026-09-06
-related: [debugging-methodology-hypothesis-testing, debugging-concurrency-intermittent-failures, debugging-signals-logs-and-correlation, platforms-environment-path-resolution, qa-process-completion-claims, debugging-methodology-probe-path-vs-operation-path, debugging-network-epipe-write-ordering]
+related: [debugging-methodology-hypothesis-testing, debugging-concurrency-intermittent-failures, debugging-signals-logs-and-correlation, platforms-environment-path-resolution, qa-process-completion-claims, debugging-methodology-probe-path-vs-operation-path, debugging-network-epipe-write-ordering, platforms-tools-search-evidence-from-a-wrapped-grep]
 ---
 
 # Building a Reproduction Before Investigating a Bug

@@ -109,6 +109,35 @@ Record what was discovered in `## Spikes`. A remaining unknown that blocks
 Phase B is escalated to the requester now — never carried forward as a
 placeholder.
 
+*Reference study* (`inspect` role, optional) — when the feature mirrors a
+behavior an existing product already has and the requester or the repo names
+that product as the reference, the study runs as a spike in a **fresh-context
+study session** that holds the `inspect` tool and returns rows only. Under
+orchestrate the coordinator ran it in Phase 2 and hands you its rows file as a
+pointer file; standalone, write the brief (product and behaviors with their
+oracle questions) to a file and run `sh
+${CLAUDE_PLUGIN_ROOT}/scripts/reference-study.sh --brief <abs path> --slug
+<product-slug>` — with the role unset it starts a headless session holding only
+the pinned REA MCP, nothing registered — or, when the role is configured to an
+MCP you registered yourself, spawn one `general-purpose` Agent with the full
+study brief in `${CLAUDE_PLUGIN_ROOT}/references/tool-profile.md` (`### inspect`;
+the licence row is settled before the first capture, and the report's `trail
+dir` is what the review greps — who runs the study and where artifacts live:
+`wiki/infrastructure/agent-orchestration/reference-study-in-a-plan.md`). Copy
+the rows into `### Reference study` under `## Spikes` — one row per observed
+behavior with the tool name plus evidence id or capture name, and the unknown
+left — and the product version plus licence outcome into `## Constraints`. The
+study agent keeps the captures and the trail (tool calls, files read, product
+version, licence outcome, a `## Fingerprints` list of the distinctive
+identifiers and string literals it saw) under
+`.claude/tmp/reference/<product-slug>/`, outside the tracked tree; the planning
+session and the implementer hold rows, never pseudocode or captures, and the
+task review greps the diff against the fingerprint list. The original's output
+becomes the Concrete example (oracle) of the `R<n>` row each study row turns
+into — source text to copy is never the deliverable. gate-A does not read this
+block. What to record and how rows become requirements:
+`wiki/qa/exploratory/behavioral-spec-from-a-reference-product.md`.
+
 **A4. Research** (`research` role — resolution order and fallback owned by
 `loop-implement`'s Tool profile section, not repeated here) — confirm this
 feature's domain has no known best-practice/pitfall you're missing: at least

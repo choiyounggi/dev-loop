@@ -9,8 +9,10 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
   - https://docs.semgrep.dev/writing-rules/testing-rules
   - https://docs.pytest.org/en/stable/reference/exit-codes.html
-last_verified: 2026-08-06
-related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, backend-common-change-impact-call-site-enumeration, platforms-processes-tool-diagnostics-without-a-failing-exit-code, qa-process-scope-purity-checks, testing-quality-history-dependent-checks-on-shallow-clones, platforms-tools-deny-rules-under-bypassed-permissions, testing-quality-assertion-scanner-false-positive-on-unittest-convention, infrastructure-agent-orchestration-gate-evidence-exit-code-class, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, platforms-toolchains-no-html-link-for-pages-misses-app-router-routes]
+  - https://nodejs.org/api/path.html
+  - "Local reproduction 2026-10-11 (Node v26.7.0): path.posix.normalize around path.posix.join over fixed and random segments, and an inner-input mutant"
+last_verified: 2026-10-11
+related: [testing-quality-tests-that-cannot-fail, testing-quality-surviving-mutant-equivalence-triage, testing-quality-minimum-case-set, backend-common-change-impact-call-site-enumeration, platforms-processes-tool-diagnostics-without-a-failing-exit-code, qa-process-scope-purity-checks, testing-quality-history-dependent-checks-on-shallow-clones, platforms-tools-deny-rules-under-bypassed-permissions, testing-quality-assertion-scanner-false-positive-on-unittest-convention, infrastructure-agent-orchestration-gate-evidence-exit-code-class, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, platforms-toolchains-no-html-link-for-pages-misses-app-router-routes]
 ---
 
 # Validating a Check Whose Target Does Not Exist Yet
@@ -77,6 +79,7 @@ known-good file + wrong anchor → 1; missing target → 3; invalid regex → 4.
 | The check is a test for behavior you are about to implement | Red is the expected state; require that it fails with the assertion the behavior owns, not with a collection/import error. `pytest` exit 5 means "no tests were collected" — a selector typo, not a failing test |
 | The check is already adopted and has never been observed passing | Run it against a known-good input now; when the expected result does not appear, treat the gate as defective rather than the work as incomplete |
 | The pre-implementation test cannot go red at all — the failure it asserts (usage error, exit 1) is exactly what the not-yet-implemented path already produces (unknown subcommand, catch-all 404) | Record it as vacuously green during the red run, and after implementation prove it by mutating the specific guard it targets (e.g. flip the arg-count check), requiring red, then restoring ([testing-quality-tests-that-cannot-fail]) — a test green for the wrong reason before the code exists never demonstrated it can catch the guard breaking |
+| A plan's red control deletes or replaces a wrapper around an inner call that may already do the wrapper's work (`path.posix.normalize(path.posix.join(d, s))` → `String(path.posix.join(d, s))`) and names a test that must go red | Before adopting the plan, evaluate the original and the mutated expression on that test's own inputs. Equal outputs mean this control cannot go red for that test: move the mutation to the inner call's input (`join(dirname(importer), s)` → `join(importer, s)`) and confirm the output changes on those inputs. Calling the wrapper mutant equivalent for every input takes a domain argument ([testing-quality-surviving-mutant-equivalence-triage]); for this example, Node documents that `path.join` normalizes its result |
 
 ## Instead of
 
@@ -86,6 +89,7 @@ known-good file + wrong anchor → 1; missing target → 3; invalid regex → 4.
 | Write the gate as `grep -q pat docs/*.md` | Assert the specific path exists, then match it with an exact count | `-q` returns 0 on a match even when another path errored, so a sibling's match masks the missing target |
 | Treat any nonzero exit as "not done yet" | Branch on 1 versus >1: content-absent versus check-could-not-run | An invalid regex and an unwritten file give different statuses; conflating them leaves a mistyped gate failing forever after the work is complete |
 | Leave the expected failure unstated and just run the check | Predict the exit status and message first, then compare | An unpredicted failure that matches nothing you expected means the check, not the code, is the unknown |
+| Adopt a plan whose red control removes a wrapper call | Evaluate the original and the mutated expression on the named test's inputs first and require different outputs | A mutant equal to the original on those inputs never goes red, so a "must be red" gate stalls the worker partway through execution |
 
 ## Sources
 
@@ -94,3 +98,6 @@ known-good file + wrong anchor → 1; missing target → 3; invalid regex → 4.
 - https://docs.semgrep.dev/writing-rules/testing-rules — rule tests annotate `ruleid:` lines "for protecting against false negatives" and `ok:` lines "for protecting against false positives"; a rule is validated against inputs that must match and inputs that must not
 - https://docs.pytest.org/en/stable/reference/exit-codes.html — exit code 5 = "No tests were collected", distinct from 1 = tests ran and failed
 - Field reproduction 2026-07-29 (BSD grep 2.6.0-FreeBSD, ugrep 7.5.0, macOS): missing path → exit 2; wrong-but-valid pattern on a present file → exit 1; `grep -q` over missing + matching paths → exit 0; unpiped `grep -c missing | tail -1` → exit 0 without `pipefail`
+- https://nodejs.org/api/path.html — `path.join()` "joins all given `path` segments together using the platform-specific separator as a delimiter, then normalizes the resulting path"
+- Local reproduction 2026-10-11 (Node v26.7.0): `path.posix.normalize(path.posix.join(d, s)) === path.posix.join(d, s)` held for 10 fixed pairs (including `./`, `../`, `a//b`, two empty strings, `/` with `..`, and a trailing `x/`) and for 200,000 random calls of 1–4 segments, each segment 0–3 pieces drawn from `a`, `b`, `.`, `..`, empty, `/`, `//`, `./`, `../`, `x/..`, `/..` — 0 differences. The inner-input mutant `join(importer, s)` for `join(dirname(importer), s)` changed the output for `./a`, `../b` and `./c/d`
+- Field case 2026-10 (linkly-invitation task t7; recorded by the originating session): a plan's red control replaced `path.posix.normalize(path.posix.join(...))` with `String(path.posix.join(...))`; the two agreed on 6 of 6 test specifiers, so the "must be red" check could not be met. Mutating the inner input instead (`dirname(importer)` → `importer`) changed the output in all 3 relative cases

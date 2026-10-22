@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://developer.apple.com/documentation/foundation/nstask/1408746-terminationhandler
 last_verified: 2026-09-08
-related: [testing-quality-tests-that-cannot-fail, testing-quality-mutation-harness-file-custody, testing-async-async-testing, testing-quality-captured-log-message-assertions]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-mutation-harness-file-custody, testing-async-async-testing, testing-quality-captured-log-message-assertions, testing-quality-calls-inside-the-event-dispatch]
 ---
 
 # An Ordering Test Built From Narration Strings at Existing Hook Sites
