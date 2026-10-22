@@ -9,7 +9,7 @@
 #  configs keep working after the rename.)
 #
 # Each capability role (intake / knowledge / tacit / verify / explore /
-# design / research, plus any custom role) is merged independently and field-wise, so a project file can
+# design / research / inspect, plus any custom role) is merged independently and field-wise, so a project file can
 # override one role — or just one field of a role — and inherit everything else.
 # To drop an inherited value, set that field to null.
 #
@@ -41,7 +41,8 @@ DEFAULTS='{
   "verify":    {"kind":"default","when":"running tests / build / lint / typecheck / QA checks (step 5)"},
   "explore":   {"kind":"default","when":"locating code, symbols, call sites (step 1); with a fresh graphify graph, configure {\"kind\":\"cli\",\"ref\":\"graphify\"} — see references/tool-profile.md"},
   "design":    {"kind":"default","when":"visual/UI spec for FE/UI tasks, e.g. a Figma link in the issue — read the referenced design before implementing (orchestrate Phase 0/2; loop-implement step 1)"},
-  "research":  {"kind":"default","when":"external best-practice/insight search during plan phases A/B; resolution order owned by loop-implement SKILL (configured tool -> brave-search MCP -> built-in WebSearch -> ABANDON)"}
+  "research":  {"kind":"default","when":"external best-practice/insight search during plan phases A/B; resolution order owned by loop-implement SKILL (configured tool -> brave-search MCP -> built-in WebSearch -> ABANDON)"},
+  "inspect":   {"kind":"default","when":"studying how an existing app, site, or binary behaves for a feature that mirrors it (wiki-plan Phase A3 reference study); rows of behavior + evidence id + unknown, never source to copy; unset = scripts/reference-study.sh runs the pinned REA MCP (rea-agents) in a headless study session, nothing to install or register — see references/tool-profile.md"}
 }'
 
 # Per-user config: explicit env wins; else the dev-loop path; else the legacy

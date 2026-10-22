@@ -35,8 +35,15 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
    ```sh
    RUNID="flush-$(date +%Y%m%d-%H%M%S)-$$"
    echo "$RUNID"          # record this — every later flush-lock.sh call needs it
-   DEV_LOOP_FLUSH_RUN_ID="$RUNID" sh "${CLAUDE_PLUGIN_ROOT}/scripts/flush-lock.sh" acquire
+   export DEV_LOOP_FLUSH_RUN_ID="$RUNID"
+   sh "${CLAUDE_PLUGIN_ROOT}/scripts/flush-lock.sh" acquire
    ```
+   Always set the run id with `export` on its own line immediately before the
+   `flush-lock.sh` call, in the SAME shell invocation — never as an inline
+   `DEV_LOOP_FLUSH_RUN_ID=... sh ...` prefix. A headless run (see
+   `hooks/auto-flush.sh`) auto-approves this call against a fixed allowlist
+   that can match a literal `sh .../flush-lock.sh acquire|release` command but
+   can never auto-approve an unscoped env-var-prefixed command.
    - Exit 0 → proceed to step 1.
    - Non-zero exit → **do not touch `~/.dev-loop/repo`.** Read the failure
      line (`held <holder-runid> <age>s` on stderr) and tell the user: "a
@@ -47,20 +54,25 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
    acquiring it, release it before stopping — **prefixed with the same
    `$RUNID`** recorded above — so the next run does not wait out the TTL:
    ```sh
-   DEV_LOOP_FLUSH_RUN_ID="<the run id you recorded above>" \
-     sh "${CLAUDE_PLUGIN_ROOT}/scripts/flush-lock.sh" release
+   export DEV_LOOP_FLUSH_RUN_ID="<the run id you recorded above>"
+   sh "${CLAUDE_PLUGIN_ROOT}/scripts/flush-lock.sh" release
    ```
 
 1. **Prepare a writable checkout** of the dev-loop repo (never edit the installed
    plugin dir — it is read-only and untracked):
    ```sh
    REPO="$HOME/.dev-loop/repo"
-   if [ -d "$REPO/.git" ]; then
-     git -C "$REPO" fetch origin && git -C "$REPO" checkout main && git -C "$REPO" reset --hard origin/main
-   else
-     mkdir -p "$HOME/.dev-loop"
-     git clone https://github.com/choiyounggi/dev-loop.git "$REPO"
-   fi
+   git -C "$REPO" fetch origin && git -C "$REPO" checkout main && git -C "$REPO" reset --hard origin/main
+   ```
+   If that command's result is an error (fresh machine, nothing cloned yet),
+   run a **separate** follow-up command instead of wrapping both in one
+   `if`/`else`, then continue below either way:
+   ```sh
+   mkdir -p "$HOME/.dev-loop"
+   git clone https://github.com/choiyounggi/dev-loop.git "$HOME/.dev-loop/repo"
+   ```
+   ```sh
+   REPO="$HOME/.dev-loop/repo"
    # Commit under THIS user's own identity — each contributor's PR carries their
    # own account; the owner reviews and approves/rejects. Do NOT hardcode an
    # identity, and NEVER commit as an assistant or add a Co-Authored-By trailer.
@@ -232,11 +244,17 @@ an `INGEST_REPORT.md` with three filled sections exists. So do the work first:
 - If the queue is empty, say so and stop — do not open an empty PR.
 - One PR per flush (batched), so review stays a single pass.
 
-## Triggering — manual and automatic
+## Triggering — manual and opt-in automatic
 - **Manual:** invoke this skill (`/dev-loop:knowledge-flush`) any time; it drains
   the shared queue (`~/.dev-loop/queue/`, keyed off `$HOME` so it spans sessions).
-- **Automatic:** the Stop hook `hooks/auto-flush.sh` fires this same pipeline in a
-  detached headless `claude` run when the queue crosses a threshold and the
-  rate-limit window has elapsed — so PRs appear without you running anything. It
-  is guarded (rate-limited, batched, recursion-safe) and opens the same reviewed,
-  gated PR. Disable with `DEV_LOOP_AUTOFLUSH=0`. See that hook for the knobs.
+  This path is unchanged either way.
+- **Automatic (opt-in, OFF by default):** set `DEV_LOOP_AUTOFLUSH=1` and the Stop
+  hook `hooks/auto-flush.sh` fires this same pipeline in a detached headless
+  `claude` run — with the user's normal permission checks (an explicit
+  `--allowedTools` list, never `bypassPermissions`) — when the queue crosses a
+  threshold and the rate-limit window has elapsed, so PRs appear without you
+  running anything. It is guarded (rate-limited, batched, recursion-safe) and
+  opens the same reviewed, gated PR. Left at the default (unset, or anything
+  other than `1`), the hook spawns and opens nothing; it only emits a
+  rate-limited notice telling you how many insights are queued and to run this
+  skill yourself. See that hook for the knobs.

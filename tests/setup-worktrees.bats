@@ -50,8 +50,17 @@ setup() {
   [[ "$output" != *"No such file or directory"* ]]
 }
 
-@test "writes a worker-scoped guardrails config into each worktree" {
-  run bash "$SW" feat/goal "$root" main feat/t1
+@test "writes a worker-scoped guardrails config into each worktree (default: loosens nothing)" {
+  run env -u DEV_LOOP_WORKER_RELAX bash "$SW" feat/goal "$root" main feat/t1
+  [ "$status" -eq 0 ]
+  cfg="$root/.worktrees/feat-t1/.groundwork/guardrails.json"
+  [ -f "$cfg" ]
+  [ "$(jq -r '.rules.rm_rf.mode' "$cfg")" = "null" ]
+  [ "$(jq -r '.rules.worktree_escape.mode' "$cfg")" = "ask" ]
+}
+
+@test "DEV_LOOP_WORKER_RELAX=1: the worktree config loosens rm_rf and keeps the asks" {
+  run env DEV_LOOP_WORKER_RELAX=1 bash "$SW" feat/goal "$root" main feat/t1
   [ "$status" -eq 0 ]
   cfg="$root/.worktrees/feat-t1/.groundwork/guardrails.json"
   [ -f "$cfg" ]

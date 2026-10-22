@@ -8,7 +8,7 @@ sources:
   - https://developer.android.com/reference/tools/gradle-api/8.7/com/android/build/api/dsl/VariantDimension
   - https://developer.android.com/build/gradle-tips
 last_verified: 2026-09-28
-related: [infrastructure-config-environment-config, platforms-shells-option-like-argument-values]
+related: [infrastructure-config-environment-config, platforms-shells-option-like-argument-values, backend-node-language-string-replace-replacement-patterns]
 ---
 
 # A Build Step That Writes a Config Value Into Generated Source
