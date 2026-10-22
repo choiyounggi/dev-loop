@@ -20,6 +20,7 @@ related:
     testing-mocking-extracted-method-this-binding,
     backend-common-api-design-unenforced-declarations,
     testing-quality-cross-component-invariant-via-shared-helper,
+    testing-mocking-wrapper-label-pinned-by-a-boundary-fault,
   ]
 ---
 
