@@ -11,8 +11,10 @@ sources:
   - https://arxiv.org/abs/2404.18796
   - https://arxiv.org/abs/2305.04388
   - "Field case 2026-10-09 (a generated-sprite variant task: a pixel/colour-distance rule replacing 'distinguishable at a glance', checked by blind LLM-subagent judgments over two review rounds)"
-last_verified: 2026-10-09
-related: [qa-process-fresh-context-code-review, backend-common-change-impact-corpus-sweep-before-a-rejection-rule]
+  - https://developer.mozilla.org/en-US/docs/Web/API/Window/getComputedStyle
+  - "Field case 2026-10-18 (a lobby-screen colour-role rule judged by screenshot, then by token value and selector list)"
+last_verified: 2026-10-22
+related: [qa-process-fresh-context-code-review, backend-common-change-impact-corpus-sweep-before-a-rejection-rule, frontend-design-theme-swap-propagation-check]
 ---
 
 # Checking a Measurable Rule That Stands In for a Human-Eye Criterion
@@ -63,6 +65,7 @@ changed pixels, colour distance, region counts — and you use LLM subagents
 |------|------|
 | The judge's reasoning and its verdict disagree | Use the pair-level text, and re-run that pair with a fresh judge. A model's stated reasoning can also misstate why it decided (Turpin et al.), so one judge's text is not final either |
 | You need to reproduce a judge's finding | Fix the generator seed and save the exact images the judge saw |
+| The rule is a fact about page elements, not a viewer's impression — a colour role such as "alarm red only on the bell, the timer ring and the banner" | Measure it instead of asking a judge to look: give the checker the token's exact value (`#ff4d3f`) and the allowed selectors, have it list every element whose computed `color`, `background-color` or border colour equals that value, and compare the list with the allowed set ([frontend-design-theme-swap-propagation-check] for the canvas compare that matches one colour across `rgb()`/`oklch()` forms). Being blind to the rule (step 1) protects a perception question; here the value is the rule. In the field case a screenshot judge failed a badge drawn in a different, darker red (`rgb(164, 42, 36)`, the danger token) as "alarm red"; the value-based check found the alarm colour on the three allowed elements only |
 
 ## Instead of
 
@@ -80,4 +83,6 @@ changed pixels, colour distance, region counts — and you use LLM subagents
 - https://arxiv.org/abs/2306.05685 — Zheng et al. 2023: LLM judges show "position, verbosity, and self-enhancement biases, as well as limited reasoning ability" (step 4)
 - https://arxiv.org/abs/2404.18796 — Verga et al. 2024: a single judge brings intra-model bias; "We propose instead to evaluate models using a Panel of LLm evaluators (PoLL)" (step 4)
 - https://arxiv.org/abs/2305.04388 — Turpin et al. 2023: "CoT explanations can systematically misrepresent the true reason for a model's prediction" (edge case 1)
+- https://developer.mozilla.org/en-US/docs/Web/API/Window/getComputedStyle — returns the resolved values of an element's CSS properties, the values the colour-role measurement compares (edge case 3)
+- Field case 2026-10-18 (field-tested; a lobby-screen task in a web game, two visual-review rounds): round 1 judged by screenshot failed the "연결 끊김" badge at `rgb(164,42,36)` (danger-strong) under an "alarm red only on X" rule; round 2, given `#ff4d3f` and the allowed selector list, found that colour only on the three allowed elements
 - Field case 2026-10-09 (field-tested, no external source): steps 3, 5 and 6 and the thresholds come from four blind judgments in round 1 and a seed-17 reproduction in the third audit. In round 2, the rule received to fix the failed pairs would have passed 5 of the 6 named pairs. No general source was found for the per-cue overstatement in step 5

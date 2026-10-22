@@ -11,7 +11,7 @@ sources:
   - https://playwright.dev/docs/api/class-page#page-emulate-media
   - https://tailwindcss.com/docs/theme
 last_verified: 2026-10-06
-related: [frontend-design-design-system-lint-gate-for-agents, frontend-design-custom-property-values-read-from-script, frontend-design-two-theme-computed-color-comparison]
+related: [frontend-design-design-system-lint-gate-for-agents, frontend-design-custom-property-values-read-from-script, frontend-design-two-theme-computed-color-comparison, qa-process-blind-llm-judgment-of-a-visual-rule]
 ---
 
 # A Pass/Fail Theme-Swap Check Instead of Screenshot Eyeballing
