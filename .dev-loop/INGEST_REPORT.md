@@ -76,3 +76,13 @@ No new category was needed.
 ## Local-layer candidates
 
 none — all six are general. The repository names in the field evidence were generalized out of the directives.
+
+## Decision Log
+
+- **Intent:** land six candidates as one reviewable batch. Five merge into existing pages as edge rows; one becomes a new page (Gradle include filters), because tests-that-cannot-fail is already over the 120-line cap and covers a different trigger.
+- **Excluded alternatives:**
+  - Draining all 77 claimed rows into one PR — released 71 instead, following the batch size of #298/#299.
+  - A new security page for agent approval prompts — merged into secrets-in-code, whose trigger already covers "a secret was just pasted/logged".
+  - Repeating the insight's "`no_service` = 404" — Slack documents no status code for it.
+- **Where to look:** the Slack row's "In observed behavior" wording (an undocumented no-post guarantee), and the Claude Code saved-rule wording ("exact string or a prefix").
+- Cross-Check: a fresh-context subagent fact-checked every added claim against the cited sources. It returned 2 overclaims and 5 prohibition phrasings outside an Instead-of table; all were corrected before this PR.
