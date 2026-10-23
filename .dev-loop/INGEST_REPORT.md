@@ -1,164 +1,78 @@
-# Knowledge flush — 3 insight(s) (headless auto-flush run 20261022-134153-21632)
+# Knowledge flush — 6 insight(s)
 
-18 queue rows were claimed this run: 3 ingested, 1 dropped as a duplicate of the
-merged wiki, 13 dropped as project-specific plan-gap rows, 1 released because it
-plausibly overlaps open PR #291. Nothing was folded into another branch.
-
-| Candidate | Domain | Disposition |
-|-----------|--------|-------------|
-| `f7273179a74dcb80` — secret in an HTTP header leaks through `http.client`'s `ValueError` | security | **ingested** — edge row in `security-secrets-secrets-in-code` (verified) |
-| `3d610c1206e1bdd6` — text nobody sent in an agent CLI's input box is the grey prompt suggestion | infrastructure | **ingested** — edge row in `infrastructure-agent-orchestration-pane-delivery-confirmation` (verified docs + field observation) |
-| `0a0ccc4ca0904514` — e2e failure moving between tests under host CPU contention | testing | **ingested** — new page `testing-flaky-e2e-failures-moving-under-host-cpu-contention` (field-tested) |
-| `97c37473b53e63c2` — string-pattern `replace`: `$n` stays literal, `$$`/`$&`/`` $` ``/`$'` expand | backend (queued as frontend) | dropped — duplicate of merged page |
-| `446c58c78d5e467f` — `git diff --numstat` count depends on the diff algorithm | testing | released — plausible overlap with open PR #291 |
-| 13 plan-gap rows (see Local-layer candidates) | — | dropped — project-specific |
+Claimed for run `flush-20261024-032221-81480`: 77 claimable rows (26 insights + 51 plan-gaps). Six general insights were kept for this batch; the other 71 were released unread for later flushes, so this PR stays one reviewable batch. It follows the still-open #298 and #299, which come from the same contributor and cover different topics.
 
 ## Verified best-practice
 
-**`f7273179a74dcb80` — confidence: verified.** Claim: when a script puts a secret
-from an env var into an HTTP header via Python `http.client`/`urllib`, a value
-with a bare CR/LF (a pasted key ending in `\n`) makes `putheader` raise a
-`ValueError` whose message contains the whole header value, so a traceback that
-escapes the script's own redaction prints the key.
-- CPython `Lib/http/client.py` (https://github.com/python/cpython/blob/main/Lib/http/client.py):
-  read in the local CPython 3.9 source — l.138
-  `_is_illegal_header_value = re.compile(rb'\n(?![ \t])|\r(?![ \t\n])').search`;
-  l.1234-1235 `if _is_illegal_header_value(values[i]): raise ValueError('Invalid header value %r' % (values[i],))`.
-  A trailing `\n` matches `\n(?![ \t])`, and `%r` repeats the full encoded value.
-  Web search confirmed the check came from the CVE-2016-5699 header-injection fix.
-  The `main`-branch file was not fetched in this run (WebFetch is not allowed here);
-  the cited line numbers are from 3.9.
-- Field reproduction (session evidence): on Python 3.13 and 3.11 the key appeared
-  in the traceback; after the pre-request check plus catch-all redaction, 0 key hits
-  and the mutation checks went red.
-
-**`3d610c1206e1bdd6` — confidence: verified (docs) + field observation.** Claim:
-in a Claude Code pane read through `tmux capture-pane`, grey text in the input box
-that nobody sent is the CLI's prompt suggestion. Plain capture drops styling, so the
-suggestion looks like an unsubmitted prompt.
-- https://code.claude.com/docs/en/interactive-mode (fetched 2026-10-22), "Prompt
-  suggestions": "shows a grayed-out example command in the prompt input"; after a
-  response it "can suggest your next prompt"; "Press `Tab` or `Right arrow` to place
-  the suggestion in the prompt input, then `Enter` to submit"; "Start typing to dismiss it".
-- tmux man page (https://man7.org/linux/man-pages/man1/tmux.1.html; same wording read
-  from the local tmux 3.7b `tmux.1`, l.2693-2696): "If -e is given, the output includes
-  escape sequences for text and background attributes."
-- Field observation (run i41): the box showed "승인됐습니다. 계획대로 구현하세요."
-  after `plan_ready`; `send-prompt.sh state lo-1-i41` → `ready` rc 0; the next real send
-  reported `delivered`.
-- Not claimed: which escape code (dim SGR 2 vs a grey colour) the CLI uses. The page
-  says "grey/dim" to match the docs' "grayed-out".
-
-**`0a0ccc4ca0904514` — confidence: field-tested.** Claim: on a shared host, a
-browser e2e failure that moves to a different timing-dependent test on each re-run
-is CPU contention until shown otherwise. Measure load and foreign headless browsers,
-re-run once after 60 s quiet, and report every run line.
-- https://playwright.dev/docs/test-cli — `--workers` defaults to 50% of logical CPU
-  cores (already cited on the wiki; it sizes to the host's cores, not to free capacity).
-- https://playwright.dev/docs/ci — recommends `workers: 1` in CI "to prioritize
-  stability and reproducibility", so each test gets the full system resources. This was
-  confirmed only through a web-search summary of the official page; the page was not
-  fetched in this run.
-- Field observation (2026-10-18, 36-test Playwright suite): load avg 19 with a foreign
-  `chrome-headless-shell` at 110% CPU → "1 failed" at `leave.spec.ts:37`, then at
-  `game-bell.spec.ts:33`; after 60 s with no headless browser → "36 passed (50.9s)".
-  This is a single host, so the page is field-tested, not verified.
-
-**`97c37473b53e63c2`** — the claim is correct (MDN replacement-pattern table; the node
-evidence in the row), but it is already on the merged wiki. See Existing-layer check.
+1. **A new test class outside a Gradle `includeTestsMatching` list never runs** (`c35500007da7629b`). Claim: when the `test` task lists its tests in `filter { includeTestsMatching … }`, an unregistered class is silently excluded from the full run. Running it with `--tests` fails "No tests found for given includes", because the build-script inclusions still apply.
+   - Sources: https://docs.gradle.org/current/userguide/java_testing.html ("When you use `--tests`, be aware that the inclusions declared in the build script are still honored") and https://docs.gradle.org/current/javadoc/org/gradle/api/tasks/testing/TestFilter.html (`failOnNoMatchingTests` "The default is true").
+   - Field reproduction: 3 new classes → "No tests found"; after registering them, 16 tests ran.
+   - Confidence: **verified**.
+2. **Count an HMAC key literal's bytes before trusting its stated size** (`429f570c59b15c8b`). Claim: an HMAC key must be at least the hash output size. Prose sizes for base64 literals are unreliable. jjwt picks or rejects the algorithm by key length.
+   - Sources: https://www.rfc-editor.org/rfc/rfc7518#section-3.2 ("A key of the same size as the hash output … or larger MUST be used") and https://raw.githubusercontent.com/jwtk/jjwt/0.11.5/README.md (HS256/384/512 need ≥ 32/48/64 bytes; `signWith(key)` auto-selects a weaker HMAC). For `signWith(key, HS512)`, https://javadoc.io/static/io.jsonwebtoken/jjwt-api/0.11.5/io/jsonwebtoken/JwtBuilder.html documents an `InvalidKeyException` "if the Key is insufficient … for the specified algorithm", and `WeakKeyException` is its subclass. The README's own `WeakKeyException` sentence is about RSA keys, so it is not cited.
+   - Field reproduction: a key described as 72 bytes decoded to 62 bytes, and 4/4 tests failed until a 70-byte key replaced it.
+   - Confidence: **verified**.
+3. **Probe a leaked Slack webhook with a body Slack rejects at parse time** (`0f1cad864ed980fb`).
+   - Sources: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/ (`invalid_payload` = malformed request; `no_service` = "disabled, removed, or invalid"; "Slack actively searches out and revokes leaked secrets") and https://docs.slack.dev/changelog/2016-05-17-changes-to-errors-for-incoming-webhooks (HTTP 400 `invalid_payload`).
+   - **Caveat:** no official page maps a status code to `no_service`. That is why the page row keys the decision on the error *string*, and the "404" in the original insight is not repeated as fact.
+   - Field observation: `400 invalid_payload`, zero posts to the channel.
+   - Confidence: **verified** for the error-string meanings. **Field-tested only** for "`invalid_payload` ⇒ live, nothing posted": Slack documents neither its check order nor a no-post guarantee, and the page row says so ("In observed behavior …").
+4. **Keep secrets out of agent command text** (`1cf3eef32b301aef`). Claim: in Claude Code, "Yes, and don't ask again" persists the approved Bash rule to `.claude/settings.local.json` at the repository root. The saved rule holds the command text (an exact string or a prefix; one rule per subcommand of a compound command), so an inline secret is stored verbatim.
+   - Source: https://code.claude.com/docs/en/permissions (table row "Permanently per repository and command"; the save location, resolved to the main checkout through worktrees; "a rule you save from a prompt covers only what its option named").
+   - Field observation: two allow rules held a `python -c` one-liner with a TOTP seed.
+   - Confidence: **verified** (location and matching from the docs; verbatim storage of that specific one-liner is field evidence).
+5. **Read the dotenv load point and the active line before trusting `DATABASE_URL`** (`815e8cb9ee66f6e3`).
+   - Sources: https://github.com/motdotla/dotenv (`#` lines are comments; default path `path.resolve(process.cwd(), '.env')`; `override` default `false`) and https://raw.githubusercontent.com/motdotla/dotenv/master/lib/main.js (per-line `obj[key] = value`, so the last duplicate in a file wins; read at v18.0.9).
+   - Confidence: **verified**.
+6. **A "no local verification" push from a fresh worktree still runs the shared pre-push hook** (`72f4e660aeb8fc8b`).
+   - Sources: https://git-scm.com/docs/githooks (non-zero pre-push "will abort without pushing anything") and https://git-scm.com/docs/gitrepository-layout (the `hooks` dir is "ignored if $GIT_COMMON_DIR is set and \"$GIT_COMMON_DIR/hooks\" will be used instead"). The pipeline exit-status rule is already sourced on testing-quality-checks-that-cannot-pass (GNU Bash manual).
+   - Field observation: a push was rejected while a piped `$?` showed 0; after `pnpm install --frozen-lockfile` the push succeeded.
+   - Confidence: **verified**.
 
 ## Existing-layer check
 
-Pages read: security-secrets-secrets-in-code, infrastructure-ci-cd-secrets-handling, infrastructure-agent-orchestration-pane-delivery-confirmation, testing-flaky-diagnosing-flaky-tests, testing-flaky-docker-vm-oversubscription-under-parallel-containers, testing-e2e-e2e-stability, backend-node-language-string-replace-replacement-patterns
+Pages read: backend-common-auth-jwt-server-side, security-secrets-secrets-in-code, infrastructure-ci-cd-secrets-handling, infrastructure-config-environment-config, databases-data-survey-surveying-live-data-for-a-rule, infrastructure-agent-orchestration-verify-command-in-a-worker-brief, infrastructure-agent-orchestration-worktree-isolated-workers, testing-quality-tests-that-cannot-fail, testing-quality-checks-that-cannot-pass, platforms-shells-portable-shell-scripts, platforms-tools-deny-rules-under-bypassed-permissions, platforms-tools-agent-permission-classifier-denials
 
-- **security-secrets-secrets-in-code** — merge target for `f727`. Its edge table
-  already has two "a library echoes the secret" rows: a URL-query key logged by HTTP
-  clients, and a DSN echoed in an error. The header-value `ValueError` is a third path
-  of the same kind, so it was added as one edge row, not a new page. One source line
-  and one field-evidence line were added. `last_verified` was left at 2026-07-12
-  because the other rows were not re-checked.
-- **infrastructure-ci-cd-secrets-handling** — read as a possible target (job-log
-  masking). Not chosen: it covers how the pipeline handles secrets, and this is a
-  script's own exception text. No edit.
-- **infrastructure-agent-orchestration-pane-delivery-confirmation** — merge target for
-  `3d61`. It already owns the input-box rows for this CLI (the `[Pasted text` placeholder,
-  where the input box sits). The suggestion case is a sibling edge row. Added the
-  interactive-mode doc to frontmatter sources, plus three Sources lines (tmux `-e`
-  quote, docs quote, field observation).
-- **testing-flaky-diagnosing-flaky-tests** — closest owner for `0a0c`. It is
-  `confidence: verified`. The 2026-10-22 log shows that the Wiki agent gate blocked
-  merging a single-field-reproduction mechanism into this page (the PR #275 split).
-  Following that precedent, the mechanism went to its own field-tested page. This page
-  gets one pointer edge row and a `related:` id; its confidence and date are unchanged.
-- **testing-flaky-docker-vm-oversubscription-under-parallel-containers** — the nearest
-  sibling: resource ceiling, different subset failing each run. It is a different case
-  (container memory, `409` errors, its own trigger), so the new page was not merged into
-  it. The two are cross-linked from the new page's `related:` and an edge row.
-- **testing-e2e-e2e-stability** — read for e2e overlap. It covers selectors, waits,
-  and data, not host contention. Linked from the new page's `related:`; no edit.
-- **backend-node-language-string-replace-replacement-patterns** — already says
-  `$n` / `$<name>` work for "regex patterns only; otherwise left literal", and has the
-  edge row "A string `from` (no captures) → `$1` stays literal, but `$$`, `$&`, `` $` ``,
-  `$'` still expand". That is exactly what `97c3` asks for, so it was dropped as a duplicate.
+`wiki_search` top hits considered (k=5 per candidate):
+- Gradle: compiler-as-call-site-inventory, assertion-scanner-false-positive-on-unittest-convention, compiler-sysroot-on-macos.
+- HMAC: jwt-server-side, validation-at-trust-boundaries, signed-link-verification-assertions, object-key-persistence.
+- Slack: signed-link-verification-assertions, secrets-handling, validation-at-trust-boundaries, suppression-state-and-delivery-failure.
+- `.env`: streaming-large-result-sets, surveying-live-data-for-a-rule, verify-command-in-a-worker-brief, path-valued-config.
+- Permission rules: secrets-handling, portable-shell-scripts, agent-permission-classifier-denials, deny-rules-under-bypassed-permissions.
+- pre-push: control-signals-vs-primary-artifacts, workflow-authored-pull-requests, worktree-isolated-workers, code-graph-as-orientation-layer.
 
-No conflicting directive was found and no page was superseded.
+Per candidate:
+- **Gradle filter:** no page covers runner include lists. tests-that-cannot-fail is about assertions that cannot fail and is already over 120 body lines, so this becomes a **new** page. It is linked from tests-that-cannot-fail.
+- **HMAC key:** jwt-server-side already says "HS256 with a ≥256-bit random key" — same trigger, compatible directive. **Merged** as one edge row plus sources.
+- **Slack webhook:** secrets-in-code's leak response says "rotate first". The probe does not conflict: it decides whether a live credential exists to rotate, and a `no_service` hook has already been revoked. **Merged** as an edge row. No contradiction flagged.
+- **Permission rule:** infrastructure-ci-cd-secrets-handling already says "pass secrets via env var or file, not argv" for CI process listings. The new part is the agent approval prompt persisting command text. **Merged** as an edge row in secrets-in-code, linked to deny-rules-under-bypassed-permissions. The two platforms/tools permission pages cover deny/classifier semantics, not what an allow approval stores, so there is no overlap.
+- **`.env` target host:** surveying-live-data-for-a-rule has "confirm the target before concluding" (live connection) but not how to read a `.env` correctly. **Merged** into environment-config as an edge row, with links both ways.
+- **pre-push:** pipefail and `| tail` exit masking are already on checks-that-cannot-pass, changed-files-only-gates and portable-shell-scripts. Only a cross-reference is added for that part. The new part — a fresh worktree shares hooks but has no installed dependencies, and skipping verification does not exempt the hook — is **merged** into verify-command-in-a-worker-brief. worktree-isolated-workers is at the 120-line cap.
+- Independent fact-check: a fresh-context subagent compared every added claim against the cited sources. Corrections applied: the Slack row is softened to observed behavior; the Claude Code rule wording now says exact string or prefix; the dotenv grep also matches `KEY: value`; the jjwt Sources line quotes "the most secure algorithm allowed"; the Gradle error text is marked as coming from the field run; and three prohibition phrasings outside an Instead-of table are rewritten as positive directives.
+- Lints: `node scripts/wiki-structure-checks.js wiki` → 469 pages, findings 0. `node scripts/wiki-lint-prohibitions.js` → 0 violations.
 
 ## Open-PR check
 
-Open `knowledge/*` heads at flush time (`gh pr list --repo choiyounggi/dev-loop
---state open --json number,headRefName --search "head:knowledge/"`):
-**#291** (`knowledge/autoflush-20261022-124048-18072`).
+Open `knowledge/*` heads listed with `gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`:
+- **#299** `dch0202-rsquare:knowledge/dch0202-rsquare-20261023-143208` — touches command-guard-exemption-matching, command-text-inspected-before-execution, ktlint-final-newline-from-editorconfig, gh-api-paginate-with-jq, search-evidence-from-a-wrapped-grep and others. The diff mentions "Gradle" only in the ktlint/editorconfig page, which is a different trigger.
+- **#298** `dch0202-rsquare:knowledge/dch0202-rsquare-20261023-140311` — gateway alias resolution, Spring env-var names, CDN traffic path, stderr in captures, tool diagnostics without a failing exit code. Its diff has no keyword hits on pipefail, pre-push, webhook, dotenv, DATABASE_URL, HMAC or permission rules.
+- **#293** `knowledge/autoflush-20261022-163155-79805` — diff-algorithm-dependent line counts. No overlap.
 
-This headless run cannot `git diff` that branch, and `gh pr view` / the GitHub MCP
-file list were not allowed. Overlap was judged from the queue rows that #291's run
-retired, using their `outcome` fields. #291 touches
-`testing-quality-anchor-cases-for-allowlist-regexes`,
-`testing-quality-checks-that-cannot-pass`,
-`qa-process-blind-llm-judgment-of-a-visual-rule`, and a new page
-`platforms-shells-non-ascii-text-after-an-unbraced-parameter`.
-
-- `f727` (security, secret in an HTTP header) — **new**: #291 touches no security page.
-- `3d61` (agent pane input box) — **new**: #291's only platforms/infrastructure page is
-  a bash parameter-expansion page, which is a different trigger.
-- `0a0c` (e2e flakiness under CPU contention) — **new**: #291 touches no `testing/flaky`
-  or e2e page.
-- `97c3` — not compared against #291: it was dropped against the merged layer.
-- `446c58c78d5e467f` (exact `git diff --numstat` count as a gate's expected value) —
-  **drop (plausible overlap)**, so its claim was **released**, not retired. It is a
-  gate-design lesson in `testing/quality`, and #291 is editing two `testing/quality`
-  gate pages (`checks-that-cannot-pass`, `anchor-cases-for-allowlist-regexes`). This run
-  cannot diff #291, so the manual flush should decide whether to fold it in or ingest it
-  as new.
+Verdict for all six candidates: **new**. No fold, no drop.
 
 ## Routing decision
 
-- `f7273179a74dcb80` → `security` / `secrets` → edge row in
-  `wiki/security/secrets/secrets-in-code.md`; security index "load when" extended.
-- `3d610c1206e1bdd6` → `infrastructure` / `agent-orchestration` → edge row in
-  `wiki/infrastructure/agent-orchestration/pane-delivery-confirmation.md`; infrastructure
-  index "load when" extended. Written generally (any helper that classifies the box, or
-  `capture-pane -e`); the dev-loop helper `send-prompt.sh` appears only in the evidence line.
-- `0a0ccc4ca0904514` → `testing` / `flaky` → new page
-  `wiki/testing/flaky/e2e-failures-moving-under-host-cpu-contention.md` (field-tested).
-  There is no new category: `flaky` already holds the sibling resource-ceiling page.
-  A pointer edge row and a `related:` id were added in `diagnosing-flaky-tests`, and a
-  testing index row was added. The INDEX.md testing line already covers "flaky tests".
-- `log.md` has one entry appended for this run.
+| Insight | Target |
+|---------|--------|
+| Gradle include filter | testing/quality → new `new-test-outside-a-runner-include-filter` (+ testing index row) |
+| HMAC key length | backend/common/auth → `jwt-server-side` edge row |
+| Slack webhook liveness | security/secrets → `secrets-in-code` edge row (+ security index "load when") |
+| Secret in approved command text | security/secrets → `secrets-in-code` edge row (+ security index "load when") |
+| `.env` target host | infrastructure/config → `environment-config` edge row (+ infrastructure index "load when") |
+| pre-push from a fresh worktree | infrastructure/agent-orchestration → `verify-command-in-a-worker-brief` edge row (+ infrastructure index "load when") |
+
+No new category was needed.
 
 ## Local-layer candidates
 
-These 13 plan-gap rows are excluded from this PR. Each records a design decision for
-the `emperor` (linkly) repository's own files, so each would be wrong in another
-codebase. Run wiki-ingest inside that project to keep any of them:
-
-| Row | Decision | Target |
-|-----|----------|--------|
-| `3632d0989f629104`, `7bfb7541e4e4bd8c` | t242 SECURITY.md sections and policy values | `wiki-local/security/disclosure/security-policy-file.md` |
-| `9700770d7c05b820` | t242 `.github/CODEOWNERS` layout | `wiki-local/infrastructure/repo-governance/codeowners-layout.md` |
-| `3d578bcfcbcc6b97`, `410400eb22f77f77` | t242 CODE_OF_CONDUCT.md source and contact | `wiki-local/infrastructure/repo-governance/code-of-conduct-source.md` |
-| `54aeaa8fdee5e0e7` | t242 mutation harness `TREE_CONTENTS` for new root files | `wiki-local/testing/quality/mutation-tree-contents.md` |
-| `0e0e7c7c4cef34c3` | t252 per-runner concurrency group for `_ai-gate.yml` | `wiki-local/infrastructure/ci-cd/ai-gate-concurrency-groups.md` |
-| `05df421bf905f5ce` | t252 `response_format: json_object` for the HTTP gate runner | `wiki-local/backend/llm/ai-gate-structured-output-mode.md` |
-| `1670e43e60cb7fe3`, `2df80edab8d41dfb` | t252 / t257 CHANGELOG bullet placement | `wiki-local/qa/release/changelog-bullet-placement.md` |
-| `1666b8cf32e274ea` | t257 `_relay_batch` calls begin/commit/rollback directly | `wiki-local/backend/outbox/relay-transaction-calls.md` |
-| `5ee53f499cc8d657`, `744090ce219677c0` | t249a1 RFC-0007 Review stage and §2.2 rule-5 chain notes | `wiki-local/qa/spec-process/rfc-promotion-checks.md` |
+none — all six are general. The repository names in the field evidence were generalized out of the directives.

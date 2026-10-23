@@ -8,8 +8,9 @@ sources:
   - https://12factor.net/config
   - https://12factor.net/build-release-run
   - https://12factor.net/dev-prod-parity
-last_verified: 2026-07-10
-related: [infrastructure-deploy-rollout-and-rollback, infrastructure-ci-cd-secrets-handling, backend-node-boundaries-runtime-validation, backend-python-boundaries-runtime-validation, backend-common-integrations-externally-owned-defaults, infrastructure-config-path-valued-config, platforms-shells-env-var-off-switches, backend-common-llm-project-local-layer-over-shared-guidance, backend-common-orm-prisma-7-config-env-and-generated-client, backend-node-runtime-env-files-with-process-loadenvfile]
+  - https://github.com/motdotla/dotenv
+last_verified: 2026-10-24
+related: [databases-data-survey-surveying-live-data-for-a-rule, infrastructure-deploy-rollout-and-rollback, infrastructure-ci-cd-secrets-handling, backend-node-boundaries-runtime-validation, backend-python-boundaries-runtime-validation, backend-common-integrations-externally-owned-defaults, infrastructure-config-path-valued-config, platforms-shells-env-var-off-switches, backend-common-llm-project-local-layer-over-shared-guidance, backend-common-orm-prisma-7-config-env-and-generated-client, backend-node-runtime-env-files-with-process-loadenvfile]
 ---
 
 # Configuration That Differs Per Environment
@@ -66,6 +67,7 @@ files, and env vars; reviewing how a service gets its settings.
 | Legacy code full of `if (env === 'prod')` branches | On each touch, replace the branch you are editing with a named config value; record the remaining branches as inventory gaps |
 | A CLI tool loads its own config in a step where the key is not needed (Prisma 7 `prisma generate` in `postinstall` or CI reading `DATABASE_URL`) | Use a tool version that tolerates the missing key (Prisma 7.2.0+: `url: process.env.DATABASE_URL`, no fallback); before that, an empty placeholder in the tool config only (`?? ''`). Rule 5 stays for the application: no default, and startup validation rejects an unset or empty value ([backend-common-orm-prisma-7-config-env-and-generated-client]) |
 | The value is a filesystem path | Presence is not enough — a relative path passes every presence check and then resolves against a working directory the launcher owns ([infrastructure-config-path-valued-config]) |
+| You are about to decide which host a writing or destructive command (`db:push`, a migration, a seed) will hit by reading `DATABASE_URL` from a `.env` file | Find the file the tool loads first: the dotenv `config({ path })` call, whose relative path resolves against the process's working directory, not the source file. In that file, list every active assignment — `grep -nE '^[[:space:]]*(export[[:space:]]+)?DATABASE_URL[[:space:]]*(=|:[[:space:]])'` (dotenv also accepts `KEY: value`) — and read all of them, not the first textual match, which can be a commented `#DATABASE_URL=` line. With several active lines dotenv keeps the last; a variable already set in the shell wins over the file (`override` defaults to `false`), so check `env` too. Then confirm against the live connection (host, port, database name) before the write ([databases-data-survey-surveying-live-data-for-a-rule]) |
 
 ## Instead of
 
@@ -81,3 +83,6 @@ files, and env vars; reviewing how a service gets its settings.
 - https://12factor.net/config — strict separation of config from code; config is everything that varies between deploys
 - https://12factor.net/build-release-run — release = build + config; releases are immutable
 - https://12factor.net/dev-prod-parity — keeping environments similar; gaps make code that passed tests fail in production
+- https://github.com/motdotla/dotenv — "lines beginning with `#` are treated as comments"; default path `path.resolve(process.cwd(), '.env')`; `override` default `false`: "we will never modify any environment variables that have already been set"
+- https://raw.githubusercontent.com/motdotla/dotenv/master/lib/main.js — the parser assigns `obj[key] = value` per matched line, so a later line in the same file replaces an earlier one (read at v18.0.9, 2026-10-24)
+- Field observation (monorepo with an app `.env` and a root `.env`): a first-match `sed … | head -1` over the app file returned a commented line's `localhost:15432`; the active line further down pointed at `localhost:15433`, an SSH tunnel to a shared dev database; the tool's own dotenv call loaded only the root `.env`

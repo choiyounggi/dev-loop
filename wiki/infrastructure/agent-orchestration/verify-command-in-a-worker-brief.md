@@ -8,9 +8,11 @@ sources:
   - https://docs.python.org/3/library/venv.html
   - https://docs.python.org/3/library/unittest.html
   - https://vitest.dev/guide/filtering
+  - https://git-scm.com/docs/githooks
+  - https://git-scm.com/docs/gitrepository-layout
   - "Local reproduction 2026-10-11 (Vitest 5.0.3, zsh 5.9, GNU bash 5.3.15): literal, escaped and pattern forms of route-group and dynamic-segment test paths"
-last_verified: 2026-09-03
-related: [platforms-environment-path-resolution, platforms-toolchains-version-management, platforms-toolchains-compiler-sysroot-on-macos, qa-process-completion-claims, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-done-criteria-in-a-split-task-piece]
+last_verified: 2026-10-24
+related: [platforms-environment-path-resolution, platforms-toolchains-version-management, platforms-toolchains-compiler-sysroot-on-macos, qa-process-completion-claims, testing-quality-tests-that-cannot-fail, infrastructure-agent-orchestration-worktree-isolated-workers, infrastructure-agent-orchestration-done-criteria-in-a-split-task-piece, testing-quality-checks-that-cannot-pass]
 ---
 
 # The Test Command Written Into a Worker's Brief
@@ -70,6 +72,7 @@ Done:     Ran ≥ 3549, failures ≤ 1, and the only failure is that same test i
 | No venv exists and the system interpreter is the intended one | Still write the path (`/usr/bin/python3`), so a later venv or a different `PATH` cannot change what the brief means |
 | The task's deliverable is a new numbered/spec document (RFC, ADR) in a repo with doc-currency gates (a README-count test, a generated-reference `--check`) | Name those gate tests on the task's own verify line and include the files they read (README rows, the routes/registry constant) in the task's scope, not only at integration |
 | The verify line passes Vitest a test file whose path holds `(`, `)`, `[` or `]` (a Next.js route group `src/app/(group)/page.test.tsx`, a dynamic segment `[slug]`) | Single-quote the path for the shell and leave it unescaped for Vitest: Vitest runs the files "whose path contains the given string", a plain substring, so `'src/app/(group)/page.test.tsx'` selects the file, while an escaped or pattern form (`\(group\)`, `layou[t]`, `.*`) selects nothing and exits 1 with "No test files found". Unquoted, zsh stops with "no matches found" and bash with a syntax error at `(`; bash also rewrites an unquoted `[slug]` to `src/app/s/…` when such a path exists |
+| The brief tells a worker to skip local verification (CI judges) and push from a freshly created worktree | Have it read the repo's push hook first (`.husky/pre-push`, or the `core.hooksPath` directory) and install dependencies before the push (`pnpm install --frozen-lockfile`) even though it runs no checks itself. A linked worktree uses the common directory's hooks but gets no `node_modules`, so a hook that calls a repo tool dies (`tsx: command not found`) and git aborts the push. "No local verification" covers what the worker chooses to run, not what the repo enforces at push, so the fix is installing dependencies with the hook left on. Judge the push by git's own status (`set -o pipefail`, or `${PIPESTATUS[0]}`) — `git push … | tail; echo $?` prints `tail`'s 0 over a rejected push ([testing-quality-checks-that-cannot-pass]) |
 
 ## Instead of
 
@@ -90,3 +93,6 @@ Done:     Ran ≥ 3549, failures ≤ 1, and the only failure is that same test i
 - https://vitest.dev/guide/filtering — "Vitest will only run test files whose path contains the given string"; a `file:line` target "requires the full filename (relative or absolute)"
 - Local reproduction 2026-10-11 (Vitest 5.0.3; zsh 5.9; GNU bash 5.3.15): `vitest run 'src/app/(group)/page.test.js'`, `'src/app/[slug]/page.test.js'`, `'(group)'`, `'app/(gr'` and `layout` each selected their file; `'src/app/\(group\)/page.test.js'`, `'src/app/layou[t].test.js'` and `'src/app/.*'` printed "No test files found, exiting with code 1". Unquoted, zsh printed `no matches found: src/app/(group)/page.test.js` (and the same for `[slug]`), bash printed ``syntax error near unexpected token `('`` and passed `src/app/[slug]/page.test.js` through unchanged until a `src/app/s/page.test.js` existed, then substituted that path
 - Field origin 2026-10 (linkly-invitation task t5; recorded by the originating session): a plan's verify commands named route-group test files; `vitest run 'src/app/layou[t].test.tsx'` printing "No test files found" (exit 1) showed that the filter is not a regex before the commands were adopted
+- https://git-scm.com/docs/githooks — pre-push: "If this hook exits with a non-zero status, `git` `push` will abort without pushing anything"; hooks live in `$GIT_DIR/hooks` "or `git config core.hooksPath`"
+- https://git-scm.com/docs/gitrepository-layout — `hooks`: "This directory is ignored if $GIT_COMMON_DIR is set and \"$GIT_COMMON_DIR/hooks\" will be used instead" (linked worktrees share the main repository's hooks)
+- Field observation (pnpm monorepo, husky pre-push running a code generator through `tsx`): the first push from a new worktree was rejected (`failed to push some refs`) while a piped `echo "RC=$?"` showed 0; `PIPESTATUS` exposed the failure; after `pnpm install --frozen-lockfile` (20 s) the hook ran 31 turbo tasks (8 m 39 s) and the push succeeded

@@ -10,7 +10,10 @@ sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_Cheat_Sheet.html
   - https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
   - https://auth0.com/docs/secure/tokens/refresh-tokens/refresh-token-rotation
-last_verified: 2026-07-10
+  - https://www.rfc-editor.org/rfc/rfc7518#section-3.2
+  - https://raw.githubusercontent.com/jwtk/jjwt/0.11.5/README.md
+  - https://javadoc.io/static/io.jsonwebtoken/jjwt-api/0.11.5/io/jsonwebtoken/JwtBuilder.html
+last_verified: 2026-10-24
 related: [databases-schema-design-requirements-to-tables, databases-indexing-index-selection, backend-common-reliability-timeouts-and-retries]
 ---
 
@@ -74,6 +77,7 @@ token storage is owned by wiki/frontend/ (plain text pointer).
 |------|------|
 | Building a denylist entry for a token | Key it by the `jti` + `iss` claims, not by raw token bytes or their hash — a JWT has no single canonical byte representation (OWASP) |
 | A legitimate client retries a refresh call after a timeout and trips reuse detection | The family is revoked and the user re-authenticates — accept this as the safe default (theft is indistinguishable from a retry); give refresh calls a single attempt, no auto-retry → [backend-common-reliability-timeouts-and-retries] |
+| An HMAC key arrives as a literal (plan, ticket, config sample) with its size stated in prose ("base64 of a 72-byte secret") | Decode it and count the bytes before wiring it in; the key must be at least the hash size — 32 bytes for HS256, 48 for HS384, 64 for HS512 (RFC 7518 §3.2). Pin the floor in a test (`decode(KEY).size >= 64` for HS512). Name the algorithm when signing: jjwt `signWith(key)` picks "the most secure algorithm allowed" for the key's length (a 62-byte key signs HS384) and reports nothing, while `signWith(key, HS512)` throws `WeakKeyException` — and when that throw sits in a shared test base-class constructor, every subclass fails at once with no pointer to the constant |
 | One issuer serves several relying services | Every token carries `aud` and every service validates its own audience value or rejects the token (RFC 8725 §3.9) |
 
 ## Instead of
@@ -92,3 +96,7 @@ token storage is owned by wiki/frontend/ (plain text pointer).
 - https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_Cheat_Sheet.html — denylist keyed by `jti`+`iss` (no canonical byte form), payload base64-readable, `none`-algorithm attack
 - https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html — server-side invalidation on logout and on privilege change (password change)
 - https://auth0.com/docs/secure/tokens/refresh-tokens/refresh-token-rotation — rotation on every exchange; reuse detection revoking the entire token family
+- https://www.rfc-editor.org/rfc/rfc7518#section-3.2 — "A key of the same size as the hash output (for instance, 256 bits for "HS256") or larger MUST be used with this algorithm"
+- https://raw.githubusercontent.com/jwtk/jjwt/0.11.5/README.md — HS256/HS384/HS512 require keys of at least 32/48/64 bytes; `signWith(key)` will "determine the most secure algorithm allowed for the specified key" (a 32-byte key "is not strong enough for `HS384` or `HS512`, so JJWT will automatically sign the JWT using `HS256`"); `Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretString))`
+- https://javadoc.io/static/io.jsonwebtoken/jjwt-api/0.11.5/io/jsonwebtoken/JwtBuilder.html — `signWith(Key, SignatureAlgorithm)` throws `InvalidKeyException` "if the Key is insufficient … for the specified algorithm"; `WeakKeyException` extends `InvalidKeyException` (jjwt-api 0.11.5 `security/WeakKeyException`)
+- Field reproduction (jjwt 0.11.5): a planned base64 key described as 72 bytes decoded to 62 bytes; `signWith(key, HS512)` threw `WeakKeyException` in a test base-class constructor and 4/4 regression tests failed; a 70-byte key turned them green
