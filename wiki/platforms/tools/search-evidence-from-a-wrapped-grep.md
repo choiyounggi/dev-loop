@@ -8,11 +8,13 @@ sources:
   - https://code.claude.com/docs/en/tools-reference
   - https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md
   - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
+  - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html
   - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html
   - https://github.com/Genivia/ugrep/pull/556
   - "ugrep 7.8.4 built-in help (`--help ignore-files`, `--help exclude-from`), read from the binary Claude Code bundles"
   - "Local reproduction 2026-10-08 (Claude Code 2.1.293, bundled ugrep 7.8.4, zsh 5.9, macOS): ignore-file skips by path form, complexity-limit error with `-e` split, BSD grep memory limit"
-last_verified: 2026-10-08
+  - "Local reproduction 2026-10-23 (bundled ugrep 7.8.4): a `$` before the pattern's last character is read as an anchor"
+last_verified: 2026-10-23
 verified_model: claude-opus-5-5
 related: [platforms-environment-path-resolution, platforms-tools-harness-mediated-tool-results, debugging-methodology-reproduce-first]
 ---
@@ -87,6 +89,7 @@ list — or such a search came back blank or printed an error naming `ugrep`.
 | You want the wrapper's speed and every file | Add `--no-ignore-files`, which cancels the wrapper's `--ignore-files`; keep it to the Bash tool, because `/usr/bin/grep` rejects it with exit 2 |
 | A gate script greps and you double-check its result by hand in the Bash tool | The script ran `/usr/bin/grep` and your check ran ugrep — compare with the same binary ([debugging-methodology-reproduce-first]) |
 | The search must also skip build output or dependencies | Scope it with `git grep` or explicit paths and `--exclude-dir=<dir>`, and say so in the claim, so the skipped set is one you chose |
+| The pattern contains `$` before its last character — shell code (`OLD=$(cat`, `${VAR}`), prices (`$5`) | The wrapper's `-G` treats that `$` as an end-of-line anchor and reports 0 with exit status 1, while POSIX BRE makes `$` an anchor only as the last character, so `/usr/bin/grep` matches. Search fixed text with `grep -F`, or write `[$]` / `\$`; re-run any 0-count with `-F` before recording "absent" |
 
 ## Instead of
 
@@ -106,3 +109,5 @@ list — or such a search came back blank or printed an error naming `ugrep`.
 - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/command.html — `command` treats its arguments as a simple command, "suppressing the shell function lookup"
 - Local reproduction 2026-10-08 (Claude Code 2.1.293, bundled ugrep 7.8.4, zsh 5.9, macOS, BSD grep 2.6.0-FreeBSD): `functions grep` printed the ugrep invocation and its defer list (`-*-filter* | -*-pager* | -*-view* | -*-format-open* | -*-config* | ---* | -@* | -*-save-config* | -[Zz]* | -[!-]*[Zz]* | --null | --null-data`); `bash -c 'type grep'` printed `/usr/bin/grep`; `grep -@ -rl` through the wrapper exited 2 with `grep: invalid option -- @`, while the bundled ugrep run directly with `-@` listed every file. In a probe whose `.gitignore` listed `hidden.txt` and `sub/ignored-dir-file.txt`, `git check-ignore` matched both; the wrapper run with an absolute path skipped only `hidden.txt`, run from inside the probe it skipped both, and `/usr/bin/grep -rl` listed all four files. 200 alternatives of `(gh|git|curl)[^|]{0,80}prN` with `-ciE` made the wrapper exit 2 with `exceeds complexity limits` and empty stdout, joined or as 201 `-e` patterns; `/usr/bin/grep` returned 1 for both forms. One `-E` alternation of 3,000 words made `/usr/bin/grep` exit 2 with `out of memory`; 3,001 `-e` patterns or `-f` returned 1
 - Field case 2026-10-08 (linkly worktree session): a long `-iE` alternation counted across 26 PR heads printed blank counts for every head through the wrapper; a dedup search through the wrapper missed gitignored files
+- https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html — §9.3.8: "A <dollar-sign> ('$') shall be an anchor when used as the last character of an entire BRE"
+- Reproduction 2026-10-23 (bundled ugrep 7.8.4 via the Bash-tool `grep` function, BSD grep 2.6.0-FreeBSD, zsh 5.9, macOS): on a file holding `OLD=$(cat state.txt)`, `a$b`, `x${y}`, `price $5`, the wrapper counted 0 for each of those four patterns and `/usr/bin/grep` counted 1; `OLD=[$](cat`, `OLD=\$(cat` and `grep -F 'OLD=$(cat'` counted 1 under both. Field case 2026-10: a check for `OLD=$(cat` in a shell script read 0 and was about to be reported as a removed guard

@@ -7,8 +7,9 @@ confidence: verified
 sources:
   - https://www.postgresql.org/docs/current/transaction-iso.html
   - https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html
-last_verified: 2026-07-10
-related: [databases-query-optimization-existence-and-count-checks, databases-schema-design-requirements-to-tables, databases-transactions-optimistic-vs-pessimistic-locking, databases-transactions-multi-row-reorder-on-a-shared-resource, testing-quality-proving-a-critical-section-is-lock-protected]
+  - https://www.postgresql.org/docs/current/indexes-partial.html
+last_verified: 2026-10-23
+related: [databases-schema-design-soft-delete, databases-query-optimization-existence-and-count-checks, databases-schema-design-requirements-to-tables, databases-transactions-optimistic-vs-pessimistic-locking, databases-transactions-multi-row-reorder-on-a-shared-resource, testing-quality-proving-a-critical-section-is-lock-protected]
 ---
 
 # Choosing Transaction Behavior for Concurrent Writes
@@ -54,6 +55,7 @@ updates / duplicate bookings under concurrency.
 | MySQL Repeatable Read + `UPDATE` based on stale snapshot reads | Updates see current rows (semi-consistent behavior differs from the read snapshot); apply the conditional-`UPDATE` row above — precondition in the `WHERE`, 0 affected rows = rejected |
 | Undecided whether stock is a counter column or reservation rows summed against capacity | The data model decides the locking row: counter column → conditional `UPDATE`; reservation rows → the multi-row invariant row. Model per [databases-schema-design-requirements-to-tables] before choosing machinery |
 | Queue-style "grab next unprocessed row" | `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 1` — workers skip contended rows instead of queueing on them |
+| Duplicate-key errors on a `unique (parent…, seq)` key where the application computes `seq` (`MAX(seq)+1`) and the write also deactivates the previous row (history kept as a new `seq`) | Before making the numbering atomic, name the rule the collision was enforcing by accident (one active row per parent, when the write deactivates the previous row) and declare it: `CREATE UNIQUE INDEX … ON t (parent…) WHERE active`; map its violation to a user-facing conflict. Atomic numbering alone turns the error into silent corruption: each transaction's deactivating `UPDATE` cannot see the other's uncommitted row, so both commit active |
 
 ## Instead of
 
@@ -65,3 +67,7 @@ updates / duplicate bookings under concurrency.
 
 - https://www.postgresql.org/docs/current/transaction-iso.html — isolation levels, serialization failures
 - https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html — InnoDB level semantics
+- https://www.postgresql.org/docs/current/transaction-iso.html — Read Committed: "a SELECT query … sees only data committed before the query began; it never sees either uncommitted data or changes committed by concurrent transactions during the query's execution"
+- https://www.postgresql.org/docs/current/indexes-partial.html — Example 11.3, a partial unique index to "ensure that there is only one “successful” entry for a given subject and target combination"
+- Reproduction 2026-10-23 (PostgreSQL 16.11, throwaway local cluster, two concurrent sessions each running `UPDATE … SET active='N' WHERE parent=1 AND active='Y'` then `INSERT … (1, nextval(seq), 'Y')`, the first holding its transaction 2 s): with only `unique(parent, seq)` both committed and 2 rows were active; with `CREATE UNIQUE INDEX … ON rel(parent) WHERE active='Y'` the second session waited for the first to commit and failed with `duplicate key value violates unique constraint`, leaving 1 active row
+- Field case 2026-09 (a parent-to-child relation table with history `seq`): two concurrent registrations both computed `seq = 1` and one failed on the composite key; an existing-relation guard read before commit did not prevent it

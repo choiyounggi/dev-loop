@@ -12,7 +12,8 @@ sources:
   - https://github.com/apple-oss-distributions/text_cmds/blob/main/wc/wc.c
   - https://github.com/freebsd/freebsd-src/blob/main/usr.bin/wc/wc.c
   - https://www.gnu.org/software/coreutils/manual/html_node/wc-invocation.html
-last_verified: 2026-10-11
+  - https://www.gnu.org/software/grep/manual/grep.html
+last_verified: 2026-10-23
 related: [platforms-shells-portable-shell-scripts, platforms-environment-unicode-text-matching, platforms-filesystems-trailing-separator-under-realpath, platforms-shells-echo-of-text-you-did-not-write]
 ---
 
@@ -35,6 +36,7 @@ flags do not. Apply the portable fix per command:
 | `timeout` | In coreutils | Absent on stock macOS — exits 127 | Install coreutils and call `gtimeout`, or background the command and `kill` it from a sleep watchdog |
 | `seq -s,` | Separator between numbers only | Separator also emitted after the last number, before the terminator | Join after generating (`seq 1 3 \| paste -sd, -`) and count items by lines, never by separators |
 | PCRE grep | `grep -P` | Not supported | `grep -E` with ERE, or `perl -ne 'print if /…/'` |
+| NUL after each file name (`grep -lZ \| xargs -0`) | `-Z` is `--null` | `-Z` is `--decompress` (behave as `zgrep`); output keeps newlines, so `xargs -0` receives every name as one argument | Spell it `--null` — both accept it — and keep a known-matching file in the input so an empty or merged list shows up as a missing hit |
 | Resolve path | `readlink -f` | Absent before macOS 13 | `cd "$(dirname "$f")" && pwd -P` for directories, `python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))'`, or coreutils `greadlink -f` |
 | File metadata | `stat -c '%s'` | `stat -f '%z'` | Detect once: `stat -c %s "$f" 2>/dev/null \|\| stat -f %z "$f"` |
 | Line count as a number | `wc -l < f` prints `398` | Prints `     398` — every count is right-aligned in a 7-wide field (`%7ju` in `wc.c`), also on stdin | Strip before use: `n=$(( $(wc -l < f) ))` or `n=$(wc -l < f \| tr -d ' ')`; then guard with `case "$n" in *[!0-9]*) exit 2;; esac` before handing it to `tail`/`sed` |
@@ -77,3 +79,5 @@ General strategy by situation:
 - https://github.com/freebsd/freebsd-src/blob/main/usr.bin/wc/wc.c — same `%7ju` format in FreeBSD
 - https://www.gnu.org/software/coreutils/manual/html_node/wc-invocation.html — GNU: "The width of the count fields varies depending on the inputs, so you should not depend on a particular field width"
 - Reproduction 2026-10-11 (macOS 26.1, 398-line file): `wc -l < f` printed `     398` and `tail -n +"$N" f` failed with `tail: illegal offset -- +     398: Invalid argument`; `$(( $(wc -l < f) ))` and `tr -d ' '` both yielded `398` and `tail` then printed line 398; `[ "$N" -eq 398 ]` passed on the padded value while `case "$N" in *[!0-9]*)` matched it as not-all-digits; GNU `gwc -l < f` printed `398`. Field case the same day: a background waiter looping on `tail -n +"$(wc -l < log)"` logged the `illegal offset` error every 10 s until the count was trimmed
+- https://www.gnu.org/software/grep/manual/grep.html — GNU `-Z`/`--null`: "Output a zero byte (the ASCII NUL character) instead of the character that normally follows a file name. For example, ‘grep -lZ’ outputs a zero byte after each file name instead of the usual newline"
+- BSD grep 2.6.0-FreeBSD `man grep` on macOS: `-Z, --decompress  Force grep to behave as zgrep.`; `--null  Prints a zero-byte after the file name.` Reproduction 2026-10-23: over two matching files, `grep -lZ` emitted 0 NUL bytes and 2 newlines and `xargs -0` passed 1 argument; `grep -l --null` emitted 2 NULs and `xargs -0` passed 2. Field case 2026-10: a scanner fed this way reported "0 findings" without having scanned anything, caught only once a known-positive sample was added
