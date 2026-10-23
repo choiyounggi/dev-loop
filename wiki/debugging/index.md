@@ -23,7 +23,7 @@ Match your situation to a "load when" line; load only matching pages.
 |------|-----------|
 | [stack-traces](signals/stack-traces.md) | Interpreting an exception/stack trace from a log, test failure, or error tracker; wrapped/rethrown causes, NPE on a chained call, async traces missing the origin, minified JS frames |
 | [reading-error-messages](signals/reading-error-messages.md) | Any error output you are about to act on — compiler/build failure, runtime error without a stack trace, config/startup error, a wall of errors from one run; deciding which of many errors to fix first (cascades); about to search for a fix or evaluate a fix found online |
-| [logs-and-correlation](signals/logs-and-correlation.md) | Diagnosing a failure that spans services/components using logs; reconstructing a timeline, following one request via (or without) a correlation id, finding the first error in a cascade |
+| [logs-and-correlation](signals/logs-and-correlation.md) | Diagnosing a failure that spans services/components using logs; reconstructing a timeline, following one request via (or without) a correlation id, finding the first error in a cascade; about to cite a status/outcome column from a table the application writes itself (request history, audit) as what the client received, or it disagrees with an alert payload or load balancer log |
 
 ## performance
 

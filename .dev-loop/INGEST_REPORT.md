@@ -1,164 +1,82 @@
-# Knowledge flush — 3 insight(s) (headless auto-flush run 20261022-134153-21632)
+# Knowledge flush — 5 insight(s)
 
-18 queue rows were claimed this run: 3 ingested, 1 dropped as a duplicate of the
-merged wiki, 13 dropped as project-specific plan-gap rows, 1 released because it
-plausibly overlaps open PR #291. Nothing was folded into another branch.
+Five harvested insights become 4 new pages (one in a new `infrastructure/edge` category) and 1 edge row; a sixth candidate is dropped as a duplicate.
 
-| Candidate | Domain | Disposition |
-|-----------|--------|-------------|
-| `f7273179a74dcb80` — secret in an HTTP header leaks through `http.client`'s `ValueError` | security | **ingested** — edge row in `security-secrets-secrets-in-code` (verified) |
-| `3d610c1206e1bdd6` — text nobody sent in an agent CLI's input box is the grey prompt suggestion | infrastructure | **ingested** — edge row in `infrastructure-agent-orchestration-pane-delivery-confirmation` (verified docs + field observation) |
-| `0a0ccc4ca0904514` — e2e failure moving between tests under host CPU contention | testing | **ingested** — new page `testing-flaky-e2e-failures-moving-under-host-cpu-contention` (field-tested) |
-| `97c37473b53e63c2` — string-pattern `replace`: `$n` stays literal, `$$`/`$&`/`` $` ``/`$'` expand | backend (queued as frontend) | dropped — duplicate of merged page |
-| `446c58c78d5e467f` — `git diff --numstat` count depends on the diff algorithm | testing | released — plausible overlap with open PR #291 |
-| 13 plan-gap rows (see Local-layer candidates) | — | dropped — project-specific |
+This run resumes a headless auto-flush from 2026-10-13 that drafted these pages and then stopped at the session limit before committing. Its drafts were kept only after re-verification here. Every source quote was compared against the live page, and every reproduction was re-run on 2026-10-23. One draft claim was wrong and is fixed (Spring Boot naming example, see below). Two pages the interrupted run never wrote were authored here.
+
+Claimed 6 queue rows for this run (`flush-20261023-140146-43232`). The other 83 claimable rows (32 insights + 51 plan-gaps) were released unread for later flushes, so this PR stays one reviewable batch.
 
 ## Verified best-practice
 
-**`f7273179a74dcb80` — confidence: verified.** Claim: when a script puts a secret
-from an env var into an HTTP header via Python `http.client`/`urllib`, a value
-with a bare CR/LF (a pasted key ending in `\n`) makes `putheader` raise a
-`ValueError` whose message contains the whole header value, so a traceback that
-escapes the script's own redaction prints the key.
-- CPython `Lib/http/client.py` (https://github.com/python/cpython/blob/main/Lib/http/client.py):
-  read in the local CPython 3.9 source — l.138
-  `_is_illegal_header_value = re.compile(rb'\n(?![ \t])|\r(?![ \t\n])').search`;
-  l.1234-1235 `if _is_illegal_header_value(values[i]): raise ValueError('Invalid header value %r' % (values[i],))`.
-  A trailing `\n` matches `\n(?![ \t])`, and `%r` repeats the full encoded value.
-  Web search confirmed the check came from the CVE-2016-5699 header-injection fix.
-  The `main`-branch file was not fetched in this run (WebFetch is not allowed here);
-  the cited line numbers are from 3.9.
-- Field reproduction (session evidence): on Python 3.13 and 3.11 the key appeared
-  in the traceback; after the pre-request check plus catch-all redaction, 0 key hits
-  and the mutation checks went red.
-
-**`3d610c1206e1bdd6` — confidence: verified (docs) + field observation.** Claim:
-in a Claude Code pane read through `tmux capture-pane`, grey text in the input box
-that nobody sent is the CLI's prompt suggestion. Plain capture drops styling, so the
-suggestion looks like an unsubmitted prompt.
-- https://code.claude.com/docs/en/interactive-mode (fetched 2026-10-22), "Prompt
-  suggestions": "shows a grayed-out example command in the prompt input"; after a
-  response it "can suggest your next prompt"; "Press `Tab` or `Right arrow` to place
-  the suggestion in the prompt input, then `Enter` to submit"; "Start typing to dismiss it".
-- tmux man page (https://man7.org/linux/man-pages/man1/tmux.1.html; same wording read
-  from the local tmux 3.7b `tmux.1`, l.2693-2696): "If -e is given, the output includes
-  escape sequences for text and background attributes."
-- Field observation (run i41): the box showed "승인됐습니다. 계획대로 구현하세요."
-  after `plan_ready`; `send-prompt.sh state lo-1-i41` → `ready` rc 0; the next real send
-  reported `delivered`.
-- Not claimed: which escape code (dim SGR 2 vs a grey colour) the CLI uses. The page
-  says "grey/dim" to match the docs' "grayed-out".
-
-**`0a0ccc4ca0904514` — confidence: field-tested.** Claim: on a shared host, a
-browser e2e failure that moves to a different timing-dependent test on each re-run
-is CPU contention until shown otherwise. Measure load and foreign headless browsers,
-re-run once after 60 s quiet, and report every run line.
-- https://playwright.dev/docs/test-cli — `--workers` defaults to 50% of logical CPU
-  cores (already cited on the wiki; it sizes to the host's cores, not to free capacity).
-- https://playwright.dev/docs/ci — recommends `workers: 1` in CI "to prioritize
-  stability and reproducibility", so each test gets the full system resources. This was
-  confirmed only through a web-search summary of the official page; the page was not
-  fetched in this run.
-- Field observation (2026-10-18, 36-test Playwright suite): load avg 19 with a foreign
-  `chrome-headless-shell` at 110% CPU → "1 failed" at `leave.spec.ts:37`, then at
-  `game-bell.spec.ts:33`; after 60 s with no headless browser → "36 passed (50.9s)".
-  This is a single host, so the page is field-tested, not verified.
-
-**`97c37473b53e63c2`** — the claim is correct (MDN replacement-pattern table; the node
-evidence in the row), but it is already on the merged wiki. See Existing-layer check.
+| Row | Claim | Verification | Confidence |
+|-----|-------|--------------|------------|
+| `65c2e2f003e51d46` | Resolve LLM-gateway aliases to their backend model and `extra_body` (`/model/info`) before choosing between them; a shared backend makes it a parameter choice | Quotes matched on docs.litellm.ai/docs/proxy/configs ("the name to pass TO litellm from the external client", "the model string passed to the litellm.completion() function"), docs.litellm.ai/docs/proxy/model_management ("Returns the full model list with API keys masked"), qwen.readthedocs.io/en/latest/deployment/vllm.html ("is not OpenAI API compatible"). Reproduced on a local LiteLLM 1.106.2 proxy with three aliases on one backend: `/v1/models` items had only `created, id, object, owned_by`; `/model/info` showed the identical `litellm_params.model` and the three `extra_body` variants, no `api_key` | verified |
+| `9db176327bc6d495` | An env variable named after the property path overrides a composed yml value whole; name it outside the property's env forms and test the resolved value | Quotes matched on the Spring Boot external-config page ("Later property sources can override the values defined in earlier ones"; the conversion rule "Replace dots (.) with underscores (_). Remove any dashes (-). Convert to uppercase.") and the `SystemEnvironmentPropertySource` javadoc ("Any hyphen variant of the above would work as well"). Reproduced on JDK 17 with spring-core 5.3.30 + spring-boot 2.7.16 and again with spring-core 6.1.14 + spring-boot 3.3.5 (same six results on both): spring-core only, `FEIGN_KAKAO_API_KEY` → `DUMMY`, `FEIGN_KAKAOAPI_KEY` → `KakaoAK unset`; with Boot attached, both → `DUMMY`; `KAKAO_SECRET` → `KakaoAK DUMMY`. **Correction:** the draft cited `MY_MAIN_PROJECT_PERSON_FIRST_NAME` as Boot's documented form. That string is not on the page, which documents dash removal (`SPRING_MAIN_LOGSTARTUPINFO`), so the source line was rewritten | verified |
+| `62947b59b38dec58` | Before changing CDN distributions named by id, find the owning account and classify each by DNS + response headers; disabled and DNS-bypassed distributions carry no traffic | Quotes matched on CloudFront DownloadDistValuesGeneral ("CloudFront doesn't accept any end-user requests that use the domain name associated with that distribution") and restrict-access-to-load-balancer ("prevent users from directly accessing an Application Load Balancer, and allow access only through CloudFront"; "you bypass CloudFront"). CNAMEs page: "CloudFront sends the request to the distribution with the more specific name match, regardless of the distribution that the DNS record points to". `ip-ranges.json` contained 214 `CLOUDFRONT` prefixes. `curl -sI https://d1.awsstatic.com/` returned `Via: 1.1 <id>.cloudfront.net (CloudFront)` and `X-Amz-Cf-Pop: ICN80-P2`. No AWS doc page defining `X-Amz-Cf-Pop` was found, so the page relies on the observed header and says so | verified |
+| `b9ae304ab9fd214c` | When a captured `$(cmd 2>&1)` value is used as a path or id, extract it from a labelled `KEY=` line | GNU bash Redirections section. Python `sys` docs: "Otherwise, it is block-buffered like regular text files. The stderr stream is line-buffered in both cases". Reproduced on zsh 5.9: a stderr warning before or after the value made a 2-line value (the trailing warning printed first, because of buffering); `[ -n ]` passed and `stat` returned rc 1; `sed -n 's/^TICK=//p'` returned exactly the path in every case and an empty string when the label was absent. For a helper that crashed with rc 3, the one-pipeline `| sed` form returned rc 0 and an empty value, while capture-first kept rc 3 and the diagnostic | verified |
+| `585847fa11694c38` | A status column the application writes itself may be reconstructed; take the sent status from a layer that observed the response | Quotes matched on the ALB access-logs page ("The status code of the response generated by the load balancer"; "status code of the response from the target"). The field case (a 409 recorded as 500 by a writer that hardcodes 500) comes from the originating session's code reading and is not re-run here | verified (doc) + field case |
+| `79fb89fc3a0b12da` | Reasoning models exhaust `max_tokens` and return blank `content` | Not ingested: already covered row-for-row by backend-common-llm-completion-response-validation, which also gives stronger sizing guidance (OpenAI's ≥25,000-token reservation) than the candidate's "3×" | dropped (duplicate) |
 
 ## Existing-layer check
 
-Pages read: security-secrets-secrets-in-code, infrastructure-ci-cd-secrets-handling, infrastructure-agent-orchestration-pane-delivery-confirmation, testing-flaky-diagnosing-flaky-tests, testing-flaky-docker-vm-oversubscription-under-parallel-containers, testing-e2e-e2e-stability, backend-node-language-string-replace-replacement-patterns
+Pages read: backend-common-llm-completion-response-validation, backend-common-llm-context-window-budget, backend-common-integrations-externally-owned-defaults, backend-java-spring-proxy-pitfalls, infrastructure-config-environment-config, security-api-exposure-exposing-an-origin-http-api, infrastructure-observability-logs-metrics-signals, debugging-signals-logs-and-correlation, platforms-processes-tool-diagnostics-without-a-failing-exit-code, platforms-processes-parsing-cli-structured-output, platforms-shells-redirection-order-for-a-silenced-write, platforms-shells-portable-shell-scripts, platforms-shells-command-text-inspected-before-execution, testing-quality-write-path-assertions
 
-- **security-secrets-secrets-in-code** — merge target for `f727`. Its edge table
-  already has two "a library echoes the secret" rows: a URL-query key logged by HTTP
-  clients, and a DSN echoed in an error. The header-value `ValueError` is a third path
-  of the same kind, so it was added as one edge row, not a new page. One source line
-  and one field-evidence line were added. `last_verified` was left at 2026-07-12
-  because the other rows were not re-checked.
-- **infrastructure-ci-cd-secrets-handling** — read as a possible target (job-log
-  masking). Not chosen: it covers how the pipeline handles secrets, and this is a
-  script's own exception text. No edit.
-- **infrastructure-agent-orchestration-pane-delivery-confirmation** — merge target for
-  `3d61`. It already owns the input-box rows for this CLI (the `[Pasted text` placeholder,
-  where the input box sits). The suggestion case is a sibling edge row. Added the
-  interactive-mode doc to frontmatter sources, plus three Sources lines (tmux `-e`
-  quote, docs quote, field observation).
-- **testing-flaky-diagnosing-flaky-tests** — closest owner for `0a0c`. It is
-  `confidence: verified`. The 2026-10-22 log shows that the Wiki agent gate blocked
-  merging a single-field-reproduction mechanism into this page (the PR #275 split).
-  Following that precedent, the mechanism went to its own field-tested page. This page
-  gets one pointer edge row and a `related:` id; its confidence and date are unchanged.
-- **testing-flaky-docker-vm-oversubscription-under-parallel-containers** — the nearest
-  sibling: resource ceiling, different subset failing each run. It is a different case
-  (container memory, `409` errors, its own trigger), so the new page was not merged into
-  it. The two are cross-linked from the new page's `related:` and an edge row.
-- **testing-e2e-e2e-stability** — read for e2e overlap. It covers selectors, waits,
-  and data, not host contention. Linked from the new page's `related:`; no edit.
-- **backend-node-language-string-replace-replacement-patterns** — already says
-  `$n` / `$<name>` work for "regex patterns only; otherwise left literal", and has the
-  edge row "A string `from` (no captures) → `$1` stays literal, but `$$`, `$&`, `` $` ``,
-  `$'` still expand". That is exactly what `97c3` asks for, so it was dropped as a duplicate.
+`wiki_search` (k=5) per candidate trigger:
 
-No conflicting directive was found and no page was superseded.
+| Candidate | Top hits | Same trigger? |
+|-----------|----------|---------------|
+| gateway aliases | externally-owned-defaults 0.81 / 0.78, context-window-budget 0.73, completion-response-validation 0.71 | No. externally-owned-defaults covers a retired alias and says to query `/v1/models`. The new page adds that `/v1/models` lists labels only. The two pages are related both ways |
+| Spring env name | call-site-enumeration 0.71, environment-config 0.70, env-var-off-switches 0.69 | No. Related to environment-config both ways |
+| CDN traffic path | object-key-persistence 0.71, logs-and-correlation 0.70, exposing-an-origin-http-api 0.70 | No. exposing-an-origin-http-api owns the origin-side fix and is linked both ways |
+| app-written status column | logs-metrics-signals 0.73, write-path-assertions 0.72 | No. Merged as an edge row into logs-and-correlation, whose trigger already covers citing logs as evidence |
+| `$(cmd 2>&1)` as a value | portable-shell-scripts 0.80, command-text-inspected-before-execution 0.76 | No. tool-diagnostics-without-a-failing-exit-code captures stderr *as diagnostics*, the opposite use. It is linked both ways |
+
+No conflicts with existing directives. The `proxy-pitfalls` related link from the interrupted draft was removed, because that page (AOP proxies) is not adjacent to env-var naming.
 
 ## Open-PR check
 
-Open `knowledge/*` heads at flush time (`gh pr list --repo choiyounggi/dev-loop
---state open --json number,headRefName --search "head:knowledge/"`):
-**#291** (`knowledge/autoflush-20261022-124048-18072`).
-
-This headless run cannot `git diff` that branch, and `gh pr view` / the GitHub MCP
-file list were not allowed. Overlap was judged from the queue rows that #291's run
-retired, using their `outcome` fields. #291 touches
-`testing-quality-anchor-cases-for-allowlist-regexes`,
-`testing-quality-checks-that-cannot-pass`,
-`qa-process-blind-llm-judgment-of-a-visual-rule`, and a new page
-`platforms-shells-non-ascii-text-after-an-unbraced-parameter`.
-
-- `f727` (security, secret in an HTTP header) — **new**: #291 touches no security page.
-- `3d61` (agent pane input box) — **new**: #291's only platforms/infrastructure page is
-  a bash parameter-expansion page, which is a different trigger.
-- `0a0c` (e2e flakiness under CPU contention) — **new**: #291 touches no `testing/flaky`
-  or e2e page.
-- `97c3` — not compared against #291: it was dropped against the merged layer.
-- `446c58c78d5e467f` (exact `git diff --numstat` count as a gate's expected value) —
-  **drop (plausible overlap)**, so its claim was **released**, not retired. It is a
-  gate-design lesson in `testing/quality`, and #291 is editing two `testing/quality`
-  gate pages (`checks-that-cannot-pass`, `anchor-cases-for-allowlist-regexes`). This run
-  cannot diff #291, so the manual flush should decide whether to fold it in or ingest it
-  as new.
+Open `knowledge/*` heads: #293 `knowledge/autoflush-20261022-163155-79805` (git diff algorithm and changed-line counts). Its diff touches `wiki/testing/quality/` only. It does not overlap any candidate, so every ingested candidate gets the verdict **new**. `79fb89fc3a0b12da` is dropped against merged content, not against an open PR.
 
 ## Routing decision
 
-- `f7273179a74dcb80` → `security` / `secrets` → edge row in
-  `wiki/security/secrets/secrets-in-code.md`; security index "load when" extended.
-- `3d610c1206e1bdd6` → `infrastructure` / `agent-orchestration` → edge row in
-  `wiki/infrastructure/agent-orchestration/pane-delivery-confirmation.md`; infrastructure
-  index "load when" extended. Written generally (any helper that classifies the box, or
-  `capture-pane -e`); the dev-loop helper `send-prompt.sh` appears only in the evidence line.
-- `0a0ccc4ca0904514` → `testing` / `flaky` → new page
-  `wiki/testing/flaky/e2e-failures-moving-under-host-cpu-contention.md` (field-tested).
-  There is no new category: `flaky` already holds the sibling resource-ceiling page.
-  A pointer edge row and a `related:` id were added in `diagnosing-flaky-tests`, and a
-  testing index row was added. The INDEX.md testing line already covers "flaky tests".
-- `log.md` has one entry appended for this run.
+| Candidate | Target | Action |
+|-----------|--------|--------|
+| 65c2e2f003e51d46 | backend/common/llm/gateway-model-alias-resolution | new page |
+| 9db176327bc6d495 | backend/java/spring/env-var-named-after-a-property-key | new page |
+| 62947b59b38dec58 | infrastructure/edge/cdn-distribution-traffic-path | new page, **new category `edge`** |
+| b9ae304ab9fd214c | platforms/shells/stderr-merged-into-a-captured-value | new page |
+| 585847fa11694c38 | debugging/signals/logs-and-correlation | +1 edge row, +1 source |
+| 79fb89fc3a0b12da | — | dropped as a duplicate |
+
+Why a new `edge` category: the existing infrastructure categories (agent-orchestration, ci-cd, config, containers, data, deploy, observability) cover building, configuring and watching services, not which CDN/edge resource a hostname's traffic actually traverses. security/api-exposure owns the origin's code-side controls, and its intro assigns WAF/TLS to the edge. The root INDEX infrastructure row and the domain index intro now mention CDN/edge traffic-path audits.
+
+## Independent review
+
+A fresh-context subagent, read-only on this checkout, re-fetched every source and found all 21 quoted phrases word for word. It re-ran the prohibitions and structure lints with no violations. Its verdict was CHANGES_REQUESTED, and all five findings were resolved before this PR:
+
+| Finding | Resolution |
+|---------|------------|
+| Gateway page implied `/model/info` needs an admin key; the docs mark only `/model/delete` "admin only" | "admin view" is now "model-info endpoint", and the edge row reads "`/model/info` is denied to your key" |
+| CDN "on the path" row: CloudFront headers prove only that *some* distribution answered | The row now also requires this distribution to hold the most specific alias match. A new edge row covers overlapping wildcard/specific aliases with the CNAMEs-page quote, so routing follows the alias match, not the DNS target |
+| `$(helper 2>&1 \| sed …)` hides the helper's exit status | Reproduced (rc 0 for a crashed helper). Capture-first `OUT=$(…); rc=$?` is now the primary recipe, and the one-pipeline form is limited to cases where crash and missing label may be handled alike |
+| Spring page scope: reproduced only on Boot 2.7 | Re-ran on spring-core 6.1.14 + spring-boot 3.3.5 with identical results. Step 1 now attributes the underscore form to `SystemEnvironmentPropertySource` and the dash-removed form to Boot's documented rule |
+| Spring page examples carried one incident's config names | Body and index line now use the neutral `client.payment-api.key` / `PAYMENT_API_TOKEN`. The reproduction and field-case source lines keep the key that was actually run |
+
+## Decision Log
+
+- **Intent:** land one reviewable batch of verified, general insights. This finishes the interrupted 2026-10-13 flush's five candidates instead of draining the whole queue (89 claimable rows) into one PR.
+- **Excluded alternatives:**
+  - Taking the interrupted run's drafts as they were. Rejected: one quoted Spring Boot example was not on the cited page, and two pages it linked to had never been written.
+  - Ingesting `79fb89fc3a0b12da`. Rejected: a duplicate of completion-response-validation.
+  - Putting the CDN page under security/api-exposure or infrastructure/observability. Rejected: neither owns "which edge resource carries a hostname's traffic".
+- **Where to look:**
+  - The new `infrastructure/edge` category (the only structural change).
+  - The CDN "on the path" row, which classifies by alias match, not DNS target.
+  - The Spring page's split between spring-core and Spring Boot env forms.
+- Self-review: independent subagent review, 1 round — 5 findings, all resolved (see "Independent review").
+
+Cross-Check: an independent fresh-context subagent re-fetched every source (21/21 quotes present) and re-checked each directive. Its 5 findings were resolved with new evidence: a Boot 3.3.5 reproduction, the CNAMEs precedence quote, and an rc-masking reproduction.
 
 ## Local-layer candidates
 
-These 13 plan-gap rows are excluded from this PR. Each records a design decision for
-the `emperor` (linkly) repository's own files, so each would be wrong in another
-codebase. Run wiki-ingest inside that project to keep any of them:
-
-| Row | Decision | Target |
-|-----|----------|--------|
-| `3632d0989f629104`, `7bfb7541e4e4bd8c` | t242 SECURITY.md sections and policy values | `wiki-local/security/disclosure/security-policy-file.md` |
-| `9700770d7c05b820` | t242 `.github/CODEOWNERS` layout | `wiki-local/infrastructure/repo-governance/codeowners-layout.md` |
-| `3d578bcfcbcc6b97`, `410400eb22f77f77` | t242 CODE_OF_CONDUCT.md source and contact | `wiki-local/infrastructure/repo-governance/code-of-conduct-source.md` |
-| `54aeaa8fdee5e0e7` | t242 mutation harness `TREE_CONTENTS` for new root files | `wiki-local/testing/quality/mutation-tree-contents.md` |
-| `0e0e7c7c4cef34c3` | t252 per-runner concurrency group for `_ai-gate.yml` | `wiki-local/infrastructure/ci-cd/ai-gate-concurrency-groups.md` |
-| `05df421bf905f5ce` | t252 `response_format: json_object` for the HTTP gate runner | `wiki-local/backend/llm/ai-gate-structured-output-mode.md` |
-| `1670e43e60cb7fe3`, `2df80edab8d41dfb` | t252 / t257 CHANGELOG bullet placement | `wiki-local/qa/release/changelog-bullet-placement.md` |
-| `1666b8cf32e274ea` | t257 `_relay_batch` calls begin/commit/rollback directly | `wiki-local/backend/outbox/relay-transaction-calls.md` |
-| `5ee53f499cc8d657`, `744090ce219677c0` | t249a1 RFC-0007 Review stage and §2.2 rule-5 chain notes | `wiki-local/qa/spec-process/rfc-promotion-checks.md` |
+none. The access-log candidate's evidence named one company's internal classes and tables; the ingested row keeps only the general mechanism and describes the field case generically.

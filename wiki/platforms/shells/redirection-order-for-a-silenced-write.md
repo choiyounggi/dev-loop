@@ -8,7 +8,7 @@ sources:
   - https://www.gnu.org/software/bash/manual/bash.html#Redirections
   - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html
 last_verified: 2026-09-27
-related: [platforms-processes-tool-diagnostics-without-a-failing-exit-code, platforms-shells-escapes-in-shell-string-literals, platforms-shells-portable-shell-scripts, platforms-tools-hook-input-fields-from-the-reference]
+related: [platforms-processes-tool-diagnostics-without-a-failing-exit-code, platforms-shells-escapes-in-shell-string-literals, platforms-shells-portable-shell-scripts, platforms-tools-hook-input-fields-from-the-reference, platforms-shells-stderr-merged-into-a-captured-value]
 ---
 
 # Silencing a File Write That May Fail to Open

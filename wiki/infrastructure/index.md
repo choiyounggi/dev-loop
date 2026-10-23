@@ -4,7 +4,7 @@ Route here for: CI/CD pipeline design, secrets in build/deploy flows, container
 image builds, container resource limits and health probes, per-environment
 configuration (env vars, config drift, startup validation), rollout/rollback
 strategy, observability (logging, metrics, alerting), datastore backup/restore
-and data-loss planning.
+and data-loss planning, CDN/edge traffic-path audits.
 
 Match your situation to a "load when" line; load only matching pages.
 
@@ -101,3 +101,9 @@ Match your situation to a "load when" line; load only matching pages.
 | [alerting](observability/alerting.md) | Creating or reviewing alerts; the team ignores a noisy pager; deciding whether a condition pages, tickets, or stays on a dashboard |
 | [suppression-state-and-delivery-failure](observability/suppression-state-and-delivery-failure.md) | Adding notification suppression to a script or service (cooldown file, "last alerted at" timestamp, sent-marker key) and choosing where the mark is written relative to the send; a condition stayed live while the channel went quiet for the whole cooldown window; writing the tests for that marker against a stub whose send always fails |
 | [suppression-key-for-a-recurring-failure](observability/suppression-key-for-a-recurring-failure.md) | A retried job or client keeps hitting the same external rejection and every retry re-sends an identical alert; choosing the dedup/suppression key (rendered text vs an error-code whitelist), the daily re-send, and keeping the retry running while only the notification is suppressed |
+
+## edge
+
+| Page | Load when |
+|------|-----------|
+| [cdn-distribution-traffic-path](edge/cdn-distribution-traffic-path.md) | An audit, alert or ticket names CDN distribution ids (CloudFront `E…`) whose owning account/environment is unknown; about to apply a WAF/cache/header change to every distribution "in front of" a service; deciding whether a distribution with an attached web ACL actually carries a hostname's traffic or is bypassed (DNS points at the origin) or disabled; reading `Via`/`X-Amz-Cf-Pop` headers and `ip-ranges.json` to attribute a resolved address |
