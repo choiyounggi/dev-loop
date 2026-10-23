@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://www.postgresql.org/docs/current/indexes-partial.html
 last_verified: 2026-07-10
-related: [databases-indexing-partial-and-expression-indexes, databases-schema-design-nullability-and-defaults, databases-schema-design-foreign-keys-and-referential-actions]
+related: [databases-transactions-isolation-level-selection, databases-indexing-partial-and-expression-indexes, databases-schema-design-nullability-and-defaults, databases-schema-design-foreign-keys-and-referential-actions]
 ---
 
 # Soft Delete

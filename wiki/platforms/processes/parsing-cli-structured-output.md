@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://man7.org/linux/man-pages/man1/jq.1.html
 last_verified: 2026-08-04
-related: [platforms-processes-non-interactive-cli-invocation, backend-common-integrations-externally-owned-defaults, platforms-processes-cloud-cli-invocation-bounds, platforms-processes-spawning-an-agent-cli-from-a-server]
+related: [platforms-tools-gh-api-paginate-with-jq, platforms-processes-non-interactive-cli-invocation, backend-common-integrations-externally-owned-defaults, platforms-processes-cloud-cli-invocation-bounds, platforms-processes-spawning-an-agent-cli-from-a-server]
 ---
 
 # Parsing Another Tool's `--json` Output From Automation
