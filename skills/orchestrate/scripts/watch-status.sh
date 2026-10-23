@@ -37,11 +37,19 @@
 # moving, and never while it keeps repainting (a spinner, a counter, a
 # background-agent timer).
 #
-# LO_GRAPH + LO_WORKTREES_ROOT (both required together, issue #167): workers
-# write status/questions worker-locally now, never into this checkout. When
-# both are set, every poll iteration runs `collect-status.sh $LO_GRAPH <dir>
-# $LO_WORKTREES_ROOT` first to pull those records in; a collector failure
-# warns on stderr and the wait continues. Either unset -> unchanged behavior.
+# LO_GRAPH + LO_WORKTREES_ROOT (collection knobs, issues #167 and #277):
+# workers write status/questions worker-locally now, never into this
+# checkout. When both knobs resolve, every poll iteration runs
+# `collect-status.sh <graph> <dir> <worktrees-root>` first to pull those
+# records in; a collector failure warns on stderr and the wait continues. An
+# explicitly set, non-empty value always wins and is not existence-checked.
+# An unset or empty one is derived from the status dir — LO_GRAPH defaults to
+# $(dirname <dir>)/graph.json and LO_WORKTREES_ROOT to
+# $(dirname $(dirname <dir>))/.worktrees — and is used only when that file /
+# directory exists. When either still has no value there is no collector call
+# for this run, and ONE `collection off` warning line naming the worktrees
+# path goes to stderr before the first poll — never a silent 0/N. stdout and
+# the exit-code contract above are unchanged.
 #
 # Auto-recover (on by default): a worker's pane can hold an unsubmitted
 # [Pasted text placeholder (send-prompt.sh `state` exit 9) after a prompt
@@ -256,14 +264,37 @@ classify_stall() {
   return 0
 }
 
+# Collection knobs (see the LO_GRAPH + LO_WORKTREES_ROOT header paragraph):
+# an explicit non-empty value wins and is passed through unchecked; an unset
+# or empty one falls back to the canonical layout beside the status dir and is
+# used only when that path exists. Resolved once, before the first poll, so
+# the `collection off` warning is printed once per process, not once per poll.
+col_graph="${LO_GRAPH:-}"; col_graph_want="$col_graph"
+col_wroot="${LO_WORKTREES_ROOT:-}"; col_wroot_want="$col_wroot"
+if [ -z "$col_graph" ]; then
+  col_graph_want="$(dirname "$dir")/graph.json"
+  if [ -f "$col_graph_want" ]; then col_graph="$col_graph_want"; fi
+fi
+if [ -z "$col_wroot" ]; then
+  col_wroot_want="$(dirname "$(dirname "$dir")")/.worktrees"
+  if [ -d "$col_wroot_want" ]; then col_wroot="$col_wroot_want"; fi
+fi
+if [ -z "$col_graph" ] || [ -z "$col_wroot" ]; then
+  col_missing=""
+  if [ -z "$col_graph" ]; then col_missing="$col_missing $col_graph_want"; fi
+  if [ -z "$col_wroot" ]; then col_missing="$col_missing $col_wroot_want"; fi
+  printf '%s\n' "[watch] collection off — worker-written records under $col_wroot_want/*/.orchestration/status will not be seen (missing:$col_missing; export LO_GRAPH and LO_WORKTREES_ROOT)" >&2
+fi
+
 while [ "$elapsed" -lt "$budget" ]; do
-  # Workers write status/questions worker-locally now (issue #167); when both
-  # LO_GRAPH and LO_WORKTREES_ROOT are set, pull those records into this
-  # canonical dir before scanning it. A transient collector failure must not
-  # kill a long wait — warn on stderr and keep polling. Either env unset ->
-  # behavior is byte-identical to before this existed (no collector call).
-  if [ -n "${LO_GRAPH:-}" ] && [ -n "${LO_WORKTREES_ROOT:-}" ]; then
-    sh "$(dirname "$0")/collect-status.sh" "$LO_GRAPH" "$dir" "$LO_WORKTREES_ROOT" >/dev/null \
+  # Workers write status/questions worker-locally now (issue #167): when
+  # col_graph and col_wroot both resolved before the loop (explicit env or
+  # derived default, issue #277), pull those records into this canonical dir
+  # before scanning it. A transient collector failure must not kill a long
+  # wait — warn on stderr and keep polling. Unresolved -> no collector call;
+  # the start-up `collection off` line already said so.
+  if [ -n "$col_graph" ] && [ -n "$col_wroot" ]; then
+    sh "$(dirname "$0")/collect-status.sh" "$col_graph" "$dir" "$col_wroot" >/dev/null \
       || echo "[watch] collect failed (rc=$?) — continuing" >&2
   fi
 

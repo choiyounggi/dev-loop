@@ -589,19 +589,32 @@ answered.
 **Session knobs (tmux substrate, set once per run):** `export LO_RUN_ID=<short-run-id>`
 so every `launch-session.sh` gets a collision-proof name `lo-<n>-<run-id>` (reuse that
 exact name for later `send-prompt.sh`); the script also exports the guardrails
-escalation env into each worker. Also export `LO_GRAPH=.orchestration/graph.json
-LO_WORKTREES_ROOT=<root>/.worktrees` once per run: with both set, every
-`watch-status.sh` call pulls each worker's worktree-local `.orchestration/status`
-(and `questions/`) records into the canonical dir automatically, once per poll
-(issue #167 — workers never write into this checkout). It also collects
+escalation env into each worker. Every `watch-status.sh` call pulls each worker's
+worktree-local `.orchestration/status` (and `questions/`) records into the
+canonical dir automatically, once per poll (issue #167 — workers never write into
+this checkout). It reads `LO_GRAPH` and `LO_WORKTREES_ROOT`; when either is unset
+or empty it derives the default from the status dir — `<status-dir>/../graph.json`
+and `<status-dir>/../../.worktrees` (issue #277) — and uses it when that path
+exists, so exporting `LO_GRAPH=.orchestration/graph.json
+LO_WORKTREES_ROOT=<root>/.worktrees` once per run is optional, and an exported
+value always wins over the derived one. When a default path is missing, the watch
+prints one `collection off` warning line on stderr at start-up and runs without
+collection: treat that line as a wrong status-dir argument or a missing graph or
+worktrees path, not as a slow worker. It also collects
 `blocked/` records (the `worker-blocked-signal.sh` hook) the same way, except a
 canonical `blocked/<task>.json` is pruned once its worker-side copy is gone —
 see exit 8 below. `ready-set.sh` reads the
 status dir directly and does not poll, so before every `ready-set.sh` round also
 run `scripts/collect-status.sh .orchestration/graph.json .orchestration/status
 .worktrees` yourself (Phase 3 step 1). Trust-screen wording drifts between CLI releases —
-if a launch hangs, set `LO_READY_EXTRA` / `LO_TRUST_EXTRA` (substrings) or
-`LO_READY_TIMEOUT`. `LO_PASTED_TAIL_LINES` (default 40) is `send-prompt.sh`'s
+if a launch hangs, set `LO_READY_EXTRA` (substring) or `LO_READY_TIMEOUT`; for a
+screen that needs an answer, set `LO_TRUST_EXTRA` (a substring of that screen) and
+`LO_TRUST_KEYS` (the keys sent when it matches, space-separated, from `Up Down Left
+Right Enter Escape Tab Space 0-9 y n`; default `Enter`; any other key is refused with
+exit 2). Keep the default `Enter` only for a screen whose highlighted default is safe:
+on a screen highlighting "No, exit" or an option that changes a user setting, Enter
+quits the worker or picks that option, so set `LO_TRUST_KEYS` to the keys that reach
+the safe option. `LO_PASTED_TAIL_LINES` (default 40) is `send-prompt.sh`'s
 fallback pasted-marker window, scanned only when it cannot locate the input box
 in the pane capture — raise it if a CLI release changes the input-box chrome so
 the box stops being locatable. `send-prompt.sh send` pastes any payload of

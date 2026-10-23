@@ -13,7 +13,7 @@ setup() {
   # Tests that need a value set it explicitly via `run env VAR=val ...`,
   # which overrides this unset for that one invocation.
   unset LO_RUN_ID LO_DRY_RUN LO_TMUX LO_CLAUDE \
-        LO_READY_TIMEOUT LO_READY_INTERVAL LO_READY_EXTRA LO_TRUST_EXTRA \
+        LO_READY_TIMEOUT LO_READY_INTERVAL LO_READY_EXTRA LO_TRUST_EXTRA LO_TRUST_KEYS \
         LO_SUBMIT_TIMEOUT LO_SUBMIT_INTERVAL LO_STATUS_DIR LO_TASK_ID \
         DEV_LOOP_WORKER_MODEL GROUNDWORK_ESCALATION_DIR GROUNDWORK_TASK_ID
 
@@ -673,4 +673,89 @@ run_screens() { # <ready-timeout> -> runs the launcher against $sd
   [ "$status" -eq 0 ]
   [ "$(grep -c '^-t lo-1 2$' "$sd/keys")" = "0" ]
   [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+}
+
+# --- LO_TRUST_KEYS (#290) ---------------------------------------------------
+# LO_TRUST_EXTRA names an extra trust screen; LO_TRUST_KEYS names the keys sent
+# when it matches (unset, empty or blank = Enter). Every token is checked
+# against send-prompt.sh's `keys` allowlist before the dry-run exit and before
+# any tmux call.
+
+pane_trust_extra() { # an unknown screen carrying the LO_TRUST_EXTRA marker
+  printf '%s\n' "Loading…" "CUSTOMTRUSTMARK"
+}
+
+run_trust() { # [env args...] -> runs the launcher against $sd with LO_TRUST_EXTRA set
+  run env "$@" STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=4 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      LO_TRUST_EXTRA=CUSTOMTRUSTMARK \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello"
+}
+
+@test "LO_TRUST_KEYS: an LO_TRUST_EXTRA screen gets the listed keys in order, one call each (#290 K1)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_trust_extra > "$sd/pane-1"; pane_ready_submitted > "$sd/pane"
+  run_trust LO_TRUST_KEYS="Down Enter"
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 4p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+}
+
+@test "LO_TRUST_KEYS: unset sends Enter, the previous behavior (boundary) (#290 K2)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_trust_extra > "$sd/pane-1"; pane_ready_submitted > "$sd/pane"
+  run_trust -u LO_TRUST_KEYS
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+}
+
+@test "LO_TRUST_KEYS: an empty value sends Enter like unset (boundary) (#290 K3)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_trust_extra > "$sd/pane-1"; pane_ready_submitted > "$sd/pane"
+  run_trust LO_TRUST_KEYS=
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+}
+
+@test "LO_TRUST_KEYS: a whitespace-only value sends Enter like unset (boundary) (#290 K4)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_trust_extra > "$sd/pane-1"; pane_ready_submitted > "$sd/pane"
+  run_trust LO_TRUST_KEYS="   "
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+}
+
+@test "LO_TRUST_KEYS: every allowlisted key passes validation (#290 K5)" {
+  run env LO_DRY_RUN=1 LO_TRUST_KEYS="Up Down Left Right Enter Escape Tab Space 0 1 2 3 4 5 6 7 8 9 y n" \
+      sh "$LS" lo-1 "$WT" bypassPermissions "prompt"
+  [ "$status" -eq 0 ]
+  [ "$output" = "session=lo-1" ]
+}
+
+@test "LO_TRUST_KEYS: a bad key after a good one is refused at exit 2, even in dry-run (error) (#290 K6)" {
+  run env LO_DRY_RUN=1 LO_TRUST_KEYS="Enter Backspace" sh "$LS" lo-1 "$WT" bypassPermissions "prompt"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"LO_TRUST_KEYS key 'Backspace' not in allowlist"* ]]
+}
+
+@test "LO_TRUST_KEYS: an invalid key is refused before any tmux call (error) (#290 K7)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_TRUST_KEYS="Down;" \
+      sh "$LS" lo-1 "$WT" bypassPermissions "prompt"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"LO_TRUST_KEYS key 'Down;' not in allowlist"* ]]
+  [ ! -e "$sd/env-log" ]
+}
+
+@test "LO_TRUST_KEYS: a glob token is checked as itself, not expanded to file names (error) (#290 K8)" {
+  gd="$BATS_TEST_TMPDIR/globdir"; mkdir -p "$gd"; : > "$gd/Enter"
+  cd "$gd"
+  run env LO_DRY_RUN=1 LO_TRUST_KEYS='*' sh "$LS" lo-1 "$WT" bypassPermissions "prompt"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"LO_TRUST_KEYS key '*' not in allowlist"* ]]
 }
