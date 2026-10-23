@@ -62,6 +62,21 @@ A fresh-context subagent, read-only on this checkout, re-fetched every source an
 | Spring page scope: reproduced only on Boot 2.7 | Re-ran on spring-core 6.1.14 + spring-boot 3.3.5 with identical results. Step 1 now attributes the underscore form to `SystemEnvironmentPropertySource` and the dash-removed form to Boot's documented rule |
 | Spring page examples carried one incident's config names | Body and index line now use the neutral `client.payment-api.key` / `PAYMENT_API_TOKEN`. The reproduction and field-case source lines keep the key that was actually run |
 
+## Decision Log
+
+- **Intent:** land one reviewable batch of verified, general insights. This finishes the interrupted 2026-10-13 flush's five candidates instead of draining the whole queue (89 claimable rows) into one PR.
+- **Excluded alternatives:**
+  - Taking the interrupted run's drafts as they were. Rejected: one quoted Spring Boot example was not on the cited page, and two pages it linked to had never been written.
+  - Ingesting `79fb89fc3a0b12da`. Rejected: a duplicate of completion-response-validation.
+  - Putting the CDN page under security/api-exposure or infrastructure/observability. Rejected: neither owns "which edge resource carries a hostname's traffic".
+- **Where to look:**
+  - The new `infrastructure/edge` category (the only structural change).
+  - The CDN "on the path" row, which classifies by alias match, not DNS target.
+  - The Spring page's split between spring-core and Spring Boot env forms.
+- Self-review: independent subagent review, 1 round — 5 findings, all resolved (see "Independent review").
+
+Cross-Check: an independent fresh-context subagent re-fetched every source (21/21 quotes present) and re-checked each directive. Its 5 findings were resolved with new evidence: a Boot 3.3.5 reproduction, the CNAMEs precedence quote, and an rc-masking reproduction.
+
 ## Local-layer candidates
 
 none. The access-log candidate's evidence named one company's internal classes and tables; the ingested row keeps only the general mechanism and describes the field case generically.
