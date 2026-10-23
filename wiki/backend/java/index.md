@@ -24,6 +24,7 @@ load it alongside the stack page here — these pages link the exact ids.
 | Page | Load when |
 |------|-----------|
 | [proxy-pitfalls](spring/proxy-pitfalls.md) | A Spring annotation (`@Transactional`/`@Async`/`@Cacheable`/`@Retryable`) silently has no effect at runtime; reviewing where such annotations are placed — self-invocation, non-public methods, final classes/methods (Kotlin), calls from constructors/`@PostConstruct`; writing tests that assert the annotation's effect |
+| [env-var-named-after-a-property-key](spring/env-var-named-after-a-property-key.md) | Moving a secret or setting from `application.yml` into an environment variable referenced as `${ENV}`; naming that variable by upper-casing the property path (`client.payment-api.key` → `CLIENT_PAYMENT_API_KEY`), above all when the yml value composes it (`"Bearer ${…}"`, `"${HOST}:${PORT}"`); an outbound call fails with 401/400 right after such a change while the app boots normally |
 
 ## runtime
 

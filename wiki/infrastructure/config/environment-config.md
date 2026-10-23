@@ -9,7 +9,7 @@ sources:
   - https://12factor.net/build-release-run
   - https://12factor.net/dev-prod-parity
 last_verified: 2026-07-10
-related: [infrastructure-deploy-rollout-and-rollback, infrastructure-ci-cd-secrets-handling, backend-node-boundaries-runtime-validation, backend-python-boundaries-runtime-validation, backend-common-integrations-externally-owned-defaults, infrastructure-config-path-valued-config, platforms-shells-env-var-off-switches, backend-common-llm-project-local-layer-over-shared-guidance, backend-common-orm-prisma-7-config-env-and-generated-client, backend-node-runtime-env-files-with-process-loadenvfile]
+related: [infrastructure-deploy-rollout-and-rollback, infrastructure-ci-cd-secrets-handling, backend-node-boundaries-runtime-validation, backend-python-boundaries-runtime-validation, backend-common-integrations-externally-owned-defaults, infrastructure-config-path-valued-config, platforms-shells-env-var-off-switches, backend-common-llm-project-local-layer-over-shared-guidance, backend-common-orm-prisma-7-config-env-and-generated-client, backend-node-runtime-env-files-with-process-loadenvfile, backend-java-spring-env-var-named-after-a-property-key]
 ---
 
 # Configuration That Differs Per Environment
