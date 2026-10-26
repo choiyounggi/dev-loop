@@ -11,8 +11,12 @@ sources:
   - https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
   - https://cmu-sei.github.io/secure-coding-standards/sei-cert-oracle-coding-standard-for-java/rules/input-output-fio/fio16-j/
   - https://zod.dev/api
-last_verified: 2026-09-03
-related: [security-authz-resource-level-checks, frontend-security-xss-safe-rendering, security-agent-exposure-in-session-tool-exposure, platforms-filesystems-trailing-separator-under-realpath, testing-quality-host-disguise-fixtures-for-url-allowlists]
+  - https://docs.python.org/3/library/json.html
+  - https://www.rfc-editor.org/rfc/rfc8259
+  - https://docs.python.org/3/library/codecs.html
+  - https://www.rfc-editor.org/rfc/rfc3629
+last_verified: 2026-10-26
+related: [security-authz-resource-level-checks, frontend-security-xss-safe-rendering, security-agent-exposure-in-session-tool-exposure, platforms-filesystems-trailing-separator-under-realpath, testing-quality-host-disguise-fixtures-for-url-allowlists, backend-common-api-design-idempotency]
 ---
 
 # Validating Data at a Trust Boundary
@@ -52,6 +56,7 @@ from other services/queues.
 | Case | Then |
 |------|------|
 | Free-text field (names, comments) where an allowlist is too restrictive | Validate length and encoding (valid UTF-8, no control characters); safety comes from sink-side encoding, not from restricting content |
+| A client-supplied JSON string becomes a stored key (idempotency key, dedup or event id) or carries a length limit | Encode it to UTF-8 at the boundary and answer 400 when that fails, then enforce the limit on the encoded byte count. JSON's grammar admits an unpaired surrogate escape such as `"\ud800"` (RFC 8259 §8.2), Python's `json` returns it as a `str`, and the UTF-8 codec refuses it — so a type and non-empty check pass and the error surfaces later as a 500 inside the database driver. `len()` counts code points, so 128 × `é` is 256 bytes. Test both sides of the limit with 2-, 3- and 4-byte characters (85 × `가` = 255 bytes, 64 emoji = 256 bytes) |
 | Feature must accept and preserve rich-text HTML | The one sanitize case: run an allowlist-based maintained sanitizer, per [frontend-security-xss-safe-rendering] |
 | Message from your own internal service ("we trust our services") | Validate the shape at the consumer boundary anyway — the sender can be buggy or compromised; a trust boundary is wherever data enters code that acts on it |
 | Header value used in logic (`X-Forwarded-For`, `Host`) | Client-settable: validate format and accept forwarding headers only from your configured trusted proxy before using them |
@@ -77,4 +82,9 @@ from other services/queues.
 - https://cmu-sei.github.io/secure-coding-standards/sei-cert-oracle-coding-standard-for-java/rules/input-output-fio/fio16-j/ — FIO16-J: canonicalize path names before validating, then confirm the canonical path is within the secure/base directory
 - https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html — "Syntactic validation should enforce correct syntax of structured fields"; "Semantic validation should enforce correctness of their values in the specific business context"; "Minimum and maximum value range check for numerical parameters"
 - https://zod.dev/api — `z.number().min(n)` / `.max(n)` (aliases of `.gte()`/`.lte()`) reject out-of-range numbers at parse time; there is no built-in clamp
+- https://docs.python.org/3/library/json.html — "Standard Compliance and Interoperability": the RFC "does not explicitly forbid JSON strings which contain byte sequences that don't correspond to valid Unicode characters (e.g. unpaired UTF-16 surrogates)"; "By default, this module accepts and outputs (when present in the original str) code points for such sequences"
+- https://www.rfc-editor.org/rfc/rfc8259 — §8.2 Unicode Characters: a string such as `"\uDEAD"` (a single unpaired surrogate) is allowed by the grammar, and the behavior of software receiving it is unpredictable
+- https://docs.python.org/3/library/codecs.html — error-handler table, `surrogatepass`: without it the utf-8/utf-16/utf-32 codecs treat a surrogate code point in a `str` as an error
+- https://www.rfc-editor.org/rfc/rfc3629 — UTF-8 encodes U+0080–U+07FF in 2 bytes, U+0800–U+FFFF in 3, U+10000 and above in 4 (the byte arithmetic in the edge row)
+- Field evidence 2026-10-26 (an event-consume route storing a client-supplied id under a 255-byte bound, sqlite driver): `"\ud800x"` raised inside the driver until an encode check returned 400; 85 × `가` (255 bytes) was accepted and 64 emoji (256 bytes) refused
 - Field evidence 2026-08-18 (mechameleon-web, review server-core-r1 F1): the server stored schema-valid placement values unclamped; `x=-9999` and `scale=0.01` put a player's figure off-screen or invisible, so a hidden player won by default. Fixed with a server-side `clampStickman` at save time plus three boundary/abuse tests

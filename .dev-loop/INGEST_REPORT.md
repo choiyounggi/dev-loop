@@ -1,164 +1,138 @@
-# Knowledge flush — 3 insight(s) (headless auto-flush run 20261022-134153-21632)
+# Knowledge flush — 2 insight(s) (headless auto-flush run, 2026-10-26)
 
-18 queue rows were claimed this run: 3 ingested, 1 dropped as a duplicate of the
-merged wiki, 13 dropped as project-specific plan-gap rows, 1 released because it
-plausibly overlaps open PR #291. Nothing was folded into another branch.
+4 queue rows were claimed this run: 2 ingested as edge rows, 1 dropped as a
+duplicate of the merged wiki, 1 dropped as a project-specific plan-gap row.
+Nothing was released, and nothing was folded into another branch.
 
 | Candidate | Domain | Disposition |
 |-----------|--------|-------------|
-| `f7273179a74dcb80` — secret in an HTTP header leaks through `http.client`'s `ValueError` | security | **ingested** — edge row in `security-secrets-secrets-in-code` (verified) |
-| `3d610c1206e1bdd6` — text nobody sent in an agent CLI's input box is the grey prompt suggestion | infrastructure | **ingested** — edge row in `infrastructure-agent-orchestration-pane-delivery-confirmation` (verified docs + field observation) |
-| `0a0ccc4ca0904514` — e2e failure moving between tests under host CPU contention | testing | **ingested** — new page `testing-flaky-e2e-failures-moving-under-host-cpu-contention` (field-tested) |
-| `97c37473b53e63c2` — string-pattern `replace`: `$n` stays literal, `$$`/`$&`/`` $` ``/`$'` expand | backend (queued as frontend) | dropped — duplicate of merged page |
-| `446c58c78d5e467f` — `git diff --numstat` count depends on the diff algorithm | testing | released — plausible overlap with open PR #291 |
-| 13 plan-gap rows (see Local-layer candidates) | — | dropped — project-specific |
+| `831eb7e1a4f7b87b`: a client JSON string used as a stored key or held to a byte limit | security | **ingested**: edge row on `security-input-validation-at-trust-boundaries` (verified) |
+| `f477f9408b951e78`: replacing exact-text workflow tests with one structural checker | testing | **ingested, corrected**: edge row on `testing-quality-ci-workflow-step-behavior-tests` (field-tested) |
+| `18eda0a34f791854`: a same-second, same-size `.py` rewrite runs stale `.pyc` | testing | dropped as a duplicate of `backend-python-language-bytecode-cache-staleness` |
+| `4fd103753eedf249`: t1-trust-select plan-gap (which key answers a numbered trust screen) | — | dropped as project-specific (see Local-layer candidates) |
 
 ## Verified best-practice
 
-**`f7273179a74dcb80` — confidence: verified.** Claim: when a script puts a secret
-from an env var into an HTTP header via Python `http.client`/`urllib`, a value
-with a bare CR/LF (a pasted key ending in `\n`) makes `putheader` raise a
-`ValueError` whose message contains the whole header value, so a traceback that
-escapes the script's own redaction prints the key.
-- CPython `Lib/http/client.py` (https://github.com/python/cpython/blob/main/Lib/http/client.py):
-  read in the local CPython 3.9 source — l.138
-  `_is_illegal_header_value = re.compile(rb'\n(?![ \t])|\r(?![ \t\n])').search`;
-  l.1234-1235 `if _is_illegal_header_value(values[i]): raise ValueError('Invalid header value %r' % (values[i],))`.
-  A trailing `\n` matches `\n(?![ \t])`, and `%r` repeats the full encoded value.
-  Web search confirmed the check came from the CVE-2016-5699 header-injection fix.
-  The `main`-branch file was not fetched in this run (WebFetch is not allowed here);
-  the cited line numbers are from 3.9.
-- Field reproduction (session evidence): on Python 3.13 and 3.11 the key appeared
-  in the traceback; after the pre-request check plus catch-all redaction, 0 key hits
-  and the mutation checks went red.
+**`831eb7e1a4f7b87b` (confidence: verified).** Claim: when a client-supplied
+JSON string becomes a stored key or has a length limit, encode it to UTF-8 at
+the boundary and return 400 if that fails. Then enforce the limit on the
+encoded byte count, and test both sides of it with 2-, 3- and 4-byte characters.
 
-**`3d610c1206e1bdd6` — confidence: verified (docs) + field observation.** Claim:
-in a Claude Code pane read through `tmux capture-pane`, grey text in the input box
-that nobody sent is the CLI's prompt suggestion. Plain capture drops styling, so the
-suggestion looks like an unsubmitted prompt.
-- https://code.claude.com/docs/en/interactive-mode (fetched 2026-10-22), "Prompt
-  suggestions": "shows a grayed-out example command in the prompt input"; after a
-  response it "can suggest your next prompt"; "Press `Tab` or `Right arrow` to place
-  the suggestion in the prompt input, then `Enter` to submit"; "Start typing to dismiss it".
-- tmux man page (https://man7.org/linux/man-pages/man1/tmux.1.html; same wording read
-  from the local tmux 3.7b `tmux.1`, l.2693-2696): "If -e is given, the output includes
-  escape sequences for text and background attributes."
-- Field observation (run i41): the box showed "승인됐습니다. 계획대로 구현하세요."
-  after `plan_ready`; `send-prompt.sh state lo-1-i41` → `ready` rc 0; the next real send
-  reported `delivered`.
-- Not claimed: which escape code (dim SGR 2 vs a grey colour) the CLI uses. The page
-  says "grey/dim" to match the docs' "grayed-out".
+- https://docs.python.org/3/library/json.html, section "Standard Compliance and
+  Interoperability" (confirmed by a docs.python.org-restricted search): the RFC
+  "does not explicitly forbid JSON strings which contain byte sequences that
+  don't correspond to valid Unicode characters (e.g. unpaired UTF-16
+  surrogates)"; "By default, this module accepts and outputs (when present in
+  the original str) code points for such sequences".
+- https://www.rfc-editor.org/rfc/rfc8259 §8.2: the grammar allows a lone
+  surrogate escape such as `"\uDEAD"`, and the behavior of software that
+  receives one is unpredictable. The page paraphrases this; it does not quote it.
+- https://docs.python.org/3/library/codecs.html, error-handler table: without
+  `surrogatepass`, the utf-8/16/32 codecs treat a surrogate code point in a
+  `str` as an error. This is the `UnicodeEncodeError` the DB driver hit.
+- https://www.rfc-editor.org/rfc/rfc3629 gives the UTF-8 byte widths: 2 bytes
+  for U+0080–07FF, 3 for U+0800–FFFF, 4 from U+10000. That checks the
+  candidate's numbers: 128 × `é` = 256 bytes, 85 × `가` = 255, 64 emoji = 256.
+- Field case from the session: `"\ud800x"` raised inside the sqlite driver
+  until the encode check made it return 400.
+- This run could not run Python because Bash is limited to the queue tool and
+  `gh pr list`. The behavior of the codec and the json module rests on the docs
+  above plus the session's field case.
 
-**`0a0ccc4ca0904514` — confidence: field-tested.** Claim: on a shared host, a
-browser e2e failure that moves to a different timing-dependent test on each re-run
-is CPU contention until shown otherwise. Measure load and foreign headless browsers,
-re-run once after 60 s quiet, and report every run line.
-- https://playwright.dev/docs/test-cli — `--workers` defaults to 50% of logical CPU
-  cores (already cited on the wiki; it sizes to the host's cores, not to free capacity).
-- https://playwright.dev/docs/ci — recommends `workers: 1` in CI "to prioritize
-  stability and reproducibility", so each test gets the full system resources. This was
-  confirmed only through a web-search summary of the official page; the page was not
-  fetched in this run.
-- Field observation (2026-10-18, 36-test Playwright suite): load avg 19 with a foreign
-  `chrome-headless-shell` at 110% CPU → "1 failed" at `leave.spec.ts:37`, then at
-  `game-bell.spec.ts:33`; after 60 s with no headless browser → "36 passed (50.9s)".
-  This is a single host, so the page is field-tested, not verified.
+**`f477f9408b951e78` (confidence: field-tested; the directive is corrected).**
+The candidate said: delete each old test that goes red on at least one of the
+new checker's mutants. That only shows the two tests overlap. An old test that
+guards a second property can pass this check and still be deleted unsafely.
+The ingested row uses the subset rule instead: delete an old test only when
+the new check is red on every mutant that turns that old test red. Keep the
+old test (or move its assertion into the new check) when it is red on a mutant
+the new check passes. Write a mutant for any old test that no mutant turns red.
 
-**`97c37473b53e63c2`** — the claim is correct (MDN replacement-pattern table; the node
-evidence in the row), but it is already on the merged wiki. See Existing-layer check.
+- Basis: mutation-score-preserving test-suite reduction. A suite is minimal
+  when removing any test lowers the mutant score, so a test can be dropped only
+  when the remaining tests kill every mutant it kills.
+  - https://www.cefns.nau.edu/~adg326/tr17.pdf
+  - https://www.cefns.nau.edu/~adg326/ase16.pdf
+  - Both were read **through web-search summaries only**. The PDFs were not
+    opened, so nothing on the page quotes them. That is why the row is
+    field-tested, not verified.
+- Related definition: mutant subsumption (Kurtz/Ammann et al.;
+  https://arxiv.org/pdf/1601.06466, also seen only in a search summary). It is
+  not cited on the page.
+- Field case: the removed `WiringTest`s were run against mutants M2/M4/M5/M7/M8/M10.
+  Each removed test failed on at least one, and none failed on the real file.
+
+**`18eda0a34f791854`: not re-researched.** It is a duplicate (see the next
+section). The existing page already cites docs.python.org import and cmdline
+docs plus PEP 552.
+
+**`4fd103753eedf249`: not researched.** It is a plan-gap row that records one
+design decision for the dev-loop repository's own trust-dialog answerer, so
+there is no general best-practice to verify.
 
 ## Existing-layer check
 
-Pages read: security-secrets-secrets-in-code, infrastructure-ci-cd-secrets-handling, infrastructure-agent-orchestration-pane-delivery-confirmation, testing-flaky-diagnosing-flaky-tests, testing-flaky-docker-vm-oversubscription-under-parallel-containers, testing-e2e-e2e-stability, backend-node-language-string-replace-replacement-patterns
+Pages read: security-input-validation-at-trust-boundaries, backend-common-api-design-idempotency, backend-python-language-bytecode-cache-staleness, testing-quality-ci-workflow-step-behavior-tests, testing-quality-source-text-wiring-assertions
 
-- **security-secrets-secrets-in-code** — merge target for `f727`. Its edge table
-  already has two "a library echoes the secret" rows: a URL-query key logged by HTTP
-  clients, and a DSN echoed in an error. The header-value `ValueError` is a third path
-  of the same kind, so it was added as one edge row, not a new page. One source line
-  and one field-evidence line were added. `last_verified` was left at 2026-07-12
-  because the other rows were not re-checked.
-- **infrastructure-ci-cd-secrets-handling** — read as a possible target (job-log
-  masking). Not chosen: it covers how the pipeline handles secrets, and this is a
-  script's own exception text. No edit.
-- **infrastructure-agent-orchestration-pane-delivery-confirmation** — merge target for
-  `3d61`. It already owns the input-box rows for this CLI (the `[Pasted text` placeholder,
-  where the input box sits). The suggestion case is a sibling edge row. Added the
-  interactive-mode doc to frontmatter sources, plus three Sources lines (tmux `-e`
-  quote, docs quote, field observation).
-- **testing-flaky-diagnosing-flaky-tests** — closest owner for `0a0c`. It is
-  `confidence: verified`. The 2026-10-22 log shows that the Wiki agent gate blocked
-  merging a single-field-reproduction mechanism into this page (the PR #275 split).
-  Following that precedent, the mechanism went to its own field-tested page. This page
-  gets one pointer edge row and a `related:` id; its confidence and date are unchanged.
-- **testing-flaky-docker-vm-oversubscription-under-parallel-containers** — the nearest
-  sibling: resource ceiling, different subset failing each run. It is a different case
-  (container memory, `409` errors, its own trigger), so the new page was not merged into
-  it. The two are cross-linked from the new page's `related:` and an edge row.
-- **testing-e2e-e2e-stability** — read for e2e overlap. It covers selectors, waits,
-  and data, not host contention. Linked from the new page's `related:`; no edit.
-- **backend-node-language-string-replace-replacement-patterns** — already says
-  `$n` / `$<name>` work for "regex patterns only; otherwise left literal", and has the
-  edge row "A string `from` (no captures) → `$1` stays literal, but `$$`, `$&`, `` $` ``,
-  `$'` still expand". That is exactly what `97c3` asks for, so it was dropped as a duplicate.
+`wiki_search` (k=6) hits considered:
 
-No conflicting directive was found and no page was superseded.
+| Candidate | Top hits | Same trigger? |
+|-----------|----------|---------------|
+| JSON key / UTF-8 bytes | exposing-an-origin-http-api 0.755, default-encoding-in-text-io 0.728, object-key-persistence 0.725, idempotency 0.722, runtime-validation 0.721; second query: minimum-case-set 0.760, multiline-form-values-arrive-with-crlf 0.747 | No page covers unpaired surrogates or byte-vs-character limits. validation-at-trust-boundaries already says "validate length and encoding (valid UTF-8)" for free text, so this is the same trigger family. **Merged** as an edge row there, with a pointer row and `related:` added both ways to idempotency |
+| stale `.pyc` | bytecode-cache-staleness 0.774 / 0.773 / 0.764, default-encoding-in-text-io 0.790 (whose row points to bytecode-cache-staleness) | **Same trigger, same directive.** Steps 1–2 and 5 already cover same-size, same-second rewrites. Its `-B`/`PYTHONDONTWRITEBYTECODE` row also shows the candidate's suggested `-B` fix is not enough on its own, because an existing `.pyc` is still read. **Dropped** as a duplicate |
+| replace exact-text tests | failing-test-first 0.782, anchor-cases-for-allowlist-regexes 0.774, surviving-mutant-equivalence-triage 0.768, ci-workflow-step-behavior-tests 0.803 (workflow query) | ci-workflow-step-behavior-tests owns exact-text workflow tests and how to replace them. It does not cover deciding which old tests to delete. **Merged** as an edge row. source-text-wiring-assertions was considered but is already 146 lines, over the cap |
+
+No conflicts with existing directives. No page was superseded.
 
 ## Open-PR check
 
-Open `knowledge/*` heads at flush time (`gh pr list --repo choiyounggi/dev-loop
---state open --json number,headRefName --search "head:knowledge/"`):
-**#291** (`knowledge/autoflush-20261022-124048-18072`).
+`gh pr list --repo choiyounggi/dev-loop --state open --search "head:knowledge/"`
+returned 4 heads. This run has no git access, so it compared each PR's
+changed-file list and body (from `gh pr list --json files,body`) against the
+candidates instead of reading their diffs.
 
-This headless run cannot `git diff` that branch, and `gh pr view` / the GitHub MCP
-file list were not allowed. Overlap was judged from the queue rows that #291's run
-retired, using their `outcome` fields. #291 touches
-`testing-quality-anchor-cases-for-allowlist-regexes`,
-`testing-quality-checks-that-cannot-pass`,
-`qa-process-blind-llm-judgment-of-a-visual-rule`, and a new page
-`platforms-shells-non-ascii-text-after-an-unbraced-parameter`.
+| PR | Topics / wiki files touched | Overlap with a candidate |
+|----|-----------------------------|--------------------------|
+| #300 | Gradle include filters, HMAC key length, Slack webhook probe, secrets in approved commands, `.env` targets, worktree pre-push; touches `security/secrets/secrets-in-code`, `testing/quality/{tests-that-cannot-fail,checks-that-cannot-pass,new-test-outside-a-runner-include-filter}`, `security/index.md`, `testing/index.md` | None. Neither target page is touched |
+| #299 | gh paginate, ktlint final newline, command-guard exemptions, grep pitfalls, incidental unique invariants; touches `security/agent-exposure/command-guard-exemption-matching`, `security/index.md` | None |
+| #298 | gateway aliases, Spring env-var names, CDN traffic path, stderr in captures | None |
+| #293 | git diff algorithm line counts; touches `testing/quality/{diff-algorithm-dependent-line-counts,json-manifest-edit-gates}`, `testing/index.md` | None |
 
-- `f727` (security, secret in an HTTP header) — **new**: #291 touches no security page.
-- `3d61` (agent pane input box) — **new**: #291's only platforms/infrastructure page is
-  a bash parameter-expansion page, which is a different trigger.
-- `0a0c` (e2e flakiness under CPU contention) — **new**: #291 touches no `testing/flaky`
-  or e2e page.
-- `97c3` — not compared against #291: it was dropped against the merged layer.
-- `446c58c78d5e467f` (exact `git diff --numstat` count as a gate's expected value) —
-  **drop (plausible overlap)**, so its claim was **released**, not retired. It is a
-  gate-design lesson in `testing/quality`, and #291 is editing two `testing/quality`
-  gate pages (`checks-that-cannot-pass`, `anchor-cases-for-allowlist-regexes`). This run
-  cannot diff #291, so the manual flush should decide whether to fold it in or ingest it
-  as new.
+Verdicts:
+- `831eb7e1a4f7b87b`: **new**.
+- `f477f9408b951e78`: **new**.
+- `18eda0a34f791854`: dropped against the merged wiki, not against an open PR.
+- `4fd103753eedf249`: excluded by the layer test, so it was not compared.
+
+Possible merge conflicts, not duplicate content:
+- `log.md`: every open flush PR appends to it.
+- `security/index.md`: also edited by #299 and #300. This PR changes only the `input` row.
+- `testing/index.md`: also edited by #293 and #300. This PR changes only the `ci-workflow-step-behavior-tests` row.
 
 ## Routing decision
 
-- `f7273179a74dcb80` → `security` / `secrets` → edge row in
-  `wiki/security/secrets/secrets-in-code.md`; security index "load when" extended.
-- `3d610c1206e1bdd6` → `infrastructure` / `agent-orchestration` → edge row in
-  `wiki/infrastructure/agent-orchestration/pane-delivery-confirmation.md`; infrastructure
-  index "load when" extended. Written generally (any helper that classifies the box, or
-  `capture-pane -e`); the dev-loop helper `send-prompt.sh` appears only in the evidence line.
-- `0a0ccc4ca0904514` → `testing` / `flaky` → new page
-  `wiki/testing/flaky/e2e-failures-moving-under-host-cpu-contention.md` (field-tested).
-  There is no new category: `flaky` already holds the sibling resource-ceiling page.
-  A pointer edge row and a `related:` id were added in `diagnosing-flaky-tests`, and a
-  testing index row was added. The INDEX.md testing line already covers "flaky tests".
-- `log.md` has one entry appended for this run.
+| Candidate | Target | Action |
+|-----------|--------|--------|
+| 831eb7e1a4f7b87b | security/input/validation-at-trust-boundaries | +1 edge row, +4 sources, `last_verified` 2026-10-26; idempotency gets a pointer row and a related id both ways (its date is unchanged); security index "load when" extended |
+| f477f9408b951e78 | testing/quality/ci-workflow-step-behavior-tests | +1 edge row, +2 sources (labelled as read through search summaries) plus the field case; `last_verified` unchanged because the new row is field-tested; testing index "load when" extended |
+| 18eda0a34f791854 | — | dropped (duplicate) |
+| 4fd103753eedf249 | — | dropped (project-specific plan-gap) |
+
+No new category was needed. Both general rows had their project names removed:
+the field case is described as "an event-consume route" and "a CI workflow".
 
 ## Local-layer candidates
 
-These 13 plan-gap rows are excluded from this PR. Each records a design decision for
-the `emperor` (linkly) repository's own files, so each would be wrong in another
-codebase. Run wiki-ingest inside that project to keep any of them:
+One row is excluded from this PR. It records a t1-trust-select design decision
+for the dev-loop repository's own orchestrate tooling (the `tetra` workspace).
+That decision: which digit to send to a numbered Claude Code trust or
+bypass-permissions screen, and never to send Enter after it. To keep it, run
+wiki-ingest inside that project.
 
 | Row | Decision | Target |
 |-----|----------|--------|
-| `3632d0989f629104`, `7bfb7541e4e4bd8c` | t242 SECURITY.md sections and policy values | `wiki-local/security/disclosure/security-policy-file.md` |
-| `9700770d7c05b820` | t242 `.github/CODEOWNERS` layout | `wiki-local/infrastructure/repo-governance/codeowners-layout.md` |
-| `3d578bcfcbcc6b97`, `410400eb22f77f77` | t242 CODE_OF_CONDUCT.md source and contact | `wiki-local/infrastructure/repo-governance/code-of-conduct-source.md` |
-| `54aeaa8fdee5e0e7` | t242 mutation harness `TREE_CONTENTS` for new root files | `wiki-local/testing/quality/mutation-tree-contents.md` |
-| `0e0e7c7c4cef34c3` | t252 per-runner concurrency group for `_ai-gate.yml` | `wiki-local/infrastructure/ci-cd/ai-gate-concurrency-groups.md` |
-| `05df421bf905f5ce` | t252 `response_format: json_object` for the HTTP gate runner | `wiki-local/backend/llm/ai-gate-structured-output-mode.md` |
-| `1670e43e60cb7fe3`, `2df80edab8d41dfb` | t252 / t257 CHANGELOG bullet placement | `wiki-local/qa/release/changelog-bullet-placement.md` |
-| `1666b8cf32e274ea` | t257 `_relay_batch` calls begin/commit/rollback directly | `wiki-local/backend/outbox/relay-transaction-calls.md` |
-| `5ee53f499cc8d657`, `744090ce219677c0` | t249a1 RFC-0007 Review stage and §2.2 rule-5 chain notes | `wiki-local/qa/spec-process/rfc-promotion-checks.md` |
+| `4fd103753eedf249` | t1-trust-select D2: which key answers a numbered screen | `wiki-local/infrastructure/agent-orchestration/numbered-trust-screen-key.md` (dev-loop repo) |
+
+The two ingested candidates are general. The duplicate's evidence came from
+linkly's `RELAY_BATCH_LIMIT`, but its lesson is general and is already in the
+bundled wiki.
