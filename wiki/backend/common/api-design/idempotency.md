@@ -9,7 +9,7 @@ sources:
   - https://www.rfc-editor.org/rfc/rfc9110
   - https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues.html
 last_verified: 2026-07-10
-related: [backend-common-jobs-idempotent-handlers, backend-common-reliability-timeouts-and-retries, databases-query-optimization-existence-and-count-checks]
+related: [backend-common-jobs-idempotent-handlers, backend-common-reliability-timeouts-and-retries, databases-query-optimization-existence-and-count-checks, security-input-validation-at-trust-boundaries]
 ---
 
 # Making Side-Effecting Endpoints Safe to Retry
@@ -58,6 +58,7 @@ Idempotency-key implementation:
 | Effect cannot join the key's DB transaction (external system) | Store progress state under the key (e.g. `charge_started`, `charge_confirmed`); on retry, resume/verify from the recorded state instead of restarting |
 | Client cannot send a key (plain browser form double-submit) | Derive the key server-side from request identity fields (e.g. user id + order draft id) and enforce it with the same unique constraint |
 | Key store grows unbounded | Prune rows older than the expiry window from step 6 |
+| The key is a client-supplied string with a length bound | Validate it as UTF-8-encodable and measure the bound in encoded bytes at the boundary, before step 1 stores it ([security-input-validation-at-trust-boundaries]) |
 
 ## Instead of
 

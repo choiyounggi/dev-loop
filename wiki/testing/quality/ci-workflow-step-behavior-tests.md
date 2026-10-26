@@ -9,6 +9,8 @@ sources:
   - https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-output-parameter
   - https://docs.github.com/en/actions/concepts/security/script-injections
   - https://docs.github.com/en/actions/reference/security/secure-use#use-an-intermediate-environment-variable
+  - https://www.cefns.nau.edu/~adg326/tr17.pdf
+  - https://www.cefns.nau.edu/~adg326/ase16.pdf
 last_verified: 2026-10-06
 related:
   [
@@ -75,6 +77,7 @@ broken step.
 | The step runs on a Windows runner (default `pwsh`) | The table covers Linux/macOS shells only; run the script with `pwsh -command ". '<file>.ps1'"` and write outputs with `$env:GITHUB_OUTPUT`, per the same reference pages |
 | The step's job uses `defaults.run.shell` | Read the shell from the job's or workflow's `defaults` when the step has no `shell:` of its own |
 | A test that reads the YAML as text must stay (it checks a trigger or permission key, not logic) | Assert the parsed key, not a substring; the parsed value fails on a misplaced key that a substring still finds |
+| You are replacing several exact-text workflow tests with one structural or executed check and want to delete the old ones | Seed one workflow mutant per property each old test guards, run the old tests and the new check on every mutant and on the real file, and delete an old test only when the new check is red on every mutant that turns that old test red. Keep it, or move its assertion into the new check, when it is red on a mutant the new check passes. An old test that no mutant turns red is unproven, so write a mutant for it before judging it. "Red on at least one of the new check's mutants" shows overlap, not coverage: the old test may guard a second property the new check never sees |
 
 ## Instead of
 
@@ -91,4 +94,6 @@ broken step.
 - https://docs.github.com/en/actions/concepts/security/script-injections — "Before the shell script is run, the expressions inside `${{ }}` are evaluated and then substituted with the resulting values"
 - https://docs.github.com/en/actions/reference/security/secure-use#use-an-intermediate-environment-variable — the env-var form for inline scripts
 - Field measurement 2026-10-05 (a container-publish workflow): moving `echo "${image}:${xy}"` outside `if [[ "$TAG" != *-* ]]` left 14/14 substring tests green; after adding execution tests the same mutant failed the pre-release test, and two more mutants (no lowercasing, wrong alias cut) failed their own tests
+- https://www.cefns.nau.edu/~adg326/tr17.pdf and https://www.cefns.nau.edu/~adg326/ase16.pdf — test-suite reduction measured by killed mutants: a suite is minimal when removing any test lowers the mutant score, so a test is safe to drop only when the remaining tests kill every mutant it kills (read through search summaries on 2026-10-26, not quoted). The replacement row applies this per old test
+- Field case 2026-10-26 (a CI workflow whose exact-text wiring tests were replaced by one step-graph checker): the removed tests were run against six seeded workflow mutants the checker catches; each removed test went red on at least one and none went red on the real file. That check is the weaker "overlap" form the row warns about; the row's subset rule is the literature's criterion, so the row is field-tested rather than verified
 - Reproduction 2026-10-06 (bash 5.3, Ruby `YAML.load_file` to extract the step): on the correct workflow and on the moved-line mutant the substring check passed both times; the executed step with `TAG=v1.2.3-rc.1` produced exactly `ghcr.io/acme/app:v1.2.3-rc.1` on the correct workflow and an extra `…:v1.2.3-rc` line on the mutant

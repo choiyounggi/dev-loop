@@ -13,7 +13,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
-| [validation-at-trust-boundaries](input/validation-at-trust-boundaries.md) | Data crosses a trust boundary into your system — HTTP bodies/params/headers/cookies, file uploads, webhook payloads, inter-service messages; choosing injection defense per output sink (SQL, shell, HTML, filesystem path); deciding validate-reject vs sanitize; a persisted position/scale/coordinate value passes its schema yet breaks the rules of the space it lands in (clamp vs reject at the server write) |
+| [validation-at-trust-boundaries](input/validation-at-trust-boundaries.md) | Data crosses a trust boundary into your system — HTTP bodies/params/headers/cookies, file uploads, webhook payloads, inter-service messages; choosing injection defense per output sink (SQL, shell, HTML, filesystem path); deciding validate-reject vs sanitize; a persisted position/scale/coordinate value passes its schema yet breaks the rules of the space it lands in (clamp vs reject at the server write); a client-supplied JSON string becomes a stored key or carries a length limit (unpaired-surrogate escapes that fail UTF-8 encoding later, limits measured in bytes not characters) |
 
 ## api-exposure
 
