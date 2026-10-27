@@ -8,6 +8,7 @@ sources:
   - https://docs.npmjs.com/cli/v10/commands/npm-ci
   - https://docs.npmjs.com/cli/v10/configuring-npm/package-lock-json
   - https://pip.pypa.io/en/stable/topics/secure-installs/
+  - https://github.com/pypa/pip/issues/7172
   - https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/
   - https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates
 last_verified: 2026-07-10
@@ -54,6 +55,7 @@ malicious or compromised packages.
 | Urgent CVE in a transitive dependency the direct dep hasn't picked up | Apply a lockfile-level override (`overrides`/`resolutions`); remove it when the direct dependency updates |
 | Dependency shows no releases or issue activity across recent versions of its ecosystem | Plan a replacement or vendor the code — future CVEs in it will have no fix |
 | Monorepo/internal registry mixing internal and public names | Scope internal packages (`@org/…`) and pin the registry per scope — unscoped internal names invite dependency-confusion substitution from the public registry |
+| Writing the known-bad test that proves `pip install --require-hashes` rejects a tampered lockfile | Replace every `--hash` of the chosen package (wheel and sdist), install into a new venv (`python -m venv --clear`), and require exit 1 plus `THESE PACKAGES DO NOT MATCH THE HASHES` in the output. pip accepts an artifact that matches any one listed hash, and a package already in the venv is reported `Requirement already satisfied` without being downloaded or hash-checked. Field case (linkly t243, 2026-10-27): one-hash tamper → rc 0; all-hash tamper in the reused venv → rc 0; all-hash tamper in a `--clear` venv → rc 1 with the mismatch error |
 
 ## Instead of
 
@@ -67,6 +69,7 @@ malicious or compromised packages.
 
 - https://docs.npmjs.com/cli/v10/commands/npm-ci — clean installs strictly from the lockfile
 - https://docs.npmjs.com/cli/v10/configuring-npm/package-lock-json — lockfile purpose: reproducible dependency trees
-- https://pip.pypa.io/en/stable/topics/secure-installs/ — hash-checking mode for pinned installs
+- https://pip.pypa.io/en/stable/topics/secure-installs/ — hash-checking mode for pinned installs; "Multiple hashes per package" (several `--hash` values per requirement, one per alternative archive)
+- https://github.com/pypa/pip/issues/7172 — `--require-hashes` does not re-verify what is already installed in the environment (the chain of trust breaks when pip itself was upgraded before the hashed install)
 - https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/ — unmaintained/vulnerable components as a top risk
 - https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates — automated vulnerability update PRs

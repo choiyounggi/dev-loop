@@ -54,7 +54,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
-| [supply-chain](dependencies/supply-chain.md) | Adding a dependency (add-vs-write decision, name verification, install scripts); updating dependencies (auto-update PRs, major versions, transitive CVE overrides); hardening against malicious/compromised packages (lockfiles, reproducible installs) |
+| [supply-chain](dependencies/supply-chain.md) | Adding a dependency (add-vs-write decision, name verification, install scripts); updating dependencies (auto-update PRs, major versions, transitive CVE overrides); hardening against malicious/compromised packages (lockfiles, reproducible installs); writing the known-bad test that proves `pip --require-hashes` rejects a tampered lockfile |
 | [agent-skill-supply-chain](dependencies/agent-skill-supply-chain.md) | Installing or importing a third-party agent skill, plugin, or MCP server (Claude Code, opencode, a team skill marketplace); vetting an external SKILL.md before an agent can execute it; resolving the canonical owner of a trending skill repo; pinning skills by source+hash; a skill asks the agent to auto-register an MCP server; publishing skills for a team |
 
 ## incident-response
