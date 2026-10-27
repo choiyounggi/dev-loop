@@ -9,8 +9,10 @@ sources:
   - https://adr.github.io/madr/
   - https://www.rfc-editor.org/rfc/rfc2223.txt
   - https://www.rfc-editor.org/faq/
+  - https://www.rfc-editor.org/rfc/rfc9141
+  - "Field case 2026-10-27 (a spec-consolidation task; recorded by the originating session): a checker's superseded-or-kept verdict changed when a source definition line was removed"
 last_verified: 2026-09-17
-related: [qa-document-verification-retiring-a-provisional-marker, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal]
+related: [qa-document-verification-retiring-a-provisional-marker, qa-document-verification-spec-document-gates, infrastructure-agent-orchestration-escape-hatch-uses-as-a-knowledge-gap-signal, testing-quality-checks-that-cannot-pass]
 ---
 
 # Superseding a Knowledge Record That Turned Out Wrong
@@ -67,6 +69,7 @@ set's schema.
 | A tool loads records by glob, not through the index | Filter on the status field in that tool, or superseded guidance is loaded as current |
 | The old record's id encodes a category the successor does not share | Keep the old id as is; ids are citation targets, and the pointer carries the move |
 | Two records supersede one (a split) | Hold a list of successor ids, and state in each successor which part it took over |
+| You are folding a record and the later documents that amended it (*Updates*) into one successor, and must decide per section or definition whether a later amendment replaced it | Let a checker compute each verdict from the sources rather than writing it by hand. Collect the names defined in the code blocks of every amendment accepted after the original whose *Updates* line names that section chain, and skip the quoted old text (`OLD:` / **Old** blocks): it repeats the old definition, so a plain grep counts a rule the amendment never redefined as replaced. For a verdict branch no current item takes, force one item down it with an override (an env var) and require both outcomes — fail when the source line is missing, pass when it is present ([testing-quality-checks-that-cannot-pass]). A hand-written verdict keeps passing after the source changes |
 
 ## Instead of
 
@@ -83,4 +86,6 @@ set's schema.
 - https://adr.github.io/madr/ — the MADR template carries status as optional front matter with the value form `superseded by ADR-0123` ("These are optional elements. Feel free to remove any of them.")
 - https://www.rfc-editor.org/rfc/rfc2223.txt — §12 "Relation to other RFCs": *Updates* marks a supplement that "cannot stand on its own"; *Obsoletes* marks a document that "can be used alone, without reference to the older document"
 - https://www.rfc-editor.org/faq/ — "the status of an RFC can change" after publication, and the status is published on the RFC's info page and a list of status changes, apart from the document text
+- https://www.rfc-editor.org/rfc/rfc9141 — an updating RFC that quotes "the original text from an RFC to be updated" as OLD and the replacement as NEW, one OLD/NEW pair per updated RFC (read through a web-search summary only; this is one document's convention, not an IETF-wide rule)
+- Field case 2026-10-27 (a spec-consolidation task; recorded by the originating session): the checker judged four grammar rules replaced by later amendments. Removing the real definition line from one amendment's copy turned that verdict to kept (exit 1). Forcing one rule down the kept branch with an env override gave exit 1 without its source line and exit 0 with it. The amendments carried the old definitions in **Old** blocks
 - Field context 2026-09-17 (dev-loop issue #195): a 276-page agent wiki had no status field, so a refuted page could only be deleted, which broke the page paths recorded in earlier plan documents
