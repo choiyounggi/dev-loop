@@ -1,164 +1,93 @@
-# Knowledge flush — 3 insight(s) (headless auto-flush run 20261022-134153-21632)
+# Knowledge flush — 1 insight(s)
 
-18 queue rows were claimed this run: 3 ingested, 1 dropped as a duplicate of the
-merged wiki, 13 dropped as project-specific plan-gap rows, 1 released because it
-plausibly overlaps open PR #291. Nothing was folded into another branch.
-
-| Candidate | Domain | Disposition |
-|-----------|--------|-------------|
-| `f7273179a74dcb80` — secret in an HTTP header leaks through `http.client`'s `ValueError` | security | **ingested** — edge row in `security-secrets-secrets-in-code` (verified) |
-| `3d610c1206e1bdd6` — text nobody sent in an agent CLI's input box is the grey prompt suggestion | infrastructure | **ingested** — edge row in `infrastructure-agent-orchestration-pane-delivery-confirmation` (verified docs + field observation) |
-| `0a0ccc4ca0904514` — e2e failure moving between tests under host CPU contention | testing | **ingested** — new page `testing-flaky-e2e-failures-moving-under-host-cpu-contention` (field-tested) |
-| `97c37473b53e63c2` — string-pattern `replace`: `$n` stays literal, `$$`/`$&`/`` $` ``/`$'` expand | backend (queued as frontend) | dropped — duplicate of merged page |
-| `446c58c78d5e467f` — `git diff --numstat` count depends on the diff algorithm | testing | released — plausible overlap with open PR #291 |
-| 13 plan-gap rows (see Local-layer candidates) | — | dropped — project-specific |
+Headless auto-flush run (claimed by run `20261027-153900-24217`): 26 rows claimed —
+1 ingested, 21 dropped as project-specific plan-gaps, 4 released as plausible
+duplicates of open knowledge PRs.
 
 ## Verified best-practice
 
-**`f7273179a74dcb80` — confidence: verified.** Claim: when a script puts a secret
-from an env var into an HTTP header via Python `http.client`/`urllib`, a value
-with a bare CR/LF (a pasted key ending in `\n`) makes `putheader` raise a
-`ValueError` whose message contains the whole header value, so a traceback that
-escapes the script's own redaction prints the key.
-- CPython `Lib/http/client.py` (https://github.com/python/cpython/blob/main/Lib/http/client.py):
-  read in the local CPython 3.9 source — l.138
-  `_is_illegal_header_value = re.compile(rb'\n(?![ \t])|\r(?![ \t\n])').search`;
-  l.1234-1235 `if _is_illegal_header_value(values[i]): raise ValueError('Invalid header value %r' % (values[i],))`.
-  A trailing `\n` matches `\n(?![ \t])`, and `%r` repeats the full encoded value.
-  Web search confirmed the check came from the CVE-2016-5699 header-injection fix.
-  The `main`-branch file was not fetched in this run (WebFetch is not allowed here);
-  the cited line numbers are from 3.9.
-- Field reproduction (session evidence): on Python 3.13 and 3.11 the key appeared
-  in the traceback; after the pre-request check plus catch-all redaction, 0 key hits
-  and the mutation checks went red.
+**3cadd01011d4cb6e — the known-bad test for `pip install --require-hashes`.**
+Claim: to prove a hash-pinned lockfile rejects tampering, replace every `--hash`
+of the chosen package (wheel and sdist) and install into a fresh venv
+(`python -m venv --clear`); require rc 1 plus `THESE PACKAGES DO NOT MATCH THE HASHES`.
 
-**`3d610c1206e1bdd6` — confidence: verified (docs) + field observation.** Claim:
-in a Claude Code pane read through `tmux capture-pane`, grey text in the input box
-that nobody sent is the CLI's prompt suggestion. Plain capture drops styling, so the
-suggestion looks like an unsubmitted prompt.
-- https://code.claude.com/docs/en/interactive-mode (fetched 2026-10-22), "Prompt
-  suggestions": "shows a grayed-out example command in the prompt input"; after a
-  response it "can suggest your next prompt"; "Press `Tab` or `Right arrow` to place
-  the suggestion in the prompt input, then `Enter` to submit"; "Start typing to dismiss it".
-- tmux man page (https://man7.org/linux/man-pages/man1/tmux.1.html; same wording read
-  from the local tmux 3.7b `tmux.1`, l.2693-2696): "If -e is given, the output includes
-  escape sequences for text and background attributes."
-- Field observation (run i41): the box showed "승인됐습니다. 계획대로 구현하세요."
-  after `plan_ready`; `send-prompt.sh state lo-1-i41` → `ready` rc 0; the next real send
-  reported `delivered`.
-- Not claimed: which escape code (dim SGR 2 vs a grey colour) the CLI uses. The page
-  says "grey/dim" to match the docs' "grayed-out".
+- "Any one listed hash is enough" — pip's secure-installs docs, section
+  "Multiple hashes per package" (https://pip.pypa.io/en/stable/topics/secure-installs/):
+  a requirement may carry several `--hash` values, one per alternative archive, and
+  pip's original hash-checking change states at least one hash must match per
+  requirement. So tampering one hash leaves a matching one and the install passes.
+- "An already-installed package is not hash-checked" — pypa/pip#7172
+  (https://github.com/pypa/pip/issues/7172) documents that `--require-hashes` does
+  not re-verify what is already in the environment. No official docs page states the
+  "Requirement already satisfied" skip in those words; this half rests on the
+  issue plus the session's reproduction.
+- Session reproduction (linkly t243, 2026-10-27): one-hash tamper → rc 0; all-hash
+  tamper in the reused venv → rc 0 with "Requirement already satisfied: attrs==26.1.0";
+  all-hash tamper in a `--clear` venv → rc 1 with the hash-mismatch error.
 
-**`0a0ccc4ca0904514` — confidence: field-tested.** Claim: on a shared host, a
-browser e2e failure that moves to a different timing-dependent test on each re-run
-is CPU contention until shown otherwise. Measure load and foreign headless browsers,
-re-run once after 60 s quiet, and report every run line.
-- https://playwright.dev/docs/test-cli — `--workers` defaults to 50% of logical CPU
-  cores (already cited on the wiki; it sizes to the host's cores, not to free capacity).
-- https://playwright.dev/docs/ci — recommends `workers: 1` in CI "to prioritize
-  stability and reproducibility", so each test gets the full system resources. This was
-  confirmed only through a web-search summary of the official page; the page was not
-  fetched in this run.
-- Field observation (2026-10-18, 36-test Playwright suite): load avg 19 with a foreign
-  `chrome-headless-shell` at 110% CPU → "1 failed" at `leave.spec.ts:37`, then at
-  `game-bell.spec.ts:33`; after 60 s with no headless browser → "36 passed (50.9s)".
-  This is a single host, so the page is field-tested, not verified.
-
-**`97c37473b53e63c2`** — the claim is correct (MDN replacement-pattern table; the node
-evidence in the row), but it is already on the merged wiki. See Existing-layer check.
+Confidence: verified for the any-one-hash rule (docs); field-tested for the
+reused-venv skip (issue + reproduction). Written into the page as an edge row
+that names the field case; the page's own `confidence: verified` and
+`last_verified` are unchanged.
 
 ## Existing-layer check
 
-Pages read: security-secrets-secrets-in-code, infrastructure-ci-cd-secrets-handling, infrastructure-agent-orchestration-pane-delivery-confirmation, testing-flaky-diagnosing-flaky-tests, testing-flaky-docker-vm-oversubscription-under-parallel-containers, testing-e2e-e2e-stability, backend-node-language-string-replace-replacement-patterns
+wiki_search for the trigger ("pip require-hashes lockfile tamper negative control
+hash-checking mode", k=5) returned: security-dependencies-supply-chain (0.758),
+platforms-toolchains-version-management (0.738),
+backend-python-language-bytecode-cache-staleness (0.737),
+platforms-processes-lock-owner-pid-from-the-holding-process (0.727), and a
+second section of platforms-toolchains-version-management (0.720). Only the first covers hash-pinned
+installs; the others are toolchain pinning, `.pyc` staleness and lock ownership.
 
-- **security-secrets-secrets-in-code** — merge target for `f727`. Its edge table
-  already has two "a library echoes the secret" rows: a URL-query key logged by HTTP
-  clients, and a DSN echoed in an error. The header-value `ValueError` is a third path
-  of the same kind, so it was added as one edge row, not a new page. One source line
-  and one field-evidence line were added. `last_verified` was left at 2026-07-12
-  because the other rows were not re-checked.
-- **infrastructure-ci-cd-secrets-handling** — read as a possible target (job-log
-  masking). Not chosen: it covers how the pipeline handles secrets, and this is a
-  script's own exception text. No edit.
-- **infrastructure-agent-orchestration-pane-delivery-confirmation** — merge target for
-  `3d61`. It already owns the input-box rows for this CLI (the `[Pasted text` placeholder,
-  where the input box sits). The suggestion case is a sibling edge row. Added the
-  interactive-mode doc to frontmatter sources, plus three Sources lines (tmux `-e`
-  quote, docs quote, field observation).
-- **testing-flaky-diagnosing-flaky-tests** — closest owner for `0a0c`. It is
-  `confidence: verified`. The 2026-10-22 log shows that the Wiki agent gate blocked
-  merging a single-field-reproduction mechanism into this page (the PR #275 split).
-  Following that precedent, the mechanism went to its own field-tested page. This page
-  gets one pointer edge row and a `related:` id; its confidence and date are unchanged.
-- **testing-flaky-docker-vm-oversubscription-under-parallel-containers** — the nearest
-  sibling: resource ceiling, different subset failing each run. It is a different case
-  (container memory, `409` errors, its own trigger), so the new page was not merged into
-  it. The two are cross-linked from the new page's `related:` and an edge row.
-- **testing-e2e-e2e-stability** — read for e2e overlap. It covers selectors, waits,
-  and data, not host contention. Linked from the new page's `related:`; no edit.
-- **backend-node-language-string-replace-replacement-patterns** — already says
-  `$n` / `$<name>` work for "regex patterns only; otherwise left literal", and has the
-  edge row "A string `from` (no captures) → `$1` stays literal, but `$$`, `$&`, `` $` ``,
-  `$'` still expand". That is exactly what `97c3` asks for, so it was dropped as a duplicate.
+security-dependencies-supply-chain already says "install with hash-pinned
+requirements" (Do this #1) but has nothing on how to test that the pinning works.
+Same trigger area, same directive direction, new edge → merged as one edge-case
+row plus one new source (pypa/pip#7172); no new page. No conflict with an existing
+directive. The security index "load when" line for supply-chain was extended.
 
-No conflicting directive was found and no page was superseded.
+Pages read: security-dependencies-supply-chain
 
 ## Open-PR check
 
-Open `knowledge/*` heads at flush time (`gh pr list --repo choiyounggi/dev-loop
---state open --json number,headRefName --search "head:knowledge/"`):
-**#291** (`knowledge/autoflush-20261022-124048-18072`).
+Open `knowledge/*` heads (from `gh pr list`, file lists via `--json files`):
+#305 (qa/document-verification/superseding-a-knowledge-record),
+#304 (qa/process/completion-claims), #301 (security/input, testing/quality/ci-workflow-step-behavior-tests,
+backend idempotency), #300 (testing/quality/checks-that-cannot-pass, tests-that-cannot-fail,
+new-test-outside-a-runner-include-filter, security/secrets, …), #299 (platforms/tools/search-evidence-from-a-wrapped-grep,
+command-guard exemptions, …), #298 (backend/infrastructure/platforms config pages),
+#293 (testing/quality/diff-algorithm-dependent-line-counts, json-manifest-edit-gates).
+This headless run cannot diff PR content, so plausible overlap counts as a pending duplicate.
 
-This headless run cannot `git diff` that branch, and `gh pr view` / the GitHub MCP
-file list were not allowed. Overlap was judged from the queue rows that #291's run
-retired, using their `outcome` fields. #291 touches
-`testing-quality-anchor-cases-for-allowlist-regexes`,
-`testing-quality-checks-that-cannot-pass`,
-`qa-process-blind-llm-judgment-of-a-visual-rule`, and a new page
-`platforms-shells-non-ascii-text-after-an-unbraced-parameter`.
+| Row | Candidate | Overlapping open PR | Verdict |
+|-----|-----------|--------------------|---------|
+| 3cadd01011d4cb6e | pip `--require-hashes` known-bad test | none touches security/dependencies or pip | new |
+| f332524447ff2105 | grep self-match of a gates ledger; `grep` shell function hides it | #299 search-evidence-from-a-wrapped-grep | released (pending duplicate) |
+| c9e00eb2a93a55e3 | checker and composer sharing hand-typed source ranges | #300 tests-that-cannot-fail / checks-that-cannot-pass; #305 document consolidation | released (pending duplicate) |
+| b3a7b01998f7d6aa | whole-line "history" exemption hides a citation in a checker | #300 tests-that-cannot-fail; #305 citation handling in a superseding document | released (pending duplicate) |
+| bdb042f44f413d06 | mutation harness copied-tree list missing a new root file | #300 checks-that-cannot-pass / new-test-outside-a-runner-include-filter | released (pending duplicate) |
 
-- `f727` (security, secret in an HTTP header) — **new**: #291 touches no security page.
-- `3d61` (agent pane input box) — **new**: #291's only platforms/infrastructure page is
-  a bash parameter-expansion page, which is a different trigger.
-- `0a0c` (e2e flakiness under CPU contention) — **new**: #291 touches no `testing/flaky`
-  or e2e page.
-- `97c3` — not compared against #291: it was dropped against the merged layer.
-- `446c58c78d5e467f` (exact `git diff --numstat` count as a gate's expected value) —
-  **drop (plausible overlap)**, so its claim was **released**, not retired. It is a
-  gate-design lesson in `testing/quality`, and #291 is editing two `testing/quality`
-  gate pages (`checks-that-cannot-pass`, `anchor-cases-for-allowlist-regexes`). This run
-  cannot diff #291, so the manual flush should decide whether to fold it in or ingest it
-  as new.
+No fold into another branch in this headless run.
 
 ## Routing decision
 
-- `f7273179a74dcb80` → `security` / `secrets` → edge row in
-  `wiki/security/secrets/secrets-in-code.md`; security index "load when" extended.
-- `3d610c1206e1bdd6` → `infrastructure` / `agent-orchestration` → edge row in
-  `wiki/infrastructure/agent-orchestration/pane-delivery-confirmation.md`; infrastructure
-  index "load when" extended. Written generally (any helper that classifies the box, or
-  `capture-pane -e`); the dev-loop helper `send-prompt.sh` appears only in the evidence line.
-- `0a0ccc4ca0904514` → `testing` / `flaky` → new page
-  `wiki/testing/flaky/e2e-failures-moving-under-host-cpu-contention.md` (field-tested).
-  There is no new category: `flaky` already holds the sibling resource-ceiling page.
-  A pointer edge row and a `related:` id were added in `diagnosing-flaky-tests`, and a
-  testing index row was added. The INDEX.md testing line already covers "flaky tests".
-- `log.md` has one entry appended for this run.
+- 3cadd01011d4cb6e → `security/dependencies/supply-chain.md`, new edge row. The
+  existing dependencies category owns lockfile/hash-pinning; no new category needed.
+  The directive is general (any project using `pip --require-hashes`), so it
+  belongs to the bundled wiki.
 
 ## Local-layer candidates
 
-These 13 plan-gap rows are excluded from this PR. Each records a design decision for
-the `emperor` (linkly) repository's own files, so each would be wrong in another
-codebase. Run wiki-ingest inside that project to keep any of them:
+21 claimed rows are wiki-plan "no owning wiki page" plan-gap records whose
+directives name one project's files and RFC line numbers. Dropped from this PR and
+retired in place (full rows stay in `~/.dev-loop/queue/plan-gaps.jsonl`):
 
-| Row | Decision | Target |
-|-----|----------|--------|
-| `3632d0989f629104`, `7bfb7541e4e4bd8c` | t242 SECURITY.md sections and policy values | `wiki-local/security/disclosure/security-policy-file.md` |
-| `9700770d7c05b820` | t242 `.github/CODEOWNERS` layout | `wiki-local/infrastructure/repo-governance/codeowners-layout.md` |
-| `3d578bcfcbcc6b97`, `410400eb22f77f77` | t242 CODE_OF_CONDUCT.md source and contact | `wiki-local/infrastructure/repo-governance/code-of-conduct-source.md` |
-| `54aeaa8fdee5e0e7` | t242 mutation harness `TREE_CONTENTS` for new root files | `wiki-local/testing/quality/mutation-tree-contents.md` |
-| `0e0e7c7c4cef34c3` | t252 per-runner concurrency group for `_ai-gate.yml` | `wiki-local/infrastructure/ci-cd/ai-gate-concurrency-groups.md` |
-| `05df421bf905f5ce` | t252 `response_format: json_object` for the HTTP gate runner | `wiki-local/backend/llm/ai-gate-structured-output-mode.md` |
-| `1670e43e60cb7fe3`, `2df80edab8d41dfb` | t252 / t257 CHANGELOG bullet placement | `wiki-local/qa/release/changelog-bullet-placement.md` |
-| `1666b8cf32e274ea` | t257 `_relay_batch` calls begin/commit/rollback directly | `wiki-local/backend/outbox/relay-transaction-calls.md` |
-| `5ee53f499cc8d657`, `744090ce219677c0` | t249a1 RFC-0007 Review stage and §2.2 rule-5 chain notes | `wiki-local/qa/spec-process/rfc-promotion-checks.md` |
+- linkly (scoter) t73 — 7cb165ad3739c095, d1d7462e0ef491d3, 553658745f645d1d,
+  751ec8f2d58a6489, fa32d25f64f17866, 319c80e5750f7148, 5ded3966bee42a08 →
+  `wiki-local/qa/document-verification/<slug>.md` in linkly if wanted; run wiki-ingest inside that project
+- linkly (scoter) t74 — 5910c088745be2f9, bbd0f966ca9a8a84, 58bacc64c53f5682,
+  3e330837af36af36, bc39bf5b6cfdf803, 523a2b2f3a4033af, c0fe7ec7917c4b6f → same target; run wiki-ingest inside that project
+- linkly (scoter) t75 — 236b8407f47d44c8, 1c042f50b8e3e1d7, bd77532c3ccfd467,
+  79f7c16283a2effa, 3ae2c8870f461135, e2e2bf774be3fb69 → same target; run wiki-ingest inside that project
+- claude-account-rotator t1 — 5828fec18f1b5d3d (lazy `readStdin()` in a CLI
+  command context) → `wiki-local/backend/node/<slug>.md` in claude-account-rotator; run wiki-ingest inside that project
