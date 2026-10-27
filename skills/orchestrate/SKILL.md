@@ -606,7 +606,17 @@ canonical `blocked/<task>.json` is pruned once its worker-side copy is gone —
 see exit 8 below. `ready-set.sh` reads the
 status dir directly and does not poll, so before every `ready-set.sh` round also
 run `scripts/collect-status.sh .orchestration/graph.json .orchestration/status
-.worktrees` yourself (Phase 3 step 1). Trust-screen wording drifts between CLI releases —
+.worktrees` yourself (Phase 3 step 1). `launch-session.sh` answers the three
+known first-launch screens by reading them, not with fixed keys. The safe option
+is "Yes" on the folder-trust screen and the bypassPermissions warning, and
+"No, keep …" on the auto-mode chooser. A numbered screen gets the digit printed
+before the safe option (a digit selects and confirms, so no Enter follows); an
+unnumbered one gets `Down` while the `❯` cursor line sits on the other option and
+`Enter` once it sits on the safe one. It reads only the lines below the
+bottom-most screen title, acts only after two identical consecutive captures,
+answers each screen kind at most once per launch, and sends no key to a screen
+it cannot read, so that launch ends in exit 4.
+Trust-screen wording drifts between CLI releases —
 if a launch hangs, set `LO_READY_EXTRA` (substring) or `LO_READY_TIMEOUT`; for a
 screen that needs an answer, set `LO_TRUST_EXTRA` (a substring of that screen) and
 `LO_TRUST_KEYS` (the keys sent when it matches, space-separated, from `Up Down Left
