@@ -132,6 +132,7 @@ mk_tmux_stub() { # -> path of an executable `tmux` test double
 #   pane            pane text served by capture-pane (absent -> empty)
 #   pane-<n>        pane text served on the nth capture-pane call (wins over `pane`)
 #   keys            one line per send-keys call (its arguments)
+#   keys-at         the same lines, each prefixed with the capture count so far
 #   has-session-rc  exit code for has-session (absent -> 1, "no such session")
 set -u
 d="${STUB_DIR:?}"
@@ -144,7 +145,8 @@ case "${1:-}" in
     if [ -f "$d/pane-$n" ]; then cat "$d/pane-$n"
     elif [ -f "$d/pane" ]; then cat "$d/pane"; fi ;;
   send-keys)
-    shift; printf '%s\n' "$*" >> "$d/keys" ;;
+    shift; printf '%s\n' "$*" >> "$d/keys"
+    printf '%s %s\n' "$(cat "$d/captures" 2>/dev/null || echo 0)" "$*" >> "$d/keys-at" ;;
 esac
 exit 0
 STUBEOF
@@ -217,6 +219,43 @@ pane_bypass_warning() { # bypassPermissions warning: "1. No, exit" is highlighte
     " By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode." \
     " ❯ 1. No, exit" \
     "   2. Yes, I accept"
+}
+
+# --- #296: CLI 2.1.309 renders folder-trust and the bypass warning unnumbered,
+# --- cancel option first, cursor on it. These build that rendering and the
+# --- capture shapes of issue #296 from the transcribed fixtures above.
+pane_trust_at() { # <no|yes> [cancel label] — folder-trust, cursor on cancel or on Yes
+  local n="   " y="   "
+  if [ "$1" = no ]; then n=" ❯ "; else y=" ❯ "; fi
+  pane_folder_trust | sed -n 1,3p
+  printf '%s\n' "${n}${2:-No, exit}" "${y}Yes, I trust this folder"
+}
+
+pane_bypass_at() { # <no|yes> — unnumbered bypass warning, cursor on "No, exit" or on Yes
+  local n="   " y="   "
+  if [ "$1" = no ]; then n=" ❯ "; else y=" ❯ "; fi
+  pane_bypass_warning | sed -n 1,2p
+  printf '%s\n' "${n}No, exit" "${y}Yes, I accept"
+}
+
+pane_trust_reflowed() { # answered folder-trust after resize-window -x 150: title row re-wrapped, still visible
+  pane_trust_at yes | awk 'NR == 1 { print substr($0, 1, 150); print substr($0, 151); next } { print }'
+}
+
+pane_trust_scrolled() { # <no|yes> — folder-trust after resize-window -x 100: title rows in history (Spike S3)
+  printf '%s\n' "er first."
+  pane_trust_at "$1" | sed 1d
+}
+
+pane_chooser_at() { # <yes|no> [mode name] — unnumbered auto-mode chooser (CLI 2.1.310), cursor on option 1 or on "No, keep"
+  local y="   " n="   "
+  if [ "$1" = yes ]; then y=" ❯ "; else n=" ❯ "; fi
+  pane_auto_mode_chooser | sed -n 1p
+  printf '%s\n' "  ${y}Yes, set auto mode as my default permission mode" "  ${n}No, keep ${2:-bypass permissions}"
+}
+
+frames() { # <n> — stdin becomes pane-<n> and pane-<n+1>: two identical consecutive captures
+  tee "$sd/pane-$1" > "$sd/pane-$(($1 + 1))"
 }
 
 # --- Task 01: launch-session.sh must not clobber tmux's own TMUX variable ---
@@ -599,7 +638,7 @@ run_screens() { # <ready-timeout> -> runs the launcher against $sd
 
 @test "screens: auto-mode chooser is answered with key 2, never a bare Enter (groundwork#41)" {
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
-  pane_auto_mode_chooser > "$sd/pane-1"; pane_ready_submitted > "$sd/pane"
+  pane_auto_mode_chooser | frames 1; pane_ready_submitted > "$sd/pane"
   run_screens 4
   [ "$status" -eq 0 ]
   [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 2" ]
@@ -607,10 +646,10 @@ run_screens() { # <ready-timeout> -> runs the launcher against $sd
   [ "$(grep -c '^-t lo-1 Enter$' "$sd/keys")" = "1" ]
 }
 
-@test "screens: folder-trust screen selects 'Yes, I trust this folder' with Down then Enter (dev-loop#276)" {
+@test "screens: folder-trust screen gets Down while the cursor is on 'No, exit', then Enter on 'Yes, I trust this folder' (dev-loop#276, #296 R2)" {
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
-  pane_folder_trust > "$sd/pane-1"; pane_ready_submitted > "$sd/pane"
-  run_screens 4
+  pane_folder_trust | frames 1; pane_trust_at yes | frames 3; pane_ready_submitted > "$sd/pane"
+  run_screens 6
   [ "$status" -eq 0 ]
   [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
   [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
@@ -619,7 +658,7 @@ run_screens() { # <ready-timeout> -> runs the launcher against $sd
 
 @test "screens: chooser with an 'Enter to confirm' footer still gets key 2, not the generic Enter (precedence)" {
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
-  { pane_auto_mode_chooser; printf '%s\n' " Enter to confirm · Esc to cancel"; } > "$sd/pane-1"
+  { pane_auto_mode_chooser; printf '%s\n' " Enter to confirm · Esc to cancel"; } | frames 1
   pane_ready_submitted > "$sd/pane"
   run_screens 4
   [ "$status" -eq 0 ]
@@ -629,41 +668,44 @@ run_screens() { # <ready-timeout> -> runs the launcher against $sd
 
 @test "screens: folder-trust with an 'Enter to confirm' footer still gets Down then Enter (precedence)" {
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
-  { pane_folder_trust; printf '%s\n' " Enter to confirm · Esc to cancel"; } > "$sd/pane-1"
+  { pane_folder_trust; printf '%s\n' " Enter to confirm · Esc to cancel"; } | frames 1
+  { pane_trust_at yes; printf '%s\n' " Enter to confirm · Esc to cancel"; } | frames 3
   pane_ready_submitted > "$sd/pane"
-  run_screens 4
+  run_screens 6
   [ "$status" -eq 0 ]
   [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
   [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
 }
 
-@test "screens: a chooser that never clears exits 4 with key 2 per attempt and no bare Enter (error)" {
+@test "screens: a chooser that never clears exits 4 after one key 2 and no bare Enter (error, #296 R15)" {
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
   pane_auto_mode_chooser > "$sd/pane"
-  run_screens 2
+  run_screens 4
   [ "$status" -eq 4 ]
   printf '%s\n' "$output" | grep -qF 'REPL not ready'
-  [ "$(grep -c '^-t lo-1 2$' "$sd/keys")" = "2" ]
+  [ "$(grep -c '^-t lo-1 2$' "$sd/keys")" = "1" ]
   [ "$(grep -c '^-t lo-1 Enter$' "$sd/keys")" = "0" ]
   [ "$(grep -c -- ' -l ' "$sd/keys")" = "0" ]
 }
 
-@test "screens: a partial chooser render with only the option-2 line still gets key 2 (boundary)" {
+@test "screens: a partial chooser render with only the option-2 line and no title gets no key (boundary, #296 R8)" {
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
-  printf '%s\n' "     2. No, keep bypass permissions" > "$sd/pane-1"
+  printf '%s\n' "     2. No, keep bypass permissions" | frames 1
   pane_ready_submitted > "$sd/pane"
   run_screens 4
   [ "$status" -eq 0 ]
-  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 2" ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+  [ "$(grep -c '^-t lo-1 2$' "$sd/keys")" = "0" ]
 }
 
-@test "screens: bypass-permissions warning still gets Down then Enter (unchanged)" {
+@test "screens: a numbered bypass-permissions warning gets the digit of 'Yes, I accept' alone, no Enter after it (#296 R1)" {
   sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
-  pane_bypass_warning > "$sd/pane-1"; pane_ready_submitted > "$sd/pane"
+  pane_bypass_warning | frames 1; pane_ready_submitted > "$sd/pane"
   run_screens 4
   [ "$status" -eq 0 ]
-  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
-  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 2" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+  [ "$(grep -c '^-t lo-1 Enter$' "$sd/keys")" = "1" ]
 }
 
 @test "screens: a ready REPL whose scrollback still shows the chooser is ready, no key 2 sent (unchanged)" {
@@ -758,4 +800,235 @@ run_trust() { # [env args...] -> runs the launcher against $sd with LO_TRUST_EXT
   run env LO_DRY_RUN=1 LO_TRUST_KEYS='*' sh "$LS" lo-1 "$WT" bypassPermissions "prompt"
   [ "$status" -eq 2 ]
   [[ "$output" == *"LO_TRUST_KEYS key '*' not in allowlist"* ]]
+}
+
+# --- #296: first-launch screens chosen by number or by the cursor line ------
+# Every actionable frame is written twice (frames), because the launcher acts
+# only on two identical consecutive captures. keys-at prefixes each key with
+# the number of captures taken when it was sent.
+
+@test "screens: a numbered bypass warning listing Yes first gets digit 1, read from the Yes line (#296 N1)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_bypass_warning | sed -n 1,2p; printf '%s\n' " ❯ 1. Yes, I accept" "   2. No, exit"; } | frames 1
+  pane_ready_submitted > "$sd/pane"
+  run_screens 4
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 1" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+}
+
+@test "screens: the folder-trust cancel label 'No, continue without these permissions' also gets Down, then Enter (#296 N2)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_trust_at no "No, continue without these permissions" | frames 1
+  pane_trust_at yes "No, continue without these permissions" | frames 3
+  pane_ready_submitted > "$sd/pane"
+  run_screens 6
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 4p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+}
+
+@test "screens: a folder-trust screen whose cursor is already on Yes gets Enter and no Down (boundary) (#296 N3)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_trust_at yes | frames 1; pane_ready_submitted > "$sd/pane"
+  run_screens 4
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+  [ "$(grep -c '^-t lo-1 Down$' "$sd/keys")" = "0" ]
+}
+
+@test "screens: a cursor that stays on 'No, exit' after one Down gets no second Down and no Enter, exit 4 (error) (#296 N4)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_folder_trust > "$sd/pane"
+  run_screens 5
+  [ "$status" -eq 4 ]
+  [ "$(grep -c '^-t lo-1 Down$' "$sd/keys")" = "1" ]
+  [ "$(grep -c '^-t lo-1 Enter$' "$sd/keys")" = "0" ]
+}
+
+@test "screens: shape 3 — the just-answered bypass frame seen again gets no second Enter; the chooser after it gets 2 (#296 N5)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_bypass_at no | frames 1; pane_bypass_at yes | frames 3; pane_bypass_at yes | frames 5
+  pane_auto_mode_chooser | frames 7; pane_ready_submitted > "$sd/pane"
+  run_screens 10
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 4p "$sd/keys")" = "-t lo-1 2" ]
+  [ "$(sed -n 5p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+  [ "$(grep -c '^-t lo-1 Enter$' "$sd/keys")" = "2" ]
+}
+
+@test "screens: shape 4 — an answered folder-trust frame re-wrapped or scrolled by a pane resize gets no second key (#296 N6)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_trust_at no | frames 1; pane_trust_at yes | frames 3
+  pane_trust_reflowed | frames 5; pane_trust_scrolled yes | frames 7
+  pane_ready_submitted > "$sd/pane"
+  run_screens 10
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 4p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+  [ "$(grep -c '^-t lo-1 Enter$' "$sd/keys")" = "2" ]
+}
+
+@test "screens: shape 1 — a stale folder-trust frame with the cursor on Yes above the live bypass warning never decides the key (#296 N7)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_trust_at yes; pane_bypass_at no; } | frames 1
+  { pane_trust_at yes; pane_bypass_at yes; } | frames 3
+  pane_ready_submitted > "$sd/pane"
+  run_screens 6
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 4p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+}
+
+@test "screens: shape 2 — a title-only bypass warning under a stale frame gets no key until its options are drawn (#296 N8)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_trust_at yes; pane_bypass_warning | sed -n 1p; } | frames 1
+  { pane_trust_at yes; pane_bypass_at no; } | tee "$sd/pane" | frames 3
+  run_screens 5
+  [ "$status" -eq 4 ]
+  [ "$(sed -n 2p "$sd/keys-at")" = "4 -t lo-1 Down" ]
+  [ "$(wc -l < "$sd/keys" | tr -d ' ')" = "2" ]
+}
+
+@test "screens: shape 2 — a title-only bypass warning under a stale numbered folder-trust frame gets no key (#296 N9)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_folder_trust | sed -n 1,3p; printf '%s\n' " ❯ 1. No, exit" "   2. Yes, I trust this folder"; pane_bypass_warning | sed -n 1p; } > "$sd/pane"
+  run_screens 3
+  [ "$status" -eq 4 ]
+  [ "$(wc -l < "$sd/keys" | tr -d ' ')" = "1" ]
+}
+
+@test "screens: torn capture — a bypass title drawn over the old frame's option rows is not acted on; the settled screen is (#296 N10)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_bypass_warning | sed -n 1,2p; printf '%s\n' " ❯ No, exit" "   Yes, I trust this folder"; } > "$sd/pane-1"
+  pane_bypass_at no | tee "$sd/pane" | frames 2
+  run_screens 4
+  [ "$status" -eq 4 ]
+  [ "$(sed -n 2p "$sd/keys-at")" = "3 -t lo-1 Down" ]
+  [ "$(grep -c '^-t lo-1 Down$' "$sd/keys")" = "1" ]
+}
+
+@test "screens: a screen seen in one capture only gets no key (boundary) (#296 N11)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_folder_trust > "$sd/pane-1"; pane_ready_submitted > "$sd/pane"
+  run_screens 4
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+}
+
+@test "screens: title scrolled off — an answered folder-trust whose title leaves and comes back gets one Enter only (#296 N12)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_trust_at no | frames 1; pane_trust_at yes | frames 3
+  pane_trust_scrolled yes | frames 5; pane_trust_at yes | frames 7
+  pane_ready_submitted > "$sd/pane"
+  run_screens 10
+  [ "$status" -eq 0 ]
+  [ "$(sed '/ -l ZZPROMPTHEAD/,$d' "$sd/keys" | grep -c '^-t lo-1 Enter$')" = "1" ]
+  [ "$(grep -c '^-t lo-1 Down$' "$sd/keys")" = "1" ]
+}
+
+@test "screens: title scrolled off before any answer — option rows with no title get no key (#296 N13)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_trust_scrolled no > "$sd/pane"
+  run_screens 3
+  [ "$status" -eq 4 ]
+  [ "$(wc -l < "$sd/keys" | tr -d ' ')" = "1" ]
+}
+
+@test "screens: a cursor on a label that is neither Yes nor No gets no key, exit 4 (error) (#296 N14)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_folder_trust | sed -n 1,2p; printf '%s\n' " ❯ Security guide" "   No, exit" "   Yes, I trust this folder"; } > "$sd/pane"
+  run_screens 3
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"REPL not ready"* ]]
+  [ "$(wc -l < "$sd/keys" | tr -d ' ')" = "1" ]
+}
+
+@test "screens: a title-only folder-trust screen gets no key, exit 4 (boundary) (#296 N15)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_folder_trust | sed -n 1p > "$sd/pane"
+  run_screens 3
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"REPL not ready"* ]]
+  [ "$(wc -l < "$sd/keys" | tr -d ' ')" = "1" ]
+}
+
+@test "screens: two cursor lines below one title get no key (boundary) (#296 N16)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_folder_trust | sed -n 1,3p; printf '%s\n' " ❯ No, exit" " ❯ Yes, I trust this folder"; } > "$sd/pane"
+  run_screens 3
+  [ "$status" -eq 4 ]
+  [ "$(wc -l < "$sd/keys" | tr -d ' ')" = "1" ]
+}
+
+@test "screens: two numbered Yes lines below one title get no digit (boundary) (#296 N17)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_bypass_warning | sed -n 1,2p; printf '%s\n' " ❯ 1. Yes, I accept" "   2. Yes, I accept"; } > "$sd/pane"
+  run_screens 3
+  [ "$status" -eq 4 ]
+  [ "$(wc -l < "$sd/keys" | tr -d ' ')" = "1" ]
+}
+
+@test "screens: an unnumbered auto-mode chooser (CLI 2.1.310) gets Down while the cursor is on 'Yes, set auto mode', then Enter on 'No, keep' (#296 N18)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_chooser_at yes | frames 1; pane_chooser_at no | frames 3; pane_ready_submitted > "$sd/pane"
+  run_screens 6
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Down" ]
+  [ "$(sed -n 3p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(sed -n 4p "$sd/keys")" = "-t lo-1 -l ZZPROMPTHEAD hello" ]
+}
+
+@test "screens: an unnumbered chooser already on 'No, keep' with another mode name gets Enter and no Down (boundary) (#296 N20)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_chooser_at no "accept edits" | frames 1; pane_ready_submitted > "$sd/pane"
+  run_screens 4
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 2p "$sd/keys")" = "-t lo-1 Enter" ]
+  [ "$(grep -c '^-t lo-1 Down$' "$sd/keys")" = "0" ]
+}
+
+@test "screens: an unnumbered chooser whose cursor stays on 'Yes, set auto mode' gets one Down and never Enter, exit 4 (error) (#296 N21)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_chooser_at yes > "$sd/pane"
+  run_screens 5
+  [ "$status" -eq 4 ]
+  [ "$(grep -c '^-t lo-1 Down$' "$sd/keys")" = "1" ]
+  [ "$(grep -c '^-t lo-1 Enter$' "$sd/keys")" = "0" ]
+}
+
+@test "screens: chooser rows with the title scrolled off and an 'Enter to confirm' footer get no key, never the generic Enter (#296 N22)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_chooser_at yes "default" | sed 1d; printf '%s\n' " Enter to confirm · Esc to cancel"; } > "$sd/pane"
+  run_screens 3
+  [ "$status" -eq 4 ]
+  [ "$(wc -l < "$sd/keys" | tr -d ' ')" = "1" ]
+}
+
+@test "screens: a title-less frame whose only cursor line is an empty REPL prompt gets no key (boundary) (#296 N23)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  { pane_trust_at no | sed -n 2,3p; printf '%s\n' "   No, exit" "   Yes, I trust this folder" "$RULE" "❯ " "$RULE"; } > "$sd/pane"
+  run_screens 3
+  [ "$status" -eq 4 ]
+  [ "$(wc -l < "$sd/keys" | tr -d ' ')" = "1" ]
+}
+
+@test "screens: a failing awk sends no key and keeps exit 4, not awk's own status (error) (#296 N19)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  fb="$(REPO_TMP)/fakebin-${BATS_TEST_NUMBER}"; mkdir -p "$fb"
+  printf '#!/bin/sh\nexit 2\n' > "$fb/awk"; chmod +x "$fb/awk"
+  pane_folder_trust > "$sd/pane"
+  run env PATH="$fb:$PATH" STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=3 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello"
+  rm -rf "$fb"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"REPL not ready"* ]]
+  [ "$(wc -l < "$sd/keys" | tr -d ' ')" = "1" ]
 }
