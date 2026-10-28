@@ -8,7 +8,7 @@ sources:
   - https://pitest.org/quickstart/basic_concepts/
   - https://github.com/kenjudy/pdca-agentic-coding-framework/issues/181
 last_verified: 2026-09-27
-related: [testing-quality-tests-that-cannot-fail, testing-quality-behavior-not-implementation, testing-mocking-captured-call-arguments, testing-quality-path-resolver-fixtures-with-coincident-cwd, testing-data-harness-vs-run-path-fixtures]
+related: [testing-quality-tests-that-cannot-fail, testing-quality-behavior-not-implementation, testing-mocking-captured-call-arguments, testing-quality-path-resolver-fixtures-with-coincident-cwd, testing-data-harness-vs-run-path-fixtures, testing-quality-spec-artifact-checks]
 ---
 
 # A Cross-Component Invariant Asserted by Calling the Same Helper Twice
@@ -21,7 +21,8 @@ produces" — and builds both sides of the assertion by calling one shared
 helper with the same arguments, instead of reading each side from what
 production assembled or from what an executed process observed; or a review
 found such an assertion green while the production wiring it names was
-broken.
+broken. Also when a completeness checker for an assembled document and the
+composer that builds it hard-code the same source line ranges.
 
 ## Do this
 
@@ -57,6 +58,7 @@ broken.
 | No child-observable artifact exists (the process writes nothing) | Inject a recording seam — a stub binary on a controlled `PATH`, or an argument spy on the spawn call — and assert its record |
 | The two components are meant to diverge under some configuration | Assert equality only for the configurations where the invariant holds and assert the divergence explicitly for the others; a blanket equality assertion hides the second case |
 | The mutation from step 1 is caught by a compile error rather than a test | Choose a mutation the type system accepts (`None` for an `Option`, the parent directory for a path) so the runtime assertion is what has to catch it |
+| A completeness checker for an assembled document and the composer that builds it both hard-code the same source line ranges | The two lists are one oracle typed twice: a range cut short in both still matches, so the checker passes while text is missing. Derive each range from structural markers in the source (the heading before it, the end of the quoted block after it), or rebuild the expected text from those markers inside the checker. Control: shorten one range by a line in both copies and require red |
 
 ## Instead of
 
@@ -70,3 +72,4 @@ broken.
 - https://pitest.org/quickstart/basic_concepts/ — a mutant that "Survived" means "the mutation was not detected by the covering test"; the test that does not redden under the wiring mutation is exactly such a covering test
 - https://github.com/kenjudy/pdca-agentic-coding-framework/issues/181 — a CLI test asserted `expect(cliOutput).toBe(applyBlock('', entries))` where `applyBlock` is the function the CLI calls; the recorded fix rule: "Oracle: where does the expected value come from, and is that source independent of the code under test? A literal, observable state (a file on disk, an HTTP response, a database row), or an external tool counts"
 - Field evidence 2026-09 (an orchestration run's audit of `controller.rs`, task t3-browser-wiring; recorded by the originating session, not re-run in this flush): mutating the browser closure to `role_cli_cwd(None, ..)` left all 10 unit and integration tests green; after the fixture recorded `pwd -P` and the integration test compared it with the worktree production created, the same mutation went red with a path diff
+- Field evidence 2026-10-27 (linkly RFC consolidation, task t72; recorded by the originating session, not re-run in this flush): an auditor shortened the source range 207-301 to 207-300 in both the composer spec and the checker's target list; the checker returned rc=0 while the last sentence of §3.3 was missing from the assembled document

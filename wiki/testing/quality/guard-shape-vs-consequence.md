@@ -7,6 +7,7 @@ confidence: field-tested
 sources:
   - https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html
   - https://pitest.org/
+  - https://eslint.org/docs/head/use/configure/rules
 last_verified: 2026-08-06
 related: [testing-quality-tests-that-cannot-fail, testing-quality-behavior-not-implementation, testing-quality-spec-artifact-checks, testing-quality-harness-reverse-controls, qa-process-regression-scope, testing-quality-source-text-wiring-assertions, qa-document-verification-model-coupled-guidance-aging-detector, testing-quality-unchanged-function-gates]
 ---
@@ -22,6 +23,8 @@ is red and you are deciding what to do about it. Also applies when authoring
 such a guard, before the first legitimate collision happens — and when you have
 just widened a guard's scan surface (a leak/masking detector now scans a
 previously unscanned output channel) and a previously green test reddens.
+Also when a text checker exempts whole lines (history sentences, quotations)
+from a citation or stale-reference rule.
 
 Reviewing a guard that has never been red → [testing-quality-tests-that-cannot-fail].
 
@@ -64,6 +67,7 @@ Reviewing a guard that has never been red → [testing-quality-tests-that-cannot
 | Case | Then |
 |------|------|
 | An exemption/allow list already exists on the guard | Each entry is a case the guard stopped measuring; convert the guard to the consequence form and delete the list, or move those artifacts out of scope by location |
+| A text checker exempts whole lines (history sentences, quotations) from a citation or stale-reference rule | Keep checking exempt lines for the pattern that must never be exempt (a section-anchored citation such as `RFC-00NN §`), and give each line that may keep it an entry naming why (quotation, kept heading id, provenance). Plant one mixed line — an exempt history sentence plus a forbidden citation — and require red. A whole-line exemption suppresses every other finding on that line, the same reason ESLint's bare `eslint-disable-line` turns off all rules there and its docs show naming the rules instead |
 | The sharpened guard goes green immediately and no fixture has both S and C | It is unproven, not passing — add the fixture from step 4 before trusting it ([testing-quality-tests-that-cannot-fail]) |
 | Reusing the production derivation means a bug in that derivation silently greens the guard | Accept the coupling — it is what keeps the guard's meaning in sync — and keep the step-4 fixture as the independent control that would catch the greening |
 | Computing C over every artifact is expensive | Keep the shape check as a cheap prefilter and compute C only for the artifacts S matched; the assertion stays "S and C" |
@@ -85,3 +89,5 @@ Reviewing a guard that has never been red → [testing-quality-tests-that-cannot
 - https://pitest.org/ — "Faults (or mutations) are automatically seeded into your code, then your tests are run. If your tests fail then the mutation is killed, if your tests pass then the mutation lived" — the basis for step 4's required-red fixture
 - Field evidence (linkly #43, 2026-08-06): adding `result.bindings` to a differential masking surface immediately reddened `test_when_guard_removed_diverges`; the repro showed the fixture's seeded row carrying an undeclared `password` key raw through the new channel while the entity declared only `id`/`email`/`token`. Narrowing the payload to declared fields preserved the test's guard-divergence intent and returned 1218 tests green with the widened detector intact
 - Field evidence (linkly #35, 2026-08-04): `test_no_shipped_example_has_a_guarded_repository_call` asserted that no shipped `.lnpl` example contained a repository call under a guard. `examples/checkout.lnpl` legitimately added a `create` under `when stock > 0` — the issue's own reproduction shape — turning the guard permanently red. Re-expressing it as "a guarded call that could actually fail", with the conflict/miss decision taken from the production `_lnpl_ops` derivation via `seeded_entities`/`repository_calls`, returned the suite to `Ran 518 tests / OK` while a fixture holding a guarded-and-can-fail create still drove the guard red
+- https://eslint.org/docs/head/use/configure/rules — a disable comment with no rule names disables every rule on that line, and listing rule names after the directive scopes it (read through a web-search summary in the 2026-10-28 flush, not fetched)
+- Field evidence 2026-10-27 (linkly RFC consolidation, task t73; recorded by the originating session, not re-run in this flush): the citation checker passed a history line holding both an exempt sentence and a stale `RFC-0015 §Alternatives` citation at 15/15; only a human reviewer found it. After a section-citation rule was applied to history lines too, the round-0 file failed exactly that line (12/16), and a mutant confirmed the rule

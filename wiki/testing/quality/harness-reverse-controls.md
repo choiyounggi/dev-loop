@@ -12,6 +12,7 @@ sources:
   - https://stryker-mutator.io/docs/mutation-testing-elements/equivalent-mutants/
   - https://testing.googleblog.com/2021/04/mutation-testing.html
   - https://docs.python.org/3/library/unittest.mock.html
+  - https://mutmut.readthedocs.io
 last_verified: 2026-08-04
 related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-schema-additions-under-a-golden-gate, testing-quality-differential-run-agreement, testing-quality-completion-predicates, testing-quality-unasserted-return-fields, testing-quality-value-preserving-refactor-assertions, testing-quality-stale-artifact-baselines, backend-python-language-bytecode-cache-staleness, qa-exploratory-override-control-pairs, testing-quality-surviving-mutant-equivalence-triage, testing-quality-spec-artifact-checks, testing-quality-synthetic-corpus-measurement-floor, debugging-performance-attributing-a-benchmark-speedup, testing-quality-unchanged-function-gates, testing-quality-anchor-cases-for-allowlist-regexes, qa-environments-proving-nothing-moves-under-reduced-motion, qa-environments-horizontal-overflow-in-full-page-screenshots]
 ---
@@ -24,6 +25,8 @@ You built a harness that reports how well something is verified — a mutation r
 doc/spec gate suite, a matrix of CI checks — and you are about to cite its score as
 evidence in a commit message, PR body, README, or report. Also when its verdicts
 come out uniform across every case: every mutant caught, or every one surviving.
+Also when a new test reads a repo-root file and the harness builds mutant trees
+from a fixed list of copied paths.
 
 ## Do this
 
@@ -93,6 +96,7 @@ come out uniform across every case: every mutant caught, or every one surviving.
 | A refactor moved value resolution from the callee's default into the caller | Re-verify every control that patches that symbol — each one silently became a no-op on the path it was written for, while still passing |
 | The harness rewrites source files in place and the runtime caches compiled artifacts | Invalidate the cache between iterations before reading any verdict — a Python harness whose mutations preserve byte length can re-run stale bytecode, producing verdicts detached from the file on disk ([backend-python-language-bytecode-cache-staleness]) |
 | The harness's "all done" signal is a text match over a status board | That predicate needs its own negative control — run it against the incomplete state and require "not done" ([testing-quality-completion-predicates]) |
+| The harness builds each mutant tree from a fixed list of copied paths (a `TREE_CONTENTS` constant, mutmut's `also_copy`) and a change adds a test that reads a new repo-root file | Add that path to the list in the same change and run the test that pins the list before calling the work done. The main suite stays green because it runs on the real tree; only the mutant trees lack the file, so every mutant dies the same way and "caught" can no longer be told apart from "broken tree" |
 | Individual checks each have a negative control already | Add the harness-level control too — a per-check control asks "can this check go red", the harness control asks "can this harness go green"; the second failure mode survives the first |
 
 ## Instead of
@@ -116,3 +120,5 @@ come out uniform across every case: every mutant caught, or every one surviving.
 - https://docs.python.org/3/library/unittest.mock.html — "Where to patch": `patch()` "works by (temporarily) changing the object that a *name* points to with another one … you must ensure that you patch the name used by the system under test", and "You patch where an object is *looked up*, which is not necessarily the same place as where it is defined" — patching a name the path does not read leaves the run unmutated
 - Field reproduction 2026-08-04 (linkly `impl/lnpl/differential.py`): `verify` resolved `seeded_entities(...)` itself and passed the result into `observe_mode_b` → `backend.build(seeded=...)`, so `backend._lnpl_ops`'s own `if seeded is None` default never executed on that path. A control patching `backend.seeded_entities` reported `AssertionError: True is not false` — no divergence, control green. Repatching `backend.READ_OPS` and `backend._failure_attempts`, both read unconditionally inside the scan, produced the expected `FAIL 2/4` and `FAIL 3/4`
 - Field reproduction 2026-07-31 (Python rule-conformance harness): the harness copied only the implementation directory into its temp tree while the tests resolved `examples/*.json` from the repo root, so all 105 tests died on `FileNotFoundError` and every mutation reported as caught — "36/36" was cited in five commits and a README. A docstring-capitalization no-op reproduced the red verdict and exposed it; copying the full repository plus adding the no-op control moved the score to 34/36 and surfaced two rules no test asserted
+- https://mutmut.readthedocs.io — `also_copy` lists the extra files and directories mutmut copies into its `mutants/` directory because running the full suite needs files beyond the tests and the source (read through a web-search summary in the 2026-10-28 flush, not fetched): a fixed copy list is a documented harness design, and each new root input must be added to it
+- Field evidence 2026-10-27 (linkly supply-chain change, task t243; recorded by the originating session, not re-run in this flush): a new test read `requirements.lock.txt` from the repo root; the list-pinning guard `test_mutation_tree` failed with `{'requirements.lock.txt': ['test_supply_chain.py']} != {}` until the path was added to `TREE_CONTENTS`, after which it ran 17 tests OK

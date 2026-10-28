@@ -11,6 +11,7 @@ sources:
   - https://github.github.com/gfm/
   - https://docs.python.org/3/library/stdtypes.html
   - https://docs.python.org/3/library/re.html
+  - https://lychee.cli.rs/recipes/anchors/
 last_verified: 2026-08-07
 related: [testing-quality-tests-that-cannot-fail, testing-quality-schema-additions-under-a-golden-gate, testing-quality-harness-reverse-controls, backend-common-api-design-unenforced-declarations]
 ---
@@ -22,7 +23,9 @@ related: [testing-quality-tests-that-cannot-fail, testing-quality-schema-additio
 You are authoring or reviewing **the check itself** that an artifact conforms
 to a source of truth: a mapping table that must hold a row per rule, a key per
 field, or a case per enum; ids that must resolve across documents; required
-sections in an RFC. Includes doc-as-spec repos where the artifact is Markdown.
+sections in an RFC. Includes doc-as-spec repos where the artifact is Markdown,
+and pointers ("the text of X lives in D §N") checked only for the target
+heading existing.
 Whether a passing check is enough to accept the deliverable is a release
 decision owned by wiki/qa/document-verification/spec-document-gates.md.
 
@@ -109,6 +112,7 @@ cells = [c.replace(r"\|", "|").strip()
 | A control that was green for months turns red right after a prose-only edit to the artifact | Read it as the anchor rotting, not the rule breaking — the control had been mutating nothing and the edit exposed it. Re-anchor on the key columns; the months of green verdicts it produced are not evidence |
 | The mutation must target a whole row that has no stable key prefix | Anchor on the row's index within the parsed table rather than on its text, and assert the parsed row count first so a re-ordered table fails loudly |
 | Several controls in the harness share one anchor string | Give each its own anchor and its own applied-assertion; one rotted shared anchor silently disarms every control that reuses it |
+| A cross-document pointer ("the text of X lives in D §N") is checked only for the target heading or anchor existing | Open D at the pinned ref and require §N to define X itself (`X ::=` in its grammar block, the term's own definition row). When §N only forwards to another document, retarget the pointer to that final owner. Control: point one pointer at a section that names X only as a forward pointer, and require red. Anchor checkers such as lychee `--include-fragments` confirm a fragment generated from a heading or explicit id exists, which says nothing about what the section holds |
 
 ## Instead of
 
@@ -130,4 +134,6 @@ cells = [c.replace(r"\|", "|").strip()
 - https://docs.python.org/3/library/stdtypes.html — `str.replace`: "Return a copy of the string with all occurrences of substring *old* replaced by *new*" — the signature carries no not-found error and no substitution count, so a stale anchor yields the original text; `re.subn` "return a tuple `(new_string, number_of_subs_made)`" is the counted form
 - Local reproduction 2026-08-07 (Python 3.14.6, macOS): a control quoting `| security | jwt | rejects unsigned tokens |` against a document whose cell had been reworded to `… at the edge` produced `mutant == doc` (mutation not applied, no exception); the same mutation anchored on the prefix `| security | jwt |` applied. `re.subn` reported `0` substitutions for the stale anchor and `1` for the prefix pattern
 - Field reproduction 2026-08-07 (linkly `impl/tests/test_enforcement_matrix.py::test_a_short_row_raises_rather_than_reading_as_empty_cells`): revising the rationale cell of the `security jwt` row stopped the literal anchor from matching; only `assertNotEqual(mutant, original, "the mutation did not apply")` surfaced it. Re-anchoring on the `| security | jwt |` prefix returned the suite to 37/37
+- https://lychee.cli.rs/recipes/anchors/ — `--include-fragments` enables anchor checking for HTML and Markdown, with fragments generated from explicit ids and from headings (read through a web-search summary in the 2026-10-28 flush, not fetched): an anchor check proves the target exists, not that it defines the referenced item
+- Field evidence 2026-10-27 (linkly RFC consolidation, task t74; recorded by the originating session, not re-run in this flush): the consolidation checker (16 checks, 18 mutants) stayed green while a pointer named a section that only forwarded to another document; after a per-item definition check was added, reverting the retarget failed with "`Duration` -> RFC-0071 §1: not defined there", and the auditor reproduced that red
 - Cross-checked against GitHub's own renderer 2026-07-29 (`POST /markdown`, `mode: gfm`): the row `|a|b\||` renders as two cells, `a` and `b|`; the anchored-delimiter snippet above returns `['a', 'b|']`, while `.strip("|")` returns `['a', 'b\\']` — the defect the delimiter-stripping note describes

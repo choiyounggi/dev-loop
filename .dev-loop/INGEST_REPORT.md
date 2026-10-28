@@ -1,164 +1,152 @@
-# Knowledge flush — 3 insight(s) (headless auto-flush run 20261022-134153-21632)
+# Knowledge flush — 4 insight(s) (headless auto-flush run 20261028-100340-23911)
 
-18 queue rows were claimed this run: 3 ingested, 1 dropped as a duplicate of the
-merged wiki, 13 dropped as project-specific plan-gap rows, 1 released because it
-plausibly overlaps open PR #291. Nothing was folded into another branch.
+6 queue rows were claimed this run: 4 ingested as edge rows on existing testing
+pages, 1 released because it plausibly overlaps open PR #299, 1 dropped as a
+project-specific plan-gap row. Nothing was folded into another branch.
 
-| Candidate | Domain | Disposition |
-|-----------|--------|-------------|
-| `f7273179a74dcb80` — secret in an HTTP header leaks through `http.client`'s `ValueError` | security | **ingested** — edge row in `security-secrets-secrets-in-code` (verified) |
-| `3d610c1206e1bdd6` — text nobody sent in an agent CLI's input box is the grey prompt suggestion | infrastructure | **ingested** — edge row in `infrastructure-agent-orchestration-pane-delivery-confirmation` (verified docs + field observation) |
-| `0a0ccc4ca0904514` — e2e failure moving between tests under host CPU contention | testing | **ingested** — new page `testing-flaky-e2e-failures-moving-under-host-cpu-contention` (field-tested) |
-| `97c37473b53e63c2` — string-pattern `replace`: `$n` stays literal, `$$`/`$&`/`` $` ``/`$'` expand | backend (queued as frontend) | dropped — duplicate of merged page |
-| `446c58c78d5e467f` — `git diff --numstat` count depends on the diff algorithm | testing | released — plausible overlap with open PR #291 |
-| 13 plan-gap rows (see Local-layer candidates) | — | dropped — project-specific |
+| Candidate | Domain hint | Disposition |
+|-----------|-------------|-------------|
+| `c9e00eb2a93a55e3`: a document checker and its composer hard-code the same source line ranges | testing | **ingested**: edge row on `testing-quality-cross-component-invariant-via-shared-helper` (field-tested) |
+| `f8a300baed4c34f0`: a "text of X lives in D §N" pointer checked only for the heading existing | qa → testing | **ingested**: edge row on `testing-quality-spec-artifact-checks` (field-tested) |
+| `b3a7b01998f7d6aa`: a citation checker exempts whole history lines | testing | **ingested**: edge row on `testing-quality-guard-shape-vs-consequence` (field-tested) |
+| `bdb042f44f413d06`: a new test reads a repo-root file a mutation harness's fixed copy list lacks | testing | **ingested**: edge row on `testing-quality-harness-reverse-controls` (field-tested) |
+| `f332524447ff2105`: a grep absence check in a gate ledger matches its own ledger file | testing | **released**: plausible overlap with open PR #299 |
+| `6867bb478197b062`: linkly t246 plan-gap (which Python classifiers `pyproject.toml` gains) | — | dropped as project-specific (see Local-layer candidates) |
 
 ## Verified best-practice
 
-**`f7273179a74dcb80` — confidence: verified.** Claim: when a script puts a secret
-from an env var into an HTTP header via Python `http.client`/`urllib`, a value
-with a bare CR/LF (a pasted key ending in `\n`) makes `putheader` raise a
-`ValueError` whose message contains the whole header value, so a traceback that
-escapes the script's own redaction prints the key.
-- CPython `Lib/http/client.py` (https://github.com/python/cpython/blob/main/Lib/http/client.py):
-  read in the local CPython 3.9 source — l.138
-  `_is_illegal_header_value = re.compile(rb'\n(?![ \t])|\r(?![ \t\n])').search`;
-  l.1234-1235 `if _is_illegal_header_value(values[i]): raise ValueError('Invalid header value %r' % (values[i],))`.
-  A trailing `\n` matches `\n(?![ \t])`, and `%r` repeats the full encoded value.
-  Web search confirmed the check came from the CVE-2016-5699 header-injection fix.
-  The `main`-branch file was not fetched in this run (WebFetch is not allowed here);
-  the cited line numbers are from 3.9.
-- Field reproduction (session evidence): on Python 3.13 and 3.11 the key appeared
-  in the traceback; after the pre-request check plus catch-all redaction, 0 key hits
-  and the mutation checks went red.
+This headless run could not fetch pages or run commands (Bash is limited to the
+queue tool and `gh pr list`). Every external source below was read through a
+web-search result summary, and each source line on the pages says so. The field
+cases come from the originating sessions and were not re-run here. So every
+ingested row is **field-tested**, and each page keeps its own `confidence` and
+`last_verified`.
 
-**`3d610c1206e1bdd6` — confidence: verified (docs) + field observation.** Claim:
-in a Claude Code pane read through `tmux capture-pane`, grey text in the input box
-that nobody sent is the CLI's prompt suggestion. Plain capture drops styling, so the
-suggestion looks like an unsubmitted prompt.
-- https://code.claude.com/docs/en/interactive-mode (fetched 2026-10-22), "Prompt
-  suggestions": "shows a grayed-out example command in the prompt input"; after a
-  response it "can suggest your next prompt"; "Press `Tab` or `Right arrow` to place
-  the suggestion in the prompt input, then `Enter` to submit"; "Start typing to dismiss it".
-- tmux man page (https://man7.org/linux/man-pages/man1/tmux.1.html; same wording read
-  from the local tmux 3.7b `tmux.1`, l.2693-2696): "If -e is given, the output includes
-  escape sequences for text and background attributes."
-- Field observation (run i41): the box showed "승인됐습니다. 계획대로 구현하세요."
-  after `plan_ready`; `send-prompt.sh state lo-1-i41` → `ready` rc 0; the next real send
-  reported `delivered`.
-- Not claimed: which escape code (dim SGR 2 vs a grey colour) the CLI uses. The page
-  says "grey/dim" to match the docs' "grayed-out".
+**`c9e00eb2a93a55e3` (field-tested).** Claim: when a completeness checker and
+the composer of an assembled document share hand-typed source line ranges,
+take the ranges from structural markers in the source, or rebuild the expected
+text from those markers inside the checker. Then require red when one range is
+shortened in both copies.
+- Basis: the page's existing source, kenjudy/pdca-agentic-coding-framework#181
+  ("is that source independent of the code under test?"), and PIT's "Survived"
+  definition. Two copies of one list are one oracle, and an oracle that is not
+  independent agrees with a wrong output.
+- Field case: shortening range 207-301 to 207-300 in both copies left the
+  checker at rc=0 while the last sentence of §3.3 was missing.
+- Searched for Google TotT "Don't Put Logic in Tests"
+  (https://testing.googleblog.com/2014/07/testing-on-toilet-dont-put-logic-in.html).
+  The search did not return the body text, so the page does not cite it.
 
-**`0a0ccc4ca0904514` — confidence: field-tested.** Claim: on a shared host, a
-browser e2e failure that moves to a different timing-dependent test on each re-run
-is CPU contention until shown otherwise. Measure load and foreign headless browsers,
-re-run once after 60 s quiet, and report every run line.
-- https://playwright.dev/docs/test-cli — `--workers` defaults to 50% of logical CPU
-  cores (already cited on the wiki; it sizes to the host's cores, not to free capacity).
-- https://playwright.dev/docs/ci — recommends `workers: 1` in CI "to prioritize
-  stability and reproducibility", so each test gets the full system resources. This was
-  confirmed only through a web-search summary of the official page; the page was not
-  fetched in this run.
-- Field observation (2026-10-18, 36-test Playwright suite): load avg 19 with a foreign
-  `chrome-headless-shell` at 110% CPU → "1 failed" at `leave.spec.ts:37`, then at
-  `game-bell.spec.ts:33`; after 60 s with no headless browser → "36 passed (50.9s)".
-  This is a single host, so the page is field-tested, not verified.
+**`f8a300baed4c34f0` (field-tested).** Claim: for each "X lives in D §N"
+pointer, require §N at the pinned ref to define X itself. When §N only forwards
+to another document, retarget the pointer to that final owner.
+- https://lychee.cli.rs/recipes/anchors/: `--include-fragments` checks anchors
+  generated from headings and explicit ids. An anchor check shows only that the
+  target exists, which is why it misses a forward-only section.
+- Field case: the t74 checker (16 checks, 18 mutants) was green until a
+  per-item definition check was added. Reverting the fix then failed with
+  "`Duration` -> RFC-0071 §1: not defined there".
 
-**`97c37473b53e63c2`** — the claim is correct (MDN replacement-pattern table; the node
-evidence in the row), but it is already on the merged wiki. See Existing-layer check.
+**`b3a7b01998f7d6aa` (field-tested).** Claim: when a checker exempts whole
+lines as history, still apply the never-exempt pattern (a section-anchored
+citation) to those lines. Keep a narrow per-line allowlist that names a reason
+for each entry.
+- https://eslint.org/docs/head/use/configure/rules: a disable comment with no
+  rule names turns off every rule on the line, and the docs show listing rule
+  names to narrow it. That is the same mechanism: an exemption wider than its
+  reason hides other findings.
+- Field case: the t73 checker passed a mixed line at 15/15. With the rule
+  applied to history lines, the round-0 file failed exactly that line (12/16).
+- Searched for ruff `blanket-noqa` (PGH004). Both searches returned unrelated
+  results, so it is not cited.
+
+**`bdb042f44f413d06` (field-tested).** Claim: when a harness builds mutant trees
+from a fixed list of copied paths, a change whose test reads a new root file
+adds that path to the list in the same change. It also runs the test that pins
+the list.
+- https://mutmut.readthedocs.io: `also_copy` lists the extra files and
+  directories that mutmut copies into `mutants/` because the full suite needs
+  them. Fixed copy lists are a documented harness design.
+- The page already says to copy the whole repository (step 4 and its Instead-of
+  row). The new row covers harnesses that keep a fixed list on purpose.
+- Field case: `test_mutation_tree` failed with
+  `{'requirements.lock.txt': ['test_supply_chain.py']} != {}` until the path was
+  added to `TREE_CONTENTS`. After that, 17 tests ran OK.
+
+**`f332524447ff2105`: not researched.** It was released before verification
+(see Open-PR check).
+
+**`6867bb478197b062`: not researched.** It is a plan-gap row that records one
+design decision for the linkly repository's own `pyproject.toml`, so there is no
+general best-practice to verify.
 
 ## Existing-layer check
 
-Pages read: security-secrets-secrets-in-code, infrastructure-ci-cd-secrets-handling, infrastructure-agent-orchestration-pane-delivery-confirmation, testing-flaky-diagnosing-flaky-tests, testing-flaky-docker-vm-oversubscription-under-parallel-containers, testing-e2e-e2e-stability, backend-node-language-string-replace-replacement-patterns
+Pages read: testing-quality-harness-reverse-controls, testing-quality-spec-artifact-checks, testing-quality-cross-component-invariant-via-shared-helper, testing-quality-guard-shape-vs-consequence
 
-- **security-secrets-secrets-in-code** — merge target for `f727`. Its edge table
-  already has two "a library echoes the secret" rows: a URL-query key logged by HTTP
-  clients, and a DSN echoed in an error. The header-value `ValueError` is a third path
-  of the same kind, so it was added as one edge row, not a new page. One source line
-  and one field-evidence line were added. `last_verified` was left at 2026-07-12
-  because the other rows were not re-checked.
-- **infrastructure-ci-cd-secrets-handling** — read as a possible target (job-log
-  masking). Not chosen: it covers how the pipeline handles secrets, and this is a
-  script's own exception text. No edit.
-- **infrastructure-agent-orchestration-pane-delivery-confirmation** — merge target for
-  `3d61`. It already owns the input-box rows for this CLI (the `[Pasted text` placeholder,
-  where the input box sits). The suggestion case is a sibling edge row. Added the
-  interactive-mode doc to frontmatter sources, plus three Sources lines (tmux `-e`
-  quote, docs quote, field observation).
-- **testing-flaky-diagnosing-flaky-tests** — closest owner for `0a0c`. It is
-  `confidence: verified`. The 2026-10-22 log shows that the Wiki agent gate blocked
-  merging a single-field-reproduction mechanism into this page (the PR #275 split).
-  Following that precedent, the mechanism went to its own field-tested page. This page
-  gets one pointer edge row and a `related:` id; its confidence and date are unchanged.
-- **testing-flaky-docker-vm-oversubscription-under-parallel-containers** — the nearest
-  sibling: resource ceiling, different subset failing each run. It is a different case
-  (container memory, `409` errors, its own trigger), so the new page was not merged into
-  it. The two are cross-linked from the new page's `related:` and an edge row.
-- **testing-e2e-e2e-stability** — read for e2e overlap. It covers selectors, waits,
-  and data, not host contention. Linked from the new page's `related:`; no edit.
-- **backend-node-language-string-replace-replacement-patterns** — already says
-  `$n` / `$<name>` work for "regex patterns only; otherwise left literal", and has the
-  edge row "A string `from` (no captures) → `$1` stays literal, but `$$`, `$&`, `` $` ``,
-  `$'` still expand". That is exactly what `97c3` asks for, so it was dropped as a duplicate.
+Also read: `wiki/testing/index.md` and `wiki/qa/index.md` (routing). I ran
+`wiki_search` once per candidate. The hits pointed to the same pages, plus
+`testing-quality-mutation-harness-file-custody` and
+`testing-quality-schema-additions-under-a-golden-gate`. Their snippets did not
+match these mechanisms, so I did not open them.
 
-No conflicting directive was found and no page was superseded.
+- `c9e00…`: no existing row covers two hand-typed copies of a range list.
+  The shared-helper page's claim ("both sides built from one source agree
+  regardless of production") is the same mechanism, so I merged the case in as
+  an edge row. Added `related: testing-quality-spec-artifact-checks`.
+- `f8a3…`: spec-artifact-checks owns "ids that must resolve across documents".
+  Its control table repoints an id to a target that does not exist, but nothing
+  covers a target that exists and does not define the item. Merged as an edge
+  row.
+- `b3a7…`: guard-shape-vs-consequence already has an edge row on exemption
+  lists ("each entry is a case the guard stopped measuring"). The new row adds
+  the line-granularity case. No conflict.
+- `bdb0…`: harness-reverse-controls step 4 already says "copy the whole
+  repository". The candidate does not conflict with it; it covers harnesses
+  whose fixed list is deliberate, so it is an edge row and not a duplicate.
+- I created no new pages. The `testing/index.md` load-when lines and the four
+  pages' "When this applies" paragraphs were extended to match. `log.md` has one
+  new ingest line.
 
 ## Open-PR check
 
-Open `knowledge/*` heads at flush time (`gh pr list --repo choiyounggi/dev-loop
---state open --json number,headRefName --search "head:knowledge/"`):
-**#291** (`knowledge/autoflush-20261022-124048-18072`).
+Open `knowledge/*` heads (`gh pr list --repo choiyounggi/dev-loop --state open
+--search "head:knowledge/"`): #306, #305, #304, #301, #300, #299, #298, #293.
+This run cannot `git diff` them. I compared each candidate against each PR's
+file list and its INGEST_REPORT body, both read through `gh pr list --json`.
 
-This headless run cannot `git diff` that branch, and `gh pr view` / the GitHub MCP
-file list were not allowed. Overlap was judged from the queue rows that #291's run
-retired, using their `outcome` fields. #291 touches
-`testing-quality-anchor-cases-for-allowlist-regexes`,
-`testing-quality-checks-that-cannot-pass`,
-`qa-process-blind-llm-judgment-of-a-visual-rule`, and a new page
-`platforms-shells-non-ascii-text-after-an-unbraced-parameter`.
-
-- `f727` (security, secret in an HTTP header) — **new**: #291 touches no security page.
-- `3d61` (agent pane input box) — **new**: #291's only platforms/infrastructure page is
-  a bash parameter-expansion page, which is a different trigger.
-- `0a0c` (e2e flakiness under CPU contention) — **new**: #291 touches no `testing/flaky`
-  or e2e page.
-- `97c3` — not compared against #291: it was dropped against the merged layer.
-- `446c58c78d5e467f` (exact `git diff --numstat` count as a gate's expected value) —
-  **drop (plausible overlap)**, so its claim was **released**, not retired. It is a
-  gate-design lesson in `testing/quality`, and #291 is editing two `testing/quality`
-  gate pages (`checks-that-cannot-pass`, `anchor-cases-for-allowlist-regexes`). This run
-  cannot diff #291, so the manual flush should decide whether to fold it in or ingest it
-  as new.
+- `f332524447ff2105` → **released**. #299 adds
+  `platforms-tools-search-evidence-from-a-wrapped-grep`: the Bash tool's `grep`
+  is a shell function, and that is the same mechanism as this candidate.
+  PR #305 released this row for the same reason.
+- `c9e00…`, `f8a3…`, `b3a7…`, `bdb0…` → **new**. None of their target pages
+  appears in any open PR's file list. I checked the nearest PRs too:
+  - #305 (superseded-section verdicts, on `qa-document-verification-superseding-a-knowledge-record`)
+    is about computing replace/keep verdicts, not range oracles or pointer
+    targets.
+  - #300's `testing-quality-new-test-outside-a-runner-include-filter` is about a
+    Gradle include filter that leaves a test unrun, not mutant trees missing a
+    file.
+  - #299's `security-agent-exposure-command-guard-exemption-matching` is about
+    command-text matching in a security guard, not line-level exemptions in a
+    document checker.
+- `6867…` → dropped as project-specific, so no open-PR verdict applies.
 
 ## Routing decision
 
-- `f7273179a74dcb80` → `security` / `secrets` → edge row in
-  `wiki/security/secrets/secrets-in-code.md`; security index "load when" extended.
-- `3d610c1206e1bdd6` → `infrastructure` / `agent-orchestration` → edge row in
-  `wiki/infrastructure/agent-orchestration/pane-delivery-confirmation.md`; infrastructure
-  index "load when" extended. Written generally (any helper that classifies the box, or
-  `capture-pane -e`); the dev-loop helper `send-prompt.sh` appears only in the evidence line.
-- `0a0ccc4ca0904514` → `testing` / `flaky` → new page
-  `wiki/testing/flaky/e2e-failures-moving-under-host-cpu-contention.md` (field-tested).
-  There is no new category: `flaky` already holds the sibling resource-ceiling page.
-  A pointer edge row and a `related:` id were added in `diagnosing-flaky-tests`, and a
-  testing index row was added. The INDEX.md testing line already covers "flaky tests".
-- `log.md` has one entry appended for this run.
+| Candidate | Target |
+|-----------|--------|
+| `c9e00…` | testing/quality → `wiki/testing/quality/cross-component-invariant-via-shared-helper.md` (edge row + source line) |
+| `f8a3…` | testing/quality → `wiki/testing/quality/spec-artifact-checks.md` (edge row + 2 source lines; frontmatter source added). The hint was `qa`, but qa/document-verification/spec-document-gates routes check-authoring to this page |
+| `b3a7…` | testing/quality → `wiki/testing/quality/guard-shape-vs-consequence.md` (edge row + 2 source lines; frontmatter source added) |
+| `bdb0…` | testing/quality → `wiki/testing/quality/harness-reverse-controls.md` (edge row + 2 source lines; frontmatter source added) |
+
+No new category or page. The existing `testing/quality` pages each own the
+mechanism.
 
 ## Local-layer candidates
 
-These 13 plan-gap rows are excluded from this PR. Each records a design decision for
-the `emperor` (linkly) repository's own files, so each would be wrong in another
-codebase. Run wiki-ingest inside that project to keep any of them:
-
-| Row | Decision | Target |
-|-----|----------|--------|
-| `3632d0989f629104`, `7bfb7541e4e4bd8c` | t242 SECURITY.md sections and policy values | `wiki-local/security/disclosure/security-policy-file.md` |
-| `9700770d7c05b820` | t242 `.github/CODEOWNERS` layout | `wiki-local/infrastructure/repo-governance/codeowners-layout.md` |
-| `3d578bcfcbcc6b97`, `410400eb22f77f77` | t242 CODE_OF_CONDUCT.md source and contact | `wiki-local/infrastructure/repo-governance/code-of-conduct-source.md` |
-| `54aeaa8fdee5e0e7` | t242 mutation harness `TREE_CONTENTS` for new root files | `wiki-local/testing/quality/mutation-tree-contents.md` |
-| `0e0e7c7c4cef34c3` | t252 per-runner concurrency group for `_ai-gate.yml` | `wiki-local/infrastructure/ci-cd/ai-gate-concurrency-groups.md` |
-| `05df421bf905f5ce` | t252 `response_format: json_object` for the HTTP gate runner | `wiki-local/backend/llm/ai-gate-structured-output-mode.md` |
-| `1670e43e60cb7fe3`, `2df80edab8d41dfb` | t252 / t257 CHANGELOG bullet placement | `wiki-local/qa/release/changelog-bullet-placement.md` |
-| `1666b8cf32e274ea` | t257 `_relay_batch` calls begin/commit/rollback directly | `wiki-local/backend/outbox/relay-transaction-calls.md` |
-| `5ee53f499cc8d657`, `744090ce219677c0` | t249a1 RFC-0007 Review stage and §2.2 rule-5 chain notes | `wiki-local/qa/spec-process/rfc-promotion-checks.md` |
+- `6867bb478197b062` (linkly/scoter, plan-gap t246: the four
+  `Programming Language :: Python :: 3.11`–`3.14` classifiers and where they go
+  in `pyproject.toml`) → `wiki-local/infrastructure/packaging/python-version-classifiers.md`.
+  Run wiki-ingest inside that project.
