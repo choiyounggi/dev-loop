@@ -5,8 +5,9 @@
 # `bash script.sh` overrides the shebang and would let a bashism pass CI and
 # then fail under dash in production.
 #
-# Every test creates its own tmux session and kills it in teardown (which bats
-# runs on failure too). No test touches a session it did not create.
+# Every test creates its own tmux session on its own PRIVATE tmux server
+# (issue #312: never the default socket) and teardown, which bats runs on
+# failure too, kills that server. No test touches a session it did not create.
 
 # `run --separate-stderr` keeps the advisory stderr out of $output so the
 # one-token stdout contract can be asserted exactly.
@@ -24,11 +25,56 @@ setup() {
   # a mapped projects dir for this worktree can exist on a developer machine
   # and would otherwise cost up to LO_RECEIPT_TIMEOUT seconds per send.
   export LO_RECEIPT_TIMEOUT=0
+  # Issue #312: every tmux server this file starts is private to the test. A
+  # generated `tmux` wrapper, first on PATH, adds `-L "$PRIV_SOCK"` to every
+  # call — this file's own `tmux ...` lines and send-prompt.sh's
+  # `command -v tmux` alike — so none reaches the default socket or the
+  # server an inherited TMUX names (-L wins over TMUX). The wrapper pins
+  # TMUX_TMPDIR to its value here, so a test that relocates TMUX_TMPDIR cannot
+  # push the private socket past the 104-byte socket-path limit. The fakes
+  # (_use_fake_tmux*) prepend their own bin later, so a fake still wins.
+  REAL_TMUX="$(command -v tmux || true)"
+  PATH_NO_PRIV="$PATH"
+  PRIV_SOCK=""; PRIV_SOCK_PATH=""; AMBIENT_SOCK=""
+  PRIV_BIN="${BATS_TEST_DIRNAME}/../.claude/tmp/spt-$$-${BATS_TEST_NUMBER:-0}"
+  if [ -n "$REAL_TMUX" ]; then
+    PRIV_SOCK="sp-$$-${BATS_TEST_NUMBER:-0}"
+    mkdir -p "$PRIV_BIN"
+    if [ -n "${TMUX_TMPDIR:-}" ]; then
+      printf '#!/bin/sh\nexec env TMUX_TMPDIR="%s" "%s" -L "%s" "$@"\n' \
+        "$TMUX_TMPDIR" "$REAL_TMUX" "$PRIV_SOCK" > "$PRIV_BIN/tmux"
+    else
+      printf '#!/bin/sh\nexec env -u TMUX_TMPDIR "%s" -L "%s" "$@"\n' \
+        "$REAL_TMUX" "$PRIV_SOCK" > "$PRIV_BIN/tmux"
+    fi
+    chmod +x "$PRIV_BIN/tmux"
+    PATH="$PRIV_BIN:$PATH"; export PATH
+  fi
 }
 
 teardown() {
   [ -n "${STUB_ROOT:-}" ] && rm -rf "$STUB_ROOT"
-  tmux kill-session -t "$S" 2>/dev/null || true
+  # Issue #312: kill only this test's private server — through the wrapper, so
+  # the pinned TMUX_TMPDIR applies — then remove the socket file, which tmux
+  # leaves behind after kill-server. The path comes from tmux, never hardcoded.
+  if [ -n "${PRIV_SOCK:-}" ] && [ -x "${PRIV_BIN:-}/tmux" ]; then
+    sock_path="${PRIV_SOCK_PATH:-}"
+    if [ -z "$sock_path" ]; then
+      sock_path="$("$PRIV_BIN/tmux" display-message -p '#{socket_path}' 2>/dev/null || true)"
+    fi
+    "$PRIV_BIN/tmux" kill-server 2>/dev/null || true
+    if [ -n "$sock_path" ] && [ -S "$sock_path" ]; then rm -f "$sock_path"; fi
+  fi
+  # A #312 case's stand-in for the ambient server: only ever a socket under
+  # this test's own $BATS_TEST_TMPDIR, and live only if a regression started it.
+  if [ -n "${AMBIENT_SOCK:-}" ] && [ -S "$AMBIENT_SOCK" ]; then
+    case "$AMBIENT_SOCK" in
+      "$BATS_TEST_TMPDIR"/*)
+        "$REAL_TMUX" -S "$AMBIENT_SOCK" kill-server 2>/dev/null || true
+        rm -f "$AMBIENT_SOCK" ;;
+    esac
+  fi
+  if [ -n "${PRIV_BIN:-}" ]; then rm -rf "$PRIV_BIN"; fi
 }
 
 # Start a throwaway session running a plain shell. A plain shell is enough to
@@ -39,7 +85,11 @@ teardown() {
 # (INTERACTIVE_COMMENTS is off), while Ubuntu CI defaults to bash, which does.
 # Pinning removes that divergence so the same assertions hold on both runners.
 mk_session() {
-  tmux new-session -d -s "$S" -x 80 -y 15 /bin/sh
+  # 3>&-: when this call starts the test's private server, the server must
+  # not inherit bats' fd 3, or bats would wait on it after the run.
+  tmux new-session -d -s "$S" -x 80 -y 15 /bin/sh 3>&-
+  # Read for teardown (issue #312): tmux leaves the socket file behind.
+  PRIV_SOCK_PATH="$(tmux display-message -p -t "=$S:" '#{socket_path}' 2>/dev/null || true)"
   sleep 1
 }
 
@@ -1299,4 +1349,80 @@ _attempt_count() { wc -l < "$FAKE_ATTEMPTS" | tr -d ' '; }
   [ -n "$a" ]
   [ -n "$b" ]
   [ "$a" = "$b" ]
+}
+
+# ------------------------------------------- private tmux server (issue #312)
+#
+# setup() routes every tmux call through a wrapper bound to a per-test private
+# server (-L). These cases prove the route: the session and send-prompt.sh
+# live on the private server — never on the server an inherited TMUX names
+# (pane case) or on a default server (no-server case) — and teardown leaves
+# no server or socket behind. A stand-in socket under $BATS_TEST_TMPDIR plays
+# the ambient server, so even a regressed mk_session cannot reach the shared
+# default server while these cases run.
+
+@test "private server: inside a pane, mk_session and send-prompt.sh reach only the private server, never the one TMUX names (#312)" {
+  [ -n "$REAL_TMUX" ]
+  AMBIENT_SOCK="$BATS_TEST_TMPDIR/d"
+  export TMUX="$AMBIENT_SOCK,1,0" LO_RUN_ID=leak312 GROUNDWORK_LEAK312=1
+  mk_session
+  run "$PRIV_BIN/tmux" has-session -t "=$S"
+  [ "$status" -eq 0 ]
+  run --separate-stderr sh "$SP" state "$S"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ready" ]
+  run --separate-stderr sh "$SP" send "$S" 'echo ZZ312PRIV'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  sleep 1
+  pane="$("$PRIV_BIN/tmux" capture-pane -t "=$S:" -p)"
+  [[ $'\n'"$pane"$'\n' == *$'\n'ZZ312PRIV$'\n'* ]]
+  # Negative control: the identical call without the private route cannot see
+  # the session, so "ready" above came from the private server.
+  run --separate-stderr env PATH="$PATH_NO_PRIV" sh "$SP" state "$S"
+  [ "$status" -eq 3 ]
+  [ "$output" = "gone" ]
+  # Nothing started a server where TMUX points.
+  [ ! -e "$AMBIENT_SOCK" ]
+}
+
+@test "private server: with no default server running, mk_session and send-prompt.sh leave no default server behind (#312)" {
+  [ -n "$REAL_TMUX" ]
+  # An empty TMUX_TMPDIR is a machine with no default server: a TMUX-less
+  # caller's default socket is "$TMUX_TMPDIR/tmux-<uid>/default".
+  unset TMUX
+  export TMUX_TMPDIR="$BATS_TEST_TMPDIR" LO_RUN_ID=leak312 GROUNDWORK_LEAK312=1
+  AMBIENT_SOCK="$BATS_TEST_TMPDIR/tmux-$(id -u)/default"
+  [ ! -e "$AMBIENT_SOCK" ]
+  mk_session
+  run --separate-stderr sh "$SP" state "$S"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ready" ]
+  # Read-only probe of that default socket: has-session never starts a server.
+  run "$REAL_TMUX" has-session -t "=$S"
+  [ "$status" -ne 0 ]
+  [ ! -e "$AMBIENT_SOCK" ]
+}
+
+@test "boundary: teardown kills the private tmux server and removes its socket file (#312)" {
+  [ -n "$REAL_TMUX" ]
+  mk_session
+  sock="$PRIV_SOCK_PATH"
+  [ -n "$sock" ]
+  [ -S "$sock" ]
+  pid="$("$PRIV_BIN/tmux" display-message -p '#{pid}')"
+  [ -n "$pid" ]
+  kill -0 "$pid"
+  teardown
+  # The process, not just the socket: without kill-server, removing the socket
+  # file alone would orphan a live server that has-session cannot see.
+  # kill-server returns before the server exits, so allow it up to 2 s.
+  i=0
+  while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 20 ]; do sleep 0.1; i=$((i + 1)); done
+  run kill -0 "$pid"
+  [ "$status" -ne 0 ]
+  run "$REAL_TMUX" -S "$sock" has-session -t "=$S"
+  [ "$status" -ne 0 ]
+  [ ! -e "$sock" ]
+  [ ! -e "$PRIV_BIN" ]
 }
