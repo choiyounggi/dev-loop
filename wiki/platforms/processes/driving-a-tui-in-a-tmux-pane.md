@@ -10,7 +10,7 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap11.html
   - https://code.claude.com/docs/en/terminal-config
 last_verified: 2026-10-02
-related: [platforms-processes-non-interactive-cli-invocation, platforms-processes-background-services, platforms-shells-portable-shell-scripts, infrastructure-agent-orchestration-pane-delivery-confirmation, platforms-processes-sentinel-driven-repl-payloads]
+related: [platforms-processes-non-interactive-cli-invocation, platforms-processes-background-services, platforms-shells-portable-shell-scripts, infrastructure-agent-orchestration-pane-delivery-confirmation, platforms-processes-sentinel-driven-repl-payloads, platforms-processes-tmux-server-environment-at-start]
 ---
 
 # Sending Input to a TUI Running in a tmux Pane

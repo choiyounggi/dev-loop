@@ -13,7 +13,7 @@ sources:
   - https://docs.python.org/3/library/subprocess.html
   - "Local reproduction 2026-10-07 (CPython 3.14.6, macOS Darwin 25.1.0): blocked FIFO open, lock, queue and socket calls each released from the test thread; daemon vs non-daemon exit measured"
 last_verified: 2026-10-07
-related: [testing-strategy-signal-delivery-to-a-process-under-test, testing-strategy-failing-test-first, testing-quality-gate-parsing-vs-command-execution, testing-quality-tests-that-cannot-fail, testing-async-async-testing, backend-python-concurrency-gil-and-concurrency-model]
+related: [testing-strategy-signal-delivery-to-a-process-under-test, testing-strategy-failing-test-first, testing-quality-gate-parsing-vs-command-execution, testing-quality-tests-that-cannot-fail, testing-async-async-testing, backend-python-concurrency-gil-and-concurrency-model, testing-strategy-long-lived-processes-under-bats]
 ---
 
 # Testing That a Call Returns Instead of Blocking

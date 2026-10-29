@@ -1,164 +1,117 @@
-# Knowledge flush — 3 insight(s) (headless auto-flush run 20261022-134153-21632)
+# Knowledge flush — 2 insight(s) (headless auto-flush run 20261029-124846-54962)
 
-18 queue rows were claimed this run: 3 ingested, 1 dropped as a duplicate of the
-merged wiki, 13 dropped as project-specific plan-gap rows, 1 released because it
-plausibly overlaps open PR #291. Nothing was folded into another branch.
+This run claimed 24 queue rows:
 
-| Candidate | Domain | Disposition |
-|-----------|--------|-------------|
-| `f7273179a74dcb80` — secret in an HTTP header leaks through `http.client`'s `ValueError` | security | **ingested** — edge row in `security-secrets-secrets-in-code` (verified) |
-| `3d610c1206e1bdd6` — text nobody sent in an agent CLI's input box is the grey prompt suggestion | infrastructure | **ingested** — edge row in `infrastructure-agent-orchestration-pane-delivery-confirmation` (verified docs + field observation) |
-| `0a0ccc4ca0904514` — e2e failure moving between tests under host CPU contention | testing | **ingested** — new page `testing-flaky-e2e-failures-moving-under-host-cpu-contention` (field-tested) |
-| `97c37473b53e63c2` — string-pattern `replace`: `$n` stays literal, `$$`/`$&`/`` $` ``/`$'` expand | backend (queued as frontend) | dropped — duplicate of merged page |
-| `446c58c78d5e467f` — `git diff --numstat` count depends on the diff algorithm | testing | released — plausible overlap with open PR #291 |
-| 13 plan-gap rows (see Local-layer candidates) | — | dropped — project-specific |
+- **2 ingested** as new pages.
+- **17 dropped** as project-specific plan-gap rows.
+- **5 released** back to pending: 2 duplicate open PRs #299 / #300, and 3 have queue files this run could not locate.
+
+Nothing was folded into another branch.
+
+Both ingested rows are plan-gap rows (wiki-plan Phase B decisions in the dev-loop repo, `cormorant`, task `t1-env-leak`). As written, each names that repo's files and line numbers, so the row is project-specific. Each carries a general lesson with its own primary source, though. Only that general lesson was ingested, and nothing from the repo except an anonymised field-case line.
+
+| Candidate | Disposition |
+|-----------|-------------|
+| `692c00d2eab28ea8` bats mechanics for a test that starts a daemon | **ingested**: new page `testing-strategy-long-lived-processes-under-bats` (verified) |
+| `fa55495d116a7d7d` where the tmux environment strip happens | **ingested**: new page `platforms-processes-tmux-server-environment-at-start` (verified) |
+| `8a67a97c4afd204c`, `f332524447ff2105` | **released**: still pending duplicates of open PRs #299 / #300 (same verdict as runs 20261029-104612-27366 and 20261029-114716-88588) |
+| `d1e6468cdb111e8c`, `baac78b023efce53`, `9f1d906f64d671ad` | **released unread**: this run cannot list `~/.dev-loop/queue`, and Read needs an exact file name. Their files are neither `plan-gaps.jsonl` nor `31e98211-….jsonl` |
+| 17 other plan-gap rows (see Local-layer candidates) | dropped as project-specific |
 
 ## Verified best-practice
 
-**`f7273179a74dcb80` — confidence: verified.** Claim: when a script puts a secret
-from an env var into an HTTP header via Python `http.client`/`urllib`, a value
-with a bare CR/LF (a pasted key ending in `\n`) makes `putheader` raise a
-`ValueError` whose message contains the whole header value, so a traceback that
-escapes the script's own redaction prints the key.
-- CPython `Lib/http/client.py` (https://github.com/python/cpython/blob/main/Lib/http/client.py):
-  read in the local CPython 3.9 source — l.138
-  `_is_illegal_header_value = re.compile(rb'\n(?![ \t])|\r(?![ \t\n])').search`;
-  l.1234-1235 `if _is_illegal_header_value(values[i]): raise ValueError('Invalid header value %r' % (values[i],))`.
-  A trailing `\n` matches `\n(?![ \t])`, and `%r` repeats the full encoded value.
-  Web search confirmed the check came from the CVE-2016-5699 header-injection fix.
-  The `main`-branch file was not fetched in this run (WebFetch is not allowed here);
-  the cited line numbers are from 3.9.
-- Field reproduction (session evidence): on Python 3.13 and 3.11 the key appeared
-  in the traceback; after the pre-request check plus catch-all redaction, 0 key hits
-  and the mutation checks went red.
+**`692c00d2eab28ea8` → bats and long-lived processes (confidence: verified).**
+- **Claim:** a process that a bats test leaves running inherits fd 3, and bats waits until every holder of fd 3 closes it. Fix: add `3>&-` to the start command and stop the process in `teardown`.
+- **`setup_file`:** processes started there still block bats even with fd 3 closed, so stop them in `teardown_file`.
+- **Helpers:** a helper that records the server's address must be called bare. `$(...)` runs it in a subshell, so its variables never reach the test's shell.
 
-**`3d610c1206e1bdd6` — confidence: verified (docs) + field observation.** Claim:
-in a Claude Code pane read through `tmux capture-pane`, grey text in the input box
-that nobody sent is the CLI's prompt suggestion. Plain capture drops styling, so the
-suggestion looks like an unsubmitted prompt.
-- https://code.claude.com/docs/en/interactive-mode (fetched 2026-10-22), "Prompt
-  suggestions": "shows a grayed-out example command in the prompt input"; after a
-  response it "can suggest your next prompt"; "Press `Tab` or `Right arrow` to place
-  the suggestion in the prompt input, then `Enter` to submit"; "Start typing to dismiss it".
-- tmux man page (https://man7.org/linux/man-pages/man1/tmux.1.html; same wording read
-  from the local tmux 3.7b `tmux.1`, l.2693-2696): "If -e is given, the output includes
-  escape sequences for text and background attributes."
-- Field observation (run i41): the box showed "승인됐습니다. 계획대로 구현하세요."
-  after `plan_ready`; `send-prompt.sh state lo-1-i41` → `ready` rc 0; the next real send
-  reported `delivered`.
-- Not claimed: which escape code (dim SGR 2 vs a grey colour) the CLI uses. The page
-  says "grey/dim" to match the docs' "grayed-out".
+Sources:
+- https://bats-core.readthedocs.io/en/stable/writing-tests.html — section "File descriptor 3 (read this if Bats hangs)": a background child inherits fd 3 and bats appears frozen.
+- https://bats-core.readthedocs.io/en/v1.3.0/writing-tests.html — same section, with the fix `command_name 3>&-`.
+- https://github.com/bats-core/bats-core/issues/530 — bats still waits for `setup_file` background processes when fd 3 is closed.
+- https://www.gnu.org/software/bash/manual/bash.html#Command-Substitution — command substitution runs in a subshell.
+- Field case from the originating plan: a `$(...)` helper left teardown with no socket name, and the run hung on fd 3.
 
-**`0a0ccc4ca0904514` — confidence: field-tested.** Claim: on a shared host, a
-browser e2e failure that moves to a different timing-dependent test on each re-run
-is CPU contention until shown otherwise. Measure load and foreign headless browsers,
-re-run once after 60 s quiet, and report every run line.
-- https://playwright.dev/docs/test-cli — `--workers` defaults to 50% of logical CPU
-  cores (already cited on the wiki; it sizes to the host's cores, not to free capacity).
-- https://playwright.dev/docs/ci — recommends `workers: 1` in CI "to prioritize
-  stability and reproducibility", so each test gets the full system resources. This was
-  confirmed only through a web-search summary of the official page; the page was not
-  fetched in this run.
-- Field observation (2026-10-18, 36-test Playwright suite): load avg 19 with a foreign
-  `chrome-headless-shell` at 110% CPU → "1 failed" at `leave.spec.ts:37`, then at
-  `game-bell.spec.ts:33`; after 60 s with no headless browser → "36 passed (50.9s)".
-  This is a single host, so the page is field-tested, not verified.
+How verified: WebSearch, 2 queries; the second (extended) returned the docs section and issue #530. This headless run has no page fetch, so the docs were read through search summaries.
 
-**`97c37473b53e63c2`** — the claim is correct (MDN replacement-pattern table; the node
-evidence in the row), but it is already on the merged wiki. See Existing-layer check.
+**`fa55495d116a7d7d` → tmux server environment (confidence: verified).**
+- **Claim:** at server start, tmux copies the starting client's whole environment into the global environment, once. Every new window merges global and session environments, with session values winning.
+- **So:** strip run-scoped variables with `env -u` (or an `env -i` allow-list) on every call that can start a server.
+- **These do not prevent the copy:** `new-session -e` only sets a session value, and `set-environment -g -u` after start leaves a window where the value is live. A strip that runs only after `has-session` reports no server can race.
+
+Sources:
+- https://man7.org/linux/man-pages/man1/tmux.1.html — section GLOBAL AND SESSION ENVIRONMENT, plus `update-environment` and hidden (`-h`) variables.
+- https://man.openbsd.org/tmux.1 — `new-session -e`. Already a source of `platforms-processes-driving-a-tui-in-a-tmux-pane`.
+- The originating plan quoted the local tmux 3.7b man page and the `tmux.c` server-start loop. The page cites that loop only as field context, not as a re-read source.
+
+How verified: WebSearch, 2 queries; the second (extended) returned the man7 section body as a summary. The macOS `/bin/sh` vs `dash` row for non-shell variable names is a field measurement and is labelled as one on the page.
+
+Not researched: the 5 released rows and the 17 dropped plan-gap rows.
 
 ## Existing-layer check
 
-Pages read: security-secrets-secrets-in-code, infrastructure-ci-cd-secrets-handling, infrastructure-agent-orchestration-pane-delivery-confirmation, testing-flaky-diagnosing-flaky-tests, testing-flaky-docker-vm-oversubscription-under-parallel-containers, testing-e2e-e2e-stability, backend-node-language-string-replace-replacement-patterns
+Pages read: platforms-processes-driving-a-tui-in-a-tmux-pane, testing-strategy-signal-delivery-to-a-process-under-test, testing-strategy-calls-that-must-not-block
 
-- **security-secrets-secrets-in-code** — merge target for `f727`. Its edge table
-  already has two "a library echoes the secret" rows: a URL-query key logged by HTTP
-  clients, and a DSN echoed in an error. The header-value `ValueError` is a third path
-  of the same kind, so it was added as one edge row, not a new page. One source line
-  and one field-evidence line were added. `last_verified` was left at 2026-07-12
-  because the other rows were not re-checked.
-- **infrastructure-ci-cd-secrets-handling** — read as a possible target (job-log
-  masking). Not chosen: it covers how the pipeline handles secrets, and this is a
-  script's own exception text. No edit.
-- **infrastructure-agent-orchestration-pane-delivery-confirmation** — merge target for
-  `3d61`. It already owns the input-box rows for this CLI (the `[Pasted text` placeholder,
-  where the input box sits). The suggestion case is a sibling edge row. Added the
-  interactive-mode doc to frontmatter sources, plus three Sources lines (tmux `-e`
-  quote, docs quote, field observation).
-- **testing-flaky-diagnosing-flaky-tests** — closest owner for `0a0c`. It is
-  `confidence: verified`. The 2026-10-22 log shows that the Wiki agent gate blocked
-  merging a single-field-reproduction mechanism into this page (the PR #275 split).
-  Following that precedent, the mechanism went to its own field-tested page. This page
-  gets one pointer edge row and a `related:` id; its confidence and date are unchanged.
-- **testing-flaky-docker-vm-oversubscription-under-parallel-containers** — the nearest
-  sibling: resource ceiling, different subset failing each run. It is a different case
-  (container memory, `409` errors, its own trigger), so the new page was not merged into
-  it. The two are cross-linked from the new page's `related:` and an edge row.
-- **testing-e2e-e2e-stability** — read for e2e overlap. It covers selectors, waits,
-  and data, not host contention. Linked from the new page's `related:`; no edit.
-- **backend-node-language-string-replace-replacement-patterns** — already says
-  `$n` / `$<name>` work for "regex patterns only; otherwise left literal", and has the
-  edge row "A string `from` (no captures) → `$1` stays literal, but `$$`, `$&`, `` $` ``,
-  `$'` still expand". That is exactly what `97c3` asks for, so it was dropped as a duplicate.
+Also read: `wiki/testing/index.md`, `wiki/platforms/index.md`, `templates/page.md`, and the tail of `log.md`.
 
-No conflicting directive was found and no page was superseded.
+`wiki_search` (k=5) runs:
+
+| Query | Top hits |
+|-------|----------|
+| bats test hangs when a background process or daemon inherits file descriptor 3 | testing-strategy-signal-delivery-to-a-process-under-test 0.740, platforms-shells-redirection-order-for-a-silenced-write 0.736, mobile-lifecycle-process-death-and-state 0.720, testing-mocking-destructive-operations-on-shared-daemons 0.719 |
+| bats-core test helpers setup teardown temp dir | testing-data-test-data-and-isolation 0.760, testing-quality-path-resolver-fixtures-with-coincident-cwd 0.756, testing-data-artifact-leakage-from-a-suite 0.756, debugging-methodology-hiding-a-tool-to-reproduce-its-absent-branch 0.714 |
+| tmux server copies the client environment into the global environment only at server start | backend-common-orm-prisma-7-config-env-and-generated-client 0.750, backend-python-boundaries-runtime-validation 0.737, platforms-tools-plugin-mcp-server-registration 0.727, platforms-environment-timezone-and-locale 0.723 |
+| tmux new-session send-keys launching worker sessions environment variables | platforms-processes-driving-a-tui-in-a-tmux-pane 0.745, infrastructure-agent-orchestration-session-completion-gates 0.741, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts 0.737, platforms-shells-portable-shell-scripts 0.734 |
+
+Findings:
+- No page covers bats fd 3. `calls-that-must-not-block` covers a single blocking call in Python, and `signal-delivery` covers SIGINT being ignored in `&` jobs. Neither covers the runner waiting on an inherited descriptor.
+- No page covers the tmux global environment. `driving-a-tui-in-a-tmux-pane` is about `send-keys` delivery, and `session-completion-gates` is about `TMUX`/`TMUX_PANE` identifying a pane.
+- So both are new pages in existing categories. Bodies are about 60 and 55 lines.
+- Related links added both ways: the bats page ↔ `testing-strategy-calls-that-must-not-block`, and the tmux page ↔ `platforms-processes-driving-a-tui-in-a-tmux-pane`. The two new pages also link each other. One-way links go to `testing-strategy-signal-delivery-to-a-process-under-test`, `testing-mocking-destructive-operations-on-shared-daemons`, `testing-quality-tests-that-cannot-fail`, `platforms-processes-spawning-an-agent-cli-from-a-server` and `testing-data-test-data-and-isolation`. Back-links were not added to those, to keep this PR off pages that open PRs might touch.
+- Conflicts: none.
 
 ## Open-PR check
 
-Open `knowledge/*` heads at flush time (`gh pr list --repo choiyounggi/dev-loop
---state open --json number,headRefName --search "head:knowledge/"`):
-**#291** (`knowledge/autoflush-20261022-124048-18072`).
+Open `knowledge/*` heads: #308, #307, #306, #305, #304, #301, #300, #299, #298, #293. This run has no git access, so overlap was judged from each PR's changed-file list (`gh pr list --json files`) and, for #307/#308, their bodies.
 
-This headless run cannot `git diff` that branch, and `gh pr view` / the GitHub MCP
-file list were not allowed. Overlap was judged from the queue rows that #291's run
-retired, using their `outcome` fields. #291 touches
-`testing-quality-anchor-cases-for-allowlist-regexes`,
-`testing-quality-checks-that-cannot-pass`,
-`qa-process-blind-llm-judgment-of-a-visual-rule`, and a new page
-`platforms-shells-non-ascii-text-after-an-unbraced-parameter`.
+| Candidate | Overlapping open PR | Verdict |
+|-----------|---------------------|---------|
+| 692c00d2eab28ea8 (bats fd 3) | None by trigger. No open PR touches `testing/strategy/`. #293, #300 and #301 edit `wiki/testing/index.md` in other categories (`quality`), so this is a merge-conflict risk, not duplicate content | **new** → ingested |
+| fa55495d116a7d7d (tmux global environment) | None by trigger. No open PR touches `platforms/processes/` tmux pages. #299 edits `platforms/processes/parsing-cli-structured-output.md` and #298 edits `platforms/processes/tool-diagnostics-without-a-failing-exit-code.md`, neither about tmux or environment inheritance. #298/#300 edit `infrastructure/config/environment-config.md` (application config, not process environment) | **new** → ingested |
+| 8a67a97c4afd204c (`grep -q` and SIGPIPE) | #299 (`platforms/tools/search-evidence-from-a-wrapped-grep.md`) | **pending duplicate** → released |
+| f332524447ff2105 (gate grep matches its own ledger) | #299, #300 (`testing/quality/checks-that-cannot-pass.md`) | **pending duplicate** → released |
+| d1e6468cdb111e8c, baac78b023efce53, 9f1d906f64d671ad | not judged (content unread) | released |
+| 17 plan-gap rows | n/a (project-specific) | dropped |
 
-- `f727` (security, secret in an HTTP header) — **new**: #291 touches no security page.
-- `3d61` (agent pane input box) — **new**: #291's only platforms/infrastructure page is
-  a bash parameter-expansion page, which is a different trigger.
-- `0a0c` (e2e flakiness under CPU contention) — **new**: #291 touches no `testing/flaky`
-  or e2e page.
-- `97c3` — not compared against #291: it was dropped against the merged layer.
-- `446c58c78d5e467f` (exact `git diff --numstat` count as a gate's expected value) —
-  **drop (plausible overlap)**, so its claim was **released**, not retired. It is a
-  gate-design lesson in `testing/quality`, and #291 is editing two `testing/quality`
-  gate pages (`checks-that-cannot-pass`, `anchor-cases-for-allowlist-regexes`). This run
-  cannot diff #291, so the manual flush should decide whether to fold it in or ingest it
-  as new.
+Possible merge conflicts, not duplicate content: `wiki/testing/index.md` (#293, #300, #301), `wiki/platforms/index.md` (#298, #299), and `log.md` (every open flush PR appends to it).
 
 ## Routing decision
 
-- `f7273179a74dcb80` → `security` / `secrets` → edge row in
-  `wiki/security/secrets/secrets-in-code.md`; security index "load when" extended.
-- `3d610c1206e1bdd6` → `infrastructure` / `agent-orchestration` → edge row in
-  `wiki/infrastructure/agent-orchestration/pane-delivery-confirmation.md`; infrastructure
-  index "load when" extended. Written generally (any helper that classifies the box, or
-  `capture-pane -e`); the dev-loop helper `send-prompt.sh` appears only in the evidence line.
-- `0a0ccc4ca0904514` → `testing` / `flaky` → new page
-  `wiki/testing/flaky/e2e-failures-moving-under-host-cpu-contention.md` (field-tested).
-  There is no new category: `flaky` already holds the sibling resource-ceiling page.
-  A pointer edge row and a `related:` id were added in `diagnosing-flaky-tests`, and a
-  testing index row was added. The INDEX.md testing line already covers "flaky tests".
-- `log.md` has one entry appended for this run.
+- `692c00d2eab28ea8` → `testing/strategy/long-lived-processes-under-bats.md`. It is a new page in an existing category. `strategy` already holds the harness-mechanics pages it sits beside (`signal-delivery-to-a-process-under-test`, `calls-that-must-not-block`).
+- `fa55495d116a7d7d` → `platforms/processes/tmux-server-environment-at-start.md`. It is a new page in an existing category. `processes` owns tmux pane mechanics (`driving-a-tui-in-a-tmux-pane`) and the environment a spawned child gets (`spawning-an-agent-cli-from-a-server`).
+- No new category.
+- Repo-specific details (line numbers, helper names, the GROUNDWORK_ variable prefix) were left out of the directives. They appear only in generic form in the field-case lines.
 
 ## Local-layer candidates
 
-These 13 plan-gap rows are excluded from this PR. Each records a design decision for
-the `emperor` (linkly) repository's own files, so each would be wrong in another
-codebase. Run wiki-ingest inside that project to keep any of them:
+These 17 rows are excluded from this PR. Each records one wiki-plan Phase B design decision for a single task. To keep any of them, run wiki-ingest inside that project.
 
-| Row | Decision | Target |
-|-----|----------|--------|
-| `3632d0989f629104`, `7bfb7541e4e4bd8c` | t242 SECURITY.md sections and policy values | `wiki-local/security/disclosure/security-policy-file.md` |
-| `9700770d7c05b820` | t242 `.github/CODEOWNERS` layout | `wiki-local/infrastructure/repo-governance/codeowners-layout.md` |
-| `3d578bcfcbcc6b97`, `410400eb22f77f77` | t242 CODE_OF_CONDUCT.md source and contact | `wiki-local/infrastructure/repo-governance/code-of-conduct-source.md` |
-| `54aeaa8fdee5e0e7` | t242 mutation harness `TREE_CONTENTS` for new root files | `wiki-local/testing/quality/mutation-tree-contents.md` |
-| `0e0e7c7c4cef34c3` | t252 per-runner concurrency group for `_ai-gate.yml` | `wiki-local/infrastructure/ci-cd/ai-gate-concurrency-groups.md` |
-| `05df421bf905f5ce` | t252 `response_format: json_object` for the HTTP gate runner | `wiki-local/backend/llm/ai-gate-structured-output-mode.md` |
-| `1670e43e60cb7fe3`, `2df80edab8d41dfb` | t252 / t257 CHANGELOG bullet placement | `wiki-local/qa/release/changelog-bullet-placement.md` |
-| `1666b8cf32e274ea` | t257 `_relay_batch` calls begin/commit/rollback directly | `wiki-local/backend/outbox/relay-transaction-calls.md` |
-| `5ee53f499cc8d657`, `744090ce219677c0` | t249a1 RFC-0007 Review stage and §2.2 rule-5 chain notes | `wiki-local/qa/spec-process/rfc-promotion-checks.md` |
+| Row | Project | Decision | Target |
+|-----|---------|----------|--------|
+| 5302bf04b6b15c6c | linkly (`shag`) | t8 rule-7 public contract of `rfc_lint.py` | `wiki-local/qa/document-verification/rfc-lint-rule7.md` |
+| 32e1f2001ef439bb | linkly (`shag`) | t8 source of "who updates which section" (`Updated-by:` only) | `wiki-local/qa/document-verification/rfc-lint-rule7.md` |
+| b42493f53212bb59 | linkly (`shag`) | t8 no-regression contract (C28) | `wiki-local/qa/document-verification/rfc-lint-rule7.md` |
+| 2d283fc00e495053 | linkly (`shag`) | t8 test placement in `impl/tests/test_rfc_lint.py` | `wiki-local/testing/quality/rfc-lint-test-layout.md` |
+| 3e25c0ce05dfb984 | linkly (`shag`) | t8 hand-off record for t9 (RosterPinTest) | `wiki-local/qa/document-verification/rfc-lint-rule7.md` |
+| 96a7b3d4848b90f0 | linkly (`shag`) | t7 §1 Full Grammar composition | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 002f8d533f96feed | linkly (`shag`) | t7 cross-RFC unit equality (C6, C19, C20, C29) | `wiki-local/qa/document-verification/cross-rfc-unit-equality.md` |
+| 957e06938cb2e214 | linkly (`shag`) | t6 how RFC-0075/0077 are produced (pinned build.sh) | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 6052c18a27fee0d5 | linkly (`shag`) | t6 source snapshot and preflight against merged RFC-0070 | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| b9c678dbb9b66231 | linkly (`shag`) | t6 RFC-0075 §5 composition | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 8ddce4726589ad52 | linkly (`shag`) | t6 RFC-0075 §6 composition | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 3164997d10cc7236 | linkly (`shag`) | t6 RFC-0075 §1–§3 composition | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| bafeea34913960a4 | linkly (`shag`) | t6 relation text, quotes and pointer lines | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| aab9ff18ed91744b | linkly (`shag`) | t6 Status blocks of RFC-0075/0077 | `wiki-local/qa/document-verification/rfc-status-block.md` |
+| 4a86878c5bda1bac | linkly (`shag`) | t6 RFC-0048 contamination | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 911b1de9596df50e | linkly (`shag`) | t6 cross-RFC unit equality (c6check.sh) | `wiki-local/qa/document-verification/cross-rfc-unit-equality.md` |
+| 6ed0459efb004b5b | linkly (`shag`) | t6 silent-drift sweep findings | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
