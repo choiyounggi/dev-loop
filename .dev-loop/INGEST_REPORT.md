@@ -1,164 +1,106 @@
-# Knowledge flush — 3 insight(s) (headless auto-flush run 20261022-134153-21632)
+# Knowledge flush — 2 insight(s) (headless auto-flush run 20261029-135519-11504)
 
-18 queue rows were claimed this run: 3 ingested, 1 dropped as a duplicate of the
-merged wiki, 13 dropped as project-specific plan-gap rows, 1 released because it
-plausibly overlaps open PR #291. Nothing was folded into another branch.
+This run claimed 20 queue rows:
 
-| Candidate | Domain | Disposition |
-|-----------|--------|-------------|
-| `f7273179a74dcb80` — secret in an HTTP header leaks through `http.client`'s `ValueError` | security | **ingested** — edge row in `security-secrets-secrets-in-code` (verified) |
-| `3d610c1206e1bdd6` — text nobody sent in an agent CLI's input box is the grey prompt suggestion | infrastructure | **ingested** — edge row in `infrastructure-agent-orchestration-pane-delivery-confirmation` (verified docs + field observation) |
-| `0a0ccc4ca0904514` — e2e failure moving between tests under host CPU contention | testing | **ingested** — new page `testing-flaky-e2e-failures-moving-under-host-cpu-contention` (field-tested) |
-| `97c37473b53e63c2` — string-pattern `replace`: `$n` stays literal, `$$`/`$&`/`` $` ``/`$'` expand | backend (queued as frontend) | dropped — duplicate of merged page |
-| `446c58c78d5e467f` — `git diff --numstat` count depends on the diff algorithm | testing | released — plausible overlap with open PR #291 |
-| 13 plan-gap rows (see Local-layer candidates) | — | dropped — project-specific |
+- **3 candidates ingested as 2 insights**: one new page (two candidates merged into it) and one edge row.
+- **14 dropped** as project-specific plan-gap rows.
+- **3 released** back to pending as plausible duplicates of open PRs.
+
+Nothing was folded into another branch.
+
+| Candidate | Disposition |
+|-----------|-------------|
+| `8165adcd84df2acc` fidelity checker shares the builder's manifest | **ingested**: new page `testing-quality-checker-sharing-the-builders-input` |
+| `d1e6468cdb111e8c` fidelity check takes its ranges from the build ledger; require unit boundaries | **ingested**: merged into the same new page (the unit-boundary row) |
+| `9f1d906f64d671ad` a brand-new function's first red is a missing-name error | **ingested**: edge row on `testing-strategy-failing-test-first` |
+| `8a67a97c4afd204c`, `f332524447ff2105` | **released**: still pending duplicates of open PRs #299 / #300 (same verdict as the three earlier runs today) |
+| `baac78b023efce53` failure-id allowlist gate must also match the cause | **released**: plausible overlap with #300 (`testing/quality/checks-that-cannot-pass.md`) and #304 (done-gate counting) |
+| 14 plan-gap rows from linkly task t3 | dropped as project-specific (see Local-layer candidates) |
+
+Unlike runs 20261029-114716-88588 and 20261029-124846-54962, this run found the queue files for `d1e6468cdb111e8c`, `baac78b023efce53` and `9f1d906f64d671ad`, so they were read and judged. It found them by matching session ids from `~/.claude/history.jsonl` to `~/.dev-loop/queue/<sessionId>.jsonl`.
 
 ## Verified best-practice
 
-**`f7273179a74dcb80` — confidence: verified.** Claim: when a script puts a secret
-from an env var into an HTTP header via Python `http.client`/`urllib`, a value
-with a bare CR/LF (a pasted key ending in `\n`) makes `putheader` raise a
-`ValueError` whose message contains the whole header value, so a traceback that
-escapes the script's own redaction prints the key.
-- CPython `Lib/http/client.py` (https://github.com/python/cpython/blob/main/Lib/http/client.py):
-  read in the local CPython 3.9 source — l.138
-  `_is_illegal_header_value = re.compile(rb'\n(?![ \t])|\r(?![ \t\n])').search`;
-  l.1234-1235 `if _is_illegal_header_value(values[i]): raise ValueError('Invalid header value %r' % (values[i],))`.
-  A trailing `\n` matches `\n(?![ \t])`, and `%r` repeats the full encoded value.
-  Web search confirmed the check came from the CVE-2016-5699 header-injection fix.
-  The `main`-branch file was not fetched in this run (WebFetch is not allowed here);
-  the cited line numbers are from 3.9.
-- Field reproduction (session evidence): on Python 3.13 and 3.11 the key appeared
-  in the traceback; after the pre-request check plus catch-all redaction, 0 key hits
-  and the mutation checks went red.
+**`8165adcd84df2acc` + `d1e6468cdb111e8c` → a checker that reads the builder's own input (confidence: field-tested).**
+- **Claim:** a fidelity checker that replays the builder's manifest or line ranges proves only that the manifest was applied. A wrong range is copied into both, so they agree.
+- **Fix:** add a check whose expected value does not come from the manifest. Options: ranges must start and end on unit boundaries, with neighbouring non-boundary lines declared as drops; a ledger-only line check; a byte comparison with independently built siblings; a rebuild from structural markers.
+- **Proof:** mutate the shared manifest or ledger itself, and give each mutant an expected set of failing checks.
 
-**`3d610c1206e1bdd6` — confidence: verified (docs) + field observation.** Claim:
-in a Claude Code pane read through `tmux capture-pane`, grey text in the input box
-that nobody sent is the CLI's prompt suggestion. Plain capture drops styling, so the
-suggestion looks like an unsubmitted prompt.
-- https://code.claude.com/docs/en/interactive-mode (fetched 2026-10-22), "Prompt
-  suggestions": "shows a grayed-out example command in the prompt input"; after a
-  response it "can suggest your next prompt"; "Press `Tab` or `Right arrow` to place
-  the suggestion in the prompt input, then `Enter` to submit"; "Start typing to dismiss it".
-- tmux man page (https://man7.org/linux/man-pages/man1/tmux.1.html; same wording read
-  from the local tmux 3.7b `tmux.1`, l.2693-2696): "If -e is given, the output includes
-  escape sequences for text and background attributes."
-- Field observation (run i41): the box showed "승인됐습니다. 계획대로 구현하세요."
-  after `plan_ready`; `send-prompt.sh state lo-1-i41` → `ready` rc 0; the next real send
-  reported `delivered`.
-- Not claimed: which escape code (dim SGR 2 vs a grey colour) the CLI uses. The page
-  says "grey/dim" to match the docs' "grayed-out".
+Sources:
+- https://discovery.ucl.ac.uk/1471263/ — Barr et al., "The Oracle Problem in Software Testing: A Survey" (IEEE TSE 2015). An oracle must tell correct behaviour apart from incorrect behaviour.
+- https://github.com/kenjudy/pdca-agentic-coding-framework/issues/181 — the rule "where does the expected value come from, and is that source independent of the code under test?" This is already a source of `testing-quality-cross-component-invariant-via-shared-helper`.
+- https://pitest.org/quickstart/basic_concepts/ — a surviving mutant was not detected by the covering tests.
+- Field cases from one RFC-consolidation project:
+  - t72: an auditor shortened a range in both spec and target, and the checker still returned rc=0.
+  - t2: a ledger mutant failed only once the boundary check existed.
+  - t7: 12 mutants each failed exactly their expected check set.
 
-**`0a0ccc4ca0904514` — confidence: field-tested.** Claim: on a shared host, a
-browser e2e failure that moves to a different timing-dependent test on each re-run
-is CPU contention until shown otherwise. Measure load and foreign headless browsers,
-re-run once after 60 s quiet, and report every run line.
-- https://playwright.dev/docs/test-cli — `--workers` defaults to 50% of logical CPU
-  cores (already cited on the wiki; it sizes to the host's cores, not to free capacity).
-- https://playwright.dev/docs/ci — recommends `workers: 1` in CI "to prioritize
-  stability and reproducibility", so each test gets the full system resources. This was
-  confirmed only through a web-search summary of the official page; the page was not
-  fetched in this run.
-- Field observation (2026-10-18, 36-test Playwright suite): load avg 19 with a foreign
-  `chrome-headless-shell` at 110% CPU → "1 failed" at `leave.spec.ts:37`, then at
-  `game-bell.spec.ts:33`; after 60 s with no headless browser → "36 passed (50.9s)".
-  This is a single host, so the page is field-tested, not verified.
+How verified: one WebSearch on oracle independence returned the Barr survey plus preprints and a blog that make the same point. The preprints and blog are not cited. This headless run has no page fetch, so the survey was read through its search summary. The techniques come from production runs, not an external doc, so the page is **field-tested**, not verified.
 
-**`97c37473b53e63c2`** — the claim is correct (MDN replacement-pattern table; the node
-evidence in the row), but it is already on the merged wiki. See Existing-layer check.
+**`9f1d906f64d671ad` → missing-name red for a brand-new function (edge row; the page stays verified).**
+- **Claim:** when the first red can only be `AttributeError` or an unresolved symbol, add a stub with the final signature that returns a type-correct wrong value, so the red is an assertion failure. If the missing-name red was already accepted, prove the assertions after green with module mutants. Each mutant must redden its owning test.
+- **Consistency with the page:** the page's existing row already says an import/name error is "not RED". The new row covers the case where no setup fix exists before the function does.
+
+Sources:
+- The page's existing sources: https://newsletter.kentbeck.com/p/canon-tdd and https://github.com/obra/superpowers (verify RED for the expected reason).
+- One WebSearch found that TDD skill guides agree: a compile or import error is not a valid red, and a minimal stub makes the test fail on an assertion. One guide disagrees. Those guides are not cited, because they are skill-directory pages.
+- Field case: 5 source mutants reddened the new rule's tests (11/4/2/1/1 failures). A module built by hand needed `__file__` set.
+
+Not researched: the 3 released rows and the 14 plan-gap rows.
 
 ## Existing-layer check
 
-Pages read: security-secrets-secrets-in-code, infrastructure-ci-cd-secrets-handling, infrastructure-agent-orchestration-pane-delivery-confirmation, testing-flaky-diagnosing-flaky-tests, testing-flaky-docker-vm-oversubscription-under-parallel-containers, testing-e2e-e2e-stability, backend-node-language-string-replace-replacement-patterns
+Pages read: testing-strategy-failing-test-first, testing-quality-cross-component-invariant-via-shared-helper, testing-quality-spec-artifact-checks, qa-document-verification-spec-document-gates
 
-- **security-secrets-secrets-in-code** — merge target for `f727`. Its edge table
-  already has two "a library echoes the secret" rows: a URL-query key logged by HTTP
-  clients, and a DSN echoed in an error. The header-value `ValueError` is a third path
-  of the same kind, so it was added as one edge row, not a new page. One source line
-  and one field-evidence line were added. `last_verified` was left at 2026-07-12
-  because the other rows were not re-checked.
-- **infrastructure-ci-cd-secrets-handling** — read as a possible target (job-log
-  masking). Not chosen: it covers how the pipeline handles secrets, and this is a
-  script's own exception text. No edit.
-- **infrastructure-agent-orchestration-pane-delivery-confirmation** — merge target for
-  `3d61`. It already owns the input-box rows for this CLI (the `[Pasted text` placeholder,
-  where the input box sits). The suggestion case is a sibling edge row. Added the
-  interactive-mode doc to frontmatter sources, plus three Sources lines (tmux `-e`
-  quote, docs quote, field observation).
-- **testing-flaky-diagnosing-flaky-tests** — closest owner for `0a0c`. It is
-  `confidence: verified`. The 2026-10-22 log shows that the Wiki agent gate blocked
-  merging a single-field-reproduction mechanism into this page (the PR #275 split).
-  Following that precedent, the mechanism went to its own field-tested page. This page
-  gets one pointer edge row and a `related:` id; its confidence and date are unchanged.
-- **testing-flaky-docker-vm-oversubscription-under-parallel-containers** — the nearest
-  sibling: resource ceiling, different subset failing each run. It is a different case
-  (container memory, `409` errors, its own trigger), so the new page was not merged into
-  it. The two are cross-linked from the new page's `related:` and an edge row.
-- **testing-e2e-e2e-stability** — read for e2e overlap. It covers selectors, waits,
-  and data, not host contention. Linked from the new page's `related:`; no edit.
-- **backend-node-language-string-replace-replacement-patterns** — already says
-  `$n` / `$<name>` work for "regex patterns only; otherwise left literal", and has the
-  edge row "A string `from` (no captures) → `$1` stays literal, but `$$`, `$&`, `` $` ``,
-  `$'` still expand". That is exactly what `97c3` asks for, so it was dropped as a duplicate.
+Also read: `wiki/testing/index.md`, `templates/page.md` and the tail of `log.md`. `wiki_search` was not permitted in this run, so routing used the full testing index.
 
-No conflicting directive was found and no page was superseded.
+- **Shared-input checker:**
+  - `cross-component-invariant-via-shared-helper` covers one helper called twice in a test, not a document checker that reads the build manifest.
+  - `spec-artifact-checks` covers coverage vs value checks and one negative control per check, but not where the expected value comes from. It is also at about 118 body lines, so a merge would break the 120-line limit.
+  - So this became a new page that links both. Its body is about 65 lines.
+- **Missing-name red:** `failing-test-first` owns RED classification, so the case became an edge row there. The page's "When this applies" line, its testing-index "load when" cell and `last_verified` were updated.
+- **Dropped run's lessons:** the run 20261028-100340-23911 marked related rows `c9e00eb2a93a55e3`, `b3a7b01998f7d6aa`, `f8a300baed4c34f0` and `bdb042f44f413d06` as ingested. No PR exists for that run (open or closed; `gh pr list --state all`), and its edge rows are not on `main`. The new page restates the shared-ranges lesson of `c9e00eb2a93a55e3` and cites its t72 field case. The other three rows are not recovered by this PR.
+- **Back-links:** none added to existing pages, to keep this PR off pages that open PRs might touch.
+- **Conflicts:** none.
 
 ## Open-PR check
 
-Open `knowledge/*` heads at flush time (`gh pr list --repo choiyounggi/dev-loop
---state open --json number,headRefName --search "head:knowledge/"`):
-**#291** (`knowledge/autoflush-20261022-124048-18072`).
+Open `knowledge/*` heads: #309, #308, #307, #306, #305, #304, #301, #300, #299, #298, #293. This run has no git access, so overlap was judged from each PR's changed-file list (`gh pr list --json files`) and the bodies of #307, #308 and #309.
 
-This headless run cannot `git diff` that branch, and `gh pr view` / the GitHub MCP
-file list were not allowed. Overlap was judged from the queue rows that #291's run
-retired, using their `outcome` fields. #291 touches
-`testing-quality-anchor-cases-for-allowlist-regexes`,
-`testing-quality-checks-that-cannot-pass`,
-`qa-process-blind-llm-judgment-of-a-visual-rule`, and a new page
-`platforms-shells-non-ascii-text-after-an-unbraced-parameter`.
+| Candidate | Overlapping open PR | Verdict |
+|-----------|---------------------|---------|
+| 8165adcd84df2acc + d1e6468cdb111e8c (checker shares builder input) | None by trigger. No open PR adds or edits a page about checker/builder oracle independence. #305 and #308 edit `qa/document-verification/` pages about superseded sections and Korean particles. #293, #300 and #301 edit other `testing/quality/` pages | **new** → ingested |
+| 9f1d906f64d671ad (missing-name red) | None. No open PR touches `testing/strategy/failing-test-first.md`. #309 adds `testing/strategy/long-lived-processes-under-bats.md` and edits `calls-that-must-not-block.md`, a different trigger | **new** → ingested |
+| baac78b023efce53 (failure-id allowlist gate) | #300 edits `testing/quality/checks-that-cannot-pass.md`, whose trigger covers new-vs-baseline failure-list gates. #304 edits `qa/process/completion-claims.md` about done-gate result counting | **pending duplicate** → released |
+| 8a67a97c4afd204c (`grep -q` + SIGPIPE) | #299 (`platforms/tools/search-evidence-from-a-wrapped-grep.md`) | **pending duplicate** → released |
+| f332524447ff2105 (gate grep matches its own ledger) | #299, #300 (`testing/quality/checks-that-cannot-pass.md`) | **pending duplicate** → released |
+| 14 plan-gap rows | n/a (project-specific) | dropped |
 
-- `f727` (security, secret in an HTTP header) — **new**: #291 touches no security page.
-- `3d61` (agent pane input box) — **new**: #291's only platforms/infrastructure page is
-  a bash parameter-expansion page, which is a different trigger.
-- `0a0c` (e2e flakiness under CPU contention) — **new**: #291 touches no `testing/flaky`
-  or e2e page.
-- `97c3` — not compared against #291: it was dropped against the merged layer.
-- `446c58c78d5e467f` (exact `git diff --numstat` count as a gate's expected value) —
-  **drop (plausible overlap)**, so its claim was **released**, not retired. It is a
-  gate-design lesson in `testing/quality`, and #291 is editing two `testing/quality`
-  gate pages (`checks-that-cannot-pass`, `anchor-cases-for-allowlist-regexes`). This run
-  cannot diff #291, so the manual flush should decide whether to fold it in or ingest it
-  as new.
+Possible merge conflicts, not duplicate content: `wiki/testing/index.md` (#293, #300, #301 and #309 also edit it) and `log.md` (every open flush PR appends to it).
 
 ## Routing decision
 
-- `f7273179a74dcb80` → `security` / `secrets` → edge row in
-  `wiki/security/secrets/secrets-in-code.md`; security index "load when" extended.
-- `3d610c1206e1bdd6` → `infrastructure` / `agent-orchestration` → edge row in
-  `wiki/infrastructure/agent-orchestration/pane-delivery-confirmation.md`; infrastructure
-  index "load when" extended. Written generally (any helper that classifies the box, or
-  `capture-pane -e`); the dev-loop helper `send-prompt.sh` appears only in the evidence line.
-- `0a0ccc4ca0904514` → `testing` / `flaky` → new page
-  `wiki/testing/flaky/e2e-failures-moving-under-host-cpu-contention.md` (field-tested).
-  There is no new category: `flaky` already holds the sibling resource-ceiling page.
-  A pointer edge row and a `related:` id were added in `diagnosing-flaky-tests`, and a
-  testing index row was added. The INDEX.md testing line already covers "flaky tests".
-- `log.md` has one entry appended for this run.
+- `8165adcd84df2acc` + `d1e6468cdb111e8c` → `testing/quality/checker-sharing-the-builders-input.md`. This is a new page in an existing category. `quality` owns "can this check discriminate" pages, beside `spec-artifact-checks` and `cross-component-invariant-via-shared-helper`. The `qa` hint on d1e6468cdb111e8c was not followed: the lesson is about the check's design, which `testing/quality/spec-artifact-checks` owns, and `qa/document-verification` covers accepting the deliverable.
+- `9f1d906f64d671ad` → edge row on `testing/strategy/failing-test-first.md`.
+- No new category. Project names, RFC numbers and script names appear only in field-case source lines.
 
 ## Local-layer candidates
 
-These 13 plan-gap rows are excluded from this PR. Each records a design decision for
-the `emperor` (linkly) repository's own files, so each would be wrong in another
-codebase. Run wiki-ingest inside that project to keep any of them:
+These 14 rows are excluded from this PR. Each records one wiki-plan Phase B design decision for task t3 of project **linkly** (checkout `shag`, the RFC-0068/RFC-0071 consolidation). To keep any of them, run wiki-ingest inside that project.
 
 | Row | Decision | Target |
 |-----|----------|--------|
-| `3632d0989f629104`, `7bfb7541e4e4bd8c` | t242 SECURITY.md sections and policy values | `wiki-local/security/disclosure/security-policy-file.md` |
-| `9700770d7c05b820` | t242 `.github/CODEOWNERS` layout | `wiki-local/infrastructure/repo-governance/codeowners-layout.md` |
-| `3d578bcfcbcc6b97`, `410400eb22f77f77` | t242 CODE_OF_CONDUCT.md source and contact | `wiki-local/infrastructure/repo-governance/code-of-conduct-source.md` |
-| `54aeaa8fdee5e0e7` | t242 mutation harness `TREE_CONTENTS` for new root files | `wiki-local/testing/quality/mutation-tree-contents.md` |
-| `0e0e7c7c4cef34c3` | t252 per-runner concurrency group for `_ai-gate.yml` | `wiki-local/infrastructure/ci-cd/ai-gate-concurrency-groups.md` |
-| `05df421bf905f5ce` | t252 `response_format: json_object` for the HTTP gate runner | `wiki-local/backend/llm/ai-gate-structured-output-mode.md` |
-| `1670e43e60cb7fe3`, `2df80edab8d41dfb` | t252 / t257 CHANGELOG bullet placement | `wiki-local/qa/release/changelog-bullet-placement.md` |
-| `1666b8cf32e274ea` | t257 `_relay_batch` calls begin/commit/rollback directly | `wiki-local/backend/outbox/relay-transaction-calls.md` |
-| `5ee53f499cc8d657`, `744090ce219677c0` | t249a1 RFC-0007 Review stage and §2.2 rule-5 chain notes | `wiki-local/qa/spec-process/rfc-promotion-checks.md` |
+| 848078b686341fea | how the two new RFCs are produced (pinned build.sh + manifests) | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| f868362a14d380d7 | source snapshot | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 6409709bc7de8005 | RFC-0071 §2 composition | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 0eede9eeb197bfe1 | RFC-0068 §Execution Model composition | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 2bfada8fcb132df5 | RFC-0068 §Guard composition | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| e99f07771edc44cd | RFC-0068 §Policy Enforcement composition | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| fa0741fda15f983b | RFC-0068 timeline C composition | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| fb6584b057acd049 | sections no updater touched | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 48921c6112310078 | RFC-0071 §Examples and §Open Questions | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| b04e2d9faa1f7dfb | dropped text, only through declared drops | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| bdd729dc5e0fa5f4 | updater completeness re-run | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 66825d94512555ac | script retention (C16) | `wiki-local/infrastructure/agent-orchestration/scratch-retention.md` |
+| 3d44fec16896399e | C15 silent-drift sweep | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| d38f5dbd8754d367 | work order | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
