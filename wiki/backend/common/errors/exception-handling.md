@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://learn.microsoft.com/en-us/dotnet/standard/exceptions/best-practices-for-exceptions
 last_verified: 2026-07-10
-related: [backend-common-api-design-error-responses, backend-common-orm-prisma-driver-adapter-errors-at-commit]
+related: [backend-common-api-design-error-responses, backend-common-orm-prisma-driver-adapter-errors-at-commit, backend-java-spring-jackson-3-jsonnode-coercion]
 ---
 
 # Placing Catch Blocks: Where Errors Are Handled, Logged, and Translated

@@ -2,14 +2,15 @@
 id: testing-quality-assertion-scanner-false-positive-on-unittest-convention
 domain: testing
 category: quality
-applies_to: [python, rust, general]
+applies_to: [python, rust, javascript, general]
 confidence: verified
 sources:
   - https://docs.python.org/3/library/unittest.html
+  - https://nodejs.org/api/test.html
   - https://docs.pytest.org/en/stable/how-to/assert.html
   - https://doc.rust-lang.org/book/ch11-03-test-organization.html
   - https://bugs.python.org/msg315638
-last_verified: 2026-10-15
+last_verified: 2026-10-29
 related: [qa-process-evaluating-review-feedback, testing-quality-checks-that-cannot-pass, infrastructure-agent-orchestration-control-signals-vs-primary-artifacts, testing-quality-harness-reverse-controls]
 ---
 
@@ -71,6 +72,7 @@ plain source and the floor reports `no-tests` on a fully tested module.
 | Two workers in the same run report the identical false positive | Fix the scanner once at the coordinator level; do not dispatch per-file rework to each worker |
 | The scanner flags most cases in a `self.assertX` file but passes one or two of them | Read the passing cases too: a comment such as `# surfaced by the assert below` matches `/assert[ \t]/`, so that "pass" is the same blind spot, not proof of an assertion. Count assertions from the parsed code instead (Python: walk `ast.parse(src)` for `ast.Assert` nodes and `ast.Call` nodes whose function name starts with `assert`) — the standard `ast` tree carries no comments — and check the detector on one unittest file and one pytest file before trusting its counts |
 | The scanner classifies by file path/name only and the failing file's language keeps tests inline in source with no `tests/`-style directory or `_test`-suffix filename (Rust `#[cfg(test)] mod tests` in `src/foo.rs`) | Read the classifier's pattern list before charging a rework round — a `.rs` file with no matching pattern always classifies as `source`; confirm with `grep -c '#\[test\]\|#\[tokio::test\]'` and the language's own runner (`cargo test`) before dispatching rework |
+| Every case of a `*.test.mjs` / `*.test.js` file written with `node:test` and `node:assert` is reported `no-assertion` | Read which analyzer the classifier picked from the file name and which pattern it counts. A floor that sends every `*.test.*` name to a Jest analyzer counts only `expect(`, while `node:test` fails a case when it throws, so `assert.equal` / `assert.throws` are the assertions. Confirm the file imports `node:test`, count `assert.` calls per case and watch one case go red (`ERR_ASSERTION`), then pass the case on as `floor=unknown` with those counts. Keep the tests in `node:assert` form: an `expect(` added only to clear the floor games the gate |
 
 ## Instead of
 
@@ -84,6 +86,9 @@ plain source and the floor reports `no-tests` on a fully tested module.
 
 - https://docs.python.org/3/library/unittest.html — "The crux of each test is a call to assertEqual() … assertTrue() or assertFalse() … or assertRaises() … These methods are used instead of the assert statement so the test runner can accumulate all test results and produce a report"
 - https://docs.pytest.org/en/stable/how-to/assert.html — "pytest allows you to use the standard Python assert for verifying expectations and values in Python tests"; assertion rewriting puts introspection information into the failure message
+- https://nodejs.org/api/test.html — a synchronous test function "is considered failing if it throws an exception, and is considered passing otherwise"; the page's own examples assert with `assert.strictEqual(1, 1)`, and `node --test` runs `**/*.test.{cjs,mjs,js}` by default, the same names a Jest-style classifier claims
+- Local read 2026-10-29 (`skills/orchestrate/scripts/test-floor.sh`, dev-loop 1.34.2): `framework_of()` maps `*.test.mjs` / `*.test.js` / `*.test.cjs` (and `.spec.*`) to `jest`; `analyze_jest` starts a case on `^[ \t]*(it|test)\(` — which also matches `node:test`'s `test(` — and sets `has_expect` only on `expect\(`, so a `node:assert` case is always `no-assertion`
+- Field evidence 2026-10-29 (linkly-calendar orchestration run): `test-floor.sh` exited 3 on a new `*.test.mjs` file whose five cases carried 1, 1, 1, 1 and 3 `assert.*` calls; the red run of the same file showed `ERR_ASSERTION`; the coordinator sent it to the auditor as `floor=unknown`
 - https://bugs.python.org/msg315638 — CPython tracker: the built-in AST does not preserve comments or whitespace; https://pypi.org/project/ast-comments/ exists to add a `Comment` node type the standard `ast` tree lacks
 - https://doc.rust-lang.org/book/ch11-03-test-organization.html — "You'll put unit tests in the src directory in each file with the code that they're testing. The convention is to create a module named tests in each file to contain the test functions and to annotate the module with cfg(test)"
 - Local reproduction 2026-09-04 (this repo, `skills/orchestrate/scripts/test-floor.sh`, `classify()`): the case patterns are `*.bats`, `test_*.py`, `*_test.py`, `*_test.go`, `*.test.*`, `*.spec.*`, and `*/tests/*|*/test/*|*/__tests__/*` — no `.rs` pattern exists, so a `.rs` source file always classifies `source` and `no-tests` fires regardless of inline `#[cfg(test)]` coverage

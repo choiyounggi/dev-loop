@@ -24,6 +24,7 @@ load it alongside the stack page here — these pages link the exact ids.
 | Page | Load when |
 |------|-----------|
 | [proxy-pitfalls](spring/proxy-pitfalls.md) | A Spring annotation (`@Transactional`/`@Async`/`@Cacheable`/`@Retryable`) silently has no effect at runtime; reviewing where such annotations are placed — self-invocation, non-public methods, final classes/methods (Kotlin), calls from constructors/`@PostConstruct`; writing tests that assert the annotation's effect |
+| [jackson-3-jsonnode-coercion](spring/jackson-3-jsonnode-coercion.md) | Migrating JSON tree-model code from Jackson 2 to Jackson 3 (Spring Boot 4) — renaming `asText()` to `asString()` by hand or with the OpenRewrite recipe, or keeping `asDouble()`/`asInt()` calls; a field that held an object or array now throws `JsonNodeException` and an outer `catch (Exception)` turns the whole parse into an error; choosing between `asString("")`, `asStringOpt()` and `stringValue()` |
 
 ## runtime
 
