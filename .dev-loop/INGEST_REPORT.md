@@ -1,164 +1,89 @@
-# Knowledge flush — 3 insight(s) (headless auto-flush run 20261022-134153-21632)
+# Knowledge flush — 1 insight(s) (headless auto-flush run, 2026-10-29)
 
-18 queue rows were claimed this run: 3 ingested, 1 dropped as a duplicate of the
-merged wiki, 13 dropped as project-specific plan-gap rows, 1 released because it
-plausibly overlaps open PR #291. Nothing was folded into another branch.
+Run `20261029-114716-88588` claimed 21 queue rows: 1 ingested as a new page, 16 dropped as project-specific plan-gap rows, 4 released back to pending (2 plausible duplicates of open PRs, 2 whose queue files this run could not locate). Nothing was folded into another branch.
 
-| Candidate | Domain | Disposition |
-|-----------|--------|-------------|
-| `f7273179a74dcb80` — secret in an HTTP header leaks through `http.client`'s `ValueError` | security | **ingested** — edge row in `security-secrets-secrets-in-code` (verified) |
-| `3d610c1206e1bdd6` — text nobody sent in an agent CLI's input box is the grey prompt suggestion | infrastructure | **ingested** — edge row in `infrastructure-agent-orchestration-pane-delivery-confirmation` (verified docs + field observation) |
-| `0a0ccc4ca0904514` — e2e failure moving between tests under host CPU contention | testing | **ingested** — new page `testing-flaky-e2e-failures-moving-under-host-cpu-contention` (field-tested) |
-| `97c37473b53e63c2` — string-pattern `replace`: `$n` stays literal, `$$`/`$&`/`` $` ``/`$'` expand | backend (queued as frontend) | dropped — duplicate of merged page |
-| `446c58c78d5e467f` — `git diff --numstat` count depends on the diff algorithm | testing | released — plausible overlap with open PR #291 |
-| 13 plan-gap rows (see Local-layer candidates) | — | dropped — project-specific |
+| Candidate | Disposition |
+|-----------|-------------|
+| `e696706cb40ae30e`: Korean particle agreement after re-pointing a numeric reference | **ingested**: new page `qa-document-verification-korean-particles-after-a-token-rewrite` (field-tested) |
+| `8a67a97c4afd204c`, `f332524447ff2105` | **released**: plausible duplicates of open PRs #299 / #300 (same verdict as run 20261029-104612-27366) |
+| `d1e6468cdb111e8c`, `baac78b023efce53` | **released unread**: their queue files could not be located (this run cannot list `~/.dev-loop/queue`; Read needs an exact file name) |
+| 16 plan-gap rows (listed under Local-layer candidates) | dropped as project-specific |
 
 ## Verified best-practice
 
-**`f7273179a74dcb80` — confidence: verified.** Claim: when a script puts a secret
-from an env var into an HTTP header via Python `http.client`/`urllib`, a value
-with a bare CR/LF (a pasted key ending in `\n`) makes `putheader` raise a
-`ValueError` whose message contains the whole header value, so a traceback that
-escapes the script's own redaction prints the key.
-- CPython `Lib/http/client.py` (https://github.com/python/cpython/blob/main/Lib/http/client.py):
-  read in the local CPython 3.9 source — l.138
-  `_is_illegal_header_value = re.compile(rb'\n(?![ \t])|\r(?![ \t\n])').search`;
-  l.1234-1235 `if _is_illegal_header_value(values[i]): raise ValueError('Invalid header value %r' % (values[i],))`.
-  A trailing `\n` matches `\n(?![ \t])`, and `%r` repeats the full encoded value.
-  Web search confirmed the check came from the CVE-2016-5699 header-injection fix.
-  The `main`-branch file was not fetched in this run (WebFetch is not allowed here);
-  the cited line numbers are from 3.9.
-- Field reproduction (session evidence): on Python 3.13 and 3.11 the key appeared
-  in the traceback; after the pre-request check plus catch-all redaction, 0 key hits
-  and the mutation checks went red.
+**`e696706cb40ae30e` (confidence: field-tested).** Claim: when a script rewrites a token inside Korean prose and a particle is attached to it, grep the rewritten tokens with the next characters, classify the old and new token by the final sound of how it is read aloud, and fix only the occurrences whose class flipped. Byte-level fidelity checks cannot see this.
 
-**`3d610c1206e1bdd6` — confidence: verified (docs) + field observation.** Claim:
-in a Claude Code pane read through `tmux capture-pane`, grey text in the input box
-that nobody sent is the CLI's prompt suggestion. Plain capture drops styling, so the
-suggestion looks like an unsubmitted prompt.
-- https://code.claude.com/docs/en/interactive-mode (fetched 2026-10-22), "Prompt
-  suggestions": "shows a grayed-out example command in the prompt input"; after a
-  response it "can suggest your next prompt"; "Press `Tab` or `Right arrow` to place
-  the suggestion in the prompt input, then `Enter` to submit"; "Start typing to dismiss it".
-- tmux man page (https://man7.org/linux/man-pages/man1/tmux.1.html; same wording read
-  from the local tmux 3.7b `tmux.1`, l.2693-2696): "If -e is given, the output includes
-  escape sequences for text and background attributes."
-- Field observation (run i41): the box showed "승인됐습니다. 계획대로 구현하세요."
-  after `plan_ready`; `send-prompt.sh state lo-1-i41` → `ready` rc 0; the next real send
-  reported `delivered`.
-- Not claimed: which escape code (dim SGR 2 vs a grey colour) the CLI uses. The page
-  says "grey/dim" to match the docs' "grayed-out".
+Change from the candidate: the candidate used two classes (vowel vs consonant ending). Research showed (으)로 needs a third class, because a ㄹ-final word takes 로, not 으로. Digits 1/7/8 (일/칠/팔) end in ㄹ, so they sit with the consonant class for 이/가, 은/는, 을/를, 과/와 but with the vowel class for (으)로. The page uses a three-class table. It also states that a number ending in 0 is read with a place unit (십/백/천/만) or 영/공, all consonant-final.
 
-**`0a0ccc4ca0904514` — confidence: field-tested.** Claim: on a shared host, a
-browser e2e failure that moves to a different timing-dependent test on each re-run
-is CPU contention until shown otherwise. Measure load and foreign headless browsers,
-re-run once after 60 s quiet, and report every run line.
-- https://playwright.dev/docs/test-cli — `--workers` defaults to 50% of logical CPU
-  cores (already cited on the wiki; it sizes to the host's cores, not to free capacity).
-- https://playwright.dev/docs/ci — recommends `workers: 1` in CI "to prioritize
-  stability and reproducibility", so each test gets the full system resources. This was
-  confirmed only through a web-search summary of the official page; the page was not
-  fetched in this run.
-- Field observation (2026-10-18, 36-test Playwright suite): load avg 19 with a foreign
-  `chrome-headless-shell` at 110% CPU → "1 failed" at `leave.spec.ts:37`, then at
-  `game-bell.spec.ts:33`; after 60 s with no headless browser → "36 passed (50.9s)".
-  This is a single host, so the page is field-tested, not verified.
+Sources checked (all read through web-search summaries; this headless run has no page fetch):
+- https://www.koreanvalley.com/korean-grammar/korean-subject-particles — 이 after a final consonant, 가 after a vowel.
+- https://www.koreanvalley.com/korean-grammar/the-object-particles-and — 을 after a final consonant, 를 after a vowel.
+- https://ko.wiktionary.org/wiki/%EB%A1%9C — 로 after no final consonant or a ㄹ final consonant; 으로 after any other final consonant.
+- https://jakup.com/tools/josa — a particle tool that classifies a number by its spoken reading (1 = 일 → ㄹ, 3 = 삼 → ㅁ). This is a tool's convention. The search found no National Institute of Korean Language rule specific to Arabic numerals, and the page says so.
+- Field case from the originating session (RFC-consolidation run): a worker recorded `RFC-0067가` after rewriting `RFC-0002가`. In the consolidated RFC, `grep -noE 'RFC-00(6[6-9]|7[0-7]).?.?'` found 49 re-points: two with attached particles (`RFC-0066이`, `RFC-0068이`) kept their class, plus `RFC-0071의` (의 does not alternate).
 
-**`97c37473b53e63c2`** — the claim is correct (MDN replacement-pattern table; the node
-evidence in the row), but it is already on the merged wiki. See Existing-layer check.
+Why field-tested, not verified: the particle rules are standard grammar, but every external source was read through a search summary, and the digit-reading convention rests on a tool's documentation plus one field case.
+
+Not researched: the 2 rows released as open-PR duplicates, the 2 rows released unread, and the 16 plan-gap rows (each records one design decision for one repository).
 
 ## Existing-layer check
 
-Pages read: security-secrets-secrets-in-code, infrastructure-ci-cd-secrets-handling, infrastructure-agent-orchestration-pane-delivery-confirmation, testing-flaky-diagnosing-flaky-tests, testing-flaky-docker-vm-oversubscription-under-parallel-containers, testing-e2e-e2e-stability, backend-node-language-string-replace-replacement-patterns
+Pages read: qa-document-verification-editing-a-gated-document, platforms-environment-unicode-text-matching
 
-- **security-secrets-secrets-in-code** — merge target for `f727`. Its edge table
-  already has two "a library echoes the secret" rows: a URL-query key logged by HTTP
-  clients, and a DSN echoed in an error. The header-value `ValueError` is a third path
-  of the same kind, so it was added as one edge row, not a new page. One source line
-  and one field-evidence line were added. `last_verified` was left at 2026-07-12
-  because the other rows were not re-checked.
-- **infrastructure-ci-cd-secrets-handling** — read as a possible target (job-log
-  masking). Not chosen: it covers how the pipeline handles secrets, and this is a
-  script's own exception text. No edit.
-- **infrastructure-agent-orchestration-pane-delivery-confirmation** — merge target for
-  `3d61`. It already owns the input-box rows for this CLI (the `[Pasted text` placeholder,
-  where the input box sits). The suggestion case is a sibling edge row. Added the
-  interactive-mode doc to frontmatter sources, plus three Sources lines (tmux `-e`
-  quote, docs quote, field observation).
-- **testing-flaky-diagnosing-flaky-tests** — closest owner for `0a0c`. It is
-  `confidence: verified`. The 2026-10-22 log shows that the Wiki agent gate blocked
-  merging a single-field-reproduction mechanism into this page (the PR #275 split).
-  Following that precedent, the mechanism went to its own field-tested page. This page
-  gets one pointer edge row and a `related:` id; its confidence and date are unchanged.
-- **testing-flaky-docker-vm-oversubscription-under-parallel-containers** — the nearest
-  sibling: resource ceiling, different subset failing each run. It is a different case
-  (container memory, `409` errors, its own trigger), so the new page was not merged into
-  it. The two are cross-linked from the new page's `related:` and an edge row.
-- **testing-e2e-e2e-stability** — read for e2e overlap. It covers selectors, waits,
-  and data, not host contention. Linked from the new page's `related:`; no edit.
-- **backend-node-language-string-replace-replacement-patterns** — already says
-  `$n` / `$<name>` work for "regex patterns only; otherwise left literal", and has the
-  edge row "A string `from` (no captures) → `$1` stays literal, but `$$`, `$&`, `` $` ``,
-  `$'` still expand". That is exactly what `97c3` asks for, so it was dropped as a duplicate.
+Also read: `wiki/qa/index.md` (whole domain index) and `log.md` (tail).
 
-No conflicting directive was found and no page was superseded.
+`wiki_search` (k=5) runs:
+
+| Query | Top hits |
+|-------|----------|
+| Korean particle 이/가 은/는 을/를 agreement after replacing a number or reference token in prose | backend-common-llm-korean-summary-line-dedupe-by-bigram-overlap 0.767, platforms-environment-unicode-text-matching 0.766, platforms-shells-non-ascii-text-after-an-unbraced-parameter 0.758, backend-node-language-string-replace-replacement-patterns 0.748, backend-common-integrations-wrapping-quotes-in-a-frontmatter-value 0.743 |
+| renumbering cross-references in documents: re-point old document ids to new ids, check surrounding text | testing-quality-spec-artifact-checks 0.872, testing-quality-schema-additions-under-a-golden-gate 0.855, qa-deliverables-generated-artifacts-as-deliverable-source 0.738, qa-document-verification-superseding-a-knowledge-record 0.737, testing-quality-checks-that-cannot-pass 0.732 |
+
+- No page covers particle agreement after a token rewrite. `unicode-text-matching` is about matching Korean text with grep/regex (code points, normalization, awk byte offsets), not about grammatical agreement after a rewrite. `editing-a-gated-document` is about text gates breaking on rewording. The spec-artifact pages are about ids resolving, not the prose around them.
+- Created one new page instead of merging, because no existing page's trigger fits. Body is about 60 lines.
+- `related:` on the new page: qa-document-verification-superseding-a-knowledge-record (re-pointing references to a superseded record), qa-document-verification-editing-a-gated-document, platforms-shells-non-ascii-text-after-an-unbraced-parameter (also a Korean particle attached to a substituted value), platforms-environment-unicode-text-matching. Back-links were not added, to keep this PR from editing pages that open PRs might touch.
+- Added one row to the `document-verification` table in `wiki/qa/index.md` and one line to `log.md`.
+- Conflicts: none.
 
 ## Open-PR check
 
-Open `knowledge/*` heads at flush time (`gh pr list --repo choiyounggi/dev-loop
---state open --json number,headRefName --search "head:knowledge/"`):
-**#291** (`knowledge/autoflush-20261022-124048-18072`).
+Open `knowledge/*` heads (`gh pr list --repo choiyounggi/dev-loop --state open --json number,headRefName --search "head:knowledge/"`): #307, #306, #305, #304, #301, #300, #299, #298, #293. This run has no git access, so overlap was judged from each PR's changed-file list (`gh pr list --json files`) and, for #305, its body.
 
-This headless run cannot `git diff` that branch, and `gh pr view` / the GitHub MCP
-file list were not allowed. Overlap was judged from the queue rows that #291's run
-retired, using their `outcome` fields. #291 touches
-`testing-quality-anchor-cases-for-allowlist-regexes`,
-`testing-quality-checks-that-cannot-pass`,
-`qa-process-blind-llm-judgment-of-a-visual-rule`, and a new page
-`platforms-shells-non-ascii-text-after-an-unbraced-parameter`.
+| Candidate | Overlapping open PR | Verdict |
+|-----------|---------------------|---------|
+| e696706cb40ae30e (Korean particles after a token rewrite) | None by trigger. #305 edits `qa/document-verification/superseding-a-knowledge-record.md` with a row about deciding which sections an amendment replaced; it has no particle or wording content. #304 edits `qa/process/completion-claims.md`. No open PR touches Korean text handling. | **new** → ingested |
+| 8a67a97c4afd204c (`grep -q` and SIGPIPE) | #299 (grep pitfalls, `platforms/tools/search-evidence-from-a-wrapped-grep.md`) | **pending duplicate** → released |
+| f332524447ff2105 (gate grep matches its own ledger) | #299, #300 (`testing/quality/checks-that-cannot-pass.md`) | **pending duplicate** → released |
+| d1e6468cdb111e8c, baac78b023efce53 | not judged (content unread) | released |
+| 16 plan-gap rows | n/a (project-specific) | dropped |
 
-- `f727` (security, secret in an HTTP header) — **new**: #291 touches no security page.
-- `3d61` (agent pane input box) — **new**: #291's only platforms/infrastructure page is
-  a bash parameter-expansion page, which is a different trigger.
-- `0a0c` (e2e flakiness under CPU contention) — **new**: #291 touches no `testing/flaky`
-  or e2e page.
-- `97c3` — not compared against #291: it was dropped against the merged layer.
-- `446c58c78d5e467f` (exact `git diff --numstat` count as a gate's expected value) —
-  **drop (plausible overlap)**, so its claim was **released**, not retired. It is a
-  gate-design lesson in `testing/quality`, and #291 is editing two `testing/quality`
-  gate pages (`checks-that-cannot-pass`, `anchor-cases-for-allowlist-regexes`). This run
-  cannot diff #291, so the manual flush should decide whether to fold it in or ingest it
-  as new.
+Possible merge conflicts, not duplicate content: `wiki/qa/index.md` (#304 and #305 also edit it, in different rows) and `log.md` (every open flush PR appends to it).
 
 ## Routing decision
 
-- `f7273179a74dcb80` → `security` / `secrets` → edge row in
-  `wiki/security/secrets/secrets-in-code.md`; security index "load when" extended.
-- `3d610c1206e1bdd6` → `infrastructure` / `agent-orchestration` → edge row in
-  `wiki/infrastructure/agent-orchestration/pane-delivery-confirmation.md`; infrastructure
-  index "load when" extended. Written generally (any helper that classifies the box, or
-  `capture-pane -e`); the dev-loop helper `send-prompt.sh` appears only in the evidence line.
-- `0a0ccc4ca0904514` → `testing` / `flaky` → new page
-  `wiki/testing/flaky/e2e-failures-moving-under-host-cpu-contention.md` (field-tested).
-  There is no new category: `flaky` already holds the sibling resource-ceiling page.
-  A pointer edge row and a `related:` id were added in `diagnosing-flaky-tests`, and a
-  testing index row was added. The INDEX.md testing line already covers "flaky tests".
-- `log.md` has one entry appended for this run.
+- e696706cb40ae30e → `qa/document-verification/korean-particles-after-a-token-rewrite.md`, new page in an existing category. The domain hint was `qa`, and `document-verification` owns automated checks over document deliverables, which is where a rewrite's check list lives. The general form is any token rewrite inside Korean text. The page also has an edge row for templates and i18n.
+- Project-specific details (RFC numbers, task names) appear only in the field-case source line.
+- No new category.
 
 ## Local-layer candidates
 
-These 13 plan-gap rows are excluded from this PR. Each records a design decision for
-the `emperor` (linkly) repository's own files, so each would be wrong in another
-codebase. Run wiki-ingest inside that project to keep any of them:
+These 16 rows are excluded from this PR. Each records one design decision from wiki-plan Phase B for a single task. To keep any of them, run wiki-ingest inside that project.
 
-| Row | Decision | Target |
-|-----|----------|--------|
-| `3632d0989f629104`, `7bfb7541e4e4bd8c` | t242 SECURITY.md sections and policy values | `wiki-local/security/disclosure/security-policy-file.md` |
-| `9700770d7c05b820` | t242 `.github/CODEOWNERS` layout | `wiki-local/infrastructure/repo-governance/codeowners-layout.md` |
-| `3d578bcfcbcc6b97`, `410400eb22f77f77` | t242 CODE_OF_CONDUCT.md source and contact | `wiki-local/infrastructure/repo-governance/code-of-conduct-source.md` |
-| `54aeaa8fdee5e0e7` | t242 mutation harness `TREE_CONTENTS` for new root files | `wiki-local/testing/quality/mutation-tree-contents.md` |
-| `0e0e7c7c4cef34c3` | t252 per-runner concurrency group for `_ai-gate.yml` | `wiki-local/infrastructure/ci-cd/ai-gate-concurrency-groups.md` |
-| `05df421bf905f5ce` | t252 `response_format: json_object` for the HTTP gate runner | `wiki-local/backend/llm/ai-gate-structured-output-mode.md` |
-| `1670e43e60cb7fe3`, `2df80edab8d41dfb` | t252 / t257 CHANGELOG bullet placement | `wiki-local/qa/release/changelog-bullet-placement.md` |
-| `1666b8cf32e274ea` | t257 `_relay_batch` calls begin/commit/rollback directly | `wiki-local/backend/outbox/relay-transaction-calls.md` |
-| `5ee53f499cc8d657`, `744090ce219677c0` | t249a1 RFC-0007 Review stage and §2.2 rule-5 chain notes | `wiki-local/qa/spec-process/rfc-promotion-checks.md` |
+| Row | Project | Decision | Target |
+|-----|---------|----------|--------|
+| 703c038c4e2cff12 | linkly (`shag`) | t5 RFC-0072 §1 production block content and order | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| aaa5aee77ff2e7e6 | linkly (`shag`) | t5 RFC-0072 §1 prose units and order | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| da44fbc670bb9772 | linkly (`shag`) | t5 cross-RFC per-unit hash comparison | `wiki-local/qa/document-verification/cross-rfc-unit-equality.md` |
+| 80c15ba6f768c903 | linkly (`shag`) | t4 how RFC-0069/0070 are produced (pinned manifests, build.sh) | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 36144195bfec2b75 | linkly (`shag`) | t4 order of units inside a composed section | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| ce1cc8a6eb6222b8 | linkly (`shag`) | t4 RFC-0069 §2 composition | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 348b44d058b38035 | linkly (`shag`) | t4 grammar productions | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 4fb3e32f4a9d90d1 | linkly (`shag`) | t4 headings and title | `wiki-local/qa/document-verification/rfc-status-block.md` |
+| cbcb88efcd56851e | linkly (`shag`) | t4 relation text and quote containers | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 4985dc6c9fad7359 | linkly (`shag`) | t4 Status block of RFC-0069/0070 | `wiki-local/qa/document-verification/rfc-status-block.md` |
+| a467d9853cd3de77 | linkly (`shag`) | t4 RFC-0048 contamination | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| c8615f2a589eebf8 | linkly (`shag`) | t4 RFC-0052 single-row binding delta | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 9745c911f7075a1e | linkly (`shag`) | t4 sentences an updater's restatement drops | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 00232b8f8800502c | linkly (`shag`) | t4 relative references inside carried updater text | `wiki-local/qa/document-verification/re-pointing-superseded-references.md` |
+| cac14dbe3a1f0867 | linkly (`shag`) | t4 §Examples of RFC-0069 | `wiki-local/qa/document-verification/mechanical-spec-consolidation.md` |
+| 7669b8098be66ad5 | dev-loop (`cormorant`) | t2-skill-prose: keep a page's `last_verified` when no source was re-checked | `wiki-local/qa/document-verification/last-verified-bumps.md` |
