@@ -5,10 +5,14 @@
 
 setup() {
   LS="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/launch-session.sh"
-  # Isolate from ambient orchestration env. A worker session running this
-  # suite inherits LO_RUN_ID/LO_STATUS_DIR/LO_TASK_ID and GROUNDWORK_* from
-  # its own launch (issue #100) — `env VAR=val` in a test's `run` line MERGES
-  # with, not replaces, the inherited environment, so these leak into
+  # Isolate from ambient orchestration env. This block must stay even after
+  # #302 (launch-session.sh now starts the tmux server with every LO_* and
+  # GROUNDWORK_* unset): a coordinator-side shell exports LO_RUN_ID (SKILL.md
+  # "Session knobs"); a tmux server something else started can still carry
+  # LO_* in its global environment (issue #100); and a worker still gets
+  # GROUNDWORK_ESCALATION_DIR / GROUNDWORK_TASK_ID from the pane-side export
+  # in launchcmd. `env VAR=val` in a test's `run` line MERGES with, not
+  # replaces, the inherited environment, so these leak into
   # launch-session.sh (and the status-update.sh it calls) unless absent here.
   # Tests that need a value set it explicitly via `run env VAR=val ...`,
   # which overrides this unset for that one invocation.
