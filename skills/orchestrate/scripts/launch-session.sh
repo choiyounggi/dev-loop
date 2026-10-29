@@ -65,6 +65,24 @@
 #                      including set-but-empty, e.g. LO_TASK_ID="" — is a
 #                      caller bug (issue #123), rejected at exit 2 before any
 #                      tmux session is touched.
+#
+# Server environment (issue #302): when the new-session call below starts the
+# tmux server, tmux copies the calling process's whole environment into the
+# server's GLOBAL environment, and every later session on that server (other
+# tasks' workers, other runs', the user's own) inherits it. So that one call
+# runs in a subshell with every LO_* and GROUNDWORK_* variable unset; the rest
+# of the caller's environment (PATH, HOME, TMUX, ...) passes through. This
+# script itself still reads LO_STATUS_DIR / LO_TASK_ID / LO_RUN_ID from the
+# caller, so the status pre-seed is unchanged. The worker gets
+# GROUNDWORK_ESCALATION_DIR, GROUNDWORK_TASK_ID and GROUNDWORK_GUARDRAILS_CONFIG
+# from the exports in its pane launch command, not from the server. Other
+# GROUNDWORK_* names the guardrails plugin reads (GROUNDWORK_AUDIT_LOG,
+# GROUNDWORK_NONINTERACTIVE) are stripped too and not re-exported; a worker on
+# an already-running server never received them either. A server that is
+# already running is unaffected: tmux copies the environment only when it
+# starts. If listing or unsetting a variable fails, the script exits non-zero
+# before tmux runs. Limit: a variable whose name is not a valid shell name
+# (LO_A-B) cannot be unset; macOS /bin/sh passes it through, dash drops it.
 set -eu
 # NOT named TMUX: that is tmux's OWN variable (the server socket). Assigning it
 # here would overwrite the caller's exported value, and every tmux child would
@@ -208,7 +226,18 @@ if "$TMUX_BIN" has-session -t "$session" 2>/dev/null; then
   exit 0
 fi
 
-"$TMUX_BIN" new-session -d -s "$session" -x 220 -y 50 -c "$wt"
+# Issue #302: start tmux without the caller's LO_* and GROUNDWORK_* variables
+# (see the header). When this call starts the server, tmux copies this
+# process's environment into the server's global environment. Both
+# assignments stand alone so `set -e` stops the script if env or sed fails;
+# an unset that fails ends the subshell before exec. TMUX_BIN was resolved
+# above, so unsetting LO_TMUX here is safe.
+caller_env=$(env)
+strip=$(printf '%s\n' "$caller_env" | sed -n 's/^\(LO_[A-Za-z0-9_]*\)=.*/\1/p; s/^\(GROUNDWORK_[A-Za-z0-9_]*\)=.*/\1/p')
+(
+  for v in $strip; do unset "$v"; done
+  exec "$TMUX_BIN" new-session -d -s "$session" -x 220 -y 50 -c "$wt"
+)
 
 # Route guardrails `ask` decisions in this (headless) worker to the coordinator
 # instead of blocking it. The escalation dir is the main repo's; task id = session.
@@ -237,15 +266,26 @@ launchcmd="$launchcmd && ${effort_env}\"$CLAUDE\" --permission-mode $perm"
 [ -n "$model" ] && launchcmd="$launchcmd --model '$model'"
 "$TMUX_BIN" send-keys -t "$session" "$launchcmd" Enter
 
-# Pass the first-launch screens, wait for REPL ready (~60s). A screen whose
-# highlighted default is harmful gets explicit keys, never a bare Enter:
-#   bypassPermissions warning ("1. No, exit" highlighted) -> Down, Enter =
-#     "Yes, I accept" (Enter alone would quit claude)
+# Pass the first-launch screens, wait for REPL ready (~60s). Three known
+# screens are answered by reading the live screen, never by a fixed key list.
+# Each has one safe option:
+#   folder-trust ("Quick safety check", dev-loop#276) -> "Yes, I trust this
+#     folder" ("No, exit" quits claude; "No, continue without these
+#     permissions" declines them and continues)
+#   bypassPermissions warning ("Claude Code running in Bypass Permissions
+#     mode") -> "Yes, I accept" ("No, exit" quits claude)
 #   auto-mode chooser ("Make auto mode your default permission mode?",
-#     groundwork#41) -> key 2 = "No, keep bypass permissions" (option 1 would
-#     rewrite the user's global default permission mode)
-#   folder-trust screen ("Quick safety check", "No, exit" highlighted,
-#     dev-loop#276) -> Down, Enter = "Yes, I trust this folder"
+#     groundwork#41) -> "No, keep <mode>" (option 1 would rewrite the user's
+#     global default permission mode)
+# A numbered screen gets the digit printed before the safe option (a digit
+# selects AND confirms, so no Enter follows). An unnumbered screen gets Down
+# while the cursor line ("❯") sits on the other option, and Enter only once it
+# sits on the safe option.
+# Only the lines below the bottom-most screen title are read, so a stale frame
+# above the live one never decides the key (#296). A screen is acted on only
+# when two consecutive captures are identical, each kind gets its confirming
+# key at most once per launch and Down at most once, and a screen that is not
+# readable gets no key at all, so the launch ends in exit 4.
 # Order: ready patterns first, then these screens, then the generic Enter-only
 # trust patterns — a screen that also shows "Enter to confirm" must never fall
 # into the Enter-only arm.
@@ -262,7 +302,7 @@ ready_timeout="${LO_READY_TIMEOUT:-60}"; ready_interval="${LO_READY_INTERVAL:-2}
 iters=$(( ready_timeout / ready_interval )); [ "$iters" -ge 1 ] || iters=1
 
 # Send the validated LO_TRUST_KEYS (default Enter) in the order given, one
-# send-keys call per key, 1 s apart like the Down/Enter arms below.
+# send-keys call per key, 1 s apart.
 send_trust_keys() {
   tk_first=1
   for k in $trust_keys; do
@@ -272,7 +312,58 @@ send_trust_keys() {
   done
 }
 
-ready=0; i=0; pane=""
+# screen_verdict <pane> -> "<kind> <verdict>" for the bottom-most first-launch
+# screen title in the pane. kind: trust | bypass | auto | none (no title line).
+# verdict, read from the lines below that title only: d<1-9> (exactly one
+# numbered line carries the kind's safe option y), enter (exactly one cursor
+# line, on y), down (exactly one cursor line, on the kind's other option m1/m2)
+# or unsure (anything else).
+screen_verdict() {
+  printf '%s\n' "$1" | awk '
+    { l[NR] = $0 }
+    index($0, "Quick safety check") { k = "trust"; t = NR }
+    index($0, "Claude Code running in Bypass Permissions mode") { k = "bypass"; t = NR }
+    index($0, "Make auto mode your default permission mode") { k = "auto"; t = NR }
+    END {
+      if (t == 0) { print "none unsure"; exit }
+      if (k == "trust") { y = "Yes, I trust this folder"; m1 = "No, exit"; m2 = "No, continue without these permissions" }
+      if (k == "bypass") { y = "Yes, I accept"; m1 = "No, exit"; m2 = m1 }
+      if (k == "auto") { y = "No, keep "; m1 = "Yes, set auto mode as my default permission mode"; m2 = m1 }
+      nd = 0; nc = 0; cur = ""
+      for (i = t + 1; i <= NR; i++) {
+        s = l[i]; c = index(s, "❯")
+        if (c) { nc++; s = substr(s, c + length("❯")) }
+        sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s)
+        if (s ~ /^[1-9]\. / && index(s, y) == 4) { nd++; d = substr(s, 1, 1) }
+        if (c) { sub(/^[1-9]\. /, "", s); cur = s }
+      }
+      v = "unsure"
+      if (nd == 1) v = "d" d
+      else if (nd == 0 && nc == 1) {
+        if (index(cur, y) == 1) v = "enter"
+        else if (cur == m1 || cur == m2) v = "down"
+      }
+      print k " " v
+    }'
+}
+
+# answer_screen: act on $pane (called only after two identical captures). The
+# answered and moved lists hold screen KINDS, never line bytes, so a reflowed
+# or scrolled repaint of an answered screen is still recognised (#296).
+answered=" "; moved=" "
+answer_screen() {
+  sv=$(screen_verdict "$pane") || sv="none unsure"
+  sv_kind=${sv%% *}; sv_v=${sv#* }
+  case "$answered" in *" $sv_kind "*) return 0 ;; esac
+  case "$sv_v" in
+    d[1-9]) "$TMUX_BIN" send-keys -t "$session" "${sv_v#d}"; answered="$answered$sv_kind " ;;
+    enter) "$TMUX_BIN" send-keys -t "$session" Enter; answered="$answered$sv_kind " ;;
+    down) case "$moved" in *" $sv_kind "*) : ;; *) "$TMUX_BIN" send-keys -t "$session" Down; moved="$moved$sv_kind " ;; esac ;;
+  esac
+  return 0
+}
+
+ready=0; i=0; pane=""; prev=""
 while [ "$i" -lt "$iters" ]; do
   sleep "$ready_interval"
   pane=$("$TMUX_BIN" capture-pane -t "$session" -p 2>/dev/null || echo "")
@@ -282,12 +373,8 @@ while [ "$i" -lt "$iters" ]; do
   case "$pane" in
     *"bypass permissions on"*|*"shift+tab to cycle"*|*"for shortcuts"*|*"? for"*)
       ready=1; break ;;
-    *"Make auto mode your default permission mode"*|*"No, keep bypass permissions"*)
-      "$TMUX_BIN" send-keys -t "$session" 2 ;;
-    *"Yes, I trust this folder"*|*"Quick safety check"*)
-      "$TMUX_BIN" send-keys -t "$session" Down; sleep 1; "$TMUX_BIN" send-keys -t "$session" Enter ;;
-    *"Yes, I accept"*|*"accept all responsibility"*)
-      "$TMUX_BIN" send-keys -t "$session" Down; sleep 1; "$TMUX_BIN" send-keys -t "$session" Enter ;;
+    *"Make auto mode your default permission mode"*|*"No, keep bypass permissions"*|*"Yes, set auto mode as my default permission mode"*|*"Yes, I trust this folder"*|*"Quick safety check"*|*"Yes, I accept"*|*"accept all responsibility"*|*"Claude Code running in Bypass Permissions mode"*)
+      if [ "$pane" = "$prev" ]; then answer_screen; fi ;;
     *"Do you trust"*|*"trust the files"*|*"Enter to confirm"*)
       "$TMUX_BIN" send-keys -t "$session" Enter ;;
     *)
@@ -295,6 +382,7 @@ while [ "$i" -lt "$iters" ]; do
         send_trust_keys
       fi ;;
   esac
+  prev=$pane
   i=$((i+1))
 done
 

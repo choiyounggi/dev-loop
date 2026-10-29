@@ -606,8 +606,29 @@ canonical `blocked/<task>.json` is pruned once its worker-side copy is gone —
 see exit 8 below. `ready-set.sh` reads the
 status dir directly and does not poll, so before every `ready-set.sh` round also
 run `scripts/collect-status.sh .orchestration/graph.json .orchestration/status
-.worktrees` yourself (Phase 3 step 1). Trust-screen wording drifts between CLI releases —
-if a launch hangs, set `LO_READY_EXTRA` (substring) or `LO_READY_TIMEOUT`; for a
+.worktrees` yourself (Phase 3 step 1). `launch-session.sh` answers the three
+known first-launch screens by reading them, not with fixed keys. The safe option
+is "Yes" on the folder-trust screen and the bypassPermissions warning, and
+"No, keep …" on the auto-mode chooser. A numbered screen gets the digit printed
+before the safe option (a digit selects and confirms, so no Enter follows); an
+unnumbered one gets `Down` while the `❯` cursor line sits on the other option and
+`Enter` once it sits on the safe one. `Down` is sent at most once per screen kind:
+a cursor still on the unsafe option after that one `Down` gets no further key, and
+the launch ends in exit 4 by design — a screen that did not move, not a script
+fault to retry. The script reads only the lines below the
+bottom-most screen title, acts only after two identical consecutive captures,
+answers each screen kind at most once per launch, and sends no key to a screen
+it cannot read, so that launch ends in exit 4.
+Trust-screen wording drifts between CLI releases —
+if a launch hangs, set `LO_READY_EXTRA` (substring) or `LO_READY_TIMEOUT`. Each
+unnumbered screen costs 4 polls (drawn, repeated → `Down`, moved, repeated →
+`Enter`; a numbered screen, or one whose cursor already sits on the safe option,
+costs 2), so a first launch that passes all three screens needs up to 13 polls
+to reach the REPL — the worst case, all three unnumbered, before any CLI
+start-up delay: about 26 s at the 2 s `LO_READY_INTERVAL` default, of the 30
+polls the 60 s `LO_READY_TIMEOUT` default gives. Keep `LO_READY_TIMEOUT` at 30 s
+or more at that interval — 13 polls plus room for CLI start-up; with fewer than
+13 polls that worst-case launch ends in exit 4. For a
 screen that needs an answer, set `LO_TRUST_EXTRA` (a substring of that screen) and
 `LO_TRUST_KEYS` (the keys sent when it matches, space-separated, from `Up Down Left
 Right Enter Escape Tab Space 0-9 y n`; default `Enter`; any other key is refused with
