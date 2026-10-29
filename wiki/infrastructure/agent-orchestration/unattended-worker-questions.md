@@ -3,7 +3,7 @@ id: infrastructure-agent-orchestration-unattended-worker-questions
 domain: infrastructure
 category: agent-orchestration
 applies_to: [tmux, general]
-confidence: verified
+confidence: field-tested
 sources:
   - https://github.com/anthropics/claude-code/issues/50728
   - https://github.com/anthropics/claude-code/issues/29530
