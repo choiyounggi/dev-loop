@@ -8,7 +8,7 @@ sources:
   - https://newsletter.kentbeck.com/p/canon-tdd
   - https://martinfowler.com/bliki/TestDrivenDevelopment.html
   - https://github.com/obra/superpowers
-last_verified: 2026-08-22
+last_verified: 2026-10-29
 related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-set, testing-quality-behavior-not-implementation, debugging-methodology-verify-the-fix]
 ---
 
@@ -19,7 +19,8 @@ related: [testing-quality-tests-that-cannot-fail, testing-quality-minimum-case-s
 Implementing new behavior or a bug fix and deciding the order of test and
 production code; production code already exists that no test ever required;
 encoding a bug reproduction as the regression test that
-[debugging-methodology-verify-the-fix] requires.
+[debugging-methodology-verify-the-fix] requires; a brand-new function whose
+first red can only be a missing-name error.
 
 ## Do this
 
@@ -55,6 +56,7 @@ encoding a bug reproduction as the regression test that
 | The fix is config/infra with no code seam to test | Verify by toggling the config both ways against the recorded repro — the config row of [debugging-methodology-verify-the-fix] |
 | A large untested implementation already exists (inherited branch, generated code) | Retrofit proof instead of deleting: write the test list, then prove each test catches a defect by mutation per [testing-quality-tests-that-cannot-fail] |
 | The "new" behavior turns out to already exist (test green on first run) | Confirm by mutation that the test can fail, then drop the duplicate implementation from the plan |
+| A brand-new function, so the first run can only be a missing-name error (`AttributeError`, `ImportError`, unresolved symbol) | Add a stub with the final signature that returns a type-correct wrong value, rerun, and require an assertion failure as the RED. When the missing-name red was already accepted and the code is green, prove the assertions after the fact: run text-mutated copies of the module (boundary flipped, a filter dropped) and require each mutant to redden its owning test. A missing-name red shows only that the test calls the function |
 
 ## Instead of
 
@@ -69,3 +71,4 @@ encoding a bug reproduction as the regression test that
 - https://newsletter.kentbeck.com/p/canon-tdd — Kent Beck's canonical TDD loop: test list → one failing test → make it pass → refactor
 - https://martinfowler.com/bliki/TestDrivenDevelopment.html — write the test first, watch it fail, write the simplest passing code
 - https://github.com/obra/superpowers — test-driven-development skill: verify-RED for the expected reason, delete code written before its test, mirror-assertion ban; field-tested across agentic coding sessions
+- Field evidence 2026-10-29 (a Python lint rule added test-first in an RFC-tooling repo): the only possible first red was `AttributeError` on the new function; after green, 5 source mutants (`>=` boundary, dropped status filters, dropped ancestry, self-reference) each reddened the rule's test class (11/4/2/1/1 failures). Running a mutant module built by hand failed until its `__file__` was set, because the module derived paths from `__file__`
