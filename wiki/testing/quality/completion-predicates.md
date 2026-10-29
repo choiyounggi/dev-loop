@@ -8,8 +8,9 @@ sources:
   - https://www.gnu.org/software/grep/manual/grep.html
   - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
   - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html
-last_verified: 2026-08-05
-related: [testing-quality-checks-that-cannot-pass, testing-quality-tests-that-cannot-fail, platforms-shells-portable-shell-scripts, platforms-processes-background-services, testing-quality-precedence-between-competing-exit-conditions]
+  - "Field reproduction 2026-10-29 (dev-loop orchestration, task orch-r268-t9): a done-gate F8 counting lines in a shared append-only log"
+last_verified: 2026-10-29
+related: [testing-quality-checks-that-cannot-pass, testing-quality-tests-that-cannot-fail, platforms-shells-portable-shell-scripts, platforms-processes-background-services, testing-quality-precedence-between-competing-exit-conditions, infrastructure-agent-orchestration-concurrent-blackboard-append-file, qa-process-completion-claims]
 ---
 
 # A Predicate That Decides When Background Work Is Finished
@@ -74,6 +75,7 @@ total=$(wc -l < "$status")
 | The predicate must run where only a regex is accepted | Escape the metacharacters and verify the pattern against a fixture containing one matching and one non-matching line before adopting it |
 | The status source is empty on the first poll (no items yet) | Require a non-zero item count as part of the done condition — `0 == 0` is the same arithmetic as "all complete" ([testing-quality-checks-that-cannot-pass]) |
 | Items can reach a terminal state that is not success (`failed`, `cancelled`) | Count each terminal state separately and make the loop's exit status name which one it saw; folding them into "not running" reports a failed run as a finished one |
+| The status source is a shared append-only log, and the worker whose artifact the gate counts also keeps appending unrelated entries to that same log after building the artifact (a findings log, a review blackboard) | Count only the entries the artifact was built from — record the line count (or a cutoff marker) at build time and compare against that, not against a fresh `grep -c` of the live file — and report the worker's own later appends as a separate number rather than folding them into the done count. A raw recount keeps growing from the worker's own subsequent writes, so a count gate that held the moment the artifact was written goes red later with nothing in the artifact itself changed |
 
 ## Instead of
 
@@ -85,6 +87,7 @@ total=$(wc -l < "$status")
 | Treat a missing status file as "nothing incomplete" | Exit with a distinct code and message for unreadable input | Absence of evidence is reported as completion, which is the failure mode that looks like success |
 | Arm a completion monitor after watching it report "done" correctly once | Run it once against the incomplete state and require "not done" first | A predicate that matches everything also reports "done" correctly at the end; only the incomplete state separates it from a constant |
 | Conclude "all done" from an empty leftover list | Compare a finished count to a total count, both non-zero | An over-matching pattern empties the leftover list, which reads identically to real completion |
+| Re-`grep -c` a shared append-only log live and compare it against the count recorded when an artifact built from it was written | Snapshot the count at build time (or filter to only the entries that fed the artifact) and diff the artifact's own content, not the log's growing line count | The same worker's later, unrelated appends to that log grow the raw count after the artifact is final, so the gate reports drift where none exists |
 
 ## Sources
 
@@ -92,3 +95,4 @@ total=$(wc -l < "$status")
 - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html — exit status 0 = lines selected, 1 = no lines selected, >1 = an error occurred, so a read error and a genuine no-match are distinguishable
 - https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html — a bracket expression `[...]` matches a single character from the enclosed set; this is what turns a literal marker into an eight-letter character class
 - Field reproduction 2026-08-04 (macOS, BSD grep): a three-line status file with one `[completed]` and two in-flight lines — `grep -c '[completed]'` returned 3 (every line), `grep -qv '[completed]'` selected nothing so the "no unfinished lines" test reported ALL COMPLETED, and `grep -cF '[completed]'` returned 1 against a total of 3. The original incident was an eight-task fan-out with one task complete, reported by its monitor as "ALL 8 TASKS COMPLETED" on the first poll. With a four-item board where one status word contained every letter in `{c,o,m,p,l,e,t,d}`, the "no unfinished" check still reports completion while the counting predicate correctly reports one of four done
+- Field reproduction 2026-10-29 (dev-loop orchestration, task orch-r268-t9): done-gate F8 went red after three `[t9] finding:` lines were appended to a shared log (216 lines vs. the 213 recorded when the gated artifact was built); filtering out the `[t9]`-tagged lines gave source=213 again, and `cmp` showed the artifact's body unchanged — the gate returned to green once it compared against the build-time count instead of the live `grep -c`

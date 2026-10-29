@@ -10,7 +10,10 @@ sources:
   - https://docs.python.org/3/library/tempfile.html
   - https://docs.semgrep.dev/writing-rules/testing-rules
   - https://eslint.org/docs/latest/extend/custom-rule-tutorial
-last_verified: 2026-08-05
+  - https://www.gnu.org/software/grep/manual/grep.html
+  - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
+  - https://man7.org/linux/man-pages/man7/pipe.7.html
+last_verified: 2026-10-29
 related: [testing-data-test-data-and-isolation, testing-quality-checks-that-cannot-pass, debugging-methodology-hypothesis-testing, debugging-methodology-isolate-by-bisection, testing-async-teardown-after-aborted-tasks]
 ---
 
@@ -85,6 +88,7 @@ ls "$SCRATCH_DIR" | sed 's/-[a-z0-9]*$//' | sort | uniq -c | sort -rn
 | Cleanup code exists but the directory survives | The path being removed is not the path being created — log both at one failing site before editing; a `cd` or a relative path resolved from a different working directory is the usual gap |
 | The leak is outside the repo (system temp), so `git status` is clean | Measure the scratch area's size and entry count as the signal; repo-only checks report a suite that fills the disk as healthy |
 | Artifacts are produced by a subprocess (a compiler, a bundler) the test invokes | Point the subprocess at the test-owned directory via its output flag or `cwd`; a subprocess inherits neither the fixture nor its teardown |
+| A verify/gate command pipes a test runner's own output into `grep -q PATTERN` to check the result | `-q` exits "immediately with zero status if any match is found" (GNU grep manual) — often after the first matching line, long before the runner's own output ends. Closing that read end while the runner still holds the pipe open for writing makes the next write raise `SIGPIPE` "if all file descriptors referring to the read end of a pipe have been closed" (pipe(7)); the runner dies there, before its own exit-time cleanup removes its temp dir. Use `grep PATTERN >/dev/null` (reads to EOF) in place of `-q`, or redirect the runner's output to a file first and `grep` the file |
 
 ## Instead of
 
@@ -96,6 +100,7 @@ ls "$SCRATCH_DIR" | sed 's/-[a-z0-9]*$//' | sort | uniq -c | sort -rn
 | Add `*.tmp`-style entries to `.gitignore` | Remove the artifacts at their source | Ignoring hides the growth from `git status` while the disk keeps filling |
 | Adopt the new lint rule after seeing it pass on the fixed tree | Run it on the unfixed tree first and require it to flag exactly the known-bad sites | A rule that matches nothing passes on clean code whether it is correct or mistyped |
 | Declare the leak fixed because the directory "looks smaller" | Count the root before and after a full suite run and require zero growth | An impression cannot separate a fixed leak from a smaller test selection |
+| Pipe a runner's output into `grep -q PATTERN` to decide pass/fail | Use `grep PATTERN >/dev/null` or redirect to a file and grep that | `-q` can exit at the first match; the runner's next write past that point gets `SIGPIPE`'d before its own cleanup runs, orphaning its temp dir |
 
 ## Sources
 
@@ -105,3 +110,7 @@ ls "$SCRATCH_DIR" | sed 's/-[a-z0-9]*$//' | sort | uniq -c | sort -rn
 - https://docs.semgrep.dev/writing-rules/testing-rules — writing rules to catch test-fixture misuse patterns
 - https://eslint.org/docs/latest/extend/custom-rule-tutorial — writing custom linting rules to enforce conventions
 - Field reproduction 2026-08-04 (task-board monitor): artifact prefixes concentrated on two call sites; `grep -n mkdtemp src/*.py` showed one site with cleanup and one without; adding context-manager form at the bare site eliminated the leak. 2026-08-05 (test suite): artifact count was 47 before run and 94 after; rewriting three `mkstemp` calls to use `pytest tmp_path` reduced delta to 0 on subsequent runs
+- https://www.gnu.org/software/grep/manual/grep.html — `-q`/`--quiet`/`--silent`: "Exit immediately with zero status if any match is found, even if an error was detected"
+- https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html — grep `-q`: "the exit status shall be zero if an input line is selected, even if an error was detected"
+- https://man7.org/linux/man-pages/man7/pipe.7.html — "If all file descriptors referring to the read end of a pipe have been closed, then a write(2) will generate a SIGPIPE signal for the writing process. If the writing process is ignoring this signal, then write(2) fails with the error EPIPE"
+- Field reproduction 2026-10-28 (vitest 4.1.12, Node 26.7.0, probe under `.claude/tmp`): `bash -c 'npm test 2>&1 | grep -q …'` left 1 entry in `$TMPDIR`; the same command with `grep … >/dev/null` left 0; plain `npm test` left 0

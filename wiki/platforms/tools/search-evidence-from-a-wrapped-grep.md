@@ -14,7 +14,7 @@ sources:
   - "Local reproduction 2026-10-08 (Claude Code 2.1.293, bundled ugrep 7.8.4, zsh 5.9, macOS): ignore-file skips by path form, complexity-limit error with `-e` split, BSD grep memory limit"
 last_verified: 2026-10-08
 verified_model: claude-opus-5-5
-related: [platforms-environment-path-resolution, platforms-tools-harness-mediated-tool-results, debugging-methodology-reproduce-first]
+related: [platforms-environment-path-resolution, platforms-tools-harness-mediated-tool-results, debugging-methodology-reproduce-first, testing-quality-checks-that-cannot-pass]
 ---
 
 # A Search Run Through the Agent Shell's `grep` Wrapper Used as Evidence
