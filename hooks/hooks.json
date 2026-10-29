@@ -7,23 +7,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/preflight.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/preflight.sh\""
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/insight-instruction.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/insight-instruction.sh\""
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/config-nudge.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/config-nudge.sh\""
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/graph-nudge.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/graph-nudge.sh\""
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/wiki-index.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/wiki-index.sh\""
           }
         ]
       }
@@ -34,11 +34,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/pre-flush-pr-gate.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-flush-pr-gate.sh\""
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/orchestrate-ask-gate.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/orchestrate-ask-gate.sh\""
           }
         ]
       }
@@ -48,15 +48,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/loop-gate.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/loop-gate.sh\""
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/harvest-insights.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/harvest-insights.sh\""
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/auto-flush.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/auto-flush.sh\""
           }
         ]
       }
@@ -66,7 +66,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh\""
           }
         ]
       }
@@ -77,7 +77,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh\""
           }
         ]
       }
@@ -87,7 +87,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh\""
           }
         ]
       }

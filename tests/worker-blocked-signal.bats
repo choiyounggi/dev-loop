@@ -276,21 +276,21 @@ _blocked_file() { printf '%s' "$WS/.orchestration/blocked/t1.json"; }
 @test "R7 normal: StopFailure is registered with no matcher and the right command" {
   run jq -e '.hooks.StopFailure[0] | has("matcher") | not' "$HOOKS_JSON"
   [ "$status" -eq 0 ]
-  run jq -e '.hooks.StopFailure[0].hooks[0].command == "bash ${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh"' "$HOOKS_JSON"
+  run jq -e '.hooks.StopFailure[0].hooks[0].command == "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh\""' "$HOOKS_JSON"
   [ "$status" -eq 0 ]
 }
 
 @test "R7 normal: Notification is registered with the nine-type matcher and the right command" {
   run jq -e '.hooks.Notification[0].matcher == "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input|worker_permission_prompt|quota_auto_resume_stale|quota_auto_resume_disabled|quota_auto_resume_fired"' "$HOOKS_JSON"
   [ "$status" -eq 0 ]
-  run jq -e '.hooks.Notification[0].hooks[0].command == "bash ${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh"' "$HOOKS_JSON"
+  run jq -e '.hooks.Notification[0].hooks[0].command == "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh\""' "$HOOKS_JSON"
   [ "$status" -eq 0 ]
 }
 
 @test "R7 normal: UserPromptSubmit is registered with no matcher and the right command" {
   run jq -e '.hooks.UserPromptSubmit[0] | has("matcher") | not' "$HOOKS_JSON"
   [ "$status" -eq 0 ]
-  run jq -e '.hooks.UserPromptSubmit[0].hooks[0].command == "bash ${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh"' "$HOOKS_JSON"
+  run jq -e '.hooks.UserPromptSubmit[0].hooks[0].command == "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/worker-blocked-signal.sh\""' "$HOOKS_JSON"
   [ "$status" -eq 0 ]
 }
 
@@ -301,9 +301,9 @@ _blocked_file() { printf '%s' "$WS/.orchestration/blocked/t1.json"; }
   [ "$status" -eq 0 ]
   run jq -e '.hooks.SessionStart[0].hooks | length == 5' "$HOOKS_JSON"
   [ "$status" -eq 0 ]
-  run jq -e '.hooks.SessionStart[0].hooks[3].command == "bash ${CLAUDE_PLUGIN_ROOT}/hooks/graph-nudge.sh"' "$HOOKS_JSON"
+  run jq -e '.hooks.SessionStart[0].hooks[3].command == "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/graph-nudge.sh\""' "$HOOKS_JSON"
   [ "$status" -eq 0 ]
-  run jq -e '.hooks.SessionStart[0].hooks[4].command == "bash ${CLAUDE_PLUGIN_ROOT}/hooks/wiki-index.sh"' "$HOOKS_JSON"
+  run jq -e '.hooks.SessionStart[0].hooks[4].command == "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/wiki-index.sh\""' "$HOOKS_JSON"
   [ "$status" -eq 0 ]
 }
 
@@ -311,6 +311,6 @@ _blocked_file() { printf '%s' "$WS/.orchestration/blocked/t1.json"; }
   jq 'del(.hooks.SessionStart[0].hooks[4])' "$HOOKS_JSON" > "$BATS_TEST_TMPDIR/hooks.json"
   run jq -e '.hooks.SessionStart[0].hooks | length == 5' "$BATS_TEST_TMPDIR/hooks.json"
   [ "$status" -ne 0 ]
-  run jq -e '.hooks.SessionStart[0].hooks[4].command == "bash ${CLAUDE_PLUGIN_ROOT}/hooks/wiki-index.sh"' "$BATS_TEST_TMPDIR/hooks.json"
+  run jq -e '.hooks.SessionStart[0].hooks[4].command == "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/wiki-index.sh\""' "$BATS_TEST_TMPDIR/hooks.json"
   [ "$status" -ne 0 ]
 }
