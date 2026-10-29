@@ -21,6 +21,10 @@ setup() {
   # (issue #123) to pass through to the behavior under test. Dry-run-only tests
   # may keep a fake path instead — the worktree guard runs after the dry-run exit.
   WT="$BATS_TEST_TMPDIR/wt"; mkdir -p "$WT"; git -C "$WT" init -q
+
+  # Issue #302 real-tmux cases set these; empty here so teardown never acts
+  # on a value inherited from the environment.
+  PRIV_SOCK=""; REAL_TMUX=""
 }
 
 @test "rejects an invalid permission mode (injection guard)" {
@@ -134,12 +138,15 @@ mk_tmux_stub() { # -> path of an executable `tmux` test double
 #   keys            one line per send-keys call (its arguments)
 #   keys-at         the same lines, each prefixed with the capture count so far
 #   has-session-rc  exit code for has-session (absent -> 1, "no such session")
+#   new-session-rc  exit code for new-session (absent -> 0)
 set -u
 d="${STUB_DIR:?}"
 printf 'TMUX=%s ARGV=%s\n' "${TMUX-<unset>}" "$*" >> "$d/env-log"
 case "${1:-}" in
   has-session)
     exit "$(cat "$d/has-session-rc" 2>/dev/null || echo 1)" ;;
+  new-session)
+    exit "$(cat "$d/new-session-rc" 2>/dev/null || echo 0)" ;;
   capture-pane)
     n=$(cat "$d/captures" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$d/captures"
     if [ -f "$d/pane-$n" ]; then cat "$d/pane-$n"
@@ -154,7 +161,20 @@ STUBEOF
   printf '%s' "$stub"
 }
 
-teardown() { rm -f "$(REPO_TMP)/tmux-stub-${BATS_TEST_NUMBER}"; }
+teardown() {
+  rm -f "$(REPO_TMP)/tmux-stub-${BATS_TEST_NUMBER}"
+  # Issue #302 real-tmux cases: acts only when the test set BOTH names (a
+  # no-op for every stub-only test). Kills only this test's private server,
+  # then removes the socket file tmux reports for it — tmux leaves that
+  # file behind after kill-server. No socket path is ever hardcoded.
+  if [ -n "${PRIV_SOCK:-}" ] && [ -n "${REAL_TMUX:-}" ]; then
+    sock_path="$("$REAL_TMUX" -L "$PRIV_SOCK" display-message -p '#{socket_path}' 2>/dev/null || true)"
+    "$REAL_TMUX" -L "$PRIV_SOCK" kill-server 2>/dev/null || true
+    if [ -n "$sock_path" ] && [ -S "$sock_path" ]; then rm -f "$sock_path"; fi
+  fi
+  rm -f "$(REPO_TMP)/tmux-private-${BATS_TEST_NUMBER}" "$(REPO_TMP)/claude-fake-${BATS_TEST_NUMBER}"
+  rm -rf "$(REPO_TMP)/fakebin-${BATS_TEST_NUMBER}"
+}
 
 # --- pane fixtures, transcribed from real `capture-pane` output of a live
 # --- Claude CLI in tmux (measured 2026-08-05). The only edits are trimming
@@ -1031,4 +1051,109 @@ run_trust() { # [env args...] -> runs the launcher against $sd with LO_TRUST_EXT
   [ "$status" -eq 4 ]
   [[ "$output" == *"REPL not ready"* ]]
   [ "$(wc -l < "$sd/keys" | tr -d ' ')" = "1" ]
+}
+
+# --- Issue #302: the tmux server's global environment -----------------------
+# When launch-session.sh's new-session call starts the tmux server, tmux
+# copies the calling process's environment into the server's GLOBAL
+# environment, and every later session on that server inherits it. These
+# cases start a REAL tmux server on a per-test private socket (-L, through
+# the wrapper below) — never the default socket — and teardown kills only
+# that server. Helpers are called bare, never as $(helper): they set the
+# globals teardown reads. Every command that may start a server closes fd 3
+# (3>&-): the server would inherit it and bats would wait on it forever.
+# The prompt is "ZZPROMPTHEAD hello": a head that appears nowhere else on
+# the pane, so the submission check's fallback cannot match it by accident.
+
+private_tmux() { # sets REAL_TMUX, PRIV_SOCK and PT (a tmux wrapper bound to PRIV_SOCK)
+  REAL_TMUX="$(command -v tmux || true)"
+  [ -n "$REAL_TMUX" ]
+  PRIV_SOCK="lsenv-$$-${BATS_TEST_NUMBER}"
+  mkdir -p "$(REPO_TMP)"
+  PT="$(REPO_TMP)/tmux-private-${BATS_TEST_NUMBER}"
+  printf '#!/bin/sh\nexec "%s" -L "%s" "$@"\n' "$REAL_TMUX" "$PRIV_SOCK" > "$PT"
+  chmod +x "$PT"
+}
+
+fake_claude() { # sets FC: shows a ready marker, keeps typed input off the screen, waits
+  mkdir -p "$(REPO_TMP)"
+  FC="$(REPO_TMP)/claude-fake-${BATS_TEST_NUMBER}"
+  cat > "$FC" <<'FAKEEOF'
+#!/bin/sh
+stty -echo 2>/dev/null
+echo "FAKE-CLAUDE bypass permissions on"
+exec sleep 30
+FAKEEOF
+  chmod +x "$FC"
+}
+
+@test "SERVER ENV: a launch that starts the tmux server leaves no LO_*/GROUNDWORK_* in its global environment (#302)" {
+  private_tmux; fake_claude
+  st="$BATS_TEST_TMPDIR/status"
+  run env SHELL=/bin/sh LO_TMUX="$PT" LO_CLAUDE="$FC" \
+      LO_RUN_ID=r302 LO_STATUS_DIR="$st" LO_TASK_ID=t302 \
+      GROUNDWORK_ESCALATION_DIR="$BATS_TEST_TMPDIR/esc" \
+      LO_READY_TIMEOUT=20 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=6 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello" 3>&-
+  [ "$status" -eq 0 ]
+  genv="$("$REAL_TMUX" -L "$PRIV_SOCK" show-environment -g)"
+  [[ $'\n'"$genv" == *$'\n'PATH=* ]]
+  [[ $'\n'"$genv" == *$'\n'HOME=* ]]
+  [[ $'\n'"$genv" != *$'\n'LO_STATUS_DIR=* ]]
+  [[ $'\n'"$genv" != *$'\n'LO_TASK_ID=* ]]
+  [[ $'\n'"$genv" != *$'\n'LO_RUN_ID=* ]]
+  [[ $'\n'"$genv" != *$'\n'GROUNDWORK_ESCALATION_DIR=* ]]
+  [[ $'\n'"$genv" != *$'\n'LO_* ]]
+  [[ $'\n'"$genv" != *$'\n'GROUNDWORK_* ]]
+  [ "$(jq -r .phase "$st/t302.json")" = "pending" ]
+  [ "$(jq -r .session "$st/t302.json")" = "lo-1-r302" ]
+}
+
+@test "SERVER ENV: on a tmux server that is already running the global environment is unchanged and the session launches (boundary) (#302)" {
+  private_tmux; fake_claude
+  env SHELL=/bin/sh LO_KEEP=1 GROUNDWORK_KEEP=1 "$PT" new-session -d -s pre -x 80 -y 24 3>&-
+  before="$("$REAL_TMUX" -L "$PRIV_SOCK" show-environment -g)"
+  [[ $'\n'"$before" == *$'\n'LO_KEEP=1* ]]
+  [[ $'\n'"$before" == *$'\n'GROUNDWORK_KEEP=1* ]]
+  run env SHELL=/bin/sh LO_TMUX="$PT" LO_CLAUDE="$FC" \
+      LO_RUN_ID=r302b LO_STATUS_DIR="$BATS_TEST_TMPDIR/status" LO_TASK_ID=t302b \
+      GROUNDWORK_ESCALATION_DIR="$BATS_TEST_TMPDIR/esc" \
+      LO_READY_TIMEOUT=20 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=6 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello" 3>&-
+  [ "$status" -eq 0 ]
+  after="$("$REAL_TMUX" -L "$PRIV_SOCK" show-environment -g)"
+  [ "$after" = "$before" ]
+  run "$REAL_TMUX" -L "$PRIV_SOCK" has-session -t lo-1-r302b
+  [ "$status" -eq 0 ]
+}
+
+@test "SERVER ENV: a failing new-session stops the launch with tmux's status, keeps TMUX, and seeds nothing (error) (#302)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; echo 3 > "$sd/new-session-rc"
+  st="$BATS_TEST_TMPDIR/status"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      TMUX=SENTINEL-SOCKET,111,0 \
+      LO_RUN_ID=r302c LO_STATUS_DIR="$st" LO_TASK_ID=t302c \
+      GROUNDWORK_ESCALATION_DIR="$BATS_TEST_TMPDIR/esc" \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello"
+  [ "$status" -eq 3 ]
+  [ ! -e "$st/t302c.json" ]
+  [ ! -e "$sd/keys" ]
+  log="$(cat "$sd/env-log")"
+  [[ $'\n'"$log"$'\n' == *$'\n'"TMUX=SENTINEL-SOCKET,111,0 ARGV=new-session -d -s lo-1-r302c -x 220 -y 50 -c $WT"$'\n'* ]]
+}
+
+@test "SERVER ENV: when listing the caller's environment fails the launch stops before tmux runs, no server and no pre-seed (error, fail-closed) (#302)" {
+  private_tmux
+  fb="$(REPO_TMP)/fakebin-${BATS_TEST_NUMBER}"; mkdir -p "$fb"
+  printf '#!/bin/sh\nexit 1\n' > "$fb/env"; chmod +x "$fb/env"
+  st="$BATS_TEST_TMPDIR/status"
+  run env PATH="$fb:$PATH" SHELL=/bin/sh LO_TMUX="$PT" LO_CLAUDE=/bin/echo \
+      LO_RUN_ID=r302d LO_STATUS_DIR="$st" LO_TASK_ID=t302d \
+      GROUNDWORK_ESCALATION_DIR="$BATS_TEST_TMPDIR/esc" \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello" 3>&-
+  [ "$status" -eq 1 ]
+  [ ! -e "$st/t302d.json" ]
+  run "$REAL_TMUX" -L "$PRIV_SOCK" ls
+  [ "$status" -ne 0 ]
 }

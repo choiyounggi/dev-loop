@@ -65,6 +65,24 @@
 #                      including set-but-empty, e.g. LO_TASK_ID="" — is a
 #                      caller bug (issue #123), rejected at exit 2 before any
 #                      tmux session is touched.
+#
+# Server environment (issue #302): when the new-session call below starts the
+# tmux server, tmux copies the calling process's whole environment into the
+# server's GLOBAL environment, and every later session on that server (other
+# tasks' workers, other runs', the user's own) inherits it. So that one call
+# runs in a subshell with every LO_* and GROUNDWORK_* variable unset; the rest
+# of the caller's environment (PATH, HOME, TMUX, ...) passes through. This
+# script itself still reads LO_STATUS_DIR / LO_TASK_ID / LO_RUN_ID from the
+# caller, so the status pre-seed is unchanged. The worker gets
+# GROUNDWORK_ESCALATION_DIR, GROUNDWORK_TASK_ID and GROUNDWORK_GUARDRAILS_CONFIG
+# from the exports in its pane launch command, not from the server. Other
+# GROUNDWORK_* names the guardrails plugin reads (GROUNDWORK_AUDIT_LOG,
+# GROUNDWORK_NONINTERACTIVE) are stripped too and not re-exported; a worker on
+# an already-running server never received them either. A server that is
+# already running is unaffected: tmux copies the environment only when it
+# starts. If listing or unsetting a variable fails, the script exits non-zero
+# before tmux runs. Limit: a variable whose name is not a valid shell name
+# (LO_A-B) cannot be unset; macOS /bin/sh passes it through, dash drops it.
 set -eu
 # NOT named TMUX: that is tmux's OWN variable (the server socket). Assigning it
 # here would overwrite the caller's exported value, and every tmux child would
@@ -208,7 +226,18 @@ if "$TMUX_BIN" has-session -t "$session" 2>/dev/null; then
   exit 0
 fi
 
-"$TMUX_BIN" new-session -d -s "$session" -x 220 -y 50 -c "$wt"
+# Issue #302: start tmux without the caller's LO_* and GROUNDWORK_* variables
+# (see the header). When this call starts the server, tmux copies this
+# process's environment into the server's global environment. Both
+# assignments stand alone so `set -e` stops the script if env or sed fails;
+# an unset that fails ends the subshell before exec. TMUX_BIN was resolved
+# above, so unsetting LO_TMUX here is safe.
+caller_env=$(env)
+strip=$(printf '%s\n' "$caller_env" | sed -n 's/^\(LO_[A-Za-z0-9_]*\)=.*/\1/p; s/^\(GROUNDWORK_[A-Za-z0-9_]*\)=.*/\1/p')
+(
+  for v in $strip; do unset "$v"; done
+  exec "$TMUX_BIN" new-session -d -s "$session" -x 220 -y 50 -c "$wt"
+)
 
 # Route guardrails `ask` decisions in this (headless) worker to the coordinator
 # instead of blocking it. The escalation dir is the main repo's; task id = session.
