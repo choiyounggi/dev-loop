@@ -4,7 +4,7 @@
 # runs. Here we cover the cheap, deterministic guards.)
 
 setup() {
-  LS="${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/launch-session.sh"
+  LS="${LS_UNDER_TEST:-${BATS_TEST_DIRNAME}/../skills/orchestrate/scripts/launch-session.sh}"
   # Isolate from ambient orchestration env. This block must stay even after
   # #302 (launch-session.sh now starts the tmux server with every LO_* and
   # GROUNDWORK_* unset): a coordinator-side shell exports LO_RUN_ID (SKILL.md
@@ -19,7 +19,14 @@ setup() {
   unset LO_RUN_ID LO_DRY_RUN LO_TMUX LO_CLAUDE \
         LO_READY_TIMEOUT LO_READY_INTERVAL LO_READY_EXTRA LO_TRUST_EXTRA LO_TRUST_KEYS \
         LO_SUBMIT_TIMEOUT LO_SUBMIT_INTERVAL LO_STATUS_DIR LO_TASK_ID \
-        DEV_LOOP_WORKER_MODEL GROUNDWORK_ESCALATION_DIR GROUNDWORK_TASK_ID
+        DEV_LOOP_WORKER_MODEL GROUNDWORK_ESCALATION_DIR GROUNDWORK_TASK_ID \
+        LO_RECEIPT_TIMEOUT LO_TRANSCRIPT_DIR CLAUDE_CONFIG_DIR CLAUDE_CODE_PROJECT_DIR_NAME
+  # Issue #314: the first-prompt receipt check is off for every test that
+  # does not opt in (send-prompt.bats line 27 precedent); RCPT-* tests set
+  # LO_RECEIPT_TIMEOUT (or unset it) per run. CLAUDE_CONFIG_DIR is unset
+  # above because an Orca or developer shell exports it and it moves the
+  # transcript root of every fake-HOME case.
+  export LO_RECEIPT_TIMEOUT=0
 
   # A valid git work-tree root, for every test that needs the worktree guard
   # (issue #123) to pass through to the behavior under test. Dry-run-only tests
@@ -143,6 +150,8 @@ mk_tmux_stub() { # -> path of an executable `tmux` test double
 #   keys-at         the same lines, each prefixed with the capture count so far
 #   has-session-rc  exit code for has-session (absent -> 1, "no such session")
 #   new-session-rc  exit code for new-session (absent -> 0)
+#   deliver         jsonl rows appended to the file named in deliver-to on the first send-keys -l (then renamed delivered)
+#   deliver-to      path of the transcript file deliver is appended to
 set -u
 d="${STUB_DIR:?}"
 printf 'TMUX=%s ARGV=%s\n' "${TMUX-<unset>}" "$*" >> "$d/env-log"
@@ -157,7 +166,14 @@ case "${1:-}" in
     elif [ -f "$d/pane" ]; then cat "$d/pane"; fi ;;
   send-keys)
     shift; printf '%s\n' "$*" >> "$d/keys"
-    printf '%s %s\n' "$(cat "$d/captures" 2>/dev/null || echo 0)" "$*" >> "$d/keys-at" ;;
+    printf '%s %s\n' "$(cat "$d/captures" 2>/dev/null || echo 0)" "$*" >> "$d/keys-at"
+    case " $* " in
+      *" -l "*)
+        if [ -f "$d/deliver" ] && [ -f "$d/deliver-to" ]; then
+          cat "$d/deliver" >> "$(cat "$d/deliver-to")"
+          mv "$d/deliver" "$d/delivered"
+        fi ;;
+    esac ;;
 esac
 exit 0
 STUBEOF
@@ -281,6 +297,11 @@ pane_chooser_at() { # <yes|no> [mode name] — unnumbered auto-mode chooser (CLI
 frames() { # <n> — stdin becomes pane-<n> and pane-<n+1>: two identical consecutive captures
   tee "$sd/pane-$1" > "$sd/pane-$(($1 + 1))"
 }
+
+rcpt_row()      { jq -cn --arg c "$1" '{type:"user",message:{role:"user",content:$c}}'; }
+rcpt_meta_row() { jq -cn --arg c "$1" '{type:"user",isMeta:true,message:{role:"user",content:$c}}'; }
+rcpt_tool_row() { printf '%s\n' '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"x"}]}}'; }
+long_prompt()   { printf 'ZZPROMPTHEAD %s' "$(printf 'x%.0s' $(seq 1 1177))"; }   # 1190 characters
 
 # --- Task 01: launch-session.sh must not clobber tmux's own TMUX variable ---
 # TMUX is tmux's server-socket variable. Assigning it exports the corruption to
@@ -1160,4 +1181,309 @@ FAKEEOF
   [ ! -e "$st/t302d.json" ]
   run "$REAL_TMUX" -L "$PRIV_SOCK" ls
   [ "$status" -ne 0 ]
+}
+
+# --- Issue #314: first-prompt receipt check (RCPT-*) ---
+# An empty input box proves the prompt left the box, not that all of it
+# arrived: the head of a ~3.3 KB first prompt was dropped and the launcher
+# still said "confirmed". The worker's own transcript is the witness. The tmux
+# stub appends $sd/deliver to the file named in $sd/deliver-to on the
+# `send-keys -l`, i.e. exactly when the CLI would record the message.
+
+@test "RCPT-1: a transcript holding only the tail exits 6 naming truncation, no ok and no pre-seed (error, regression) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  td="$BATS_TEST_TMPDIR/tr"; mkdir -p "$td"
+  { rcpt_meta_row "$p"; rcpt_row "${p: -163}"; rcpt_tool_row; } > "$sd/deliver"
+  printf '%s' "$td/s.jsonl" > "$sd/deliver-to"
+  [ "${#p}" -eq 1190 ]
+  run env -u LO_RECEIPT_TIMEOUT STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      LO_TRANSCRIPT_DIR="$td" LO_STATUS_DIR="$BATS_TEST_TMPDIR/status" LO_TASK_ID=t314 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "$p"
+  [ "$status" -eq 6 ]
+  [[ "$output" != *"ok:"* ]]
+  [[ "$output" == *"truncated"* ]]
+  [[ "$output" == *"163 of 1190"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/status/t314.json" ]
+}
+
+@test "RCPT-2: a transcript holding the whole prompt exits 0 with the unchanged ok line and the pre-seed (normal) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  td="$BATS_TEST_TMPDIR/tr"; mkdir -p "$td"
+  rcpt_row "$p" > "$sd/deliver"
+  printf '%s' "$td/s.jsonl" > "$sd/deliver-to"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      LO_TRANSCRIPT_DIR="$td" LO_RECEIPT_TIMEOUT=2 \
+      LO_STATUS_DIR="$BATS_TEST_TMPDIR/status" LO_TASK_ID=t314 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "$p"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok: lo-1 launched + prompt submitted (confirmed)"* ]]
+  [[ "$output" != *"receipt"* ]]
+  [ "$(jq -r .phase "$BATS_TEST_TMPDIR/status/t314.json")" = pending ]
+  [ "$(jq -r .session "$BATS_TEST_TMPDIR/status/t314.json")" = lo-1 ]
+}
+
+@test "RCPT-3: no new user message within LO_RECEIPT_TIMEOUT=1 exits 7 receipt UNKNOWN (boundary) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  td="$BATS_TEST_TMPDIR/tr"; mkdir -p "$td"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      LO_TRANSCRIPT_DIR="$td" LO_RECEIPT_TIMEOUT=1 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "$p"
+  [ "$status" -eq 7 ]
+  [[ "$output" == *"receipt UNKNOWN"* ]]
+  [[ "$output" == *"no new user message in 1s"* ]]
+  [[ "$output" != *"ok:"* ]]
+}
+
+@test "RCPT-4: HOME empty with no LO_TRANSCRIPT_DIR or CLAUDE_CONFIG_DIR exits 7 no transcript dir (error) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      HOME= LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "$p"
+  [ "$status" -eq 7 ]
+  [[ "$output" == *"no transcript dir"* ]]
+  [[ "$output" != *"ok:"* ]]
+}
+
+@test "RCPT-5: a jq that fails its probe exits 7 jq missing or failing (error) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  td="$BATS_TEST_TMPDIR/tr"; mkdir -p "$td"
+  fb="$(REPO_TMP)/fakebin-${BATS_TEST_NUMBER}"; mkdir -p "$fb"
+  printf '#!/bin/sh\nexit 127\n' > "$fb/jq"; chmod +x "$fb/jq"
+  run env PATH="$fb:$PATH" STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      LO_TRANSCRIPT_DIR="$td" LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "$p"
+  [ "$status" -eq 7 ]
+  [[ "$output" == *"jq missing or failing"* ]]
+  [[ "$output" != *"ok:"* ]]
+}
+
+@test "RCPT-6: LO_RECEIPT_TIMEOUT=0 turns the check off — a tail-only transcript still exits 0 (boundary) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  td="$BATS_TEST_TMPDIR/tr"; mkdir -p "$td"
+  rcpt_row "${p: -163}" > "$sd/deliver"
+  printf '%s' "$td/s.jsonl" > "$sd/deliver-to"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      LO_TRANSCRIPT_DIR="$td" LO_RECEIPT_TIMEOUT=0 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "$p"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok: lo-1 launched + prompt submitted (confirmed)"* ]]
+  [[ "$output" != *"truncated"* ]]
+}
+
+@test "RCPT-7: a reused worktree's older transcript is not read — the new file's whole message exits 0 (boundary) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  td="$BATS_TEST_TMPDIR/tr"; mkdir -p "$td"
+  { rcpt_row "old a"; rcpt_row "old b"; rcpt_row "old c"; } > "$td/old.jsonl"
+  touch -t 202601010000 "$td/old.jsonl"
+  rcpt_row "$p" > "$sd/deliver"
+  printf '%s' "$td/new.jsonl" > "$sd/deliver-to"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      LO_TRANSCRIPT_DIR="$td" LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "$p"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok:"* ]]
+}
+
+@test "RCPT-8: a truncated message appended to the same transcript after earlier ones exits 6 (boundary) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  td="$BATS_TEST_TMPDIR/tr"; mkdir -p "$td"
+  { rcpt_row "earlier a"; rcpt_row "earlier b"; } > "$td/s.jsonl"
+  rcpt_row "${p: -163}" > "$sd/deliver"
+  printf '%s' "$td/s.jsonl" > "$sd/deliver-to"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      LO_TRANSCRIPT_DIR="$td" LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "$p"
+  [ "$status" -eq 6 ]
+  [[ "$output" == *"163 of 1190"* ]]
+}
+
+@test "RCPT-9: trailing whitespace the CLI trims does not count as truncation (boundary) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  td="$BATS_TEST_TMPDIR/tr"; mkdir -p "$td"
+  rcpt_row "ZZPROMPTHEAD hello" > "$sd/deliver"
+  printf '%s' "$td/s.jsonl" > "$sd/deliver-to"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      LO_TRANSCRIPT_DIR="$td" LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD hello "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok:"* ]]
+}
+
+@test "RCPT-10: exit 5 (box never emptied) outranks a truncated receipt (precedence) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_unsubmitted > "$sd/pane"
+  p="$(long_prompt)"
+  td="$BATS_TEST_TMPDIR/tr"; mkdir -p "$td"
+  rcpt_row "${p: -163}" > "$sd/deliver"
+  printf '%s' "$td/s.jsonl" > "$sd/deliver-to"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      LO_TRANSCRIPT_DIR="$td" LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "$p"
+  [ "$status" -eq 5 ]
+  [[ "$output" == *"NOT confirmed submitted"* ]]
+  [[ "$output" != *"truncated"* ]]
+  [[ "$output" != *"receipt UNKNOWN"* ]]
+}
+
+@test "RCPT-12: the derived transcript dir maps an underscore in the worktree path to a dash (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  h="$BATS_TEST_TMPDIR/home"; mkdir -p "$h"
+  w="$BATS_TEST_TMPDIR/my_wt"; mkdir -p "$w"; git -C "$w" init -q
+  phys="$(cd "$w" && pwd -P)"; m="${phys//[^a-zA-Z0-9]/-}"
+  [[ "$m" == *"-my-wt" ]]
+  mkdir -p "$h/.claude/projects/$m"
+  rcpt_row "$p" > "$sd/deliver"
+  printf '%s' "$h/.claude/projects/$m/s.jsonl" > "$sd/deliver-to"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      HOME="$h" LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$w" bypassPermissions "$p"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok:"* ]]
+}
+
+@test "RCPT-13: a non-ASCII worktree path maps one dash per UTF-16 code unit (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  h="$BATS_TEST_TMPDIR/home"; mkdir -p "$h"
+  w="$BATS_TEST_TMPDIR/wt-$(printf '\303\251\360\237\230\200')"; mkdir -p "$w"; git -C "$w" init -q
+  parent="$(cd "$BATS_TEST_TMPDIR" && pwd -P)"
+  m="${parent//[^a-zA-Z0-9]/-}-wt----"
+  mkdir -p "$h/.claude/projects/$m"
+  rcpt_row "$p" > "$sd/deliver"
+  printf '%s' "$h/.claude/projects/$m/s.jsonl" > "$sd/deliver-to"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      HOME="$h" LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$w" bypassPermissions "$p"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok:"* ]]
+}
+
+@test "RCPT-14: a mapped name over 200 characters resolves to the one <first 200>-* dir (boundary) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  h="$BATS_TEST_TMPDIR/home"; mkdir -p "$h"
+  n="$(printf 'w%.0s' $(seq 1 210))"
+  w="$BATS_TEST_TMPDIR/$n"; mkdir -p "$w"; git -C "$w" init -q
+  phys="$(cd "$w" && pwd -P)"; m="${phys//[^a-zA-Z0-9]/-}"
+  [ "${#m}" -gt 200 ]
+  pre="${m:0:200}"
+  mkdir -p "$h/.claude/projects/$pre-1a2b3c"
+  rcpt_row "$p" > "$sd/deliver"
+  printf '%s' "$h/.claude/projects/$pre-1a2b3c/s.jsonl" > "$sd/deliver-to"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      HOME="$h" LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$w" bypassPermissions "$p"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok:"* ]]
+}
+
+@test "RCPT-15: two dirs sharing the cut 200-character prefix exit 7 ambiguous transcript dir (error) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  h="$BATS_TEST_TMPDIR/home"; mkdir -p "$h"
+  n="$(printf 'w%.0s' $(seq 1 210))"
+  w="$BATS_TEST_TMPDIR/$n"; mkdir -p "$w"; git -C "$w" init -q
+  phys="$(cd "$w" && pwd -P)"; m="${phys//[^a-zA-Z0-9]/-}"
+  [ "${#m}" -gt 200 ]
+  pre="${m:0:200}"
+  mkdir -p "$h/.claude/projects/$pre-1a2b3c" "$h/.claude/projects/$pre-zz9"
+  rcpt_row "$p" > "$sd/deliver"
+  printf '%s' "$h/.claude/projects/$pre-1a2b3c/s.jsonl" > "$sd/deliver-to"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      HOME="$h" LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$w" bypassPermissions "$p"
+  [ "$status" -eq 7 ]
+  [[ "$output" == *"ambiguous transcript dir: 2 dirs match"* ]]
+}
+
+@test "RCPT-16: CLAUDE_CONFIG_DIR (with a space) replaces HOME/.claude as the transcript root (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  cfg="$BATS_TEST_TMPDIR/cfg dir"
+  h="$BATS_TEST_TMPDIR/home"; mkdir -p "$h"
+  phys="$(cd "$WT" && pwd -P)"; m="${phys//[^a-zA-Z0-9]/-}"
+  mkdir -p "$cfg/projects/$m"
+  rcpt_row "$p" > "$sd/deliver"
+  printf '%s' "$cfg/projects/$m/s.jsonl" > "$sd/deliver-to"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      HOME="$h" CLAUDE_CONFIG_DIR="$cfg" LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "$p"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok:"* ]]
+  [ ! -e "$h/.claude" ]
+}
+
+@test "RCPT-17: a worktree path with a decomposed (NFD) character exits 7 at once (error) (#314)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  h="$BATS_TEST_TMPDIR/home"; mkdir -p "$h"
+  w="$BATS_TEST_TMPDIR/wt-e$(printf '\314\201')"; mkdir -p "$w"; git -C "$w" init -q
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      HOME="$h" LO_RECEIPT_TIMEOUT=2 \
+      sh "$LS" lo-1 "$w" bypassPermissions "$p"
+  [ "$status" -eq 7 ]
+  [[ "$output" == *"decomposed (NFD)"* ]]
+}
+
+@test "RCPT-11: the script header, SKILL.md step 2a and the template agree on exits 6/7, the knobs and the pointer file (#314)" {
+  SK="${BATS_TEST_DIRNAME}/../skills/orchestrate/SKILL.md"
+  TPL="${BATS_TEST_DIRNAME}/../skills/orchestrate/templates/session-prompt.md"
+  hdr="$(sed -n '1,/^set -eu$/p' "$LS")"
+  [[ "$hdr" == *"#   exit 6    "* ]]
+  [[ "$hdr" == *"#   exit 7    "* ]]
+  [[ "$hdr" == *"LO_RECEIPT_TIMEOUT"* ]]
+  [[ "$hdr" == *"LO_TRANSCRIPT_DIR"* ]]
+  s2a="$(awk '/\*\*2a\. Plan it yourself/{p=1} p && /^3\. `scripts\/watch-status\.sh/{exit} p' "$SK" | tr '\n' ' ' | tr -s ' ')"
+  [[ "$s2a" == *"**6** = the worker's transcript shows the prompt truncated"* ]]
+  [[ "$s2a" == *"**7** = the prompt left the input box"* ]]
+  [[ "$s2a" == *"send-prompt.sh state"* ]]
+  [[ "$s2a" == *'**3** (`gone`)'* ]]
+  [[ "$s2a" == *"status-update.sh"* ]]
+  [[ "$s2a" == *"pending"* ]]
+  [[ "$s2a" == *"BEFORE"* ]]
+  [[ "$s2a" == *"{ORCH_DIR}/prompts/<task>-plan.txt"* ]]
+  sk="$(tr '\n' ' ' < "$SK" | tr -s ' ')"
+  [[ "$sk" == *"exits **6** (truncated) or **7** (receipt unknown)"* ]]
+  tpl="$(tr '\n' ' ' < "$TPL" | tr -s ' ')"
+  [[ "$tpl" == *"{ORCH_DIR}/prompts/{TASK}-plan.txt"* ]]
 }
