@@ -9,7 +9,7 @@ sources:
   - https://prometheus.io/docs/practices/naming/
   - https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
 last_verified: 2026-07-10
-related: [infrastructure-observability-alerting, infrastructure-observability-missing-container-metrics, backend-common-errors-refusing-a-backend-without-the-needed-capability]
+related: [infrastructure-observability-alerting, infrastructure-observability-missing-container-metrics, backend-common-errors-refusing-a-backend-without-the-needed-capability, testing-quality-prometheus-exposition-parsing-in-test-helpers]
 ---
 
 # Instrumenting a Service with Logs and Metrics
