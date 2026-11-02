@@ -71,8 +71,10 @@
 #   LO_RECEIPT_TIMEOUT  seconds send polls the worker transcript for the
 #                       received prompt (default 10; 0 disables the check)
 #   LO_TRANSCRIPT_DIR   directory holding the worker's *.jsonl transcripts
-#                       (default derived from the pane's current path under
-#                       $HOME/.claude/projects/)
+#                       (default: ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/
+#                       <pane path, every UTF-16 code unit outside A-Za-z0-9
+#                       -> '-'>, a name over 200 chars matched as <first 200>-*;
+#                       the CLI's rule, shared helper sourced below set -eu)
 #   LO_CONFIRM_DELAY    seconds to settle before classifying a send (default 1)
 #   LO_STABLE_DELAY     seconds between pre-send pane-stabilization captures
 #                       (default 1; issue #7 keys->send redraw race guard)
@@ -83,6 +85,9 @@
 #   LO_PICKUP_TIMEOUT   wait deadline in seconds (default 180)
 #   LO_PICKUP_INTERVAL  wait poll interval in seconds (default 2)
 set -eu
+# The CLI's transcript-dir rule, shared with launch-session.sh and token-report.sh (#320).
+case $0 in */*) _sd=${0%/*} ;; *) _sd=. ;; esac
+SCRIPT_DIR=$(CDPATH= cd -- "$_sd" && pwd -P); . "$SCRIPT_DIR/transcript-dir.sh"
 
 # NOT named TMUX: tmux exports TMUX="<socket>,<pid>,<session>" into every pane,
 # so a script running inside a session inherits it as an EXPORTED variable.
@@ -355,7 +360,10 @@ transcript_dir() { # $1=session -> dir on stdout, rc 1 when it cannot be derived
   if [ -n "${LO_TRANSCRIPT_DIR:-}" ]; then printf '%s' "$LO_TRANSCRIPT_DIR"; return 0; fi
   _p=$("$TMUX_BIN" display -p -t "$(target_pane "$1")" '#{pane_current_path}' 2>/dev/null) || return 1
   [ -n "$_p" ] || return 1
-  printf '%s/.claude/projects/%s' "${HOME:-}" "$(printf '%s' "$_p" | tr '/.' '-')"
+  transcript_dir_derive "$_p" || return 1
+  transcript_dir_resolve "$td_root" "$td_name"
+  [ -n "$td_dir" ] || return 1
+  printf '%s' "$td_dir"
 }
 
 # "<count> <last-length>" of user TEXT messages in the newest transcript
