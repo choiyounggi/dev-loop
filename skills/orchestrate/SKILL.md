@@ -647,6 +647,10 @@ for up to `LO_RECEIPT_TIMEOUT` seconds (default 10; 0 disables) —
 path>` location — and `state`/`send` recognise a mid-turn worker by
 `LO_BUSY_REGEX` (default: the CLI's elapsed-time spinner suffix or the legacy
 `esc to interrupt`) plus the optional fixed-string `LO_BUSY_PATTERN`.
+`launch-session.sh` runs the same transcript receipt check on the first prompt
+once its input box is empty, for up to `LO_RECEIPT_TIMEOUT` seconds (default 20
+there; 0 turns it off), reading `LO_TRANSCRIPT_DIR` or the location derived from
+the worktree argument, and exits **6** (truncated) or **7** (receipt unknown).
 `status-update.sh` resolves the status file's `session` field
 from `tmux display-message -p '#S'` only when the caller is itself inside tmux
 (`$TMUX` set) — a coordinator-side call (this shell, not a worker's tmux pane)
@@ -1041,8 +1045,13 @@ reasoning-effort flags) that `worker-start` cannot express.
    `DEV_LOOP_WORKER_MODEL=<id from the profile table> DEV_LOOP_WORKER_EFFORT=<level from the profile table> LO_STATUS_DIR=<abs status dir>
    LO_TASK_ID=<task> scripts/launch-session.sh lo-<n> <worktree> bypassPermissions
    "<plan prompt>"`
-   (plan prompt = templates/session-prompt.md §1 — the tmux set — with the
-   subagent + tmux worker protocol blocks). With BOTH vars set, a successful
+   (plan prompt = the one line `Read the file {ORCH_DIR}/prompts/<task>-plan.txt
+   in full and follow it exactly.` — first write templates/session-prompt.md §1 —
+   the tmux set — with the subagent + tmux worker protocol blocks, every token
+   substituted, to that file, creating `{ORCH_DIR}/prompts/` if absent; a
+   multi-kilobyte first prompt can lose its head in the CLI's paste handling while
+   the input box still empties (#314), and a one-line pointer stays under the
+   paste threshold). With BOTH vars set, a successful
    launch (the confirmed-submission path AND the session-reuse path) pre-seeds
    `<LO_STATUS_DIR>/<LO_TASK_ID>.json` phase=pending with the resolved session
    name via the sibling status-update.sh, so dead/stalled-worker detection covers
@@ -1055,7 +1064,28 @@ reasoning-effort flags) that `worker-start` cannot express.
    lo-<n>` and branch on its exit: **9** (`unsubmitted`) means the prompt is
    already in the box — `scripts/send-prompt.sh keys lo-<n> Enter`, never a
    re-send (that double-pastes); re-send only when `state` reports `ready`/0.
-   Never launch a second session on top of it.
+   **6** = the worker's transcript shows the prompt truncated (head lost; stderr
+   names received N of M characters): run `STATUS_DIR=<abs status dir>
+   STATUS_SESSION=<resolved session name> sh scripts/status-update.sh <task>
+   pending worktree=<worktree>` BEFORE re-sending (the pre-seed launch-session
+   skipped; after the send it could overwrite the worker's first report), then
+   re-send the pointer line with `scripts/send-prompt.sh send <resolved session
+   name> "<pointer line>"` and branch on its exit as in Phase 4 — never trust the
+   tail that arrived. **7** = the prompt left the input box but its receipt could
+   not be read (no transcript dir, an ambiguous one, a worktree path with
+   decomposed (NFD) characters, jq missing or failing, or no new user message
+   within `LO_RECEIPT_TIMEOUT`), so it may have arrived whole: run
+   `scripts/send-prompt.sh state <resolved session name>` first — **4** (`busy`):
+   the worker took a prompt, do not re-send, and run the status-update.sh call
+   above only while `<abs status dir>/<task>.json` does not exist yet; **9**:
+   `scripts/send-prompt.sh keys <resolved session name> Enter`; **0** (`ready`):
+   run the status-update.sh call, then re-send the pointer line as for 6 (§1 is
+   safe to repeat: the worker re-checks the plan and reports `plan_ready` again);
+   **3** (`gone`): the worker exited — launch it again with the command above;
+   **6** or **127**: tmux failed or is missing — stop and report it to the user,
+   never re-send blind. A **7** on every launch means the transcript location
+   changed: set `LO_TRANSCRIPT_DIR`, or `LO_RECEIPT_TIMEOUT=0` to fall back to the
+   input-box check alone. Never launch a second session on top of it.
 3. `scripts/watch-status.sh <status-dir> plan_ready <N>` in the background; when it
    exits, collect `plans/<task>.md`. *(Orca substrate: `scripts/orca-wait.sh
    <timeout-ms> <this Wave's task ids>` per O4 instead — same exit-code contract,

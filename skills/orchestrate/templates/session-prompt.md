@@ -19,12 +19,16 @@ target the main worktree instead · `{SKILL}` orchestrate skill dir abs path ·
 Dispatch is created *after* `task-create`, so on a task's first phase leave it
 unsubstituted and the worker reads it from its own Orca dispatch context.
 
-**tmux substrate.** §1–§4 — one line each, `send-keys -l`.
+**tmux substrate.** §1–§4 — one line each, `send-keys -l`; §1's line is a pointer to a file (below).
 
 ## tmux delivery — how §1–§4 reach a worker
 
 §1 is injected by `launch-session.sh`, which owns the trust screen and the first
-injection. Do not re-implement that path.
+injection. Do not re-implement that path. The coordinator writes §1 with the
+Subagent and tmux worker protocol blocks, every token substituted, to
+`{ORCH_DIR}/prompts/{TASK}-plan.txt` and launches with the one line
+`Read the file {ORCH_DIR}/prompts/{TASK}-plan.txt in full and follow it exactly.`
+(SKILL.md Phase 3 step 2a; a multi-kilobyte first prompt lost its head in #314).
 
 Every prompt after §1 — §2, §3, §4 — goes to the already-running session through
 `send-prompt.sh`. Raw `send-keys` returns 0 as soon as the keys reach the pane,
@@ -75,7 +79,8 @@ The queued/busy markers are the Claude CLI's own wording, not this repo's.
 Override `LO_QUEUED_PATTERN` / `LO_BUSY_PATTERN` when a CLI release renames them.
 
 Append the **tmux worker protocol** block below — together with the Subagent
-block — to every §1–§4 prompt, flattened into the single sent line.
+block — to every §1–§4 prompt, flattened into the single sent line (for §1:
+into the pointer file's content).
 
 ## (1) Plan — injected at session launch
 

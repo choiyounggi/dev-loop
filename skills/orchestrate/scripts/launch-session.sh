@@ -19,10 +19,22 @@
 # "[Pasted text #1 +1 lines]" for 45 minutes while this script printed "ok"; a
 # single extra Enter then ran it. So the prompt is not reported as delivered
 # until the input box is observed empty again — see "confirm submission" below.
+#
+# Receipt pitfall (issue #314): an empty input box proves the prompt left the
+# box, not that all of it arrived. Measured: the head of a ~3.3 KB first prompt
+# was dropped, the tail emptied the box on Enter, and this script said
+# "confirmed" while the worker idled. So after the box check the worker's own
+# transcript is read and the first new user message must be as long as the
+# prompt — see "confirm receipt" below. Send a long first prompt as a one-line
+# pointer to a file instead (SKILL.md Phase 3 step 2a). The worker's
+# CLAUDE_CONFIG_DIR comes from the tmux server's global environment (#302),
+# not from this caller, so a server started with a different value files the
+# transcript elsewhere and every launch exits 7: set LO_TRANSCRIPT_DIR.
 # Delivering a SUBSEQUENT prompt to an already-running session is not this
 # script's job: scripts/session-send.sh owns that contract.
 #
 #   exit 0    launched and the prompt is confirmed submitted
+#             and, unless LO_RECEIPT_TIMEOUT=0, received whole (see exit 6/7)
 #   exit 1    wrong argument count
 #   exit 2    invalid permission mode, invalid worker model or effort, invalid session
 #             name, a worktree argument that is not a git work-tree root,
@@ -32,6 +44,23 @@
 #   exit 5    the prompt was sent but submission could NOT be confirmed — the
 #             session is alive and may hold an unsubmitted prompt (prints the
 #             last screen). Distinct from 4: there the CLI never came up.
+#   exit 6    the prompt was submitted but the worker's transcript shows it
+#             TRUNCATED: its first new user message is shorter than the
+#             prompt (issue #314, head lost). The session is alive; re-send
+#             the prompt as a one-line file pointer with send-prompt.sh and
+#             never trust the tail that arrived.
+#   exit 7    the prompt was submitted but its receipt is UNKNOWN: no
+#             transcript dir (LO_TRANSCRIPT_DIR, CLAUDE_CONFIG_DIR and HOME
+#             all empty), an ambiguous one (two dirs share a cut long-path
+#             prefix), a worktree path with decomposed (NFD) characters
+#             (the CLI NFC-normalizes it; this script cannot), jq missing or
+#             failing, or no new user message within LO_RECEIPT_TIMEOUT
+#             (also the symptom when the CLI files transcripts elsewhere,
+#             e.g. under CLAUDE_CODE_PROJECT_DIR_NAME: set LO_TRANSCRIPT_DIR).
+#             It may still be a whole delivery: read send-prompt.sh state
+#             before re-sending (SKILL.md Phase 3 step 2a).
+#             LO_RECEIPT_TIMEOUT=0 turns the check off (exit 0 on an empty
+#             input box, pre-#314).
 #   exit 127  tmux, git, or claude not found
 #
 # env (also test hooks):
@@ -54,6 +83,16 @@
 #                      exits 2 before any tmux call (#290).
 #   LO_SUBMIT_TIMEOUT / LO_SUBMIT_INTERVAL submission-confirm budget (default
 #                      20 / 2); attempts = floor(timeout/interval), minimum 1
+#   LO_RECEIPT_TIMEOUT seconds the first prompt's receipt is polled in the
+#                      worker's newest transcript once the input box is empty
+#                      (default 20; 0 disables; not a non-negative integer = 20)
+#   LO_TRANSCRIPT_DIR  directory of the worker's *.jsonl transcripts (default
+#                      ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<physical
+#                      worktree path with every UTF-16 code unit outside
+#                      A-Za-z0-9 mapped to ->, the CLI's own rule; a name
+#                      over 200 characters is matched as <first 200>-*
+#                      because the CLI appends a hash). Set it when the CLI
+#                      keeps transcripts elsewhere.
 #   LO_STATUS_DIR / LO_TASK_ID  when BOTH are set, pre-seed the status record
 #                      (phase=pending, via the sibling status-update.sh) once
 #                      the launch succeeds — on the reuse path and after the
@@ -392,6 +431,102 @@ if [ "$ready" -ne 1 ]; then
   exit 4
 fi
 
+# ---- confirm receipt (issue #314) -------------------------------------------
+# The worker's own transcript is the witness: the first user TEXT message that
+# is new since the snapshot below must be at least as long as the prompt
+# (leading/trailing whitespace trimmed). Filter = send-prompt.sh's
+# transcript_user_text (tool_result and isMeta rows do not count). The dir name
+# is the CLI's rule: every UTF-16 code unit outside A-Za-z0-9 becomes '-', and a
+# name over 200 characters is cut and given a hash suffix (matched by glob).
+receipt_timeout="${LO_RECEIPT_TIMEOUT:-20}"
+case "$receipt_timeout" in ''|*[!0-9]*) receipt_timeout=20 ;; esac
+rcpt_skip=""; rcpt_root=""; rcpt_name=""; rcpt_dir=""; rcpt_amb=0
+rcpt_f0=""; rcpt_c0=0; sent_len=0
+rcpt_map='[$p | explode[] | if (. >= 48 and . <= 57) or (. >= 65 and . <= 90) or (. >= 97 and . <= 122) then . elif . > 65535 then (45, 45) else 45 end] | implode'
+rcpt_nfd='[$p | explode[] | select((. >= 768 and . <= 879) or (. >= 4352 and . <= 4607) or (. >= 6832 and . <= 6911) or (. >= 7616 and . <= 7679) or (. >= 8400 and . <= 8447) or (. >= 65056 and . <= 65071))] | length > 0'
+
+receipt_unknown() { # $1 = reason; never returns
+  echo "launch-session: $session prompt submitted but receipt UNKNOWN ($1) — it may have arrived whole: run send-prompt.sh state $session before any re-send (SKILL.md Phase 3 step 2a); LO_RECEIPT_TIMEOUT=0 turns this check off" >&2
+  exit 7
+}
+newest_transcript() { # $1 = dir ('' allowed) -> newest *.jsonl path or nothing
+  [ -n "$1" ] || return 0
+  ls -t "$1"/*.jsonl 2>/dev/null | head -n 1
+}
+user_text_lengths() { # $1 = jsonl file -> one line per user text message: its length
+  jq -r 'select(.type=="user" and ((.isMeta // false) | not)) | .message.content
+    | if type=="string" then . elif type=="array" then (map(select(.type=="text") | .text) | join("")) else "" end
+    | select(length > 0) | length' "$1" 2>/dev/null || true
+}
+resolve_rcpt_dir() { # sets rcpt_dir ('' = not there yet) and rcpt_amb (count when > 1)
+  rcpt_amb=0
+  if [ -n "${LO_TRANSCRIPT_DIR:-}" ]; then rcpt_dir="$LO_TRANSCRIPT_DIR"; return 0; fi
+  if [ "${#rcpt_name}" -le 200 ]; then rcpt_dir="$rcpt_root/$rcpt_name"; return 0; fi
+  rcpt_dir=""; _n=0
+  for _d in "$rcpt_root/$(printf '%s' "$rcpt_name" | cut -c1-200)"-*; do
+    [ -d "$_d" ] || continue
+    _n=$((_n + 1)); rcpt_dir="$_d"
+  done
+  if [ "$_n" -gt 1 ]; then rcpt_amb=$_n; rcpt_dir=""; fi
+  return 0
+}
+confirm_receipt() { # after the box is confirmed empty: exit 6/7 or return
+  [ "$receipt_timeout" -gt 0 ] || return 0
+  if [ -n "$rcpt_skip" ]; then receipt_unknown "$rcpt_skip"; fi
+  _r=0; _got=""
+  while :; do
+    resolve_rcpt_dir
+    if [ "$rcpt_amb" -gt 1 ]; then
+      receipt_unknown "ambiguous transcript dir: $rcpt_amb dirs match $(printf '%s' "$rcpt_name" | cut -c1-200)-*"
+    fi
+    _f1=$(newest_transcript "$rcpt_dir")
+    if [ -n "$_f1" ]; then
+      _base=0
+      if [ "$_f1" = "$rcpt_f0" ]; then _base=$rcpt_c0; fi
+      _got=$(user_text_lengths "$_f1" | sed -n "$((_base + 1))p")
+      if [ -n "$_got" ]; then break; fi
+    fi
+    _r=$((_r + 1))
+    if [ "$_r" -ge "$receipt_timeout" ]; then break; fi
+    sleep 1
+  done
+  if [ -z "$_got" ]; then
+    _where="$rcpt_dir"
+    if [ -z "$_where" ]; then _where="$rcpt_root/$(printf '%s' "$rcpt_name" | cut -c1-200)-*"; fi
+    receipt_unknown "no new user message in ${receipt_timeout}s in $_where"
+  fi
+  if [ "$_got" -lt "$sent_len" ]; then
+    echo "launch-session: $session prompt truncated — the worker received $_got of $sent_len characters (head lost, issue #314); re-send it as a one-line file pointer with send-prompt.sh, never trust the tail" >&2
+    exit 6
+  fi
+  return 0
+}
+
+# Snapshot BEFORE the send: the newest transcript and its message count, so a
+# reused worktree's older session file is never read as this launch's (S3).
+if [ "$receipt_timeout" -gt 0 ]; then
+  if ! jq -n 'empty' >/dev/null 2>&1; then
+    rcpt_skip="jq missing or failing"
+  elif [ -z "${LO_TRANSCRIPT_DIR:-}" ]; then
+    _cfg="${CLAUDE_CONFIG_DIR:-}"
+    if [ -z "$_cfg" ] && [ -n "${HOME:-}" ]; then _cfg="$HOME/.claude"; fi
+    if [ -z "$_cfg" ]; then
+      rcpt_skip="no transcript dir: HOME, CLAUDE_CONFIG_DIR and LO_TRANSCRIPT_DIR are empty"
+    elif [ "$(jq -n --arg p "$wt_physical" "$rcpt_nfd")" = "true" ]; then
+      rcpt_skip="worktree path has decomposed (NFD) characters the CLI NFC-normalizes: set LO_TRANSCRIPT_DIR"
+    else
+      rcpt_root="$_cfg/projects"
+      rcpt_name=$(jq -rn --arg p "$wt_physical" "$rcpt_map")
+    fi
+  fi
+  if [ -z "$rcpt_skip" ]; then
+    sent_len=$(jq -rn --arg p "$prompt" '$p | sub("^\\s+"; "") | sub("\\s+$"; "") | length')
+    resolve_rcpt_dir
+    rcpt_f0=$(newest_transcript "$rcpt_dir")
+    if [ -n "$rcpt_f0" ]; then rcpt_c0=$(user_text_lengths "$rcpt_f0" | awk 'END { print NR }'); fi
+  fi
+fi
+
 # inject the one-line prompt (literal) then submit
 "$TMUX_BIN" send-keys -t "$session" -l "$prompt"
 "$TMUX_BIN" send-keys -t "$session" Enter
@@ -467,6 +602,7 @@ if [ "$submitted" -ne 1 ]; then
   echo "$pane" | tail -8 >&2
   exit 5
 fi
+confirm_receipt
 
 preseed_status
 
