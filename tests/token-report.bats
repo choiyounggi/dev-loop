@@ -8,7 +8,9 @@ setup() {
   FIX="${BATS_TEST_DIRNAME}/fixtures/token-report"
   TAB="$(printf '\t')"
   # Isolate from ambient orchestration env (mirrors launch-session.bats).
-  unset LO_CTX_WARN
+  # Developer/Orca shells export CLAUDE_CONFIG_DIR, which now moves the
+  # --cwd root (#320).
+  unset LO_CTX_WARN CLAUDE_CONFIG_DIR
 }
 
 # --- normal ------------------------------------------------------------
@@ -104,4 +106,44 @@ setup() {
   run env HOME="$fakehome" sh "$TR" --cwd "/Users/x/project" .
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" | grep -qE "^lo-1${TAB}3${TAB}500${TAB}65\.0${TAB}2000${TAB}2000\$"
+}
+
+@test "--cwd maps an underscore to a dash (CLI rule, #320)" {
+  fakehome="$BATS_TEST_TMPDIR/fakehome-us"
+  projdir="$fakehome/.claude/projects/-Users-x-my-project-1"
+  mkdir -p "$projdir"
+  cp "$FIX/session-a.jsonl" "$projdir/lo-1.jsonl"
+  run env HOME="$fakehome" sh "$TR" --cwd "/Users/x/my_project_1" .
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"lo-1${TAB}3${TAB}500${TAB}65.0${TAB}2000${TAB}2000"* ]]
+}
+
+@test "--cwd maps a space to a dash (CLI rule, #320)" {
+  fakehome="$BATS_TEST_TMPDIR/fakehome-sp"
+  projdir="$fakehome/.claude/projects/-Users-x-my-proj"
+  mkdir -p "$projdir"
+  cp "$FIX/session-a.jsonl" "$projdir/lo-1.jsonl"
+  run env HOME="$fakehome" sh "$TR" --cwd "/Users/x/my proj" .
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"lo-1${TAB}3${TAB}500${TAB}65.0${TAB}2000${TAB}2000"* ]]
+}
+
+@test "--cwd reads CLAUDE_CONFIG_DIR instead of HOME/.claude (#320)" {
+  cfg="$BATS_TEST_TMPDIR/cfg dir"
+  projdir="$cfg/projects/-Users-x-project"
+  mkdir -p "$projdir"
+  cp "$FIX/session-a.jsonl" "$projdir/lo-1.jsonl"
+  fakehome="$BATS_TEST_TMPDIR/fakehome-cfg"
+  mkdir -p "$fakehome"
+  run env HOME="$fakehome" CLAUDE_CONFIG_DIR="$cfg" sh "$TR" --cwd "/Users/x/project" .
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"lo-1${TAB}3${TAB}500${TAB}65.0${TAB}2000${TAB}2000"* ]]
+  [ ! -e "$fakehome/.claude" ]
+}
+
+@test "--cwd with HOME and CLAUDE_CONFIG_DIR both empty -> exit 2 naming --cwd (#320)" {
+  run env HOME= CLAUDE_CONFIG_DIR= sh "$TR" --cwd "/Users/x/project" .
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"--cwd"* ]]
+  [[ "$output" == *"no-home"* ]]
 }

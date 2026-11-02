@@ -1,9 +1,9 @@
 #!/bin/sh
 # token-report.sh — per-session + total token usage report from Claude Code
 # session transcript JSONL files (Claude Code writes these under
-# ~/.claude/projects/<escaped-cwd>/). Read at orchestration run teardown to
-# audit a run's token efficiency: calls, output tokens, cache hit %, and
-# final/peak context per session.
+# ${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<escaped-cwd>/). Read at
+# orchestration run teardown to audit a run's token efficiency: calls,
+# output tokens, cache hit %, and final/peak context per session.
 #
 # usage: token-report.sh [--cwd <project-dir>] <file-or-dir>...
 #   <file-or-dir>       a .jsonl transcript, or a directory (its *.jsonl
@@ -12,17 +12,25 @@
 #                       one is resolved against the --cwd mapping below (or
 #                       taken as relative to the caller's cwd if --cwd was
 #                       not given).
-#   --cwd <project-dir> an absolute project/worktree path, mapped to
-#                       ~/.claude/projects/<escaped> — the directory Claude
-#                       Code writes that project's session transcripts
-#                       under. <escaped> is <project-dir> with every `/`
-#                       and `.` replaced by `-`. Typical use at teardown:
+#   --cwd <project-dir> an absolute project/worktree path, mapped to the
+#                       directory Claude Code writes that project's session
+#                       transcripts under, by the CLI's rule shared with
+#                       launch-session.sh and send-prompt.sh:
+#                       ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<escaped>,
+#                       <escaped> = <project-dir> with every UTF-16 code unit
+#                       outside A-Za-z0-9 replaced by `-`; an <escaped> over
+#                       200 characters matches the one <first 200>-*
+#                       directory. The path is mapped as given — pass
+#                       `pwd -P` output when it may run through a symlink.
+#                       Typical use at teardown:
 #                       `token-report.sh --cwd "$PWD" .`
 #
 # exit 0   report printed: table on stdout, peak-context warnings on stderr
 # exit 2   usage error — no sources given, a source path that does not
 #          exist, or (when --cwd is given) its mapped directory does not
-#          exist (stderr names the attempted path)
+#          exist (stderr names the attempted path), the --cwd path cannot
+#          be mapped (HOME and CLAUDE_CONFIG_DIR empty, decomposed NFD
+#          characters) or it matches several directories
 # exit 4   malformed LO_CTX_WARN (non-numeric or <= 0) — refused, never
 #          silently defaulted
 # exit 127 jq not found
@@ -49,6 +57,9 @@
 #                non-numeric or <= 0 value is refused at exit 4 rather than
 #                silently falling back to the default.
 set -eu
+# The CLI's transcript-dir rule, shared with launch-session.sh and send-prompt.sh (#320).
+case $0 in */*) _sd=${0%/*} ;; *) _sd=. ;; esac
+SCRIPT_DIR=$(CDPATH= cd -- "$_sd" && pwd -P); . "$SCRIPT_DIR/transcript-dir.sh"
 
 JQ=$(command -v jq) || { echo "token-report: jq not found" >&2; exit 127; }
 
@@ -59,12 +70,20 @@ cwd_map=""
 if [ "${1:-}" = "--cwd" ]; then
   if [ $# -lt 2 ]; then usage; exit 2; fi
   proj="$2"; shift 2
-  escaped=$(printf '%s' "$proj" | tr '/.' '-')
-  cwd_map="$HOME/.claude/projects/$escaped"
-  if [ ! -d "$cwd_map" ]; then
-    echo "token-report: --cwd mapped directory not found: '$cwd_map' (from '$proj')" >&2
+  if ! transcript_dir_derive "$proj"; then
+    echo "token-report: --cwd cannot map '$proj' to a transcript directory ($td_err)" >&2
     exit 2
   fi
+  transcript_dir_resolve "$td_root" "$td_name"
+  if [ "$td_amb" -gt 1 ]; then
+    echo "token-report: --cwd mapped directory ambiguous: $td_amb dirs match '$td_want' (from '$proj')" >&2
+    exit 2
+  fi
+  if [ -z "$td_dir" ] || [ ! -d "$td_dir" ]; then
+    echo "token-report: --cwd mapped directory not found: '$td_want' (from '$proj')" >&2
+    exit 2
+  fi
+  cwd_map="$td_dir"
 fi
 
 if [ $# -lt 1 ]; then usage; exit 2; fi
