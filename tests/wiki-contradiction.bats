@@ -230,7 +230,7 @@ setup() {
 
 @test "prose: loop-implement names the script, the evidence predicate, and the byte-exact retry sentence" {
   loop=$(cat "$LOOP")
-  [[ "$loop" == *"scripts/wiki-contradiction.sh --page <id>"* ]]
+  [[ "$loop" == *'scripts/wiki-contradiction.sh" --page <id>'* ]]
   [[ "$loop" == *"failed at least twice on that"* ]]
   [[ "$loop" == *"page falsification candidate"* ]]
   [[ "$loop" == *"Bounded: ≤3 attempts per task; 3rd failure STOPs + escalates."* ]]

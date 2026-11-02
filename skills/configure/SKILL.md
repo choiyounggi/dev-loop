@@ -22,7 +22,7 @@ when it exists) also needs no config; it is not the `knowledge` role.
 
 1. **Show the current profile.** Run and report what is already set vs. default:
    ```sh
-   sh ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh --summary
+   sh "${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh" --summary
    ```
 
 2. **Decide scope.**
@@ -32,7 +32,7 @@ when it exists) also needs no config; it is not the `knowledge` role.
    Ask the user which, if unclear. (Legacy `~/.claude/loop-orchestrator/tools.json`
    and `<repo>/.loop-orchestrator/tools.json` are still read as a fallback.)
 
-3. **Map each role to a real tool.** Read `${CLAUDE_PLUGIN_ROOT}/examples/tools.example.json`
+3. **Map each role to a real tool.** Read `"${CLAUDE_PLUGIN_ROOT}/examples/tools.example.json"`
    as the shape and `references/tool-profile.md` for the schema. For THIS
    environment, detect and propose concrete mappings, then confirm with the user:
 

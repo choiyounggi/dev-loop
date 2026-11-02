@@ -221,20 +221,20 @@ rec() { # <ts> <page_id>
 }
 
 @test "(b) step 7 names wiki-usage.sh after the report and leaves the t6 hunks intact" {
-  run grep -F 'scripts/wiki-usage.sh --task <NN-slug> --repo <project root>' "$LOOP"
+  run grep -F 'scripts/wiki-usage.sh" --task <NN-slug> --repo <project root>' "$LOOP"
   [ "$status" -eq 0 ]
   run grep -F 'its exit code never changes the PASS or FAIL verdict' "$LOOP"
   [ "$status" -eq 0 ]
-  [ "$(grep -n -F 'scripts/wiki-usage.sh --task' "$LOOP" | head -1 | cut -d: -f1)" -gt "$(grep -n -F 'WIKI: references you applied).' "$LOOP" | cut -d: -f1)" ]
+  [ "$(grep -n -F 'scripts/wiki-usage.sh" --task' "$LOOP" | head -1 | cut -d: -f1)" -gt "$(grep -n -F 'WIKI: references you applied).' "$LOOP" | cut -d: -f1)" ]
   [ "$(grep -F -c 'Bounded: ≤3 attempts per task; 3rd failure STOPs + escalates.' "$LOOP")" -eq 1 ]
   [ "$(grep -F -c '4. **Apply wiki directives as written.**' "$LOOP")" -eq 1 ]
   [ "$(grep -F -c '5. **Cite what you applied.**' "$LOOP")" -eq 1 ]
-  [ "$(grep -F -c 'scripts/wiki-contradiction.sh --page <id>' "$LOOP")" -eq 1 ]
+  [ "$(grep -F -c 'scripts/wiki-contradiction.sh" --page <id>' "$LOOP")" -eq 1 ]
 }
 
 @test "(b2) negative control: stripping the wiki-usage.sh sentence removes the wiring match" {
   grep -v -F 'scripts/wiki-usage.sh' "$LOOP" > "$BATS_TEST_TMPDIR/loop.md"
-  run grep -F 'scripts/wiki-usage.sh --task <NN-slug>' "$BATS_TEST_TMPDIR/loop.md"
+  run grep -F 'scripts/wiki-usage.sh" --task <NN-slug>' "$BATS_TEST_TMPDIR/loop.md"
   [ "$status" -eq 1 ]
 }
 

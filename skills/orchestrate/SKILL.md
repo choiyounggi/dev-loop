@@ -11,7 +11,7 @@ You are the orchestrator. **You do not implement — sessions do.** You clarify,
 decompose, distribute, review, integrate, and merge. Autonomy lives inside the
 implementation loop; two human gates bracket it (task-split, pre-merge).
 
-Scripts referenced below live in `${CLAUDE_PLUGIN_ROOT}/skills/orchestrate/scripts/`.
+Scripts referenced below live in `"${CLAUDE_PLUGIN_ROOT}/skills/orchestrate/scripts/"`.
 Communication: session→orchestrator via each worker's OWN worktree-local
 `.orchestration/status/<task>.json` (never the coordinator's checkout — a
 worker writing there can hit a guardrails permission prompt no human is
@@ -61,7 +61,7 @@ AskUserQuestion (and, when Orca is detected, one naming the substrate choice).
 
 ## Tool profile
 Resolve the pluggable tool profile once up front:
-`sh ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh --summary`. It maps capability
+`sh "${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh" --summary`. It maps capability
 roles — `intake` (issue-tracker work-list source), `knowledge` (domain/policy),
 `tacit` (incidents/danger zones), `verify` (test/build/lint/typecheck/QA
 command), `explore` (code search; a fresh graphify graph when Preflight says
@@ -178,7 +178,7 @@ Basis:
 merge-on-approval row.
 
 ## Preflight
-Run `${CLAUDE_PLUGIN_ROOT}/hooks/preflight.sh` to resolve git/tmux/jq paths and
+Run `"${CLAUDE_PLUGIN_ROOT}/hooks/preflight.sh"` to resolve git/tmux/jq paths and
 surface any missing CLI. **git, tmux, and jq are all required** — if any is
 missing, stop and ask the user to install it (the SessionStart preflight hook is
 advisory only; this skill must hard-require them). For a missing tmux: with the
@@ -186,7 +186,7 @@ user's consent, install it (macOS: `brew install tmux`; otherwise advise) before
 launching sessions. Never auto-install without consent.
 
 **Code-graph freshness (optional `explore` lead).** Run
-`sh ${CLAUDE_PLUGIN_ROOT}/scripts/graph-freshness.sh <root>` once, bare (read
+`sh "${CLAUDE_PLUGIN_ROOT}/scripts/graph-freshness.sh" <root>` once, bare (read
 its exit code on the next line, never in a pipe). It never runs graphify
 itself. Branch on the code: **0** (`fresh`) — set `explore` to graphify for
 this run and write the row from Phase 3 step 2 into every brief; **2**
@@ -386,14 +386,14 @@ reference, run the study now, before Gate 1, so its tier and licence outcome
 sit on the Gate 1 risk table. Write the brief (the product — name, version,
 where it runs — and the behaviors to observe, one line each with its oracle
 question) to `{ORCH_DIR}/reference/<product-slug>-brief.md` and run, in the
-background, `sh ${CLAUDE_PLUGIN_ROOT}/scripts/reference-study.sh --brief <that
+background, `sh "${CLAUDE_PLUGIN_ROOT}/scripts/reference-study.sh" --brief <that
 abs path> --slug <product-slug>`: with the `inspect` role unset (`default`)
 the script starts a headless study session whose only MCP server is the pinned
 REA, so nothing is registered and this session never loads the tool; it
 supplies the rest of the study brief from
-`${CLAUDE_PLUGIN_ROOT}/references/tool-profile.md` (`### inspect`) — the
+`"${CLAUDE_PLUGIN_ROOT}/references/tool-profile.md"` (`### inspect`) — the
 absolute path of the licence table
-`${CLAUDE_PLUGIN_ROOT}/wiki/qa/exploratory/behavioral-spec-from-a-reference-product.md`,
+`"${CLAUDE_PLUGIN_ROOT}/wiki/qa/exploratory/behavioral-spec-from-a-reference-product.md"`,
 whose row is settled BEFORE the first capture (no matching row, or a row that
 forbids a driven browser or capture tooling: capture nothing, return
 `licence: unresolved` with `rows: 0`); the trail dir
@@ -968,7 +968,7 @@ reasoning-effort flags) that `worker-start` cannot express.
    `design.md` and replies with its stop report (plan dir, gate-A rc, decision
    and no-wiki counts, expected size, contradiction line). Before this and
    every later reviewer call, run
-   `sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check requirements-covered <plan dir>`.
+   `sh "${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh" check requirements-covered <plan dir>`.
    On `fail`, forward its stderr with SendMessage: a "no leading R<n> id"
    failure to the same `task-analyst` first (wait for its ANALYSIS REPORT and
    re-run gate-A), any other failure to the same task-planner; then wait for a

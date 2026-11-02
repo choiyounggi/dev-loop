@@ -158,7 +158,7 @@ normalize_ws() { printf '%s' "$1" | tr '\n' ' ' | tr -s ' '; }
   [[ "$(printf '%s' "$output" | jq -r '.when')" == *"scripts/reference-study.sh runs the pinned REA MCP"* ]]
   # the coordinator runs the script in Phase 2 and keeps the Agent spawn for a self-registered MCP only
   orch="$(normalize_ws "$(cat "${ROOT}/skills/orchestrate/SKILL.md")")"
-  [[ "$orch" == *'sh ${CLAUDE_PLUGIN_ROOT}/scripts/reference-study.sh --brief <that abs path> --slug <product-slug>'* ]]
+  [[ "$orch" == *'sh "${CLAUDE_PLUGIN_ROOT}/scripts/reference-study.sh" --brief <that abs path> --slug <product-slug>'* ]]
   [[ "$orch" == *"When the role is configured to an MCP you registered yourself, spawn one fresh-context"* ]]
   [[ "$orch" == *"a script exit of 3, 4 or 5"* ]]
   # no shipped text still describes the old default (a study agent spawned to inherit a registered MCP)
