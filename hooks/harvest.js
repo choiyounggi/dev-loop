@@ -40,14 +40,34 @@ function safeJson(s) {
 }
 
 // Resolve the transcript path: prefer the Stop hook's transcript_path, else the
-// newest .jsonl in the session's project dir under ~/.claude/projects/.
+// newest .jsonl in the session's project dir, located by the Claude Code CLI's
+// rule (same as skills/orchestrate/scripts/transcript-dir.sh, #320/#325): root
+// $CLAUDE_CONFIG_DIR (when non-empty) else ~/.claude, then projects/<name>, where
+// <name> is the cwd with every UTF-16 code unit outside A-Za-z0-9 mapped to '-'
+// (no `u` flag, so a code point above U+FFFF gives two dashes). A name over 200
+// characters is the one directory matching <first 200>-* (the CLI appends a
+// hash); zero or several matches return null.
 function resolveTranscript(payload) {
   const tp = payload.transcript_path;
   if (tp && fs.existsSync(tp)) return tp;
 
   const cwd = payload.cwd || process.cwd();
-  const encoded = cwd.replace(/[/.]/g, '-');
-  const projDir = path.join(os.homedir(), '.claude', 'projects', encoded);
+  const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  const root = path.join(configDir, 'projects');
+  const encoded = cwd.replace(/[^A-Za-z0-9]/g, '-');
+  let projDir = path.join(root, encoded);
+  if (encoded.length > 200) {
+    const prefix = encoded.slice(0, 200) + '-';
+    // A missing root throws here; main()'s top-level catch turns that into
+    // "no harvest, exit 0", the same outcome as zero matches.
+    const matches = fs.readdirSync(root).filter((n) => {
+      if (!n.startsWith(prefix)) return false;
+      const st = fs.statSync(path.join(root, n), { throwIfNoEntry: false });
+      return Boolean(st && st.isDirectory());
+    });
+    if (matches.length !== 1) return null;
+    projDir = path.join(root, matches[0]);
+  }
   if (!fs.existsSync(projDir)) return null;
   const files = fs
     .readdirSync(projDir)
