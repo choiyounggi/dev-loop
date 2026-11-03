@@ -77,7 +77,7 @@ carrying that `gate-A rc` and do no design work.
 
 1. Run Phase B from the task-analyst's `analysis.md` and write `design.md`
    with its `## Review` section left empty. Then run
-   `sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check requirements-covered <plan dir>`
+   `sh "${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh" check requirements-covered <plan dir>`
    and fix `design.md` until it prints `ok` — every Rule must be named by a
    Decision row before the reviewer sees it. A failure saying Rule rows have
    no leading `R<n>` id is an `analysis.md` defect: do not edit `analysis.md`;

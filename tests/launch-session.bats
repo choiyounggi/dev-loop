@@ -537,6 +537,53 @@ long_prompt()   { printf 'ZZPROMPTHEAD %s' "$(printf 'x%.0s' $(seq 1 1177))"; } 
   [ "$(jq -r .worktree "$st/t3.json")" = "$WT" ]
 }
 
+# --- Issue #321: exit 5 pre-seeds too ---
+# Exit 5 leaves a live session the coordinator recovers with one Enter or a
+# re-send, so it seeds like exit 0. Exits 6/7 still skip (RCPT-1, RCPT-18).
+
+@test "pre-seed: exit 5 (submission unconfirmed) seeds phase=pending with the resolved session name (normal) (#321)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_ready_unsubmitted > "$sd/pane"
+  st="$BATS_TEST_TMPDIR/status"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_RUN_ID=r5 LO_STATUS_DIR="$st" LO_TASK_ID=t5 \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD you are the worker"
+  [ "$status" -eq 5 ]
+  [[ "$output" == *"NOT confirmed submitted"* ]]
+  [[ "$output" != *"ok:"* ]]
+  [ -f "$st/t5.json" ]
+  [ "$(jq -r .phase "$st/t5.json")" = "pending" ]
+  [ "$(jq -r .session "$st/t5.json")" = "lo-1-r5" ]
+  [ "$(jq -r .worktree "$st/t5.json")" = "$WT" ]
+}
+
+@test "pre-seed: exit 5 with both vars unset writes nothing and adds no output (boundary) (#321)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_ready_unsubmitted > "$sd/pane"
+  st="$BATS_TEST_TMPDIR/status"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD you are the worker"
+  [ "$status" -eq 5 ]
+  [[ "$output" == *"NOT confirmed submitted"* ]]
+  [[ "$output" != *"status["* ]]
+  [[ "$output" != *"pre-seed"* ]]
+  [ ! -e "$st" ]
+}
+
+@test "pre-seed: exit 5 with an unwritable status dir still exits 5 and warns on stderr (error) (#321)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"; pane_ready_unsubmitted > "$sd/pane"
+  # a status dir UNDER a regular file: status-update's mkdir -p fails deterministically
+  touch "$BATS_TEST_TMPDIR/blocker"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_STATUS_DIR="$BATS_TEST_TMPDIR/blocker/sub" LO_TASK_ID=t5 \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "ZZPROMPTHEAD you are the worker"
+  [ "$status" -eq 5 ]
+  [[ "$output" == *"NOT confirmed submitted"* ]]
+  [[ "$output" == *"status pre-seed failed for task 't5'"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/blocker/sub" ]
+}
+
 # --- DEV_LOOP_WORKER_MODEL --------------------------------------------------
 # The worker may run a cheaper tier than the coordinator. Unset MUST stay
 # byte-identical to the previous behavior (no --model at all), or every existing
@@ -1463,6 +1510,23 @@ FAKEEOF
       sh "$LS" lo-1 "$w" bypassPermissions "$p"
   [ "$status" -eq 7 ]
   [[ "$output" == *"decomposed (NFD)"* ]]
+}
+
+@test "RCPT-18: exit 7 with LO_STATUS_DIR/LO_TASK_ID set seeds no record (boundary) (#321)" {
+  sd="$BATS_TEST_TMPDIR/sd"; mkdir -p "$sd"
+  pane_ready_submitted > "$sd/pane"
+  p="$(long_prompt)"
+  td="$BATS_TEST_TMPDIR/tr"; mkdir -p "$td"
+  st="$BATS_TEST_TMPDIR/status"
+  run env STUB_DIR="$sd" LO_TMUX="$(mk_tmux_stub)" LO_CLAUDE=/bin/echo \
+      LO_READY_TIMEOUT=2 LO_READY_INTERVAL=1 LO_SUBMIT_TIMEOUT=2 LO_SUBMIT_INTERVAL=1 \
+      LO_TRANSCRIPT_DIR="$td" LO_RECEIPT_TIMEOUT=1 \
+      LO_STATUS_DIR="$st" LO_TASK_ID=t7 \
+      sh "$LS" lo-1 "$WT" bypassPermissions "$p"
+  [ "$status" -eq 7 ]
+  [[ "$output" == *"receipt UNKNOWN"* ]]
+  [[ "$output" != *"ok:"* ]]
+  [ ! -e "$st/t7.json" ]
 }
 
 @test "RCPT-11: the script header, SKILL.md step 2a and the template agree on exits 6/7, the knobs and the pointer file (#314)" {

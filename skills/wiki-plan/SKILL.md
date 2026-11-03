@@ -71,7 +71,7 @@ command.
 
 ## Phase A — Analyze (produces `plans/<feature>/analysis.md`)
 
-Copy `${CLAUDE_PLUGIN_ROOT}/templates/analysis.md` to `plans/<feature>/analysis.md`
+Copy `"${CLAUDE_PLUGIN_ROOT}/templates/analysis.md"` to `plans/<feature>/analysis.md`
 and fill it in. Its section headers are parsed by `plan-gate.sh` — keep them
 exactly as the template has them.
 
@@ -116,11 +116,11 @@ study session** that holds the `inspect` tool and returns rows only. Under
 orchestrate the coordinator ran it in Phase 2 and hands you its rows file as a
 pointer file; standalone, write the brief (product and behaviors with their
 oracle questions) to a file and run `sh
-${CLAUDE_PLUGIN_ROOT}/scripts/reference-study.sh --brief <abs path> --slug
+"${CLAUDE_PLUGIN_ROOT}/scripts/reference-study.sh" --brief <abs path> --slug
 <product-slug>` — with the role unset it starts a headless session holding only
 the pinned REA MCP, nothing registered — or, when the role is configured to an
 MCP you registered yourself, spawn one `general-purpose` Agent with the full
-study brief in `${CLAUDE_PLUGIN_ROOT}/references/tool-profile.md` (`### inspect`;
+study brief in `"${CLAUDE_PLUGIN_ROOT}/references/tool-profile.md"` (`### inspect`;
 the licence row is settled before the first capture, and the report's `trail
 dir` is what the review greps — who runs the study and where artifacts live:
 `wiki/infrastructure/agent-orchestration/reference-study-in-a-plan.md`). Copy
@@ -149,8 +149,8 @@ open (never a silent skip).
 
 **gate-A** — once `analysis.md` is complete:
 ```
-sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh emit A plans/<feature> .dev-loop/gates/plan-A-<feature>.md
-sh ${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh --run .dev-loop/gates/plan-A-<feature>.md
+sh "${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh" emit A plans/<feature> .dev-loop/gates/plan-A-<feature>.md
+sh "${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh" --run .dev-loop/gates/plan-A-<feature>.md
 ```
 Gate ids: `baseline-tests-ran`, `affected-files-evidenced`,
 `open-questions-resolved`, `constraints-surveyed`, `lint-surveyed`,
@@ -160,7 +160,7 @@ gate means fixing `analysis.md`, not editing the gate.
 
 ## Phase B — Design (produces `plans/<feature>/design.md`)
 
-Copy `${CLAUDE_PLUGIN_ROOT}/templates/design-doc.md` to `plans/<feature>/design.md`
+Copy `"${CLAUDE_PLUGIN_ROOT}/templates/design-doc.md"` to `plans/<feature>/design.md`
 (note the filename changes from `design-doc.md` to `design.md`). Its `## Decisions`
 table now has six columns:
 
@@ -206,12 +206,12 @@ decision routing left at `[no-wiki]`. Call the MCP tool when present
 (`wiki_search(query, k=5, domain?)` / `wiki_page(page_id)` from the
 `dev-loop-wiki` server); from a Bash-only context with no MCP tool (the
 `task-planner` agent, any subagent), call the CLI form instead —
-`bash ${CLAUDE_PLUGIN_ROOT}/scripts/wiki-mcp-launch.sh index search --query
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/wiki-mcp-launch.sh" index search --query
 "<text>" --k 5 --json` — resolving `${CLAUDE_PLUGIN_ROOT}` exactly as this
 skill's opening note above already resolves it, not a second rule. Both
 forms return the same JSON row shape (`page_id`, `path`, `section`,
 `snippet`, `score`, `confidence`, `last_verified`). Example:
-`bash ${CLAUDE_PLUGIN_ROOT}/scripts/wiki-mcp-launch.sh index search --query
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/wiki-mcp-launch.sh" index search --query
 "retry a failing GitHub API call with exponential backoff" --k 5 --json`
 returns hits including `backend-common-reliability-timeouts-and-retries` —
 open that page and confirm its "When this applies" matches before citing it.
@@ -236,7 +236,7 @@ matching page does the decision's `Wiki basis` cell take the literal
 `[no-wiki]`.
 
 **Pre-review check** — before every `plan-reviewer` call, run
-`sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh check requirements-covered plans/<feature>`.
+`sh "${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh" check requirements-covered plans/<feature>`.
 `fail` lists the uncovered Rules on stderr: fix `design.md` until it prints `ok`
 instead of spending a reviewer round on them. This check is not a reviewer call
 and does not count toward the 3-call bound.
@@ -257,8 +257,8 @@ then escalate — never retry on `sonnet`.
 
 **gate-B**:
 ```
-sh ${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh emit B plans/<feature> .dev-loop/gates/plan-B-<feature>.md
-sh ${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh --run .dev-loop/gates/plan-B-<feature>.md
+sh "${CLAUDE_PLUGIN_ROOT}/skills/wiki-plan/scripts/plan-gate.sh" emit B plans/<feature> .dev-loop/gates/plan-B-<feature>.md
+sh "${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh" --run .dev-loop/gates/plan-B-<feature>.md
 ```
 Gate ids: `groundings-exist`, `decision-rows-complete`, `requirements-covered`, `reviewer-verdict`, `gaps-emitted`.
 Exit 0 before entering Phase C.

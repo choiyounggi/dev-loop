@@ -55,7 +55,7 @@ A3 reference study; see `references/tool-profile.md`).
 (`plan` is intentionally absent — see above.) Resolve them once at the start:
 
 ```
-sh ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh --summary
+sh "${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh" --summary
 ```
 
 For each role: if a tool is configured, use it where the loop references that role
@@ -111,7 +111,7 @@ starting the next, so a downstream task always builds on a verified upstream one
 1. Analyze + load refs— read THIS task's "Wiki pages (read these first, only
                         these)" — the pages `wiki-plan` navigated to — and load
                         exactly those — a `wiki/...` path from
-                        `${CLAUDE_PLUGIN_ROOT}/wiki/`, a `wiki-local/...` path
+                        `"${CLAUDE_PLUGIN_ROOT}/wiki/"`, a `wiki-local/...` path
                         from the project root — plus the task's Inputs (confirm
                         each exists; a missing Input is a
                         plan defect -> 7b, not a stand-in). List the test
@@ -150,7 +150,7 @@ starting the next, so a downstream task always builds on a verified upstream one
                         PASS. Emit the task report (format below, with the
                         WIKI: references you applied).                          [DoD / evaluator]
                         After the report is emitted, run
-                        `sh ${CLAUDE_PLUGIN_ROOT}/scripts/wiki-usage.sh --task <NN-slug> --repo <project root> --line "<WIKI: line>"`
+                        `sh "${CLAUDE_PLUGIN_ROOT}/scripts/wiki-usage.sh" --task <NN-slug> --repo <project root> --line "<WIKI: line>"`
                         once per WIKI: line (usage telemetry, wiki-lint check 18);
                         its exit code never changes the PASS or FAIL verdict — a
                         refusal is noted in NOTES: only.
@@ -195,7 +195,7 @@ correct. While implementing a task:
    different case. When the task report's `WIKI:` line already names that page
    id and row, and the same task's Verify has failed at least twice on that
    same page and row, treat it as a page falsification candidate: record it
-   with `sh ${CLAUDE_PLUGIN_ROOT}/scripts/wiki-contradiction.sh --page <id>
+   with `sh "${CLAUDE_PLUGIN_ROOT}/scripts/wiki-contradiction.sh" --page <id>
    --row <row> --task <task> --count <n> --verify "<cmd>" --output "<excerpt>"`
    (see 7b) and keep retrying the task as usual. Both pieces of evidence must
    already be in the report before the call; a report that only says the wiki
@@ -265,7 +265,7 @@ the countable half of test quality (tests exist, case counts, assertion
 presence), never the semantic half:
 
 ```
-sh ${CLAUDE_PLUGIN_ROOT}/skills/orchestrate/scripts/test-floor.sh <cwd> <same diff range step 6's self-review used>
+sh "${CLAUDE_PLUGIN_ROOT}/skills/orchestrate/scripts/test-floor.sh" <cwd> <same diff range step 6's self-review used>
 ```
 
 - exit 3 (stdout `fail`) -> treat as `VERDICT: FAIL` immediately: strengthen
@@ -307,7 +307,7 @@ judge, so "done" survives long sessions and is never a self-report. At step 0
 write `.dev-loop/gates/<task-id>.md` from `templates/gates.md`; at step 7 run:
 
 ```
-sh ${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh --run .dev-loop/gates/<task-id>.md
+sh "${CLAUDE_PLUGIN_ROOT}/skills/loop-implement/scripts/gate-check.sh" --run .dev-loop/gates/<task-id>.md
 ```
 
 - The checker executes each runnable gate's `CHECK:` itself; a gate is MET

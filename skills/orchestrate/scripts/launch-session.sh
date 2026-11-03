@@ -44,6 +44,8 @@
 #   exit 5    the prompt was sent but submission could NOT be confirmed — the
 #             session is alive and may hold an unsubmitted prompt (prints the
 #             last screen). Distinct from 4: there the CLI never came up.
+#             With LO_STATUS_DIR and LO_TASK_ID set, the status record is
+#             pre-seeded before this exit, as on exit 0 (#321).
 #   exit 6    the prompt was submitted but the worker's transcript shows it
 #             TRUNCATED: its first new user message is shorter than the
 #             prompt (issue #314, head lost). The session is alive; re-send
@@ -94,9 +96,10 @@
 #                      because the CLI appends a hash). Set it when the CLI
 #                      keeps transcripts elsewhere.
 #   LO_STATUS_DIR / LO_TASK_ID  when BOTH are set, pre-seed the status record
-#                      (phase=pending, via the sibling status-update.sh) once
-#                      the launch succeeds — on the reuse path and after the
-#                      prompt is confirmed submitted — so dead/stalled-worker
+#                      (phase=pending, via the sibling status-update.sh) on
+#                      reuse, after a confirmed submission, and before exit
+#                      5 (#321); never on exit 6 or 7, whose recovery may
+#                      re-send the prompt — so dead/stalled-worker
 #                      detection covers the session from launch, not from its
 #                      first self-report. A seeding failure warns on stderr
 #                      and never changes the exit code. Both unset: exactly
@@ -123,6 +126,9 @@
 # before tmux runs. Limit: a variable whose name is not a valid shell name
 # (LO_A-B) cannot be unset; macOS /bin/sh passes it through, dash drops it.
 set -eu
+# The CLI's transcript-dir rule, shared with send-prompt.sh and token-report.sh (#320).
+case $0 in */*) _sd=${0%/*} ;; *) _sd=. ;; esac
+SCRIPT_DIR=$(CDPATH= cd -- "$_sd" && pwd -P); . "$SCRIPT_DIR/transcript-dir.sh"
 # NOT named TMUX: that is tmux's OWN variable (the server socket). Assigning it
 # here would overwrite the caller's exported value, and every tmux child would
 # then try to connect to a binary path as a socket — measured as
@@ -232,8 +238,9 @@ fi
 # Pre-seed the status record so dead/stalled-worker detection covers this
 # worker from launch time, not from its first self-report (plan_ready).
 # Active only when the orchestrator sets BOTH LO_STATUS_DIR and LO_TASK_ID.
-# A seeding failure must never fail a launch that already succeeded: warn on
-# stderr, keep the exit code (the `if !` condition context suppresses set -e).
+# A seeding failure must never change the exit code (0, or 5 when submission
+# is unconfirmed): warn on stderr, keep the exit code (the `if !` condition
+# context suppresses set -e).
 # stdout of status-update is routed to stderr so this script's parsed stdout
 # (session=… / ok:…) stays unchanged.
 preseed_status() {
@@ -436,14 +443,13 @@ fi
 # is new since the snapshot below must be at least as long as the prompt
 # (leading/trailing whitespace trimmed). Filter = send-prompt.sh's
 # transcript_user_text (tool_result and isMeta rows do not count). The dir name
-# is the CLI's rule: every UTF-16 code unit outside A-Za-z0-9 becomes '-', and a
-# name over 200 characters is cut and given a hash suffix (matched by glob).
+# follows the CLI's rule, implemented by the shared helper sourced at the top
+# (every UTF-16 code unit outside A-Za-z0-9 becomes '-'; a name over 200
+# characters is matched as <first 200>-*).
 receipt_timeout="${LO_RECEIPT_TIMEOUT:-20}"
 case "$receipt_timeout" in ''|*[!0-9]*) receipt_timeout=20 ;; esac
 rcpt_skip=""; rcpt_root=""; rcpt_name=""; rcpt_dir=""; rcpt_amb=0
 rcpt_f0=""; rcpt_c0=0; sent_len=0
-rcpt_map='[$p | explode[] | if (. >= 48 and . <= 57) or (. >= 65 and . <= 90) or (. >= 97 and . <= 122) then . elif . > 65535 then (45, 45) else 45 end] | implode'
-rcpt_nfd='[$p | explode[] | select((. >= 768 and . <= 879) or (. >= 4352 and . <= 4607) or (. >= 6832 and . <= 6911) or (. >= 7616 and . <= 7679) or (. >= 8400 and . <= 8447) or (. >= 65056 and . <= 65071))] | length > 0'
 
 receipt_unknown() { # $1 = reason; never returns
   echo "launch-session: $session prompt submitted but receipt UNKNOWN ($1) — it may have arrived whole: run send-prompt.sh state $session before any re-send (SKILL.md Phase 3 step 2a); LO_RECEIPT_TIMEOUT=0 turns this check off" >&2
@@ -461,13 +467,8 @@ user_text_lengths() { # $1 = jsonl file -> one line per user text message: its l
 resolve_rcpt_dir() { # sets rcpt_dir ('' = not there yet) and rcpt_amb (count when > 1)
   rcpt_amb=0
   if [ -n "${LO_TRANSCRIPT_DIR:-}" ]; then rcpt_dir="$LO_TRANSCRIPT_DIR"; return 0; fi
-  if [ "${#rcpt_name}" -le 200 ]; then rcpt_dir="$rcpt_root/$rcpt_name"; return 0; fi
-  rcpt_dir=""; _n=0
-  for _d in "$rcpt_root/$(printf '%s' "$rcpt_name" | cut -c1-200)"-*; do
-    [ -d "$_d" ] || continue
-    _n=$((_n + 1)); rcpt_dir="$_d"
-  done
-  if [ "$_n" -gt 1 ]; then rcpt_amb=$_n; rcpt_dir=""; fi
+  transcript_dir_resolve "$rcpt_root" "$rcpt_name"
+  rcpt_dir="$td_dir"; rcpt_amb="$td_amb"
   return 0
 }
 confirm_receipt() { # after the box is confirmed empty: exit 6/7 or return
@@ -508,15 +509,14 @@ if [ "$receipt_timeout" -gt 0 ]; then
   if ! jq -n 'empty' >/dev/null 2>&1; then
     rcpt_skip="jq missing or failing"
   elif [ -z "${LO_TRANSCRIPT_DIR:-}" ]; then
-    _cfg="${CLAUDE_CONFIG_DIR:-}"
-    if [ -z "$_cfg" ] && [ -n "${HOME:-}" ]; then _cfg="$HOME/.claude"; fi
-    if [ -z "$_cfg" ]; then
-      rcpt_skip="no transcript dir: HOME, CLAUDE_CONFIG_DIR and LO_TRANSCRIPT_DIR are empty"
-    elif [ "$(jq -n --arg p "$wt_physical" "$rcpt_nfd")" = "true" ]; then
-      rcpt_skip="worktree path has decomposed (NFD) characters the CLI NFC-normalizes: set LO_TRANSCRIPT_DIR"
+    if transcript_dir_derive "$wt_physical"; then
+      rcpt_root="$td_root"; rcpt_name="$td_name"
     else
-      rcpt_root="$_cfg/projects"
-      rcpt_name=$(jq -rn --arg p "$wt_physical" "$rcpt_map")
+      case "$td_err" in
+        no-home) rcpt_skip="no transcript dir: HOME, CLAUDE_CONFIG_DIR and LO_TRANSCRIPT_DIR are empty" ;;
+        nfd) rcpt_skip="worktree path has decomposed (NFD) characters the CLI NFC-normalizes: set LO_TRANSCRIPT_DIR" ;;
+        *) rcpt_skip="jq missing or failing" ;;
+      esac
     fi
   fi
   if [ -z "$rcpt_skip" ]; then
@@ -600,6 +600,9 @@ done
 if [ "$submitted" -ne 1 ]; then
   echo "launch-session: $session prompt NOT confirmed submitted after ${submit_timeout}s — the session is alive and may be holding the prompt unsubmitted in its input box; send one Enter to '$session' or relaunch (last screen below)" >&2
   echo "$pane" | tail -8 >&2
+  # the session is alive, so the watch must cover it while the coordinator
+  # recovers it (one Enter or a re-send): seed before exiting (#321)
+  preseed_status
   exit 5
 fi
 confirm_receipt

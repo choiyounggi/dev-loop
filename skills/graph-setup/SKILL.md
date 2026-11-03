@@ -30,7 +30,7 @@ Run `command -v graphify`.
 
 ### Step 2 — configure the workspace
 
-Run `sh ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh --role workspace`.
+Run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh" --role workspace`.
 
 - Already has `roots`? Use them as-is.
 - Unset (`{"kind":"default"}`)? Ask the user for the root directory path(s)
@@ -48,7 +48,7 @@ Run `sh ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-tools.sh --role workspace`.
 
 Run, with the configured depth/exclude/roots:
 ```sh
-sh ${CLAUDE_PLUGIN_ROOT}/scripts/graph-workspace.sh --status --depth <n> [--exclude <glob>]... -- <root>...
+sh "${CLAUDE_PLUGIN_ROOT}/scripts/graph-workspace.sh" --status --depth <n> [--exclude <glob>]... -- <root>...
 ```
 Print every returned line verbatim as a table: repo, freshness, hooks.
 
@@ -74,7 +74,7 @@ For every repo in the workspace, in order:
 
 1. `(cd "<repo>" && graphify hook install)` — installs graphify's own
    `post-commit`/`post-checkout` hooks.
-2. `sh ${CLAUDE_PLUGIN_ROOT}/scripts/graph-hooks.sh install "<repo>"` —
+2. `sh "${CLAUDE_PLUGIN_ROOT}/scripts/graph-hooks.sh" install "<repo>"` —
    installs dev-loop's `post-merge` hook.
 
 `graph-hooks.sh install` also adds `graphify-out/` to `.git/info/exclude` (graphify's own installer does not); a repo's `.gitignore` is never touched by either — do not edit it yourself either.

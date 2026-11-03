@@ -25,6 +25,8 @@ setup() {
   # a mapped projects dir for this worktree can exist on a developer machine
   # and would otherwise cost up to LO_RECEIPT_TIMEOUT seconds per send.
   export LO_RECEIPT_TIMEOUT=0
+  # Developer/Orca shells export these; each moves the transcript dir (#320).
+  unset CLAUDE_CONFIG_DIR LO_TRANSCRIPT_DIR
   # Issue #312: every tmux server this file starts is private to the test. A
   # generated `tmux` wrapper, first on PATH, adds `-L "$PRIV_SOCK"` to every
   # call — this file's own `tmux ...` lines and send-prompt.sh's
@@ -802,11 +804,12 @@ _enter_count() { grep -cx -- "send-keys -t =$S: Enter" "$FAKE_SEND_LOG"; }
 
 @test "send: default transcript dir (derived from pane_current_path) is used when LO_TRANSCRIPT_DIR is unset" {
   # Every other receipt test overrides LO_TRANSCRIPT_DIR; this one exercises
-  # the real transcript_dir() derivation ($HOME/.claude/projects/<tr '/.' '->
-  # of the pane's cwd>) end to end.
+  # the real transcript_dir() derivation end to end. The derivation follows
+  # the CLI rule ($HOME/.claude/projects/<pane cwd with every character
+  # outside A-Za-z0-9 -> '-'>), computed here without the helper (#320).
   _use_fake_tmux_send
   fake_path="$STUB_ROOT/work/myrepo"
-  mapped=$(printf '%s' "$fake_path" | tr '/.' '-')
+  mapped="${fake_path//[^a-zA-Z0-9]/-}"
   derived_dir="$STUB_ROOT/home/.claude/projects/$mapped"
   mkdir -p "$derived_dir"
   : > "$derived_dir/s.jsonl"
@@ -821,6 +824,135 @@ _enter_count() { grep -cx -- "send-keys -t =$S: Enter" "$FAKE_SEND_LOG"; }
   # appears on the fallback path, so its absence proves the derived directory
   # was the one actually read — a broken '.' mapping would land here too.
   case "$stderr" in *"receipt unknown"*) return 1 ;; *) : ;; esac
+}
+
+@test "send: CLI rule — a pane path with a space maps to dashes and the receipt verifies (#320)" {
+  _use_fake_tmux_send
+  fake_path="$STUB_ROOT/work/my repo"
+  m="${fake_path//[^a-zA-Z0-9]/-}"
+  [[ "$m" == *"-my-repo" ]]
+  d="$STUB_ROOT/home/.claude/projects/$m"
+  mkdir -p "$d"; : > "$d/s.jsonl"
+  FAKE_TRANSCRIPT="$d/s.jsonl"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  prompt='echo T320_SPACE'
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 HOME="$STUB_ROOT/home" \
+    FAKE_PANE_PATH="$fake_path" FAKE_RECEIPT_CONTENT="$prompt" sh "$SP" send "$S" "$prompt"
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  [[ "$stderr" != *"receipt unknown"* ]]
+}
+
+@test "send: CLI rule — an underscore in the pane path maps to a dash (#320)" {
+  _use_fake_tmux_send
+  fake_path="$STUB_ROOT/work/my_repo"
+  m="${fake_path//[^a-zA-Z0-9]/-}"
+  [[ "$m" == *"-my-repo" ]]
+  d="$STUB_ROOT/home/.claude/projects/$m"
+  mkdir -p "$d"; : > "$d/s.jsonl"
+  FAKE_TRANSCRIPT="$d/s.jsonl"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  prompt='echo T320_UNDERSCORE'
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 HOME="$STUB_ROOT/home" \
+    FAKE_PANE_PATH="$fake_path" FAKE_RECEIPT_CONTENT="$prompt" sh "$SP" send "$S" "$prompt"
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  [[ "$stderr" != *"receipt unknown"* ]]
+}
+
+@test "send: CLAUDE_CONFIG_DIR replaces HOME/.claude as the transcript root (#320)" {
+  _use_fake_tmux_send
+  cfg="$STUB_ROOT/cfg dir"
+  fake_path="$STUB_ROOT/work/cfgrepo"
+  m="${fake_path//[^a-zA-Z0-9]/-}"
+  mkdir -p "$cfg/projects/$m"; : > "$cfg/projects/$m/s.jsonl"
+  # Decoy under HOME/.claude: reading it would never see the receipt.
+  mkdir -p "$STUB_ROOT/home/.claude/projects/$m"
+  : > "$STUB_ROOT/home/.claude/projects/$m/s.jsonl"
+  FAKE_TRANSCRIPT="$cfg/projects/$m/s.jsonl"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  prompt='echo T320_CFG'
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 HOME="$STUB_ROOT/home" \
+    CLAUDE_CONFIG_DIR="$cfg" FAKE_PANE_PATH="$fake_path" FAKE_RECEIPT_CONTENT="$prompt" \
+    sh "$SP" send "$S" "$prompt"
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  [[ "$stderr" != *"receipt unknown"* ]]
+}
+
+@test "send: LO_TRANSCRIPT_DIR wins over a mappable pane path (#320)" {
+  _use_fake_tmux_send
+  fake_path="$STUB_ROOT/work/ovr"
+  m="${fake_path//[^a-zA-Z0-9]/-}"
+  mkdir -p "$STUB_ROOT/tx"; : > "$STUB_ROOT/tx/s.jsonl"
+  # Decoy at the mapped dir: reading it would never see the receipt.
+  mkdir -p "$STUB_ROOT/home/.claude/projects/$m"
+  : > "$STUB_ROOT/home/.claude/projects/$m/s.jsonl"
+  FAKE_TRANSCRIPT="$STUB_ROOT/tx/s.jsonl"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  prompt='echo T320_OVERRIDE'
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 HOME="$STUB_ROOT/home" \
+    LO_TRANSCRIPT_DIR="$STUB_ROOT/tx" FAKE_PANE_PATH="$fake_path" FAKE_RECEIPT_CONTENT="$prompt" \
+    sh "$SP" send "$S" "$prompt"
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  [[ "$stderr" != *"receipt unknown"* ]]
+}
+
+@test "send: error — HOME and CLAUDE_CONFIG_DIR both empty -> receipt unknown (no transcript dir) (#320)" {
+  _use_fake_tmux_send
+  fake_path="$STUB_ROOT/work/nohome"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 HOME= CLAUDE_CONFIG_DIR= \
+    FAKE_PANE_PATH="$fake_path" sh "$SP" send "$S" 'echo T320_NOHOME'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  [[ "$stderr" == *"receipt unknown (no transcript dir)"* ]]
+}
+
+@test "send: boundary — a mapped name over 200 characters verifies through the one <first 200>-* dir (#320)" {
+  _use_fake_tmux_send
+  fake_path="$STUB_ROOT/work/$(head -c 210 /dev/zero | tr '\0' L)"
+  m="${fake_path//[^a-zA-Z0-9]/-}"
+  [ "${#m}" -gt 200 ]
+  d="$STUB_ROOT/home/.claude/projects/${m:0:200}-h4sh"
+  mkdir -p "$d"; : > "$d/s.jsonl"
+  FAKE_TRANSCRIPT="$d/s.jsonl"
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  prompt='echo T320_LONG'
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 HOME="$STUB_ROOT/home" \
+    FAKE_PANE_PATH="$fake_path" FAKE_RECEIPT_CONTENT="$prompt" sh "$SP" send "$S" "$prompt"
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  [[ "$stderr" != *"receipt unknown"* ]]
+}
+
+@test "send: error — two dirs sharing the 200-character prefix -> receipt unknown (no transcript dir) (#320)" {
+  _use_fake_tmux_send
+  fake_path="$STUB_ROOT/work/$(head -c 210 /dev/zero | tr '\0' L)"
+  m="${fake_path//[^a-zA-Z0-9]/-}"
+  [ "${#m}" -gt 200 ]
+  for h in aaaa bbbb; do
+    mkdir -p "$STUB_ROOT/home/.claude/projects/${m:0:200}-$h"
+    : > "$STUB_ROOT/home/.claude/projects/${m:0:200}-$h/s.jsonl"
+  done
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 HOME="$STUB_ROOT/home" \
+    FAKE_PANE_PATH="$fake_path" sh "$SP" send "$S" 'echo T320_AMBIGUOUS'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  [[ "$stderr" == *"receipt unknown (no transcript dir)"* ]]
+}
+
+@test "send: error — a decomposed (NFD) pane path -> receipt unknown (no transcript dir) (#320)" {
+  _use_fake_tmux_send
+  fake_path="$STUB_ROOT/work/caf"$'e\xcc\x81'
+  printf '%s\n' 'READY>' 'READY> T3_RAN' > "$FAKE_CAPTURES"
+  run --separate-stderr env LO_STABLE_TRIES=0 LO_RECEIPT_TIMEOUT=3 HOME="$STUB_ROOT/home" \
+    FAKE_PANE_PATH="$fake_path" sh "$SP" send "$S" 'echo T320_NFD'
+  [ "$status" -eq 0 ]
+  [ "$output" = "delivered" ]
+  [[ "$stderr" == *"receipt unknown (no transcript dir)"* ]]
 }
 
 @test "send: pane_current_path unobtainable -> no transcript dir resolvable, delivered with 'receipt unknown' on stderr" {

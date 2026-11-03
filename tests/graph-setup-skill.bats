@@ -19,15 +19,15 @@ setup() {
 }
 
 @test "site: resolve-tools.sh --role workspace is consumed" {
-  [[ "$content" == *"resolve-tools.sh --role workspace"* ]]
+  [[ "$content" == *'resolve-tools.sh" --role workspace'* ]]
 }
 
 @test "site: graph-workspace.sh --status is consumed" {
-  [[ "$content" == *"graph-workspace.sh --status"* ]]
+  [[ "$content" == *'graph-workspace.sh" --status'* ]]
 }
 
 @test "site: graph-hooks.sh install is consumed" {
-  [[ "$content" == *"graph-hooks.sh install"* ]]
+  [[ "$content" == *'graph-hooks.sh" install'* ]]
 }
 
 @test "site: graphify hook install is consumed" {
@@ -63,9 +63,9 @@ setup() {
 
 @test "negative control: deleting the graph-hooks.sh install line fails only that site check" {
   BROKEN="$BATS_TEST_TMPDIR/SKILL-broken.md"
-  grep -v 'graph-hooks.sh install' "$SKILL" > "$BROKEN"
+  grep -v 'graph-hooks.sh" install' "$SKILL" > "$BROKEN"
   broken_content=$(cat "$BROKEN")
-  [[ "$broken_content" != *"graph-hooks.sh install"* ]]
+  [[ "$broken_content" != *'graph-hooks.sh" install'* ]]
   [[ "$broken_content" == *"graphify hook install"* ]]
 }
 
