@@ -8,7 +8,7 @@ sources:
   - https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html
   - https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
 last_verified: 2026-08-05
-related: [platforms-shells-portable-shell-scripts, infrastructure-config-environment-config, platforms-environment-path-resolution, platforms-shells-unset-versus-empty-parameters, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan]
+related: [platforms-shells-portable-shell-scripts, infrastructure-config-environment-config, platforms-environment-path-resolution, platforms-shells-unset-versus-empty-parameters, infrastructure-agent-orchestration-checkable-claims-in-an-adopted-plan, platforms-processes-spawning-an-agent-cli-from-a-server]
 ---
 
 # Turning a Script's Behavior Off Through an Environment Variable
@@ -63,6 +63,7 @@ esac
 | Passing a sentinel makes the script fail loudly instead of disabling | The script has no disabled path — add one, or skip the whole invocation from the caller |
 | The value comes from a `.env` file or CI variable UI | Empty and unset are frequently indistinguishable there (many loaders export the key with an empty value); use an explicit sentinel value such as `off`, never blank |
 | A long-lived service reads the switch | Config-shaped switches for a service belong in its validated config schema — [infrastructure-config-environment-config] |
+| The script is a Claude Code hook and the switch is also set in a `settings.json` `env` block | The settings value overwrites your shell export; pass the switch with `--settings '{"env":{…}}'` for that run — [platforms-processes-spawning-an-agent-cli-from-a-server] step 5 |
 
 ## Instead of
 

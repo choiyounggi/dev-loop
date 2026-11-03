@@ -1,164 +1,156 @@
-# Knowledge flush — 3 insight(s) (headless auto-flush run 20261022-134153-21632)
+# Knowledge flush — 4 insight(s) (headless auto-flush run, claims 20261103-141924-81381)
 
-18 queue rows were claimed this run: 3 ingested, 1 dropped as a duplicate of the
-merged wiki, 13 dropped as project-specific plan-gap rows, 1 released because it
-plausibly overlaps open PR #291. Nothing was folded into another branch.
+12 queue rows were claimed this run: 4 ingested (all merged into existing pages,
+no new page), 8 released. Nothing was dropped and nothing was folded into another
+branch.
 
 | Candidate | Domain | Disposition |
 |-----------|--------|-------------|
-| `f7273179a74dcb80` — secret in an HTTP header leaks through `http.client`'s `ValueError` | security | **ingested** — edge row in `security-secrets-secrets-in-code` (verified) |
-| `3d610c1206e1bdd6` — text nobody sent in an agent CLI's input box is the grey prompt suggestion | infrastructure | **ingested** — edge row in `infrastructure-agent-orchestration-pane-delivery-confirmation` (verified docs + field observation) |
-| `0a0ccc4ca0904514` — e2e failure moving between tests under host CPU contention | testing | **ingested** — new page `testing-flaky-e2e-failures-moving-under-host-cpu-contention` (field-tested) |
-| `97c37473b53e63c2` — string-pattern `replace`: `$n` stays literal, `$$`/`$&`/`` $` ``/`$'` expand | backend (queued as frontend) | dropped — duplicate of merged page |
-| `446c58c78d5e467f` — `git diff --numstat` count depends on the diff algorithm | testing | released — plausible overlap with open PR #291 |
-| 13 plan-gap rows (see Local-layer candidates) | — | dropped — project-specific |
+| `4a4d2d93a546c007` — multi-turn `claude -p --input-format stream-json` child runs the user's side-effect Stop hooks every turn; off switches via `--settings` env | platforms | **ingested** — `platforms-processes-spawning-an-agent-cli-from-a-server` step 5 + edge row; pointer row in `platforms-shells-env-var-off-switches` (verified) |
+| `b426bd7890dbefb1` — capture proxy under a gateway: chain upstream to `ANTHROPIC_BASE_URL`, not api.anthropic.com | platforms (hint: debugging) | **ingested** — same page: allow-list row, edge row, Instead-of row (verified) |
+| `6ee0f099480423ae` — `CLAUDE_CODE_SUBAGENT_MODEL` does not move the built-in Explore subagent | platforms | **ingested** — edge row in `platforms-tools-per-call-subagent-effort` (verified) |
+| `11f15aebd9a88007` — strip parent `CLAUDE_CODE_*` before spawning a child `claude` to observe it | platforms (hint: debugging) | **ingested (narrowed)** — allow-list row + field-observed edge row on the spawning page; the unconfirmed causes are not stated (field-tested part only) |
+| `fc76dc4dfa08ecde` — Docker-gated schema validator: skip vs fail, known-bad document | testing | released — plausible overlap with open PRs #300 / #317 |
+| `df1515d721c90d64` — gate CHECK timeout when one check runs the suite N times | testing | released — plausible overlap with open PR #317 |
+| `63053db1289c8c67`, `ff1c87af4b580dfb`, `baa5d1ff9bb87683`, `97bbff78b9f5c7fc`, `850083307d5abc22`, `a3d296b1c4070ff3` | unknown | released unread — queue file not locatable in this run (see below) |
+
+The headless sandbox blocked listing `~/.dev-loop/queue/` and `node -e`. Queue files
+can only be opened by guessing session-id file names from `~/.claude/history.jsonl`.
+Six rows were not found that way — most likely they come from headless child
+`claude` sessions (the capture experiments), whose ids never reach the history file.
+They were released (confirmed with `queue-claim.js list`, which printed all 8
+released ids) for the manual skill to process. The `wiki_search` MCP tool was also
+denied in this run, so the existing-layer check read index files and pages directly.
 
 ## Verified best-practice
 
-**`f7273179a74dcb80` — confidence: verified.** Claim: when a script puts a secret
-from an env var into an HTTP header via Python `http.client`/`urllib`, a value
-with a bare CR/LF (a pasted key ending in `\n`) makes `putheader` raise a
-`ValueError` whose message contains the whole header value, so a traceback that
-escapes the script's own redaction prints the key.
-- CPython `Lib/http/client.py` (https://github.com/python/cpython/blob/main/Lib/http/client.py):
-  read in the local CPython 3.9 source — l.138
-  `_is_illegal_header_value = re.compile(rb'\n(?![ \t])|\r(?![ \t\n])').search`;
-  l.1234-1235 `if _is_illegal_header_value(values[i]): raise ValueError('Invalid header value %r' % (values[i],))`.
-  A trailing `\n` matches `\n(?![ \t])`, and `%r` repeats the full encoded value.
-  Web search confirmed the check came from the CVE-2016-5699 header-injection fix.
-  The `main`-branch file was not fetched in this run (WebFetch is not allowed here);
-  the cited line numbers are from 3.9.
-- Field reproduction (session evidence): on Python 3.13 and 3.11 the key appeared
-  in the traceback; after the pre-request check plus catch-all redaction, 0 key hits
-  and the mutation checks went red.
+**`4a4d2d93a546c007` — confidence: verified.** Claim: a child Claude Code that keeps
+`HOME` runs the user's `Stop` hooks after every response, so a multi-turn stream-json
+child repeats auto-publish/auto-PR hooks once per turn. A shell export of the hook's
+off switch is overwritten by the user's `settings.json` `env`. `--settings
+'{"env":{…}}'` outranks user settings and reaches hook processes.
+- https://code.claude.com/docs/en/hooks — "Per turn" events are `UserPromptSubmit`,
+  `Stop`, `StopFailure`; Stop runs when the main agent has finished responding and has
+  no matcher. The docs do not say outright that this holds under
+  `--input-format stream-json`; the field case covers that part.
+- https://code.claude.com/docs/en/settings — precedence managed > command-line
+  arguments (`--settings`) > local > project > user; a settings `env` value
+  "overwrites the same variable exported in your shell" and applies to subprocesses;
+  `--settings '{"disableAllHooks": true}'`; the Desktop-app / self-hosted-runner
+  exception.
+- Field case (session evidence, 2026-11-03, Claude Code 2.1.317): six Stop events in
+  a six-turn session log; a probe Stop hook recorded `AUTO_VELOG_AUTODRAFT=0
+  PROBE_X=from-settings`; dev-loop auto-flush printed only its notice in place of the
+  user setting `DEV_LOOP_AUTOFLUSH=1`.
+- Both doc lines came from web-search summaries of the pages; WebFetch is not
+  allowed in this run, so no page was fetched.
 
-**`3d610c1206e1bdd6` — confidence: verified (docs) + field observation.** Claim:
-in a Claude Code pane read through `tmux capture-pane`, grey text in the input box
-that nobody sent is the CLI's prompt suggestion. Plain capture drops styling, so the
-suggestion looks like an unsubmitted prompt.
-- https://code.claude.com/docs/en/interactive-mode (fetched 2026-10-22), "Prompt
-  suggestions": "shows a grayed-out example command in the prompt input"; after a
-  response it "can suggest your next prompt"; "Press `Tab` or `Right arrow` to place
-  the suggestion in the prompt input, then `Enter` to submit"; "Start typing to dismiss it".
-- tmux man page (https://man7.org/linux/man-pages/man1/tmux.1.html; same wording read
-  from the local tmux 3.7b `tmux.1`, l.2693-2696): "If -e is given, the output includes
-  escape sequences for text and background attributes."
-- Field observation (run i41): the box showed "승인됐습니다. 계획대로 구현하세요."
-  after `plan_ready`; `send-prompt.sh state lo-1-i41` → `ready` rc 0; the next real send
-  reported `delivered`.
-- Not claimed: which escape code (dim SGR 2 vs a grey colour) the CLI uses. The page
-  says "grey/dim" to match the docs' "grayed-out".
+**`b426bd7890dbefb1` — confidence: verified.** Claim: under an LLM gateway, the child
+inherits `ANTHROPIC_AUTH_TOKEN`, a bearer credential only the gateway accepts; a
+capture proxy forwarding to api.anthropic.com gets 401.
+- https://code.claude.com/docs/en/llm-gateway-connect — `ANTHROPIC_BASE_URL` points at
+  the gateway, `ANTHROPIC_AUTH_TOKEN` is sent as `Authorization: Bearer`; with a
+  gateway configured, a 401's text comes from the gateway and `/login` does not fix it.
+- Field case: first capture attempt 401 `authentication_error`; with the proxy
+  upstream set to the parent's `ANTHROPIC_BASE_URL`, three 200 responses.
 
-**`0a0ccc4ca0904514` — confidence: field-tested.** Claim: on a shared host, a
-browser e2e failure that moves to a different timing-dependent test on each re-run
-is CPU contention until shown otherwise. Measure load and foreign headless browsers,
-re-run once after 60 s quiet, and report every run line.
-- https://playwright.dev/docs/test-cli — `--workers` defaults to 50% of logical CPU
-  cores (already cited on the wiki; it sizes to the host's cores, not to free capacity).
-- https://playwright.dev/docs/ci — recommends `workers: 1` in CI "to prioritize
-  stability and reproducibility", so each test gets the full system resources. This was
-  confirmed only through a web-search summary of the official page; the page was not
-  fetched in this run.
-- Field observation (2026-10-18, 36-test Playwright suite): load avg 19 with a foreign
-  `chrome-headless-shell` at 110% CPU → "1 failed" at `leave.spec.ts:37`, then at
-  `game-bell.spec.ts:33`; after 60 s with no headless browser → "36 passed (50.9s)".
-  This is a single host, so the page is field-tested, not verified.
+**`6ee0f099480423ae` — confidence: verified.** Claim: `CLAUDE_CODE_SUBAGENT_MODEL`
+moved a general-purpose subagent but not Explore.
+- https://code.claude.com/docs/en/sub-agents#choose-a-model — "Setting
+  `CLAUDE_CODE_SUBAGENT_MODEL` by itself doesn't change the model the built-in
+  Explore and Plan subagents run on"; the env var ranks below per-call and
+  frontmatter `model`; `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` (v2.1.257+) applies one
+  model to all; a user/project subagent named `Explore` overrides the built-in.
+- The docs strengthen the candidate: it said "Explore uses the parent model" for
+  2.1.317 only; the ingested row states the documented mechanism and both fixes
+  (FORCE, user `Explore`) and adds Plan.
+- Field case: clean-environment capture — general-purpose request `model`
+  `claude-sonnet-5-5`, Explore request `model` `claude-opus-5-5`.
 
-**`97c37473b53e63c2`** — the claim is correct (MDN replacement-pattern table; the node
-evidence in the row), but it is already on the merged wiki. See Existing-layer check.
+**`11f15aebd9a88007` — confidence: field-tested (narrowed).** Claim: a child `claude`
+started inside a session inherits `CLAUDE_CODE_*` variables and may behave
+differently from a standalone run.
+- https://code.claude.com/docs/en/plugin-hints — Claude Code sets `CLAUDECODE=1` in
+  Bash-tool and hook commands and `CLAUDE_CODE_CHILD_SESSION=1` on v2.1.172+. That
+  backs "the child sees itself as nested".
+- The candidate's two observed effects were not both confirmed. "Subagent model not
+  applied" is explained by `6ee0` (the request was an Explore subagent), so it is
+  not cited as env inheritance. "Interactive session record not saved" stays as a
+  field observation marked "cause not isolated". The directive itself (start the
+  child under the existing step-1 `env -i` allow-list and record any variable kept)
+  needs no new claim; it applies the page's existing allow-list rule.
 
 ## Existing-layer check
 
-Pages read: security-secrets-secrets-in-code, infrastructure-ci-cd-secrets-handling, infrastructure-agent-orchestration-pane-delivery-confirmation, testing-flaky-diagnosing-flaky-tests, testing-flaky-docker-vm-oversubscription-under-parallel-containers, testing-e2e-e2e-stability, backend-node-language-string-replace-replacement-patterns
+Pages read: platforms-processes-spawning-an-agent-cli-from-a-server, platforms-tools-per-call-subagent-effort, platforms-shells-env-var-off-switches
 
-- **security-secrets-secrets-in-code** — merge target for `f727`. Its edge table
-  already has two "a library echoes the secret" rows: a URL-query key logged by HTTP
-  clients, and a DSN echoed in an error. The header-value `ValueError` is a third path
-  of the same kind, so it was added as one edge row, not a new page. One source line
-  and one field-evidence line were added. `last_verified` was left at 2026-07-12
-  because the other rows were not re-checked.
-- **infrastructure-ci-cd-secrets-handling** — read as a possible target (job-log
-  masking). Not chosen: it covers how the pipeline handles secrets, and this is a
-  script's own exception text. No edit.
-- **infrastructure-agent-orchestration-pane-delivery-confirmation** — merge target for
-  `3d61`. It already owns the input-box rows for this CLI (the `[Pasted text` placeholder,
-  where the input box sits). The suggestion case is a sibling edge row. Added the
-  interactive-mode doc to frontmatter sources, plus three Sources lines (tmux `-e`
-  quote, docs quote, field observation).
-- **testing-flaky-diagnosing-flaky-tests** — closest owner for `0a0c`. It is
-  `confidence: verified`. The 2026-10-22 log shows that the Wiki agent gate blocked
-  merging a single-field-reproduction mechanism into this page (the PR #275 split).
-  Following that precedent, the mechanism went to its own field-tested page. This page
-  gets one pointer edge row and a `related:` id; its confidence and date are unchanged.
-- **testing-flaky-docker-vm-oversubscription-under-parallel-containers** — the nearest
-  sibling: resource ceiling, different subset failing each run. It is a different case
-  (container memory, `409` errors, its own trigger), so the new page was not merged into
-  it. The two are cross-linked from the new page's `related:` and an edge row.
-- **testing-e2e-e2e-stability** — read for e2e overlap. It covers selectors, waits,
-  and data, not host contention. Linked from the new page's `related:`; no edit.
-- **backend-node-language-string-replace-replacement-patterns** — already says
-  `$n` / `$<name>` work for "regex patterns only; otherwise left literal", and has the
-  edge row "A string `from` (no captures) → `$1` stays literal, but `$$`, `$&`, `` $` ``,
-  `$'` still expand". That is exactly what `97c3` asks for, so it was dropped as a duplicate.
+Indexes read: `INDEX.md`, `wiki/platforms/index.md` (full).
 
-No conflicting directive was found and no page was superseded.
+- **platforms-processes-spawning-an-agent-cli-from-a-server** — owns the child
+  `claude` environment (allow-list of `PATH`/`HOME`/`CLAUDE_CODE_DISABLE_*`, cwd
+  outside a work tree). `b426` and `11f1` are rows of that same allow-list table
+  (gateway pair; parent `CLAUDECODE`/`CLAUDE_CODE_*`), and `4a4d` is the settings
+  half of the same spawn decision (which hooks the child runs). Merged: trigger
+  widened from "server" to "server, script, or another Claude Code session"; two
+  allow-list rows; step 5 with a two-row Need/Do table; three edge rows; one
+  Instead-of row; four doc sources + one field-case source; `related:` +
+  `platforms-shells-env-var-off-switches`, `platforms-tools-per-call-subagent-effort`;
+  `last_verified` 2026-11-03, `verified_model` claude-opus-5-5. Body is 110 lines
+  (≤ 120). No conflict with existing directives: the allow-list rule already strips
+  everything not named, the new rows only name two more variables explicitly.
+- **platforms-tools-per-call-subagent-effort** — its Sources already cite the
+  sub-agents model order and `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, and an edge row
+  covers FORCE. The Explore/Plan exemption was missing. Merged as one edge row,
+  one doc source line, one field-case line; "When this applies" gained the
+  "subagent model does not move" trigger; `last_verified` 2026-11-03.
+- **platforms-shells-env-var-off-switches** — its trigger "a feature you turned off
+  keeps running" matches `4a4d`'s shell-export symptom. Added one pointer edge row
+  to the spawning page's step 5 and a `related:` id; no directive change there.
+- `platforms-processes-non-interactive-cli-invocation` and
+  `platforms-tools-deny-rules-under-bypassed-permissions` were judged from their
+  index lines only (stdin/timeouts; permission deny rules) — different triggers,
+  not opened, not edited.
+
+Reviewer note: the repo's bats directive-count test (the "directive count" in
+earlier log entries) was not run here — Bash is limited to the queue and `gh pr
+list` in this headless run. Step 5 is a new numbered directive on the spawning
+page; bump the count if that test fails.
 
 ## Open-PR check
 
 Open `knowledge/*` heads at flush time (`gh pr list --repo choiyounggi/dev-loop
---state open --json number,headRefName --search "head:knowledge/"`):
-**#291** (`knowledge/autoflush-20261022-124048-18072`).
+--state open --json number,headRefName --search "head:knowledge/"`): #324, #319,
+#318, #317, #315, #310, #309, #308, #307, #306, #305, #304, #301, #300, #299, #298,
+#293. This headless run cannot `git diff` them; overlap was judged from each PR's
+title, changed-file list and report body (`gh pr list ... --json
+number,title,files,body`).
 
-This headless run cannot `git diff` that branch, and `gh pr view` / the GitHub MCP
-file list were not allowed. Overlap was judged from the queue rows that #291's run
-retired, using their `outcome` fields. #291 touches
-`testing-quality-anchor-cases-for-allowlist-regexes`,
-`testing-quality-checks-that-cannot-pass`,
-`qa-process-blind-llm-judgment-of-a-visual-rule`, and a new page
-`platforms-shells-non-ascii-text-after-an-unbraced-parameter`.
-
-- `f727` (security, secret in an HTTP header) — **new**: #291 touches no security page.
-- `3d61` (agent pane input box) — **new**: #291's only platforms/infrastructure page is
-  a bash parameter-expansion page, which is a different trigger.
-- `0a0c` (e2e flakiness under CPU contention) — **new**: #291 touches no `testing/flaky`
-  or e2e page.
-- `97c3` — not compared against #291: it was dropped against the merged layer.
-- `446c58c78d5e467f` (exact `git diff --numstat` count as a gate's expected value) —
-  **drop (plausible overlap)**, so its claim was **released**, not retired. It is a
-  gate-design lesson in `testing/quality`, and #291 is editing two `testing/quality`
-  gate pages (`checks-that-cannot-pass`, `anchor-cases-for-allowlist-regexes`). This run
-  cannot diff #291, so the manual flush should decide whether to fold it in or ingest it
-  as new.
+| Row | Overlapping open PR | Verdict |
+|-----|---------------------|---------|
+| `4a4d2d93a546c007` | None. No open PR edits `spawning-an-agent-cli-from-a-server.md`, `env-var-off-switches.md`, or any hooks/settings-precedence page. #300 edits `platforms/tools/deny-rules-under-bypassed-permissions.md` (permission deny rules — different trigger); #299 edits `command-text-inspected-before-execution.md` (PreToolUse gates on command text) | new |
+| `b426bd7890dbefb1` | None by trigger. #298 adds `backend/common/llm/gateway-model-alias-resolution.md`, which is about LiteLLM model aliases (`/model/info`), not gateway auth or proxy chaining | new |
+| `6ee0f099480423ae` | None. No open PR edits `per-call-subagent-effort.md` or any subagent-model page | new |
+| `11f15aebd9a88007` | None by trigger. #309 adds `tmux-server-environment-at-start.md` (tmux copies the client env into the server at start) — env inheritance, but a different mechanism and trigger | new |
+| `fc76dc4dfa08ecde` | #300 and #317 edit `testing/quality/checks-that-cannot-pass.md` (#300 also `tests-that-cannot-fail.md`); a skipped or always-valid validator is their theme. Same verdict as runs #318/#319/#324 | released (pending duplicate) |
+| `df1515d721c90d64` | #317 ("self-matching gate CHECKs … done-gates") edits `checks-that-cannot-pass.md` and `completion-predicates.md`; a check killed by its timeout reads as a check that cannot pass. Same verdict as run #324 | released (pending duplicate) |
+| 6 unread rows | not compared (unread) | released |
 
 ## Routing decision
 
-- `f7273179a74dcb80` → `security` / `secrets` → edge row in
-  `wiki/security/secrets/secrets-in-code.md`; security index "load when" extended.
-- `3d610c1206e1bdd6` → `infrastructure` / `agent-orchestration` → edge row in
-  `wiki/infrastructure/agent-orchestration/pane-delivery-confirmation.md`; infrastructure
-  index "load when" extended. Written generally (any helper that classifies the box, or
-  `capture-pane -e`); the dev-loop helper `send-prompt.sh` appears only in the evidence line.
-- `0a0ccc4ca0904514` → `testing` / `flaky` → new page
-  `wiki/testing/flaky/e2e-failures-moving-under-host-cpu-contention.md` (field-tested).
-  There is no new category: `flaky` already holds the sibling resource-ceiling page.
-  A pointer edge row and a `related:` id were added in `diagnosing-flaky-tests`, and a
-  testing index row was added. The INDEX.md testing line already covers "flaky tests".
+- `4a4d2d93a546c007`, `b426bd7890dbefb1`, `11f15aebd9a88007` →
+  `platforms` / `processes` → merged into
+  `wiki/platforms/processes/spawning-an-agent-cli-from-a-server.md`. `b426` and
+  `11f1` carried a `debugging` hint, but their directives are about how to build
+  a child process's environment, which this page owns. The diagnosis (401, missing
+  transcript) is only the symptom.
+- `6ee0f099480423ae` → `platforms` / `tools` → merged into
+  `wiki/platforms/tools/per-call-subagent-effort.md` (the page that already holds
+  the subagent model order and `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`).
+- Pointer only: `wiki/platforms/shells/env-var-off-switches.md` (one edge row).
+- `wiki/platforms/index.md` load-when lines extended for all three pages. No new
+  page, category or domain, so `INDEX.md` was not edited.
 - `log.md` has one entry appended for this run.
 
 ## Local-layer candidates
 
-These 13 plan-gap rows are excluded from this PR. Each records a design decision for
-the `emperor` (linkly) repository's own files, so each would be wrong in another
-codebase. Run wiki-ingest inside that project to keep any of them:
-
-| Row | Decision | Target |
-|-----|----------|--------|
-| `3632d0989f629104`, `7bfb7541e4e4bd8c` | t242 SECURITY.md sections and policy values | `wiki-local/security/disclosure/security-policy-file.md` |
-| `9700770d7c05b820` | t242 `.github/CODEOWNERS` layout | `wiki-local/infrastructure/repo-governance/codeowners-layout.md` |
-| `3d578bcfcbcc6b97`, `410400eb22f77f77` | t242 CODE_OF_CONDUCT.md source and contact | `wiki-local/infrastructure/repo-governance/code-of-conduct-source.md` |
-| `54aeaa8fdee5e0e7` | t242 mutation harness `TREE_CONTENTS` for new root files | `wiki-local/testing/quality/mutation-tree-contents.md` |
-| `0e0e7c7c4cef34c3` | t252 per-runner concurrency group for `_ai-gate.yml` | `wiki-local/infrastructure/ci-cd/ai-gate-concurrency-groups.md` |
-| `05df421bf905f5ce` | t252 `response_format: json_object` for the HTTP gate runner | `wiki-local/backend/llm/ai-gate-structured-output-mode.md` |
-| `1670e43e60cb7fe3`, `2df80edab8d41dfb` | t252 / t257 CHANGELOG bullet placement | `wiki-local/qa/release/changelog-bullet-placement.md` |
-| `1666b8cf32e274ea` | t257 `_relay_batch` calls begin/commit/rollback directly | `wiki-local/backend/outbox/relay-transaction-calls.md` |
-| `5ee53f499cc8d657`, `744090ce219677c0` | t249a1 RFC-0007 Review stage and §2.2 rule-5 chain notes | `wiki-local/qa/spec-process/rfc-promotion-checks.md` |
+none

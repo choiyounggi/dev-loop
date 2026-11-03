@@ -11,7 +11,7 @@ sources:
   - https://code.claude.com/docs/en/env-vars
   - https://code.claude.com/docs/en/settings-reference#fallbackmodel
   - "Field case 2026-10-08 (dev-loop PR #262: effort floor for analysis, design and QA agents)"
-last_verified: 2026-10-09
+last_verified: 2026-11-03
 verified_model: claude-opus-5-5
 related:
   [
@@ -28,8 +28,9 @@ related:
 A Claude Code session, skill, or orchestrator spawns the same subagent role at
 different effort levels depending on the call — by risk tier, task size, or
 review depth — and you are deciding how to pass the level. Also when a subagent
-appears to ignore the `effort` its definition sets, and when a role must never
-run below a minimum model or effort (a floor) on any tier or call path.
+appears to ignore the `effort` its definition sets, when a role must never
+run below a minimum model or effort (a floor) on any tier or call path, and
+when `CLAUDE_CODE_SUBAGENT_MODEL` does not move some subagents' model.
 
 ## Do this
 
@@ -74,6 +75,7 @@ run below a minimum model or effort (a floor) on any tier or call path.
 | A `maxEffortLevel` setting or organization effort cap is set | Variants above the cap run at the cap; read the cap before adding a higher variant |
 | The variant names an effort the model does not offer | Claude Code falls back to the highest supported level at or below it (`xhigh` runs as `high` on Opus 4.6); pin a `model` that offers the level |
 | `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` is on | Frontmatter `model` and the per-call `model` are both ignored; only `effort` still distinguishes the variants |
+| You set `CLAUDE_CODE_SUBAGENT_MODEL` to cut subagent cost | It is only a default below the per-call and frontmatter `model`, and the built-in Explore and Plan subagents ignore it (Explore inherits the main model, capped at Opus). Also set `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`, or define a user/project subagent named `Explore` with its own `model`; confirm each subagent type's model on its `/tasks` row |
 | A rationale paragraph in the base body explains the old level | The generator copies it into every variant; rewrite it when the levels change ([qa-document-verification-rationale-prose-after-a-config-value-change]) |
 
 ## Instead of
@@ -94,4 +96,6 @@ run below a minimum model or effort (a floor) on any tier or call path.
 - https://code.claude.com/docs/en/env-vars — `CLAUDE_CODE_EFFORT_LEVEL`: "Takes precedence over `--effort`, `/effort`, and the `modelSettings` and `effortLevel` settings. A `maxEffortLevel` cap still applies" (step 5, row 2; raw page re-checked 2026-10-09)
 - https://code.claude.com/docs/en/settings-reference#fallbackmodel — `fallbackModel`: "Name backup models for Claude Code to try, in order, when your primary model is overloaded or unavailable" (step 5, row 3)
 - Field case 2026-10-08 (dev-loop PR #262, merged as `5c9bddb`): one change closed all three paths — the tier generator went from one level lower to "one effort step lower, never below high", worker effort went from medium to high because the worker's in-session self-audit inherits `CLAUDE_CODE_EFFORT_LEVEL`, and the 429 rule went from "opus, then sonnet" to "whichever of `opus` and `fable` the 429 does not name … never below Opus". Re-checked 2026-10-09 in a scratch clone: with the generator set back to `task-reviewer:medium`, `tests/agent-model-pin.bats` test 5 ("meets the opus-5.5-high floor") failed; on `main` the two floor test files passed 21 of 21
+- https://code.claude.com/docs/en/sub-agents#choose-a-model — "Setting `CLAUDE_CODE_SUBAGENT_MODEL` by itself doesn't change the model the built-in Explore and Plan subagents run on"; `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` (v2.1.257+) applies one model to every subagent; a user or project subagent named `Explore` overrides the built-in and keeps its own `model` (search-result summary 2026-11-03; page not fetched)
+- Field case 2026-11-03 (Claude Code 2.1.317, clean-environment API capture): with `CLAUDE_CODE_SUBAGENT_MODEL=claude-sonnet-5-5`, a general-purpose subagent's request carried `claude-sonnet-5-5` and an Explore subagent's request carried the parent's `claude-opus-5-5`
 - Observed 2026-10-06 (Claude Code, Opus 5.5 session): the Agent tool's input schema lists `description`, `prompt`, `subagent_type`, `model`, `isolation`, `run_in_background` and no effort field
