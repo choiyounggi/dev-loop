@@ -13,7 +13,8 @@ sources:
   - https://www.gnu.org/software/bash/manual/html_node/Double-Quotes.html
   - https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
   - https://jqlang.org/manual/
-last_verified: 2026-09-03
+  - https://mywiki.wooledge.org/BashFAQ/050
+last_verified: 2026-11-03
 related: [platforms-tools-bsd-vs-gnu-cli, platforms-toolchains-version-management, platforms-shells-command-text-inspected-before-execution, platforms-shells-escapes-in-shell-string-literals, platforms-shells-env-var-off-switches, platforms-shells-unset-versus-empty-parameters, platforms-shells-option-like-argument-values, platforms-processes-tool-diagnostics-without-a-failing-exit-code, testing-quality-completion-predicates, platforms-processes-driving-a-tui-in-a-tmux-pane, infrastructure-agent-orchestration-shared-run-state, infrastructure-ci-cd-changed-files-only-gates, testing-quality-tests-that-cannot-fail, platforms-tools-jq-dot-rebinding-in-predicates, platforms-shells-redirection-order-for-a-silenced-write, platforms-shells-echo-of-text-you-did-not-write]
 ---
 
@@ -49,7 +50,7 @@ non-interactive environment).
 
 | Behavior | bash/sh | zsh | Portable action |
 |----------|---------|-----|-----------------|
-| Unquoted `$var` holding `cmd -flag` | Splits into `cmd` + `-flag` | Stays one word — runs `cmd -flag` as a single command name and fails `no such file` | Store only the binary path in the variable; pass flags as separate literal words or an array: `"$BIN" -C "$dir" init` |
+| Unquoted `$var` holding `cmd -flag` | Splits into `cmd` + `-flag` | Stays one word — runs `cmd -flag` as a single command name and fails `no such file` | Store only the binary path in the variable; pass flags as separate literal words or an array: `"$BIN" -C "$dir" init`. When the fixed part is a whole command (`perl x.pl`), define a function instead: `P() { perl x.pl "$@"; }` — it behaves the same in both shells |
 | Word starting with `=` (e.g. `echo ===`) | Literal `===` | `=word` expands to a command's path — bare `===` errors `== not found` and aborts the compound command | Use an alphabetic separator string (`echo SEP`) or quote it (`echo '==='`) |
 | Array indexing | 0-based | 1-based (unless `KSH_ARRAYS`) | Iterate with `"${arr[@]}"`; when a numeric index is unavoidable, gate the script to one shell via the shebang |
 
@@ -108,6 +109,7 @@ non-interactive environment).
 | A flag is parsed correctly but still appears among the operands | The reordering loop is inside a function. Flags set globals (which survive), operands are set positionally (which do not) — so detection works and the argument list stays wrong, with no error. Move the loop inline (step 5) |
 | A payload argument begins with `-` | Pass it after a `--` separator (`cmd -- "$text"`); quoting does not help, because the option parser, not the shell, is what claims it ([platforms-shells-option-like-argument-values]) |
 | Message text must contain a command example | Single-quote the whole argument, or write the text to a file and pass the path — a double-quoted backtick executes and the message ships with the output spliced in |
+| A batch of in-place edits calls a multi-word command stored in a variable (`P='perl x.pl'; $P file` per file) | In zsh every call fails `no such file or directory: perl x.pl`, and any later command in the batch (`sed -n`, a summary `echo`) still prints normal-looking output. Use the function form from step 4, have each edit print a success marker (`ok <file>`), and count the markers against the number of files before treating the batch as done |
 | A coordinator launches several tmux sessions or jobs from one shared multi-word variable (`set -- $args`) instead of calling the launcher per task | zsh keeps `$args` as one word (`SH_WORD_SPLIT` is off by default), so every session inherits one malformed name or cwd — `tmux ls` shows names containing spaces sharing a directory. Call the launcher once per task with its own quoted arguments, and verify each session right after start (`tmux display-message -t "$name" -p '#{session_name} #{pane_current_path}'`) so a malformed launch fails at its launch site instead of exiting 0 |
 
 ## Instead of
@@ -115,7 +117,7 @@ non-interactive environment).
 | If you are about to | Do this instead | Why |
 |---------------------|-----------------|-----|
 | Build a command string and `eval` it | Build an array and expand it: `cmd "${args[@]}"` | `eval` re-parses quotes and globs; arrays pass arguments through exactly |
-| Put a command plus its flags in one variable and run `$cmd` | Variable holds the binary path only; flags are separate words | zsh runs the whole value as one command name; bash re-splits and re-globs it |
+| Put a command plus its flags in one variable and run `$cmd` | Variable holds the binary path only; flags are separate words — or wrap the command in a function (`P() { perl x.pl "$@"; }`) | zsh runs the whole value as one command name; bash re-splits and re-globs it. Variables hold data; code belongs in a function (BashFAQ/050) |
 | Trust a trailing `echo "done"` as proof a step ran | Verify the produced state with an independent command | Inside `&&` chains and subshells, `set -e` misses failures and the echo still prints |
 | Wrap a regex containing `\$`, `\"`, or a backtick in double quotes | Single-quote the pattern (`grep -E '…\$'`), or write only the five double-quote escapes deliberately | Double quotes silently drop the backslash before those characters, so `"\$"` becomes bare `$` and the pattern matches something else |
 | Pass `VAR=` to turn off a feature a script reads as `${VAR:-default}` | Pass a value the script's validation rejects, or change the script to `${VAR-default}` | `:-` substitutes the default for an empty value too, so the feature stays on and the disable is silently ignored |
@@ -133,6 +135,8 @@ non-interactive environment).
 - https://zsh.sourceforge.io/Doc/Release/Parameters.html — zsh arrays numbered from 1 (KSH_ARRAYS excepted)
 - https://google.github.io/styleguide/shellguide.html — quote variables, prefer bash for scripts, arrays over eval
 - https://www.shellcheck.net/ — shell script static analysis
+- https://mywiki.wooledge.org/BashFAQ/050 — "I'm trying to put a command in a variable": variables hold data, code belongs in functions, dynamic arguments go in arrays
 - https://jqlang.org/manual/ — `index(s)` outputs the index of the first occurrence of `s` in the input; `IN(s)` outputs true if `.` appears in the stream; `--arg`/`--argjson` bind shell values as jq variables without re-tokenizing them
 - Field reproduction 2026-08-21 (dev-loop orchestrate on macOS zsh, issue choiyounggi/dev-loop#123): a shared `set -- $args` launch helper started three tmux sessions with space-containing names and one shared cwd (`tmux ls`); calling the launcher once per task with explicit arguments produced the intended sessions
+- Field reproduction 2026-11-02 (dev-loop t3-plugin-root-quoting, macOS zsh): `P='perl .claude/tmp/pin.pl'; $P <file>` across 11 files printed `(eval):8: no such file or directory: perl .claude/tmp/pin.pl` for each while the trailing `sed` output looked normal; with `P() { perl .claude/tmp/pin.pl "$@"; }` the batch printed 11 `ok tests/...` lines
 - Field reproduction 2026-08-27 (graph-drop guard, review t1-graph-drop-r1 F1): a `for id in $(jq -r …)` membership loop let a producer named `"Auth Token"` through (0 rejections); moving the test into jq with `--arg` rejected it (3 rejections)
