@@ -44,6 +44,8 @@
 #   exit 5    the prompt was sent but submission could NOT be confirmed — the
 #             session is alive and may hold an unsubmitted prompt (prints the
 #             last screen). Distinct from 4: there the CLI never came up.
+#             With LO_STATUS_DIR and LO_TASK_ID set, the status record is
+#             pre-seeded before this exit, as on exit 0 (#321).
 #   exit 6    the prompt was submitted but the worker's transcript shows it
 #             TRUNCATED: its first new user message is shorter than the
 #             prompt (issue #314, head lost). The session is alive; re-send
@@ -94,9 +96,10 @@
 #                      because the CLI appends a hash). Set it when the CLI
 #                      keeps transcripts elsewhere.
 #   LO_STATUS_DIR / LO_TASK_ID  when BOTH are set, pre-seed the status record
-#                      (phase=pending, via the sibling status-update.sh) once
-#                      the launch succeeds — on the reuse path and after the
-#                      prompt is confirmed submitted — so dead/stalled-worker
+#                      (phase=pending, via the sibling status-update.sh) on
+#                      reuse, after a confirmed submission, and before exit
+#                      5 (#321); never on exit 6 or 7, whose recovery may
+#                      re-send the prompt — so dead/stalled-worker
 #                      detection covers the session from launch, not from its
 #                      first self-report. A seeding failure warns on stderr
 #                      and never changes the exit code. Both unset: exactly
@@ -235,8 +238,9 @@ fi
 # Pre-seed the status record so dead/stalled-worker detection covers this
 # worker from launch time, not from its first self-report (plan_ready).
 # Active only when the orchestrator sets BOTH LO_STATUS_DIR and LO_TASK_ID.
-# A seeding failure must never fail a launch that already succeeded: warn on
-# stderr, keep the exit code (the `if !` condition context suppresses set -e).
+# A seeding failure must never change the exit code (0, or 5 when submission
+# is unconfirmed): warn on stderr, keep the exit code (the `if !` condition
+# context suppresses set -e).
 # stdout of status-update is routed to stderr so this script's parsed stdout
 # (session=… / ok:…) stays unchanged.
 preseed_status() {
@@ -596,6 +600,9 @@ done
 if [ "$submitted" -ne 1 ]; then
   echo "launch-session: $session prompt NOT confirmed submitted after ${submit_timeout}s — the session is alive and may be holding the prompt unsubmitted in its input box; send one Enter to '$session' or relaunch (last screen below)" >&2
   echo "$pane" | tail -8 >&2
+  # the session is alive, so the watch must cover it while the coordinator
+  # recovers it (one Enter or a re-send): seed before exiting (#321)
+  preseed_status
   exit 5
 fi
 confirm_receipt

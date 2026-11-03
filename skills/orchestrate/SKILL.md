@@ -118,15 +118,21 @@ run.
 (d) **measure it during the run, not only after it.** At that same
 merge-on-approval boundary, before offering the `/compact`, read this
 coordinator session's own peak context. Target the newest transcript in the
-project's mapped directory, not the directory: the teardown form
+project's mapped directory (mapped by transcript-dir.sh, the rule
+launch-session.sh and token-report.sh share), not the directory: the
+teardown form
 (`--cwd <root> .`) reports every past session for this project, while the newest
 transcript is this live session, since it is the only one being written during
 the run.
 
 ```sh
-d="$HOME/.claude/projects/$(printf '%s' "$PWD" | tr '/.' '-')"
-newest=$(ls -t "$d"/*.jsonl | head -1)
-sh {SKILL}/scripts/token-report.sh "$newest"
+. {SKILL}/scripts/transcript-dir.sh
+if transcript_dir_derive "$(pwd -P)" && transcript_dir_resolve "$td_root" "$td_name" && [ -d "$td_dir" ]; then
+  newest=$(ls -t "$td_dir"/*.jsonl | head -1)
+  sh {SKILL}/scripts/token-report.sh "$newest"
+else
+  echo "no transcript dir for $(pwd -P): ${td_err:-none or ambiguous}"
+fi
 ```
 
 That prints a two-row table, plus one `warn: peak context …` line on stderr once
@@ -1051,16 +1057,19 @@ reasoning-effort flags) that `worker-start` cannot express.
    substituted, to that file, creating `{ORCH_DIR}/prompts/` if absent; a
    multi-kilobyte first prompt can lose its head in the CLI's paste handling while
    the input box still empties (#314), and a one-line pointer stays under the
-   paste threshold). With BOTH vars set, a successful
-   launch (the confirmed-submission path AND the session-reuse path) pre-seeds
+   paste threshold). With BOTH vars set, launch-session.sh pre-seeds
    `<LO_STATUS_DIR>/<LO_TASK_ID>.json` phase=pending with the resolved session
    name via the sibling status-update.sh, so dead/stalled-worker detection covers
-   the pre-plan_ready window; a seeding failure warns on stderr only and never
-   changes the exit code; either var unset = the previous behavior exactly.
+   the pre-plan_ready window — on the confirmed-submission path, the
+   session-reuse path AND exit **5**, never on exit 6 or 7; a seeding failure
+   warns on stderr only and never changes the exit code; either var unset = the
+   previous behavior exactly.
    Exit **0** = launched *and* the prompt confirmed
    submitted; **4** = the REPL never became ready (relaunch); **5** = the prompt was
    sent but submission could NOT be confirmed — the session is alive and may be
-   holding an unsubmitted prompt, so read it with `scripts/send-prompt.sh state
+   holding an unsubmitted prompt; its status record is already pre-seeded, so
+   run no status-update.sh call before or after the recovery below. Read it
+   with `scripts/send-prompt.sh state
    lo-<n>` and branch on its exit: **9** (`unsubmitted`) means the prompt is
    already in the box — `scripts/send-prompt.sh keys lo-<n> Enter`, never a
    re-send (that double-pastes); re-send only when `state` reports `ready`/0.
