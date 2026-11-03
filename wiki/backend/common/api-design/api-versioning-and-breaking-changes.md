@@ -9,7 +9,7 @@ sources:
   - https://docs.stripe.com/upgrades
   - https://datatracker.ietf.org/doc/html/rfc8594
 last_verified: 2026-08-17
-related: [backend-common-change-impact-call-site-enumeration]
+related: [backend-common-change-impact-call-site-enumeration, backend-common-api-design-server-decisions-in-status-responses]
 ---
 
 # Versioning a Public API and Rolling Out Breaking Changes

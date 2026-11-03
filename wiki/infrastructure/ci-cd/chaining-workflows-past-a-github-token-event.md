@@ -11,7 +11,7 @@ sources:
   - https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run
   - https://github.com/googleapis/release-please-action/blob/main/README.md
 last_verified: 2026-10-09
-related: [infrastructure-ci-cd-workflow-authored-pull-requests]
+related: [infrastructure-ci-cd-workflow-authored-pull-requests, infrastructure-ci-cd-rerunnable-multi-artifact-release]
 ---
 
 # A Workflow That Must Start Another Workflow
