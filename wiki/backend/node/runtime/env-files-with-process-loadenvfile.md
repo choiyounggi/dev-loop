@@ -16,7 +16,7 @@ sources:
   - https://github.com/nodejs/node/blob/7514ef8caff3feea55c60d628e003ccbda850485/test/parallel/test-process-load-env-file.js
   - "Local reproduction 2026-10-08 (Node v26.7.0): layering order for the function and for repeated flags, shell precedence and two ways past it, literal `$` text, `\\n` in double quotes, NODE_OPTIONS through each path, a missing file and a relative path run from another directory"
 last_verified: 2026-10-08
-related: [infrastructure-config-environment-config, backend-common-orm-prisma-7-config-env-and-generated-client, security-secrets-secrets-in-code]
+related: [infrastructure-config-environment-config, backend-common-orm-prisma-7-config-env-and-generated-client, security-secrets-secrets-in-code, infrastructure-deploy-effective-target-guard-for-a-deploy-cli]
 ---
 
 # Loading .env Files with process.loadEnvFile

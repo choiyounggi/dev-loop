@@ -1,164 +1,88 @@
-# Knowledge flush — 3 insight(s) (headless auto-flush run 20261022-134153-21632)
+# Knowledge flush — 7 insight(s)
 
-18 queue rows were claimed this run: 3 ingested, 1 dropped as a duplicate of the
-merged wiki, 13 dropped as project-specific plan-gap rows, 1 released because it
-plausibly overlaps open PR #291. Nothing was folded into another branch.
+7 queued rows claimed: 7 general insights, 4 new pages, 3 merged into existing pages, 0 dropped. One candidate claim was refuted during verification and corrected (see dad0a142c377a6f1).
 
-| Candidate | Domain | Disposition |
-|-----------|--------|-------------|
-| `f7273179a74dcb80` — secret in an HTTP header leaks through `http.client`'s `ValueError` | security | **ingested** — edge row in `security-secrets-secrets-in-code` (verified) |
-| `3d610c1206e1bdd6` — text nobody sent in an agent CLI's input box is the grey prompt suggestion | infrastructure | **ingested** — edge row in `infrastructure-agent-orchestration-pane-delivery-confirmation` (verified docs + field observation) |
-| `0a0ccc4ca0904514` — e2e failure moving between tests under host CPU contention | testing | **ingested** — new page `testing-flaky-e2e-failures-moving-under-host-cpu-contention` (field-tested) |
-| `97c37473b53e63c2` — string-pattern `replace`: `$n` stays literal, `$$`/`$&`/`` $` ``/`$'` expand | backend (queued as frontend) | dropped — duplicate of merged page |
-| `446c58c78d5e467f` — `git diff --numstat` count depends on the diff algorithm | testing | released — plausible overlap with open PR #291 |
-| 13 plan-gap rows (see Local-layer candidates) | — | dropped — project-specific |
+This flush reuses the content of an earlier local commit (29a219b, same base `50a3af6`) that never reached GitHub, because the contributor has read-only access to this repo. Every page was reviewed again and four were corrected. The PR comes from the fork `jocenunes/dev-loop` for the same reason.
 
 ## Verified best-practice
 
-**`f7273179a74dcb80` — confidence: verified.** Claim: when a script puts a secret
-from an env var into an HTTP header via Python `http.client`/`urllib`, a value
-with a bare CR/LF (a pasted key ending in `\n`) makes `putheader` raise a
-`ValueError` whose message contains the whole header value, so a traceback that
-escapes the script's own redaction prints the key.
-- CPython `Lib/http/client.py` (https://github.com/python/cpython/blob/main/Lib/http/client.py):
-  read in the local CPython 3.9 source — l.138
-  `_is_illegal_header_value = re.compile(rb'\n(?![ \t])|\r(?![ \t\n])').search`;
-  l.1234-1235 `if _is_illegal_header_value(values[i]): raise ValueError('Invalid header value %r' % (values[i],))`.
-  A trailing `\n` matches `\n(?![ \t])`, and `%r` repeats the full encoded value.
-  Web search confirmed the check came from the CVE-2016-5699 header-injection fix.
-  The `main`-branch file was not fetched in this run (WebFetch is not allowed here);
-  the cited line numbers are from 3.9.
-- Field reproduction (session evidence): on Python 3.13 and 3.11 the key appeared
-  in the traceback; after the pre-request check plus catch-all redaction, 0 key hits
-  and the mutation checks went red.
+**9f5c3a177b7d59b1: a markdown code span copied into a gate `CHECK:` line runs as command substitution.**
+- Sources: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html (§2.6.3), https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
+- How verified: end-to-end on main `50a3af6`. `plan-gate.sh emit A` kept the backticks in `CHECK:`, and `gate-check.sh --run` recorded `baseline-tests-ran` UNMET with `exit=127`; the bare bullet recorded MET with `exit=0 matched: GATE_OK`. A code span printing `touch <path>` created the file, so the output really is executed.
+- Confidence: verified.
+- Owner note: `plan-gate.sh` lines 85 and 369 could strip the backticks. That is a skill change, so it is out of scope here.
 
-**`3d610c1206e1bdd6` — confidence: verified (docs) + field observation.** Claim:
-in a Claude Code pane read through `tmux capture-pane`, grey text in the input box
-that nobody sent is the CLI's prompt suggestion. Plain capture drops styling, so the
-suggestion looks like an unsubmitted prompt.
-- https://code.claude.com/docs/en/interactive-mode (fetched 2026-10-22), "Prompt
-  suggestions": "shows a grayed-out example command in the prompt input"; after a
-  response it "can suggest your next prompt"; "Press `Tab` or `Right arrow` to place
-  the suggestion in the prompt input, then `Enter` to submit"; "Start typing to dismiss it".
-- tmux man page (https://man7.org/linux/man-pages/man1/tmux.1.html; same wording read
-  from the local tmux 3.7b `tmux.1`, l.2693-2696): "If -e is given, the output includes
-  escape sequences for text and background attributes."
-- Field observation (run i41): the box showed "승인됐습니다. 계획대로 구현하세요."
-  after `plan_ready`; `send-prompt.sh state lo-1-i41` → `ready` rc 0; the next real send
-  reported `delivered`.
-- Not claimed: which escape code (dim SGR 2 vs a grey colour) the CLI uses. The page
-  says "grey/dim" to match the docs' "grayed-out".
+**dad0a142c377a6f1: non-ASCII object keys fail in Convex at runtime.**
+- Sources: https://docs.convex.dev/database/types, https://docs.convex.dev/production/state/limits, convex 1.46.0 and 1.47.0 `dist/esm/values/value.js` (`validateObjectField`).
+- How verified: `convexToJson` threw for `16–30`, `preço` and an emoji, and passed `16-30`. Through `convexTest`, on convex 1.46.0 with convex-test 0.0.60 and on 1.47.0 with 0.0.62, `t.query` and `t.mutation` threw the same error, including for a nested key.
+- Correction: the candidate said `convex-test` passes. That is false for a test that calls the registered function, so the page now says only helper-level tests miss it.
+- Confidence: verified.
 
-**`0a0ccc4ca0904514` — confidence: field-tested.** Claim: on a shared host, a
-browser e2e failure that moves to a different timing-dependent test on each re-run
-is CPU contention until shown otherwise. Measure load and foreign headless browsers,
-re-run once after 60 s quiet, and report every run line.
-- https://playwright.dev/docs/test-cli — `--workers` defaults to 50% of logical CPU
-  cores (already cited on the wiki; it sizes to the host's cores, not to free capacity).
-- https://playwright.dev/docs/ci — recommends `workers: 1` in CI "to prioritize
-  stability and reproducibility", so each test gets the full system resources. This was
-  confirmed only through a web-search summary of the official page; the page was not
-  fetched in this run.
-- Field observation (2026-10-18, 36-test Playwright suite): load avg 19 with a foreign
-  `chrome-headless-shell` at 110% CPU → "1 failed" at `leave.spec.ts:37`, then at
-  `game-bell.spec.ts:33`; after 60 s with no headless browser → "36 passed (50.9s)".
-  This is a single host, so the page is field-tested, not verified.
+**064e6c85d3711615: parallel children patching one parent document exhaust write-conflict retries, and `convex-test` cannot show it.**
+- Sources: https://docs.convex.dev/error, https://docs.convex.dev/testing/convex-test, convex-test 0.0.60 `dist/index.js` (`TransactionManager`), @convex-dev/workpool README and 0.4.13 `dist/component/complete.js`.
+- How verified: docs give the error text and the data-model remedy. The convex-test source serializes top-level transactions, and a local run of 34 parallel read-and-patch mutations gave 0 rejections and a final count of 34. The docs page does not discuss concurrency, so that claim rests on source and reproduction. The failure on a real deployment is a field report (34 children, 281 mock tests green); it was not reproduced here.
+- Correction: the earlier draft advised against throttling, but the Workpool README documents `maxParallelism: 1` as a fix, so it is now a table row. `onComplete` is inline only when `runOnCompleteInline` is set, and the page now says so.
+- Confidence: verified.
 
-**`97c37473b53e63c2`** — the claim is correct (MDN replacement-pattern table; the node
-evidence in the row), but it is already on the merged wiki. See Existing-layer check.
+**fb8f286a0d295bd3: an `apiSpec` timeout from `npx convex run` hides "Could not find function".**
+- Sources: convex 1.46.0 `dist/esm/cli/lib/run.js` lines 52-56.
+- How verified: source read: within `convex run`, `apiSpec` is queried only inside the `Could not find function` branch. The 1 s timeout is a field observation; no string for it exists in the npm package, so it comes from the server.
+- Confidence: verified for the mechanism.
+
+**ef1f9fc35666da7f: a target guard must resolve the environment in the CLI's own order.**
+- Sources: https://docs.convex.dev/cli/reference/deploy, https://docs.convex.dev/production/project-configuration, convex 1.46.0 `dist/esm/cli/lib/deploymentSelection.js` lines 84-85 and `command.js`, `npx convex deploy --help`.
+- How verified: source read plus a local dotenv 17.3.1 run: the same two `config` calls gave the file's value when unset and kept `dev:exported` when exported. `--help` confirms the production default and the `--dry-run` wording.
+- Correction: added the flags that override the environment (`--prod`, `--deployment`, `--deployment-name`, `--preview-name`, `--url`, `--admin-key`), which the candidate and the earlier draft omitted.
+- Confidence: verified.
+
+**9e1f0d72258b768a: prove "identical to main" by running the base commit's code against the committed snapshots.**
+- Sources: https://git-scm.com/docs/git-archive, https://jestjs.io/docs/cli (`--ci`), https://vitest.dev/guide/snapshot.
+- How verified: the tools' behaviour is documented, and Vitest was added beside Jest. The method itself comes from one field review (3 of 3 green, checksums unchanged).
+- Confidence: field-tested for the method.
+
+**b68aa8912bbe777d: three Templater toggles live in device local storage, not `data.json`.**
+- Sources: https://raw.githubusercontent.com/SilentVoid13/Templater/master/src/settings/LocalSettings.ts, https://raw.githubusercontent.com/SilentVoid13/Templater/master/src/settings/Settings.ts, https://raw.githubusercontent.com/SilentVoid13/Templater/master/src/main.ts, https://raw.githubusercontent.com/obsidianmd/obsidian-api/master/obsidian.d.ts
+- How verified: read current source on master, which matches the installed 2.26.0. `test/specs/migration.e2e.ts` asserts these keys are not migrated.
+- Correction: added the reset notice for old `data.json` values, and the vault scope of `App.loadLocalStorage`.
+- Confidence: verified.
+
+All 13 cited URLs returned HTTP 200 on 2026-11-04.
 
 ## Existing-layer check
 
-Pages read: security-secrets-secrets-in-code, infrastructure-ci-cd-secrets-handling, infrastructure-agent-orchestration-pane-delivery-confirmation, testing-flaky-diagnosing-flaky-tests, testing-flaky-docker-vm-oversubscription-under-parallel-containers, testing-e2e-e2e-stability, backend-node-language-string-replace-replacement-patterns
+Pages read: infrastructure-agent-orchestration-gate-evidence-exit-code-class, testing-quality-key-order-in-serialized-goldens, testing-quality-value-preserving-refactor-assertions, testing-quality-stale-artifact-baselines, debugging-signals-reading-error-messages, databases-transactions-optimistic-vs-pessimistic-locking
 
-- **security-secrets-secrets-in-code** — merge target for `f727`. Its edge table
-  already has two "a library echoes the secret" rows: a URL-query key logged by HTTP
-  clients, and a DSN echoed in an error. The header-value `ValueError` is a third path
-  of the same kind, so it was added as one edge row, not a new page. One source line
-  and one field-evidence line were added. `last_verified` was left at 2026-07-12
-  because the other rows were not re-checked.
-- **infrastructure-ci-cd-secrets-handling** — read as a possible target (job-log
-  masking). Not chosen: it covers how the pipeline handles secrets, and this is a
-  script's own exception text. No edit.
-- **infrastructure-agent-orchestration-pane-delivery-confirmation** — merge target for
-  `3d61`. It already owns the input-box rows for this CLI (the `[Pasted text` placeholder,
-  where the input box sits). The suggestion case is a sibling edge row. Added the
-  interactive-mode doc to frontmatter sources, plus three Sources lines (tmux `-e`
-  quote, docs quote, field observation).
-- **testing-flaky-diagnosing-flaky-tests** — closest owner for `0a0c`. It is
-  `confidence: verified`. The 2026-10-22 log shows that the Wiki agent gate blocked
-  merging a single-field-reproduction mechanism into this page (the PR #275 split).
-  Following that precedent, the mechanism went to its own field-tested page. This page
-  gets one pointer edge row and a `related:` id; its confidence and date are unchanged.
-- **testing-flaky-docker-vm-oversubscription-under-parallel-containers** — the nearest
-  sibling: resource ceiling, different subset failing each run. It is a different case
-  (container memory, `409` errors, its own trigger), so the new page was not merged into
-  it. The two are cross-linked from the new page's `related:` and an edge row.
-- **testing-e2e-e2e-stability** — read for e2e overlap. It covers selectors, waits,
-  and data, not host contention. Linked from the new page's `related:`; no edit.
-- **backend-node-language-string-replace-replacement-patterns** — already says
-  `$n` / `$<name>` work for "regex patterns only; otherwise left literal", and has the
-  edge row "A string `from` (no captures) → `$1` stays literal, but `$$`, `$&`, `` $` ``,
-  `$'` still expand". That is exactly what `97c3` asks for, so it was dropped as a duplicate.
-
-No conflicting directive was found and no page was superseded.
+- `wiki_search` ran on all 7 triggers. Top hits considered: 9f5c → `qa-process-completion-claims`, `platforms-shells-heredoc-body-expansion-with-backtick-prose`, `infrastructure-agent-orchestration-gate-evidence-exit-code-class`, `platforms-shells-command-text-inspected-before-execution`. 9e1f → `testing-quality-key-order-in-serialized-goldens`, `testing-quality-behavior-not-implementation`. The Convex, guard and Templater triggers returned only unrelated pages (best scores about 0.75).
+- `grep -i convex` and `grep -i 'obsidian|templater'` over `wiki/` returned nothing on main.
+- Merged: 9f5c into `gate-evidence-exit-code-class` (new step, edge rows, sources); fb8f into `reading-error-messages` (edge row, source); 9e1f into `stale-artifact-baselines` (edge row, sources).
+- Created: the four pages listed under Routing decision.
+- Conflicts: none flagged. The docs/code gap on ASCII field names is recorded as an edge row.
+- `related:` links added both ways: `backend-node-boundaries-runtime-validation`, `databases-transactions-optimistic-vs-pessimistic-locking`, `infrastructure-config-environment-config`, `backend-node-runtime-env-files-with-process-loadenvfile`.
+- Checks: `node scripts/wiki-structure-checks.js wiki` reports 472 pages, 0 findings; `wiki-lint-prohibitions.js` reports 0 violations.
 
 ## Open-PR check
 
-Open `knowledge/*` heads at flush time (`gh pr list --repo choiyounggi/dev-loop
---state open --json number,headRefName --search "head:knowledge/"`):
-**#291** (`knowledge/autoflush-20261022-124048-18072`).
+Listed 22 open `knowledge/*` heads: #293, #298-#301, #304-#310, #315, #317-#319, #324, #328-#332. Diffed the 19 same-repo heads through `origin/<head>`, and the 3 fork heads (#298, #299, #300) through `pull/<n>/head`, for Convex, Templater, Obsidian, `git archive`, workpool, `.env`, backtick, snapshot and command substitution. A title and body search for Convex or Templater returned nothing.
 
-This headless run cannot `git diff` that branch, and `gh pr view` / the GitHub MCP
-file list were not allowed. Overlap was judged from the queue rows that #291's run
-retired, using their `outcome` fields. #291 touches
-`testing-quality-anchor-cases-for-allowlist-regexes`,
-`testing-quality-checks-that-cannot-pass`,
-`qa-process-blind-llm-judgment-of-a-visual-rule`, and a new page
-`platforms-shells-non-ascii-text-after-an-unbraced-parameter`.
-
-- `f727` (security, secret in an HTTP header) — **new**: #291 touches no security page.
-- `3d61` (agent pane input box) — **new**: #291's only platforms/infrastructure page is
-  a bash parameter-expansion page, which is a different trigger.
-- `0a0c` (e2e flakiness under CPU contention) — **new**: #291 touches no `testing/flaky`
-  or e2e page.
-- `97c3` — not compared against #291: it was dropped against the merged layer.
-- `446c58c78d5e467f` (exact `git diff --numstat` count as a gate's expected value) —
-  **drop (plausible overlap)**, so its claim was **released**, not retired. It is a
-  gate-design lesson in `testing/quality`, and #291 is editing two `testing/quality`
-  gate pages (`checks-that-cannot-pass`, `anchor-cases-for-allowlist-regexes`). This run
-  cannot diff #291, so the manual flush should decide whether to fold it in or ingest it
-  as new.
+- All 7 candidates: **new**. Keyword hits in #299, #309, #317 and #329 are unrelated uses of "snapshot" or "command substitution".
+- Adjacent, not duplicate: #301 covers UTF-8 byte bounds for client JSON keys, which is a different trigger from Convex field names. #300 edits `environment-config.md`, which this PR touches only in `related:`, so a trivial merge conflict is possible.
 
 ## Routing decision
 
-- `f7273179a74dcb80` → `security` / `secrets` → edge row in
-  `wiki/security/secrets/secrets-in-code.md`; security index "load when" extended.
-- `3d610c1206e1bdd6` → `infrastructure` / `agent-orchestration` → edge row in
-  `wiki/infrastructure/agent-orchestration/pane-delivery-confirmation.md`; infrastructure
-  index "load when" extended. Written generally (any helper that classifies the box, or
-  `capture-pane -e`); the dev-loop helper `send-prompt.sh` appears only in the evidence line.
-- `0a0ccc4ca0904514` → `testing` / `flaky` → new page
-  `wiki/testing/flaky/e2e-failures-moving-under-host-cpu-contention.md` (field-tested).
-  There is no new category: `flaky` already holds the sibling resource-ceiling page.
-  A pointer edge row and a `related:` id were added in `diagnosing-flaky-tests`, and a
-  testing index row was added. The INDEX.md testing line already covers "flaky tests".
-- `log.md` has one entry appended for this run.
+| Insight | Target | Action |
+|---------|--------|--------|
+| 9f5c3a177b7d59b1 | infrastructure/agent-orchestration/gate-evidence-exit-code-class | merge |
+| dad0a142c377a6f1 | backend/node/convex/ascii-keys-in-returned-objects | new page |
+| 064e6c85d3711615 | backend/node/convex/parallel-children-writing-one-parent-document | new page |
+| fb8f286a0d295bd3 | debugging/signals/reading-error-messages | merge |
+| ef1f9fc35666da7f | infrastructure/deploy/effective-target-guard-for-a-deploy-cli | new page |
+| 9e1f0d72258b768a | testing/quality/stale-artifact-baselines | merge |
+| b68aa8912bbe777d | platforms/tools/templater-device-local-settings | new page |
+
+New category `backend/node/convex`: no existing node category (runtime, async, boundaries, language) fits a hosted backend's value rules and transaction model, and two pages share it.
 
 ## Local-layer candidates
 
-These 13 plan-gap rows are excluded from this PR. Each records a design decision for
-the `emperor` (linkly) repository's own files, so each would be wrong in another
-codebase. Run wiki-ingest inside that project to keep any of them:
+none
 
-| Row | Decision | Target |
-|-----|----------|--------|
-| `3632d0989f629104`, `7bfb7541e4e4bd8c` | t242 SECURITY.md sections and policy values | `wiki-local/security/disclosure/security-policy-file.md` |
-| `9700770d7c05b820` | t242 `.github/CODEOWNERS` layout | `wiki-local/infrastructure/repo-governance/codeowners-layout.md` |
-| `3d578bcfcbcc6b97`, `410400eb22f77f77` | t242 CODE_OF_CONDUCT.md source and contact | `wiki-local/infrastructure/repo-governance/code-of-conduct-source.md` |
-| `54aeaa8fdee5e0e7` | t242 mutation harness `TREE_CONTENTS` for new root files | `wiki-local/testing/quality/mutation-tree-contents.md` |
-| `0e0e7c7c4cef34c3` | t252 per-runner concurrency group for `_ai-gate.yml` | `wiki-local/infrastructure/ci-cd/ai-gate-concurrency-groups.md` |
-| `05df421bf905f5ce` | t252 `response_format: json_object` for the HTTP gate runner | `wiki-local/backend/llm/ai-gate-structured-output-mode.md` |
-| `1670e43e60cb7fe3`, `2df80edab8d41dfb` | t252 / t257 CHANGELOG bullet placement | `wiki-local/qa/release/changelog-bullet-placement.md` |
-| `1666b8cf32e274ea` | t257 `_relay_batch` calls begin/commit/rollback directly | `wiki-local/backend/outbox/relay-transaction-calls.md` |
-| `5ee53f499cc8d657`, `744090ce219677c0` | t249a1 RFC-0007 Review stage and §2.2 rule-5 chain notes | `wiki-local/qa/spec-process/rfc-promotion-checks.md` |
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

@@ -37,3 +37,10 @@ own the Node mechanics.
 | Page | Load when |
 |------|-----------|
 | [string-replace-replacement-patterns](language/string-replace-replacement-patterns.md) | A JS/TS script (codemod, fixture or snippet paster, template filler, build step) inserts text it did not write — SQL, shell, a fixture, user input, file contents — with `replace`/`replaceAll` or a regex; a pasted plpgsql `$$` body arrives as `$` (Postgres 42601 `syntax error at or near "$"`) or a `$&`/`` $` ``/`$'` in the inserted text turns into other text; choosing between a replacer function, `split/join`, and escaping `$` as `$$` |
+
+## convex
+
+| Page | Load when |
+|------|-----------|
+| [ascii-keys-in-returned-objects](convex/ascii-keys-in-returned-objects.md) | A Convex function returns or stores an object whose keys come from data or labels (en dash, accent, emoji); the log shows `Field name ... has invalid character` while types and helper tests pass |
+| [parallel-children-writing-one-parent-document](convex/parallel-children-writing-one-parent-document.md) | Parallel workpool or scheduled actions patch one shared parent document; a job passes `convex-test` and fails on a deployment with "changed while this mutation was being run and on every subsequent retry" |

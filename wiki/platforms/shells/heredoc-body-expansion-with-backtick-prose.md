@@ -9,7 +9,7 @@ sources:
   - https://zsh.sourceforge.io/Doc/Release/Redirection.html
   - https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
 last_verified: 2026-09-28
-related: [platforms-shells-escapes-in-shell-string-literals, platforms-shells-portable-shell-scripts, platforms-shells-command-text-inspected-before-execution]
+related: [platforms-shells-escapes-in-shell-string-literals, platforms-shells-portable-shell-scripts, platforms-shells-command-text-inspected-before-execution, infrastructure-agent-orchestration-gate-evidence-exit-code-class]
 ---
 
 # Heredoc Body That Must Expand a Variable While Holding Backtick Prose
