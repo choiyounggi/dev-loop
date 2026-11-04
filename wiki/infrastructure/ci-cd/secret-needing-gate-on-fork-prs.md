@@ -9,7 +9,7 @@ sources:
   - https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/
   - https://github.com/anthropics/claude-code-action/blob/main/docs/security.md
 last_verified: 2026-09-08
-related: [infrastructure-ci-cd-secrets-handling, infrastructure-ci-cd-pipeline-structure, infrastructure-ci-cd-review-bot-adopted-as-a-blocking-gate]
+related: [infrastructure-ci-cd-secrets-handling, infrastructure-ci-cd-pipeline-structure, infrastructure-ci-cd-review-bot-adopted-as-a-blocking-gate, infrastructure-ci-cd-tool-restriction-for-a-ci-agent-runner]
 ---
 
 # A Secret-Needing Check Gate on Pull Requests From Forks
