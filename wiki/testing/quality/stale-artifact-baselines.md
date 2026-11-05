@@ -8,7 +8,10 @@ sources:
   - https://slsa.dev/spec/v1.0/provenance
   - https://jestjs.io/docs/snapshot-testing
   - http://octopusinvitro.gitlab.io/blog/code-and-tech/approval-testing
-last_verified: 2026-08-06
+  - https://git-scm.com/docs/git-archive
+  - https://jestjs.io/docs/cli
+  - https://vitest.dev/guide/snapshot
+last_verified: 2026-11-04
 related: [testing-quality-differential-run-agreement, testing-quality-tests-that-cannot-fail, testing-quality-harness-reverse-controls, qa-deliverables-generated-artifacts-as-deliverable-source, testing-quality-key-order-in-serialized-goldens]
 ---
 
@@ -86,6 +89,7 @@ and you are about to treat the comparison as clean.
 | Case | Then |
 |------|------|
 | The artifact is an approved snapshot in the suite (`.approved`, `.snap`) | Regenerating it to match current output is the deliberate act the tooling warns about — "we would need to fix the bug before re-generating snapshots to avoid recording snapshots of the buggy behavior"; review the diff row by row before approving |
+| A PR claims "identical to main" and cites a snapshot it says main produced | Export the base commit to an empty directory (`git archive <base> \| tar -x -C <dir>`), install the base commit's dependencies (the export has no `node_modules`), put the PR's committed snapshots in place, run the same test in CI mode so nothing is rewritten, and compare the snapshot checksums before and after. A snapshot regenerated on the branch shows only that the branch agrees with itself |
 | The row identity is not stable across generations (positional index, re-issued ids) | Key on a natural composite (entity id + period) and report rows whose key resolves in one side only as a separate class from rows whose values differ |
 | Only aggregates are available (the rows were never published) | Report the aggregate comparison as an aggregate claim and state that row-level agreement was not evaluated — the number is real and its scope is narrow |
 | Regenerating the before side is expensive (long pipeline, external data) | Regenerate on the subset the change can reach, chosen by the code paths the revert touches, and mark the rest untested rather than assuming |
@@ -107,3 +111,7 @@ and you are about to treat the comparison as clean.
 - https://jestjs.io/docs/snapshot-testing — "If we had any additional failing snapshot tests due to an unintentional bug, we would need to fix the bug before re-generating snapshots to avoid recording snapshots of the buggy behavior"; snapshots are to be committed and reviewed "as you would any other type of test or code in your project"
 - http://octopusinvitro.gitlab.io/blog/code-and-tech/approval-testing — on the golden-master framing: "'Golden Master' is not a great name for the snapshot, as it implies that it will never change, and this is not always true"
 - Field reproduction 2026-08-05 (manday engine, impact measurement of one regex change): `estimated.json`'s counted-SP total was 211.48, matching the current HEAD run exactly, so the file read as a clean baseline. A row-level comparison found NEWRTB-2182 differing (분석조사/0.19 in the file vs 인프라/0.56 on HEAD). The file was generated before the classifier's lookbehind change — its `dead` field being `None`, which current code always populates, dated it — and the issue was a rollup parent excluded from the counted total, which is why the totals agreed while a row did not
+- https://git-scm.com/docs/git-archive — exports the tree of a named commit without touching the working tree
+- https://jestjs.io/docs/cli — `--ci`: a new snapshot fails the test instead of being stored automatically
+- https://vitest.dev/guide/snapshot — Vitest does not write snapshots when `process.env.CI` is truthy; mismatched, missing and obsolete snapshots fail the run
+- Field report: a review ran the base commit's code against the committed snapshots; 3 of 3 passed and the three JSON checksums stayed the same

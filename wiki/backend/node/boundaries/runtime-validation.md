@@ -7,7 +7,7 @@ confidence: verified
 sources:
   - https://zod.dev/basics
 last_verified: 2026-07-10
-related: [security-input-validation-at-trust-boundaries, backend-common-api-design-error-responses, backend-common-jobs-idempotent-handlers, backend-node-boundaries-nestjs-multer-upload-errors]
+related: [security-input-validation-at-trust-boundaries, backend-common-api-design-error-responses, backend-common-jobs-idempotent-handlers, backend-node-boundaries-nestjs-multer-upload-errors, backend-node-convex-ascii-keys-in-returned-objects]
 ---
 
 # Typing External Data in a TypeScript Service
