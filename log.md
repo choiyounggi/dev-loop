@@ -435,3 +435,4 @@ Append-only. Format: `## [YYYY-MM-DD] <ingest|revise|lint|gap|contradiction|drif
 ## [2026-11-04] ingest | platforms-tools-templater-device-local-settings — three Templater toggles live in device local storage, not data.json
 ## [2026-11-04] ingest | debugging-signals-reading-error-messages — edge row: an internal lookup failing while the tool reports another error hides the original
 ## [2026-11-04] ingest | testing-quality-stale-artifact-baselines — edge row: prove "identical to main" by running the base commit's code against the committed snapshots
+## [2026-11-06] ingest | backend-common-ml-inference-device-choice-on-apple-silicon — new page: measure CPU fp32 / MPS fp32 / MPS fp16 p95 at batch 1 before picking the device; pin device and dtype; re-run the task metric after fp16

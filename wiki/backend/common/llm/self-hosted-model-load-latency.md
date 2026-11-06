@@ -8,7 +8,7 @@ sources:
   - https://github.com/ollama/ollama/blob/main/docs/faq.mdx
   - https://github.com/ollama/ollama/blob/main/docs/api.md
 last_verified: 2026-09-28
-related: [backend-common-llm-context-window-budget, backend-common-reliability-timeouts-and-retries, backend-common-reliability-client-side-rate-limiting]
+related: [backend-common-llm-context-window-budget, backend-common-reliability-timeouts-and-retries, backend-common-reliability-client-side-rate-limiting, backend-common-ml-inference-device-choice-on-apple-silicon]
 ---
 
 # First Request to a Self-Hosted Model Server After Idle
