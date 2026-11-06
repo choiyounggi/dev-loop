@@ -8,7 +8,7 @@ sources:
   - https://arxiv.org/abs/0912.0902
   - https://arxiv.org/abs/1605.02541
 last_verified: 2026-08-07
-related: []
+related: [backend-common-ml-grouped-cross-validation-for-templated-examples]
 ---
 
 # Point Predictions from a Median-Predicting Model Scored by MAPE

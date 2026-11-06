@@ -10,7 +10,7 @@ sources:
   - "표준국어대사전 (https://stdict.korean.go.kr): entries 안2, 못4, 없다, 않다, 불-12, 비-30, 무-10, 미-11"
   - "Local computation 2026-10-11 (Node 26.7.0, character-bigram sets with whitespace removed)"
 last_verified: 2026-10-11
-related: [backend-common-llm-completion-response-validation, platforms-environment-unicode-text-matching]
+related: [backend-common-llm-completion-response-validation, platforms-environment-unicode-text-matching, backend-common-ml-grouped-cross-validation-for-templated-examples]
 ---
 
 # Deduplicating Korean Summary Lines by Character-Bigram Overlap
