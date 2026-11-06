@@ -435,3 +435,4 @@ Append-only. Format: `## [YYYY-MM-DD] <ingest|revise|lint|gap|contradiction|drif
 ## [2026-11-04] ingest | platforms-tools-templater-device-local-settings — three Templater toggles live in device local storage, not data.json
 ## [2026-11-04] ingest | debugging-signals-reading-error-messages — edge row: an internal lookup failing while the tool reports another error hides the original
 ## [2026-11-04] ingest | testing-quality-stale-artifact-baselines — edge row: prove "identical to main" by running the base commit's code against the committed snapshots
+## [2026-11-06] ingest | backend-common-ml-grouped-cross-validation-for-templated-examples — group near-duplicate templated examples before CV; threshold from out-of-fold predictions, OOS recall on a held-out set
