@@ -113,6 +113,7 @@ Match your situation to a "load when" line; load only matching pages.
 
 | Page | Load when |
 |------|-----------|
+| [inference-device-choice-on-apple-silicon](common/ml/inference-device-choice-on-apple-silicon.md) | Running a PyTorch transformer (sentence-transformers embedding model, encoder classifier) one request at a time on an Apple Silicon Mac and choosing `cpu` vs `mps` and fp32 vs fp16; a "MPS is slower for small batches" rule is about to decide the device unmeasured; `device` left unset so the library picks MPS; a half-precision checkpoint lands on CPU and runs slowly; re-checking the task metric after an fp16 switch |
 | [mape-aligned-point-prediction](common/ml/mape-aligned-point-prediction.md) | A regression model evaluated by MAPE was trained as a median predictor (log target + L1 loss, or quantile q50) — deciding what point value to emit, or the model systematically overpredicts on MAPE despite fitting well; choosing between a global scale factor and per-row variance-based correction |
 | [benchmark-relative-signal-classification](common/ml/benchmark-relative-signal-classification.md) | Code grades a per-entity observation (a stock's move or buy-flow, a store's sales jump, a cohort's lift, a service's latency change) as entity-specific strength while a driver shared by the whole population (market index, holiday, platform-wide release, seasonality) moves every entity; the same "strong" label fires across most of the population on one day; choosing the benchmark and the window a signal grader needs; the benchmark feed is missing |
 
