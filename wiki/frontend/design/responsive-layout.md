@@ -25,7 +25,7 @@ sources:
   - https://www.w3.org/TR/css-text-3/
   - https://developer.mozilla.org/en-US/docs/Web/CSS/flex-shrink
 last_verified: 2026-09-06
-related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements, frontend-performance-bundle-and-assets, frontend-design-design-canvas-workflow, frontend-design-ui-hardening-against-real-content, frontend-design-product-ui-vs-brand-surface]
+related: [frontend-design-anti-slop-visual-design, frontend-accessibility-interactive-elements, frontend-performance-bundle-and-assets, frontend-design-design-canvas-workflow, frontend-design-ui-hardening-against-real-content, frontend-design-product-ui-vs-brand-surface, frontend-design-rendered-ui-gate-for-agent-built-screens]
 ---
 
 # Making One Layout Work From 320px Phones to Desktop
