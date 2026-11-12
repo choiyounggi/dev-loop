@@ -40,7 +40,7 @@ Decide by the platforms you must ship and how the app changes after release.
 | You ship on web, macOS, iOS or Linux, and you can rebuild when Exact changes | Exact fits: one `app.contract` runs on all four hosts with native controls (UIKit, AppKit, the browser's DOM) |
 | You must ship to Google Play or distribute a Windows app | Choose another stack for now: Android builds, runs and is driven on emulators and phones, but delivery and store packaging do not exist; Windows control parity and delivery are unfinished |
 | You need to ship TypeScript or Rust logic changes to installed apps without a store release | Choose another stack, or plan store releases for every logic change: signed delivery covers plans and assets, not TypeScript or Rust modules |
-| You need camera access, grid/masonry virtualization, a general webview, or a devtools UI | Choose another stack: v1 leaves these out on purpose |
+| You need camera access, grid/masonry virtualization, a general webview beyond `iframe`, or a devtools UI | Choose another stack: v1 leaves these out on purpose |
 | The app's view logic needs loops, `await`, or I/O inside the UI layer | Put that work in a data source (`app.ts` or a Rust crate) and keep Contract declarative: Contract has no effects outside actions, no loops in actions, no `await` |
 
 When Exact fits:
