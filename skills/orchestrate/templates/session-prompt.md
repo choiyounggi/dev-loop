@@ -84,19 +84,19 @@ into the pointer file's content).
 
 ## (1) Plan — injected at session launch
 
-You are the session for {TASK}. Treat {ORCH_DIR}/briefs/{TASK}.md `<task_brief>` as authority — especially `<scope_boundaries>`, `<dependencies>`, and `<definition_of_done>`. Use the loop-implement skill but STOP after planning. The coordinator has ALREADY run `wiki-plan` and written the plan to {ORCH_DIR}/plans/{TASK}.md, so take loop-implement step 2's "a plan already exists" path: ADOPT that plan, do not re-plan it. Check it against the brief — every decision actually made (nothing left "as appropriate"), each with its decision->page map entry, and no contradiction with `<scope_boundaries>`, `<dependencies>`, or `<definition_of_done>`. If it fails any of those, do NOT quietly rewrite it: report the specific gap as a failure and stop, so the coordinator re-plans on the planning model. Otherwise run `STATUS_DIR=.orchestration/status sh {SKILL}/scripts/status-update.sh {TASK} plan_ready worktree=$PWD` and wait for an approval message. Do NOT write implementation code yet.
+You are the session for {TASK}. Treat {ORCH_DIR}/briefs/{TASK}.md `<task_brief>` as authority — especially `<scope_boundaries>`, `<dependencies>`, and `<definition_of_done>`. Use the loop-implement skill but STOP after planning. The coordinator has ALREADY run `wiki-plan` and written the plan to {ORCH_DIR}/plans/{TASK}.md, so take loop-implement step 2's "a plan already exists" path: ADOPT that plan, do not re-plan it. Check it against the brief — every decision actually made (nothing left "as appropriate"), each with its decision->page map entry, and no contradiction with `<scope_boundaries>`, `<dependencies>`, or `<definition_of_done>`. If it fails any of those, do NOT quietly rewrite it: report the specific gap as a failure and stop, so the coordinator re-plans on the planning model. Otherwise run `STATUS_DIR=.orchestration/status sh "{SKILL}/scripts/status-update.sh" {TASK} plan_ready worktree=$PWD` and wait for an approval message. Do NOT write implementation code yet.
 
 ## (2) Implement — injected after plan approval
 
-Approved. First read {ORCH_DIR}/notes/decisions.md if it exists (cross-task facts; consume, never edit past lines). Implement {ORCH_DIR}/plans/{TASK}.md via the loop-implement skill: respect `<effort_level>` (max 3 retries), write tests first, run them, self-review, and at step 6.5 you MUST call the test-quality-auditor subagent. Never touch anything in `<out_of_scope>`. Confirm EVERY `<definition_of_done>` item. If you changed a declared interface or made a load-bearing decision, APPEND one line with `printf '%s\n' '- [{TASK}] <fact>' >> {ORCH_DIR}/notes/decisions.md` (never Write/Edit — concurrent workers can drop each other's lines), and re-read the file before self-review. Then run `STATUS_DIR=.orchestration/status sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD` and wait. Do not commit, push, or PR.
+Approved. First read {ORCH_DIR}/notes/decisions.md if it exists (cross-task facts; consume, never edit past lines). Implement {ORCH_DIR}/plans/{TASK}.md via the loop-implement skill: respect `<effort_level>` (max 3 retries), write tests first, run them, self-review, and at step 6.5 you MUST call the test-quality-auditor subagent. Never touch anything in `<out_of_scope>`. Confirm EVERY `<definition_of_done>` item. If you changed a declared interface or made a load-bearing decision, APPEND one line with `printf '%s\n' '- [{TASK}] <fact>' >> {ORCH_DIR}/notes/decisions.md` (never Write/Edit — concurrent workers can drop each other's lines), and re-read the file before self-review. Then run `STATUS_DIR=.orchestration/status sh "{SKILL}/scripts/status-update.sh" {TASK} impl_done worktree=$PWD` and wait. Do not commit, push, or PR.
 
 ## (3) Rework — injected when review requests changes
 
-Address the issues in {ORCH_DIR}/reviews/{TASK}-r{N}.md via the loop-implement skill (re-run step 6.5 audit; never weaken or skip tests). Per finding: fix it, or answer its Question with the concrete reason and leave it — either way, append `- **Answer (r{N})** — fixed` or `- **Answer (r{N})** — stands: <reason>` under that finding in the absolute file {ORCH_DIR}/reviews/{TASK}-r{N}.md; silence on any finding is not a valid resolution. This obligation binds blocking findings only — answering Non-blocking findings is encouraged, not required. Then run `STATUS_DIR=.orchestration/status sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD` and wait.
+Address the issues in {ORCH_DIR}/reviews/{TASK}-r{N}.md via the loop-implement skill (re-run step 6.5 audit; never weaken or skip tests). Per finding: fix it, or answer its Question with the concrete reason and leave it — either way, append `- **Answer (r{N})** — fixed` or `- **Answer (r{N})** — stands: <reason>` under that finding in the absolute file {ORCH_DIR}/reviews/{TASK}-r{N}.md; silence on any finding is not a valid resolution. This obligation binds blocking findings only — answering Non-blocking findings is encouraged, not required. Then run `STATUS_DIR=.orchestration/status sh "{SKILL}/scripts/status-update.sh" {TASK} impl_done worktree=$PWD` and wait.
 
 ## (4) Merge-prep — injected after final approval
 
-Approved. Commit your changes on {BRANCH} with a conventional message (no push, no PR — the orchestrator merges into {INTEG} locally). Then run `STATUS_DIR=.orchestration/status sh {SKILL}/scripts/status-update.sh {TASK} done worktree=$PWD`. You may then stop.
+Approved. Commit your changes on {BRANCH} with a conventional message (no push, no PR — the orchestrator merges into {INTEG} locally). Then run `STATUS_DIR=.orchestration/status sh "{SKILL}/scripts/status-update.sh" {TASK} done worktree=$PWD`. You may then stop.
 
 ## tmux worker protocol — REQUIRED block, append to every §1–§4 prompt above
 
@@ -106,7 +106,7 @@ Approved. Commit your changes on {BRANCH} with a conventional message (no push, 
     [4], mirrored here).
 
 [2] Blocking question — run
-    `STATUS_DIR=.orchestration/status sh {SKILL}/scripts/ask-coordinator.sh {TASK} "<question>" [options-csv]`
+    `STATUS_DIR=.orchestration/status sh "{SKILL}/scripts/ask-coordinator.sh" {TASK} "<question>" [options-csv]`
     (writes one pending question record — `questions/{TASK}.json`; a second
     call overwrites it), then WAIT at the REPL: the coordinator's answer
     arrives as a new prompt via send-prompt.sh. Do not poll, do not proceed
@@ -153,7 +153,7 @@ one carrying its decision->page map entry, and no contradiction with
 `<scope_boundaries>`, `<dependencies>`, or `<definition_of_done>`. If it fails any of
 those, do NOT quietly rewrite it: report the specific gap as a failure and stop, so the
 coordinator re-plans on the planning model. Otherwise run
-`STATUS_DIR=.orchestration/status sh {SKILL}/scripts/status-update.sh {TASK} plan_ready worktree=$PWD`
+`STATUS_DIR=.orchestration/status sh "{SKILL}/scripts/status-update.sh" {TASK} plan_ready worktree=$PWD`
 and report exactly once:
 `orca orchestration send --type worker_done --subject "plan_ready: {TASK}" --body "<what the adopted plan decides, what remains>" --task-id {ORCA_TASK_ID} --dispatch-id {ORCA_DISPATCH_ID} --outcome succeeded --json`
 (no `--files-modified`: you adopted the coordinator's plan and wrote nothing.)
@@ -170,7 +170,7 @@ never edit past lines). Implement {ORCH_DIR}/plans/{TASK}.md via the loop-implem
 interface or made a load-bearing decision, APPEND one line with `printf '%s\n' '- [{TASK}]
 <fact>' >> {ORCH_DIR}/notes/decisions.md` (never Write/Edit — concurrent workers can drop
 each other's lines), and re-read the file before self-review. Then run
-`STATUS_DIR=.orchestration/status sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD`
+`STATUS_DIR=.orchestration/status sh "{SKILL}/scripts/status-update.sh" {TASK} impl_done worktree=$PWD`
 and report exactly once:
 `orca orchestration send --type worker_done --subject "impl_done: {TASK}" --body "<what changed, what remains>" --task-id {ORCA_TASK_ID} --dispatch-id {ORCA_DISPATCH_ID} --outcome succeeded --files-modified "<csv>" --json`
 (a failure is `--outcome failed`, never failure encoded only in prose).
@@ -185,7 +185,7 @@ Question with the concrete reason and leave it — either way, append `- **Answe
 file {ORCH_DIR}/reviews/{TASK}-r{N}.md; silence on any finding is not a
 valid resolution. This obligation binds blocking findings only — answering Non-blocking
 findings is encouraged, not required. Then run
-`STATUS_DIR=.orchestration/status sh {SKILL}/scripts/status-update.sh {TASK} impl_done worktree=$PWD`
+`STATUS_DIR=.orchestration/status sh "{SKILL}/scripts/status-update.sh" {TASK} impl_done worktree=$PWD`
 and report exactly once:
 `orca orchestration send --type worker_done --subject "impl_done: {TASK} r{N}" --body "<per-finding outcomes, e.g. F1 fixed, F2 stands: short reason>" --task-id {ORCA_TASK_ID} --dispatch-id {ORCA_DISPATCH_ID} --outcome succeeded --files-modified "<csv>" --json`
 (a failure is `--outcome failed`, never failure encoded only in prose). Then END YOUR TURN.
@@ -194,14 +194,14 @@ and report exactly once:
 
 Approved. Commit your changes on {BRANCH} with a conventional message (no push, no PR —
 the orchestrator merges into {INTEG} locally). Then run
-`STATUS_DIR=.orchestration/status sh {SKILL}/scripts/status-update.sh {TASK} done worktree=$PWD`
+`STATUS_DIR=.orchestration/status sh "{SKILL}/scripts/status-update.sh" {TASK} done worktree=$PWD`
 and report exactly once:
 `orca orchestration send --type worker_done --subject "done: {TASK}" --body "<the commit subject + what shipped>" --task-id {ORCA_TASK_ID} --dispatch-id {ORCA_DISPATCH_ID} --outcome succeeded --files-modified "<csv>" --json`
 (a failure is `--outcome failed`, never failure encoded only in prose). Then END YOUR TURN.
 
 ## Orca worker protocol — REQUIRED block, append to every §O prompt above
 
-[1] Status stays durable — keep calling `{SKILL}/scripts/status-update.sh` at every
+[1] Status stays durable — keep calling `"{SKILL}/scripts/status-update.sh"` at every
     phase, exactly as the tmux path does. The status files remain the re-entry state;
     the messages below sit on top of them, never instead of them.
 
