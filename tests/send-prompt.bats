@@ -1218,9 +1218,11 @@ tpl_sections_single_line() {
   # Bumped from 3052262382/7974 (t2-stash-prohibition, issue #166): rule [9]
   # added the git-stash prohibition — refs/stash is repository-global, so a
   # parallel worker's stash pop can take another worker's uncommitted work.
+  # Bumped from 2063842636/8186 (t2-skill-placeholder-quoting, issue #326): every
+  # {SKILL}/<path> word in the Orca span became its own double-quoted word.
   run sh -c "sed -n '/^\*\*Orca substrate\.\*\*/,/^## Subagent usage protocol/p' '$TPL' | cksum"
   [ "$status" -eq 0 ]
-  [ "$output" = "2063842636 8186" ]
+  [ "$output" = "1857087609 8196" ]
 }
 
 @test "template: both worker protocol blocks forbid git stash (issue #166)" {
