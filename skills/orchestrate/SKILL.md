@@ -126,10 +126,10 @@ transcript is this live session, since it is the only one being written during
 the run.
 
 ```sh
-. {SKILL}/scripts/transcript-dir.sh
+. "{SKILL}/scripts/transcript-dir.sh"
 if transcript_dir_derive "$(pwd -P)" && transcript_dir_resolve "$td_root" "$td_name" && [ -d "$td_dir" ]; then
   newest=$(ls -t "$td_dir"/*.jsonl | head -1)
-  sh {SKILL}/scripts/token-report.sh "$newest"
+  sh "{SKILL}/scripts/token-report.sh" "$newest"
 else
   echo "no transcript dir for $(pwd -P): ${td_err:-none or ambiguous}"
 fi
@@ -216,7 +216,7 @@ deny-net that still blocks dangerous commands in bypass mode and escalates
 DENIED. Handle this at onboarding, not at the first failure:
 
 1. **Probe once, read-only**, during Preflight:
-   `sh {SKILL}/scripts/install-permission-rules.sh --check` — exit 0 rules
+   `sh "{SKILL}/scripts/install-permission-rules.sh" --check` — exit 0 rules
    present (nothing to do), **4** absent, 3 the settings file is malformed
    (surface that to the user; fix before anything else).
 2. **On 4, ask the user — never install silently.** One question: "orchestrate's
@@ -228,7 +228,7 @@ DENIED. Handle this at onboarding, not at the first failure:
    without a fresh explicit yes is the supply-chain pattern guardrails exists
    to stop — and the fresh consent is also what lets the classifier pass the
    write at all.
-3. **On an explicit yes**, run `sh {SKILL}/scripts/install-permission-rules.sh`
+3. **On an explicit yes**, run `sh "{SKILL}/scripts/install-permission-rules.sh"`
    (idempotent; backs up, refuses a malformed target, atomic write). On no —
    or if the installer itself is classifier-blocked — fall back to showing the
    snippet for the user to paste themselves, then continue; the launch will
@@ -1479,7 +1479,7 @@ the same merge-verify-before-`worktree rm` rule applies to worktree removal
 archives `.orchestration/` and sweeps tmux-side leftovers regardless of
 substrate.
 
-After teardown, audit the run's token efficiency: `sh {SKILL}/scripts/token-report.sh
+After teardown, audit the run's token efficiency: `sh "{SKILL}/scripts/token-report.sh"
 --cwd <root> .` for the coordinator's own session, plus one more `--cwd
 <worktree>` per run worktree (each worker's transcripts live under its own
 cwd). Put the table and any `warn:` lines in the final run report — a
