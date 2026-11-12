@@ -15,7 +15,7 @@ sources:
   - https://github.com/schoero/eslint-plugin-better-tailwindcss/blob/main/docs/settings/settings.md — `entryPoint` for Tailwind v4
   - the local hallmark skill lists 58 slop gates in `slop-test.md`: gate 1 (Inter display font), gate 2 (purple-to-blue gradient; atmospheric allows radial background gradients, no genre allows gradient text), gate 7 (modern-minimal allows pure `#fff` paper), gates 10/11 (`transition-all`; uniform hover-scale across multiple unrelated elements), gate 30 (emoji as feature icon)
 last_verified: 2026-10-06
-related: [frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, frontend-design-design-system-lint-gate-for-agents, infrastructure-ci-cd-changed-files-only-gates, infrastructure-ci-cd-write-time-limit-guards]
+related: [frontend-design-anti-slop-visual-design, frontend-design-product-ui-vs-brand-surface, frontend-design-design-system-lint-gate-for-agents, infrastructure-ci-cd-changed-files-only-gates, infrastructure-ci-cd-write-time-limit-guards, frontend-design-rendered-ui-gate-for-agent-built-screens]
 ---
 
 # A Deterministic Gate for AI-Slop Tells
