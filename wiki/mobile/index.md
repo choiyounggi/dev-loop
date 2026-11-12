@@ -4,8 +4,10 @@ Route here for: app-side iOS/Android/cross-platform concerns — process lifecyc
 and state survival, offline storage and sync, network calls from the device,
 store releases/rollout/hotfix strategy, startup performance, deep-link/push
 entry routing, modal presentation (sheets/covers contending for one host),
-runtime permissions, sensitive data stored on the device, and in-composition
-UI state identity (a Compose map marker driven by changing state).
+runtime permissions, sensitive data stored on the device, in-composition
+UI state identity (a Compose map marker driven by changing state), and
+cross-platform stack choices (rewriting a client in Rust for startup/memory,
+adopting and driving Expo Exact).
 Server-side API patterns (idempotency storage, retry contracts, error bodies)
 stay in the backend domain (pages link there).
 
@@ -71,3 +73,11 @@ Match your situation to a "load when" line; load only matching pages.
 | Page | Load when |
 |------|-----------|
 | [sensitive-data-on-device](security/sensitive-data-on-device.md) | Storing tokens/credentials/PII in a mobile app; choosing storage APIs (prefs vs Keychain/Keystore vs encrypted store); reviewing what leaks via app-switcher screenshots, backups, clipboard, logs, keyboards, or WebViews |
+
+## cross-platform
+
+| Page | Load when |
+|------|-----------|
+| [rust-rewrite-for-startup-and-memory](cross-platform/rust-rewrite-for-startup-and-memory.md) | Deciding whether to rebuild a desktop or mobile client in Rust or on a Rust UI framework (GPUI, Expo Exact) to cut startup time or memory; the argument is a vendor figure (Discord's 290 MB, "smoother than SwiftUI"); splitting measured cost into embedded runtime vs launch work vs app data; sharing logic between desktop and mobile through a Rust core |
+| [adopting-expo-exact](cross-platform/adopting-expo-exact.md) | Choosing Expo Exact (Contract + Rust runtime) for a new app; checking its platform coverage (Android store packaging, Windows, production code updates); pinning the Exact checkout an app builds against; installing its toolchain; setting the feedback policy that sends notes to Expo before an agent runs |
+| [agent-build-and-verify-loop-in-expo-exact](cross-platform/agent-build-and-verify-loop-in-expo-exact.md) | A coding agent writes or tests an Exact app (`app.contract`, `app.ts`, `*.test.contract`); choosing the compile gate, `testId`s, the agent clock instead of sleeps, and `verify` as the done check; a drive is stale, flaky, dated 2026-01-01, taps by coordinates, or passes while the layout spills; two worktrees fight over one iOS simulator |

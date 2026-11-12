@@ -8,7 +8,7 @@ sources:
   - https://developer.android.com/topic/performance/vitals/launch-time
   - https://developer.apple.com/documentation/xcode/reducing-your-app-s-launch-time
 last_verified: 2026-07-10
-related: [mobile-release-staged-rollout-and-hotfix]
+related: [mobile-release-staged-rollout-and-hotfix, mobile-cross-platform-rust-rewrite-for-startup-and-memory]
 ---
 
 # App Cold-Start Time Budget
