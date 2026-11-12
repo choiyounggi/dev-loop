@@ -7,7 +7,7 @@ confidence: field-tested
 sources:
   - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Errors
   - https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html
-last_verified: 2026-07-10
+last_verified: 2026-11-04
 related: [debugging-signals-stack-traces, debugging-methodology-hypothesis-testing, backend-common-errors-diagnostics-from-a-shared-code-path, backend-java-kotlin-compiler-daemon-heap-pressure, infrastructure-agent-orchestration-gate-evidence-exit-code-class]
 ---
 
@@ -66,6 +66,7 @@ trace is attached, [debugging-signals-stack-traces] owns the trace reading.
 | A stack trace is attached to the error | Read the message per this page, read the trace per [debugging-signals-stack-traces] |
 | Location points into generated or vendored code | The suspect is the input your project feeds it (template, schema, config, call site) — find and open that input, not the generated line |
 | Build tool prints only a summary ("1 error", "task failed") | Re-run with the verbose/full-log flag and read the underlying tool's message; the summary is not the message |
+| The error names an internal lookup the tool makes while reporting another failure (`npx convex run` ending in `_system/cli/modules:apiSpec ... timed out`) | Treat the original failure as the error: the CLI asks for `apiSpec` only after "Could not find function", to list alternatives. Confirm the function exists in the deployed code, and compare the failing step across runs before calling it transient |
 
 ## Instead of
 
@@ -79,4 +80,5 @@ trace is attached, [debugging-signals-stack-traces] owns the trace reading.
 
 - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Errors — error name + message as the lookup key toward understanding and resolving an error
 - https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html — `-Wfatal-errors`: abort on the first error instead of printing further error messages
+- convex 1.46.0, dist/esm/cli/lib/run.js lines 52-56 — `apiSpec` is queried inside the `Could not find function` branch, so a failure there replaces the original message
 - Search strategy and multi-error triage: field-tested practice; no citable primary source
