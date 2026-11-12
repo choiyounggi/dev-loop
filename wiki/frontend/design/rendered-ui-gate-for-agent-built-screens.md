@@ -6,6 +6,8 @@ applies_to: [html, css, playwright, chrome]
 confidence: field-tested
 sources:
   - https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/hidden
+  - https://html.spec.whatwg.org/multipage/rendering.html
+  - https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Cascade/Specificity
   - https://www.w3.org/TR/WCAG22/#contrast-minimum
   - https://www.w3.org/TR/WCAG22/#reflow
   - https://www.w3.org/TR/WCAG22/#focus-visible
@@ -43,7 +45,7 @@ tells: [frontend-design-slop-detector-gate]; taste: [qa-process-blind-llm-judgme
 
 | Finding | Fix |
 |---------|-----|
-| `state: … visible while … exists` | A rule like `.empty { display: flex }` overrides the `hidden` attribute (MDN); add `[hidden] { display: none !important; }` or toggle a class |
+| `state: … visible while … exists` | A rule like `.empty { display: flex }` overrides the `hidden` attribute (MDN); add `[hidden] { display: none !important; }`, write `.empty:not([hidden])`, or toggle a class. A reset's `[hidden] { display: none }` without `!important` still loses: `[hidden]` and `.empty` are both 0-1-0, so the later rule wins |
 | `contrast r<4.5` (or `<3` for 24 px / 18.66 px bold) | Darken the text token, then rerun; WCAG 1.4.3 |
 | `horizontal scroll at 320px` | Find the widest element at 320 px (in the trial, a table) and reflow it into stacked rows, or scroll it inside its own container; WCAG 1.4.10 |
 | `no visible focus` | Add a `:focus-visible` outline of 2 px or more; WCAG 2.4.7 |
