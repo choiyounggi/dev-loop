@@ -14,7 +14,7 @@ sources:
   - https://developer.mozilla.org/en-US/docs/Web/CSS/font-variant-numeric
   - https://github.com/jakubkrehel/skills/blob/8b254eb75dadf3615a6abce87aed28e1b6e4d77c/skills/better-typography/SKILL.md
 last_verified: 2026-11-12
-related: [frontend-design-slop-detector-gate, frontend-design-responsive-layout, frontend-design-ui-hardening-against-real-content, qa-process-completion-claims, qa-process-blind-llm-judgment-of-a-visual-rule, testing-quality-checks-that-cannot-pass]
+related: [frontend-design-slop-detector-gate, frontend-design-responsive-layout, frontend-design-ui-hardening-against-real-content, qa-process-completion-claims, qa-process-blind-llm-judgment-of-a-visual-rule, testing-quality-checks-that-cannot-pass, frontend-design-polish-values-for-product-ui]
 ---
 
 # A Rendered Gate for a Screen an Agent Built or Redesigned
