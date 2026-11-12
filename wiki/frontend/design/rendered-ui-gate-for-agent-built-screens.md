@@ -21,23 +21,19 @@ related: [frontend-design-slop-detector-gate, frontend-design-responsive-layout,
 
 ## When this applies
 
-An agent built or redesigned a web screen (with a design skill such as hallmark, a
-`better-*` review skill, or none) and reports it done on its own checklist or a
-self-scored "58/58"; you need pass/fail evidence from the rendered page that each UI
-state shows only when it should and that contrast, reflow, focus, names, targets and
-input size meet their floors. Source-level tells belong to
-[frontend-design-slop-detector-gate]; taste stays with a blind review
-([qa-process-blind-llm-judgment-of-a-visual-rule]).
+An agent built or redesigned a web screen (hallmark, a `better-*` skill, or none)
+and reports done on its own checklist; you need rendered pass/fail evidence for UI
+state visibility, contrast, reflow, focus, names, targets and input size. Source
+tells: [frontend-design-slop-detector-gate]; taste: [qa-process-blind-llm-judgment-of-a-visual-rule].
 
 ## Do this
 
 1. Give the screen stable hooks before it is built: a `data-testid` on each state
    element (empty, error, toast, dialog) and on the rows that exclude it, and
    `data-live` on every number that changes in place (counters, timers, prices).
-2. Copy the script into the project's Playwright setup (`playwright` with its
-   Chromium), set `EXCLUSIVE` to the screen's state pairs, and run it against the dev
-   server: `bun ui-gate.mjs http://localhost:5173/settings` (or `node`). It checks
-   at 1280 px and 320 px and exits 1 on any finding.
+2. Copy the script into the project's Playwright setup, set `EXCLUSIVE` to the
+   screen's state pairs, and run `node ui-gate.mjs http://localhost:5173/settings`.
+   It checks at 1280 px and 320 px and exits 1 on any finding.
 3. Prove the gate first: run it on the screen as it was before the redesign (it must
    exit 1) and on one page you know is clean (it must exit 0), as
    [testing-quality-checks-that-cannot-pass] requires.
@@ -51,8 +47,8 @@ input size meet their floors. Source-level tells belong to
 | `contrast r<4.5` (or `<3` for 24 px / 18.66 px bold) | Darken the text token, then rerun; WCAG 1.4.3 |
 | `horizontal scroll at 320px` | Find the widest element at 320 px (in the trial, a table) and reflow it into stacked rows, or scroll it inside its own container; WCAG 1.4.10 |
 | `no visible focus` | Add a `:focus-visible` outline of 2 px or more; WCAG 2.4.7 |
-| `no accessible name` | Add a visible `<label>` for fields and `aria-label` for icon-only buttons; WCAG 4.1.2 |
-| `target WxH` | Make the control at least 24×24 CSS px; a link inside a sentence is exempt (WCAG 2.5.8) |
+| `no name with letters` | Add a visible `<label>` for fields and an `aria-label` for icon-only buttons. WCAG 4.1.2 needs a name; this gate also fails a glyph-only name (`✕`, `⚙`), which a screen reader reads as the symbol |
+| `target WxH` | Make the control at least 24×24 CSS px (WCAG 2.5.8); inline links are skipped |
 | `live number without tabular-nums` | Set `font-variant-numeric: tabular-nums` so ticking digits keep one width |
 | `form control text Npx < 16px` | Set 16 px or more: iOS Safari zooms the page when a focused field's text is smaller |
 
@@ -65,7 +61,7 @@ const url = process.argv[2]; const out = [];
 const browser = await chromium.launch();
 async function at(width, fn) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
-  await page.goto(url); await page.waitForLoadState('networkidle'); await fn(page); await page.close();
+  await page.goto(url, { waitUntil: 'load' }); await page.waitForTimeout(800); await fn(page); // never networkidle: a polling screen never idles await page.close();
 }
 await at(1280, async page => {
   out.push(...await page.evaluate(([ex, live]) => {
@@ -79,7 +75,9 @@ await at(1280, async page => {
       if (!shown(e) || ![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
       let bg = null; for (let a = e; a && !bg; a = a.parentElement) { const s = getComputedStyle(a); if (s.backgroundImage !== 'none') bg = 'img'; else if (rgba(s.backgroundColor)[3] >= 1) bg = rgba(s.backgroundColor); }
       if (bg === 'img') { f.push(`note: contrast unmeasured over a gradient/image: ${label(e)}`); continue; }
-      bg ||= [255, 255, 255, 1]; const s = getComputedStyle(e), fg = rgba(s.color), mix = fg.map((v, i) => i < 3 ? v * fg[3] + bg[i] * (1 - fg[3]) : 1);
+      bg ||= [255, 255, 255, 1]; const s = getComputedStyle(e), fg = rgba(s.color);
+      for (let a = e; a; a = a.parentElement) fg[3] *= +getComputedStyle(a).opacity; // faded ancestors fade the text
+      const mix = fg.map((v, i) => i < 3 ? v * fg[3] + bg[i] * (1 - fg[3]) : 1);
       const [hi, lo] = [lum(mix), lum(bg)].sort((a, b) => b - a), ratio = (hi + 0.05) / (lo + 0.05), px = parseFloat(s.fontSize);
       const need = px >= 24 || (+s.fontWeight >= 700 && px >= 18.66) ? 3 : 4.5;
       if (ratio < need) f.push(`contrast ${ratio.toFixed(2)}<${need}: ${label(e)}`);
@@ -88,8 +86,8 @@ await at(1280, async page => {
       if (!shown(e)) continue; const r = e.getBoundingClientRect();
       const ids = (e.getAttribute('aria-labelledby') || '').split(/\s+/).map(i => document.getElementById(i)?.textContent || '');
       const name = [e.getAttribute('aria-label'), ...ids, ...[...(e.labels || [])].map(l => l.textContent), /^(INPUT|SELECT|TEXTAREA)$/.test(e.tagName) ? '' : e.textContent, e.title].join(' ');
-      if (!/\p{L}/u.test(name)) f.push(`no accessible name: ${label(e)}`);
-      if ((r.width < 24 || r.height < 24) && !(e.tagName === 'A' && e.closest('p'))) f.push(`target ${Math.round(r.width)}x${Math.round(r.height)}: ${label(e)}`);
+      if (!/\p{L}/u.test(name)) f.push(`no name with letters: ${label(e)}`);
+      if ((r.width < 24 || r.height < 24) && !(e.tagName === 'A' && getComputedStyle(e).display === 'inline')) f.push(`target ${Math.round(r.width)}x${Math.round(r.height)}: ${label(e)}`);
     }
     for (const e of document.querySelectorAll(live)) if (!/tabular-nums/.test(getComputedStyle(e).fontVariantNumeric)) f.push(`live number without tabular-nums: ${label(e)}`);
     return f;
@@ -103,7 +101,7 @@ await at(1280, async page => {
 await at(320, async page => {
   const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   if (over > 0) out.push(`horizontal scroll at 320px: ${over}px`);
-  for (const px of await page.$$eval('input, select, textarea', es => es.map(e => parseFloat(getComputedStyle(e).fontSize)))) if (px < 16) out.push(`form control text ${px}px < 16px`);
+  for (const px of await page.$$eval('input, select, textarea', es => es.filter(e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden').map(e => parseFloat(getComputedStyle(e).fontSize)))) if (px < 16) out.push(`form control text ${px}px < 16px`);
 });
 await browser.close();
 const all = [...new Set(out)], findings = all.filter(x => !x.startsWith('note:')); all.forEach(x => console.log(x));
@@ -115,17 +113,18 @@ console.log(`findings: ${findings.length}`); process.exit(findings.length ? 1 : 
 | Case | Then |
 |------|------|
 | Text sits on a gradient or an image | The script prints a `note:` instead of a finding; check that text by eye or sample pixels from a screenshot |
-| The success path waits on a simulated request (a spinner for 350 ms) | Wait for the resulting row or toast, never a fixed 200 ms; a short fixed wait reported a working invite as broken in the trial |
+| The success path waits on a simulated request (a 350 ms spinner) | Wait for the resulting row or toast; a fixed 200 ms wait reported a working invite as broken in the trial |
 | The redesign swapped `window.confirm` for its own dialog | Drive the dialog's confirm button by its test id; a `dialog` handler alone sees nothing |
 | Prose line length is checked with a `ch` cap | `max-width: 65ch` measures about 90 real characters of prose in a proportional face; state which unit a rule uses before failing a page on it |
-| A visually hidden screen-reader span (1×1 px, clipped) | Skipped: the script ignores elements 1 px or smaller |
+| A small control meets 2.5.8 through its Spacing exception (a 24 px circle around it touches no other target) | The gate still reports it; measure the spacing in the screenshot and record the waiver |
+| The page polls (`setInterval` + `fetch`) | Expected: the script waits for `load` plus 800 ms, because `networkidle` never arrives on a polling page and timed out after 30 s in review |
 
 ## Sources
 
 - MDN `hidden`: "changing the value of the CSS `display` property on a hidden element
-  will override the hidden state"; MDN `font-variant-numeric` (`tabular-nums`).
-- WCAG 2.2: 1.4.3 Contrast (Minimum), 1.4.10 Reflow (320 CSS px), 2.4.7 Focus Visible,
-  2.5.8 Target Size (Minimum) with its inline exception, 4.1.2 Name, Role, Value.
+  will override the hidden state"; MDN `font-variant-numeric`.
+- WCAG 2.2: 1.4.3, 1.4.10 (320 CSS px), 2.4.7, 2.5.8 (with its Spacing and Inline
+  exceptions), 4.1.2. Ancestor `opacity` is folded into the text alpha, an approximation.
 - jakubkrehel/skills `better-typography` at 8b254eb: "iOS Safari zooms the whole page
   when an input's text is smaller than `16px`."
 - Trial, 2026-11-12: one screen with 13 planted defects, redesigned three ways (the
