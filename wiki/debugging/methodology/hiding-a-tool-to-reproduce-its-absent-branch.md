@@ -8,7 +8,7 @@ sources:
   - https://docs.python.org/3/library/shutil.html#shutil.which
   - https://cmake.org/cmake/help/latest/command/find_program.html
 last_verified: 2026-10-02
-related: [debugging-methodology-reproduce-first, platforms-environment-path-resolution, platforms-toolchains-compiler-sysroot-on-macos, testing-quality-tests-that-cannot-fail]
+related: [debugging-methodology-reproduce-first, platforms-environment-path-resolution, platforms-toolchains-compiler-sysroot-on-macos, testing-quality-tests-that-cannot-fail, testing-quality-tests-gated-on-an-external-validator]
 ---
 
 # Hiding an Installed Tool to Reproduce Its "Tool Absent" Branch
